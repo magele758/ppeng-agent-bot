@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('对话列边缘和正文留白 [AC:chat-column#AC-1] [AC:chat-column#AC-2]', async ({ page }) => {
+test('对话列边缘和正文留白 [AC:chat-column#AC-1] [AC:chat-column#AC-2] [AC:chat-column#AC-3]', async ({ page }) => {
   await page.goto('/');
   await page.locator('.lab-shell').first().waitFor();
   const fixture = page.locator('#column-fixture');
@@ -10,7 +10,7 @@ test('对话列边缘和正文留白 [AC:chat-column#AC-1] [AC:chat-column#AC-2]
     sample.className = 'lab-shell';
     sample.innerHTML = `<div class="chat-panel-body">
       <div class="chat-feed-shell"><div class="chat-feed"><div class="chat-feed__track">
-        <div class="chat-bubble__body chat-bubble__md"><p>正文 <code>example.ts</code></p><p>下一段</p></div>
+        <div class="chat-turn chat-turn--assistant"><div class="chat-turn__content"><div class="chat-bubble"><div class="chat-bubble__body chat-bubble__md"><p>${"中英文混排的长段落。".repeat(60)} <code>example.ts</code></p><p>下一段</p></div></div></div></div>
       </div></div></div>
       <div class="chat-composer-outer"><div class="session-recap-bar"><div class="session-recap">摘要</div></div>
         <div class="chat-composer"></div></div></div>`;
@@ -19,7 +19,7 @@ test('对话列边缘和正文留白 [AC:chat-column#AC-1] [AC:chat-column#AC-2]
   });
   for (const width of [960, 480, 320]) {
     await fixture.evaluate((node, width) => { node.style.width = width + 'px'; }, width);
-    const edges = await fixture.locator('.chat-feed__track,.session-recap,.chat-composer').evaluateAll(nodes =>
+    const edges = await fixture.locator('.chat-bubble__md > p:first-child,.session-recap,.chat-composer').evaluateAll(nodes =>
       nodes.map(node => [node.getBoundingClientRect().left, node.getBoundingClientRect().right]));
     expect(edges).toEqual([edges[0], edges[0], edges[0]]);
   }
