@@ -1,0 +1,15 @@
+id: chat-column
+title: 对话区对齐与阅读留白
+status: implemented
+requirement: |
+  这个跟上面对话的边要对齐，下面的对话框也要对齐，现在对话的内容，还是比较密集，黑白色混一起，看起来对话框的内容感觉很脏的视觉效果，这几个问题再优化下
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 对话底部有摘要和输入框
+    when: 对话栏变宽或变窄
+    then: 三者左右边缘保持对齐
+  - id: AC-2
+    given: 回复包含多段正文和行内代码
+    when: 阅读这条回复
+    then: 正文有宽松的行距和段距，行内代码没有成片的底色和边框
