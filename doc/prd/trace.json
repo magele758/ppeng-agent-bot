@@ -3015,6 +3015,13 @@
       ]
     },
     {
+      "id": "pm2-service",
+      "title": "用 PM2 启动并管理服务",
+      "tests": [
+        "scripts/test/pm2-service.test.mjs"
+      ]
+    },
+    {
       "id": "pnpm-migration",
       "title": "全仓库迁移至 pnpm 并完成回归",
       "tests": [

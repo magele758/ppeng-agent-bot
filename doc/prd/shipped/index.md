@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 362 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 363 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -654,6 +654,12 @@
 - `play-group-delete-menu` 群聊行的删除收进悬停图标菜单
 - `play-rail-default-closed` 对话页右侧栏默认关闭
 - `play-sidebar-collapse` 对话页会话列表可收起
+
+## pm2（1）
+
+需求正文见 [other](other.md)。
+
+- `pm2-service` 用 PM2 启动并管理服务
 
 ## pnpm（1）
 
