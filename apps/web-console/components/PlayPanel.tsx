@@ -1214,11 +1214,10 @@ export function PlayPanel({
   );
 
   const renderChatHeader = () => (
-            <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}${mobileBotBarOpen ? ' is-mobile-open' : ''}`}>
+            <header className={`chat-panel-header chat-panel-header--floating${headerBotName ? ' chat-panel-header--bot' : ''}${mobileBotBarOpen ? ' is-mobile-open' : ''}`}>
       <div className="chat-panel-header__text">
         {renderTitleRow()}
-        {!headerBotId && renderHeaderDetails()}
-        {mobileBotBarOpen && headerBotId && <div className="mobile-bot-secondary">{renderHeaderDetails()}<BotPermissionsLink botId={headerBotId} botName={headerTitle} /></div>}
+        {mobileBotBarOpen && <div className="mobile-bot-secondary">{renderHeaderDetails()}{headerBotId && <BotPermissionsLink botId={headerBotId} botName={headerTitle} />}</div>}
       </div>
       {renderHeaderActions()}
     </header>
@@ -1325,9 +1324,9 @@ export function PlayPanel({
                         togglePlayRail();
                         setMoreMenuOpen(false);
                       }}><WorkspaceIcon kind="panel" />{t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')}</button>
-                      {headerBotId && !mobileBotBarOpen && <details className="bot-header-secondary"><summary>{t('play.rowMenu.advanced')}</summary>
+                      {!mobileBotBarOpen && <details className="bot-header-secondary"><summary>{t('play.rowMenu.advanced')}</summary>
                         {renderHeaderDetails()}
-                        <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />
+                        {headerBotId && <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />}
                       </details>}
                       <SessionBriefToggle compact />
                       <label

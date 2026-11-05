@@ -1,0 +1,15 @@
+id: shared-chat-header
+title: 会话和群聊统一浮动顶部
+status: implemented
+requirement: |
+  群聊和普通会话的顶部也按这个方式统一一下，重复的按钮都收一收，保持整个 UI 一致
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 打开普通会话
+    when: 查看顶部和更多菜单
+    then: 标题和更多入口使用浮层，信息栏开关与会话信息收进菜单，无顶部停止或重新运行按钮
+  - id: AC-2
+    given: 打开群聊
+    when: 查看顶部和打开更多菜单
+    then: 顶部与 Bot 对话使用同样的浮层样式，群聊设置与模型设置收进菜单且仍可使用

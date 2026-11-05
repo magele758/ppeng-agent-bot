@@ -274,8 +274,8 @@ html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell
 }
 
 /* Floating chat identity and compact actions sit above the transcript. */
-.lab-shell .play-main.chat-panel:has(> .chat-panel-header--bot) { position: relative; }
-.lab-shell .play-main.chat-panel > .chat-panel-header--bot {
+.lab-shell .play-main.chat-panel:has(> .chat-panel-header--floating) { position: relative; }
+.lab-shell .play-main.chat-panel > .chat-panel-header--floating {
   position: absolute;
   inset: 10px 12px auto;
   z-index: 30;
@@ -288,16 +288,16 @@ html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell
   backdrop-filter: none;
   pointer-events: none;
 }
-.lab-shell .chat-panel-header--bot .chat-panel-header__text {
+.lab-shell .chat-panel-header--floating .chat-panel-header__text {
   flex: 0 1 auto;
-  max-width: calc(100% - 108px);
+  max-width: calc(100% - 64px);
   padding: 5px 12px 5px 6px;
   border-radius: 24px;
   background: var(--ui-surface);
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
   pointer-events: auto;
 }
-.lab-shell .chat-panel-header--bot .chat-panel-header__actions {
+.lab-shell .chat-panel-header--floating .chat-panel-header__actions {
   display: flex;
   position: absolute;
   top: 0;
@@ -311,8 +311,8 @@ html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
   pointer-events: auto;
 }
-.lab-shell .chat-panel-header--bot .chat-panel-header__face { width: 32px; height: 32px; }
-.lab-shell .play-main:has(> .chat-panel-header--bot) .chat-feed { padding-top: 76px; scroll-padding-top: 76px; }
+.lab-shell .chat-panel-header--floating .chat-panel-header__face { width: 32px; height: 32px; }
+.lab-shell .play-main:has(> .chat-panel-header--floating) .chat-feed { padding-top: 76px; scroll-padding-top: 76px; }
 .lab-shell .play-main.chat-panel .session-recap {
   padding: 4px 0;
   border: 0;
@@ -329,13 +329,20 @@ html[data-theme="light"] .lab-shell .list-item.list-item--session {
   border-radius: 0;
   box-shadow: none;
 }
-.lab-shell .play-main:has(> .chat-panel-header--bot) .chat-panel-body:has(.goal-status-card) { padding-top: 64px; }
+.lab-shell .play-main:has(> .chat-panel-header--floating) .chat-panel-body:has(.goal-status-card) { padding-top: 64px; }
 @media (max-width: 760px) {
-  .lab-shell .play-main.chat-panel > .chat-panel-header--bot.is-mobile-open {
+  .lab-shell .play-main.chat-panel > .chat-panel-header--floating.is-mobile-open {
     position: relative;
     inset: auto;
     margin: 10px 12px;
     flex-shrink: 0;
   }
-  .lab-shell .play-main:has(> .chat-panel-header--bot.is-mobile-open) .chat-panel-body { padding-top: 0; }
+  .lab-shell .play-main:has(> .chat-panel-header--floating.is-mobile-open) .chat-panel-body { padding-top: 0; }
 }
+
+.lab-shell .chat-panel-header--floating .chat-panel-title { padding: 5px 6px; }
+.lab-shell .play-group-context { flex: 0 1 auto; min-height: 0; overflow: auto; }
+.lab-shell .play-group-context:not(:empty) { padding-top: 64px; }
+.lab-shell .play-group-context:empty { display: none; }
+.lab-shell .chat-panel-header.chat-panel-header--floating:not(.is-mobile-open) .chat-panel-header__actions { display: flex; }
+.lab-shell .chat-panel-header--floating .chat-panel-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

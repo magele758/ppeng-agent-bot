@@ -82,6 +82,7 @@ test('a room explicitly saves its own shared facts and reloads them [AC:bot-func
   });
   await mockRoom(page);
   await page.getByTestId('play-group-row').filter({ hasText: 'Deletion test room' }).click();
+  await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
   await page.getByRole('button', { name: '群聊设置', exact: true }).click();
   const editor = page.getByTestId('room-shared-context');
   await editor.locator('summary').click();
@@ -93,6 +94,7 @@ test('a room explicitly saves its own shared facts and reloads them [AC:bot-func
   expect(entries).toEqual({ deployment: 'room-specific target' });
   await page.reload();
   await page.getByTestId('play-group-row').filter({ hasText: 'Deletion test room' }).click();
+  await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
   await page.getByRole('button', { name: '群聊设置', exact: true }).click();
   await editor.locator('summary').click();
   await expect(editor.getByTestId('room-shared-value')).toHaveValue('room-specific target');

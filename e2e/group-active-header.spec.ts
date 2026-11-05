@@ -34,6 +34,7 @@ for (const size of [3, 7]) {
     await expect(strip).toHaveCount(0);
     active = ['member1'];
     await expect(strip.locator('.play-group-working__name')).toHaveText('Member 1');
+    await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
     await panel.getByRole('button', { name: '群聊设置', exact: true }).click();
     const settings = panel.getByTestId('room-settings');
     const members = settings.locator('.play-group-settings-members');
@@ -67,6 +68,7 @@ for (const size of [3, 7]) {
       await expect(settings.getByRole('button', { name: '把 Member 0 移出群聊', exact: true })).toHaveCount(0);
       await expect(settings.getByRole('button', { name: '把 Member 1 移出群聊', exact: true })).toBeDisabled();
     }
+    await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
     await panel.getByRole('button', { name: '群聊设置', exact: true }).click();
     await expect(settings).toHaveCount(0);
     await expect(strip.locator('.play-group-working__name')).toHaveText('Member 1');

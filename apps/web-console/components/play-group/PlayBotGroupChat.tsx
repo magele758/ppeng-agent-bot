@@ -19,6 +19,7 @@ import {
 } from '@/lib/bot-group';
 import { stripVisibleClockMarks } from '@/lib/visible-clock';
 import { MarkdownHtml } from '../MarkdownHtml';
+import { RowActionMenu } from '../RowActionMenu';
 import { BotFace } from '../BotFace';
 import { useBotWorkStates } from '../bot-work/BotWorkState';
 import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
@@ -520,15 +521,18 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
 
   return (
     <div className="play-main chat-panel" data-testid="play-group-chat">
-      <header className="chat-panel-header">
+      <header className="chat-panel-header chat-panel-header--floating">
         <div className="chat-panel-header__text">
           <h2 className="chat-panel-title">{room?.title ?? t('play.group.badge')}</h2>
         </div>
-        <div className="play-group-header-actions">
+        <div className="chat-panel-header__actions play-toolbar">
+          <RowActionMenu label={t('play.header.more')}>
           <a className="btn btn-ghost btn-sm" href="#/settings/models" data-testid="room-default-model">{t('play.groupModel.settings')}</a>
           <button type="button" className="btn btn-ghost btn-sm" aria-expanded={showSettings} onClick={() => setShowSettings(value => !value)}>{t('play.groupSettings.title')}</button>
+          </RowActionMenu>
         </div>
       </header>
+      <div className="play-group-context">
       <RoomGoalBar
         goal={goal}
         busy={goalBusy}
@@ -572,6 +576,7 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
       {!showSettings && error ? <p className="play-group-error">{error}</p> : null}
       <RoomReplyFailure turn={turns.at(-1)} />
       <RoomCollaborationHistory turns={turns} names={new Map(bots.map(bot => [bot.id, bot.name]))} />
+      </div>
       <div className="chat-panel-body">
         <div className="chat-feed-shell">
           <div className="chat-feed" role="log" ref={feedRef} aria-label={t('play.group.transcript')}>

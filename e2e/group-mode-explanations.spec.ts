@@ -10,6 +10,7 @@ test('mode and budget guidance explains actual behavior without saving [AC:group
   await page.route('**/api/bot-rooms/mode-guide/turns', r => r.fulfill({ json: { turns: [] } }));
   await page.goto('/#/bot');
   await page.getByRole('button', { name: '打开群聊 Mode guide', exact: true }).click();
+  await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
   await page.getByRole('button', { name: '群聊设置', exact: true }).click();
   const settings = page.getByTestId('room-settings');
   await settings.getByText('详细流程与适用场景', { exact: true }).click();
