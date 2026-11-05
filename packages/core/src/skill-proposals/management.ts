@@ -150,17 +150,12 @@ async function adoptPendingOperation(
   requestKey: string | undefined,
   input: SkillManagementInput,
 ): Promise<boolean> {
-  if (
-    previous.status !== "pending" ||
-    !requestKey ||
-    previous.requestKey === requestKey
-  )
-    return false;
+  if (previous.status !== "pending") return false;
   const allowed = await deps.authorize(session, {
     ...input,
     name: previous.name,
   });
-  return !!allowed && requestKey === deps.requestKey?.(session);
+  return requestStillCurrent(!!allowed, requestKey, deps.requestKey?.(session));
 }
 
 function savedCaptureFor(deps: Deps, row: SkillOperation) {

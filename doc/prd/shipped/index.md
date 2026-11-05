@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 363 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 364 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -864,7 +864,7 @@
 
 - `single-host-bot-completion` 单机 Bot 工作收尾与默认入口
 
-## skill（7）
+## skill（8）
 
 需求正文见 [skill](skill.md)。
 
@@ -874,6 +874,7 @@
 - `skill-manifest-boundary` 技能能力边界
 - `skill-operation-card-dismissal` 技能管理结果可收起关闭且不干扰对话
 - `skill-operation-confirm-bar` 技能操作确认后收成可关闭的小横条
+- `skill-pending-retry` 技能待确认请求重新授权
 - `skill-proposals` 技能提案审批
 
 ## skin（1）

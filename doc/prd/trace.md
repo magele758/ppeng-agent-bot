@@ -3113,6 +3113,12 @@ Secure Form fill-from-Vault
 - `apps/web-console/components/skill-operation-card-model.test.ts`
 - `e2e/skill-operation-confirm-bar.spec.ts`
 
+### skill-pending-retry
+
+技能待确认请求重新授权
+
+- `packages/core/test/agent-skill-management.test.js`
+
 ### skill-proposals
 
 技能提案审批

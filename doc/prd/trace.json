@@ -3530,6 +3530,13 @@
       ]
     },
     {
+      "id": "skill-pending-retry",
+      "title": "技能待确认请求重新授权",
+      "tests": [
+        "packages/core/test/agent-skill-management.test.js"
+      ]
+    },
+    {
       "id": "skill-proposals",
       "title": "技能提案审批",
       "tests": [
