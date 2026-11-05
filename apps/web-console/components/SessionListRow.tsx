@@ -68,7 +68,7 @@ export function SessionListRow({
   onDelete,
   deleteAria,
   deleteLabel,
-  confirmLabel
+  confirmLabel, rowActions
 }: {
   session: SessionSummary;
   bots: readonly BotInfo[];
@@ -77,6 +77,7 @@ export function SessionListRow({
   checked: boolean;
   selectMode: boolean;
   deleting: boolean;
+  rowActions?: ReactNode;
   status: ReactNode;
   onOpen: () => void;
   onToggleChecked: (checked: boolean) => void;
@@ -142,6 +143,7 @@ export function SessionListRow({
           <SessionRowSubtitle bot={view.bot} subtitle={view.subtitle} hasQuestion={view.hasQuestion} agentId={session.agentId} owner={view.owner} />
         </div>
       </div>
+      {rowActions}
       <SessionRowDeleteGate title={view.title} deleting={deleting} selectMode={selectMode} confirm={confirm} onDelete={onDelete}
         deleteAria={deleteAria} deleteLabel={deleteLabel} confirmLabel={confirmLabel} />
     </div>

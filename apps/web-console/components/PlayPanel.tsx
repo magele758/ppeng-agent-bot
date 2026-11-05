@@ -74,6 +74,7 @@ import { usePlayComposerHint } from './usePlayComposerHint';
 import { useSessionRecap } from './useSessionRecap';
 import { SessionRecapBar } from './SessionRecapBar';
 import type { BotFirstTaskConversation } from '@/lib/bot-first-task';
+import { BotRowMenu } from './BotRowMenu';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { BotPinArea } from './BotPinArea';
 import { BotPermissionsLink, BotDetailPane, BotDetailToggle, botDetailIsVisible, botDetailMainClass } from './BotDetailMenu';
@@ -990,7 +991,9 @@ export function PlayPanel({
     } finally { setDeleting(false); }
   };
   const removalProps = (s: SessionSummary, rowBot: BotInfo | undefined) => {
-    if (rowBot) return { deleteAria: t('play.entry.removeBot', { name: rowBot.name }), deleteLabel: t('play.entry.remove'), confirmLabel: t('play.entry.confirmRemove'), onDelete: () => { void removeBot(rowBot); } };
+    if (rowBot) return { rowActions: <BotRowMenu bot={rowBot} details={() => {
+      setOpenGroupId(null); setMobileSessionsOpen(false); onSelectSession(s.id); setBotDetailOpen(true);
+    }} remove={() => void removeBot(rowBot)} />, deleteAria: t('play.entry.removeBot', { name: rowBot.name }), deleteLabel: t('play.entry.remove'), confirmLabel: t('play.entry.confirmRemove'), onDelete: () => { void removeBot(rowBot); } };
     if (!onDeleteSessions) return {};
     return { onDelete: (title: string) => { void confirmDelete([s.id], t('play.sidebar.deleteConfirmOne', { title })); } };
   };
@@ -1161,6 +1164,9 @@ export function PlayPanel({
                 sessions={sessions}
                 rooms={sidebarRooms}
                 selectedRoomId={openGroupId}
+                renderFallbackActions={bot => <BotRowMenu bot={bot} remove={() => void removeBot(bot)} details={() => {
+                  setOpenGroupId(null); setMobileSessionsOpen(false); void chat.selectBot(bot.id); setBotDetailOpen(true);
+                }} />}
                 renderSession={renderSession}
                 onOpenSession={(sessionId) => {
                   setOpenGroupId(null);
@@ -1212,7 +1218,8 @@ export function PlayPanel({
             <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}${mobileBotBarOpen ? ' is-mobile-open' : ''}`}>
       <div className="chat-panel-header__text">
         {renderTitleRow()}
-        {renderHeaderDetails()}
+        {!headerBotId && renderHeaderDetails()}
+        {mobileBotBarOpen && headerBotId && <div className="mobile-bot-secondary">{renderHeaderDetails()}<BotPermissionsLink botId={headerBotId} botName={headerTitle} /></div>}
       </div>
       {renderHeaderActions()}
     </header>
@@ -1231,7 +1238,7 @@ export function PlayPanel({
                     />
                   ) : null}
                   <h2 className="chat-panel-title" id="playTitle">
-                    {headerTitle}
+                    {headerBotId ? <BotDetailToggle botId={headerBotId} name={headerTitle} open={botDetailOpen} onToggle={() => setBotDetailOpen(open => !open)} /> : headerTitle}
                   </h2>
                   <button
                     type="button"
@@ -1243,8 +1250,6 @@ export function PlayPanel({
                   >
                     {t(mobileBotBarOpen ? 'mobile.botBarCollapse' : 'mobile.botBarExpand')}
                   </button>
-                  <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />
-                  <BotDetailToggle botId={headerBotId} open={botDetailOpen} onToggle={() => setBotDetailOpen(open => !open)} />
                 </div>
   );
 
@@ -1332,6 +1337,10 @@ export function PlayPanel({
                   </button>
                   {moreMenuOpen ? (
                     <div className="more-menu__pop" role="menu">
+                      {headerBotId && !mobileBotBarOpen && <details className="bot-header-secondary"><summary>{t('play.rowMenu.advanced')}</summary>
+                        {renderHeaderDetails()}
+                        <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />
+                      </details>}
                       <SessionBriefToggle compact />
                       <label
                         className="toggle toggle--compact more-menu__item"

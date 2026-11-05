@@ -110,6 +110,7 @@ export const play = {
     saveFailed: 'Reply mode was not saved',
     saved: 'Saved',
   },
+  rowMenu: { advanced: 'Advanced settings and usage', label: 'More actions for {name}', details: 'View details', cron: 'View scheduled tasks', group: 'Join a group', room: 'Join a group chat', remove: 'Remove from list', empty: 'No available destinations' },
   entry: { new: 'New', remove: 'Remove', confirmRemove: 'Confirm remove', removeBot: 'Remove Bot “{name}”', removeBotConfirm: 'Remove Bot “{name}”? It will be hidden from the Bot list. Existing conversations, group chats and tasks are kept; this does not delete conversations.', removeFailed: 'Removal failed: {error}' },
   groupModel: {
     settings: "Default model",

@@ -360,9 +360,10 @@ export function botDetailIsVisible(open: boolean, botId: string, groupId: string
 export function botDetailMainClass(visible: boolean): string {
   return `play-main-col${visible ? ' is-bot-detail-open' : ''}`;
 }
-export function BotDetailToggle({ botId, open, onToggle }: { botId: string; open: boolean; onToggle: () => void }) {
+export function BotDetailToggle({ botId, open, onToggle, name }: { name?: string; botId: string; open: boolean; onToggle: () => void }) {
   const { t } = useI18n();
   if (!botId) return null;
+  if (name) return <button type="button" className="bot-title-button" data-testid="bot-detail-toggle" aria-expanded={open} aria-controls="bot-detail-panel" onClick={onToggle}>{name}</button>;
   return <button type="button" className="chat-panel-header__detail" data-testid="bot-detail-toggle" aria-expanded={open} aria-controls="bot-detail-panel" onClick={onToggle}>
     {open ? t('play.botDetail.close') : t('play.botDetail.open')}
   </button>;
