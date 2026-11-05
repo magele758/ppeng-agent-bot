@@ -389,7 +389,7 @@ async function replSession(rest: string[]): Promise<void> {
     for (;;) {
       const line = (await rl.question('> ')).trim();
       if (!line) continue;
-      if (line === 'quit' || line === 'exit') break;
+      if (['quit', 'exit'].includes(line)) break;
       await sendReplMessage(sessionId, line, noStream);
     }
   } finally {
