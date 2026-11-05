@@ -237,3 +237,38 @@ html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .chat-pane
     border-color: #999;
   }
 }
+
+html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell {
+  & .list-item.list-item--session {
+    border: 1px solid transparent;
+    border-radius: 12px;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  & .list-item.list-item--session:hover {
+    background: #f7f8f7;
+  }
+
+  & .list-item.list-item--session:is(.selected, .is-checked) {
+    background: #f0f3f1;
+    border-color: #dce3de;
+  }
+
+  & .play-group-composer textarea {
+    flex: 0 0 100%;
+    box-sizing: border-box;
+    border: 0;
+    background: transparent;
+    padding: 4px;
+  }
+
+  & .play-group-composer button[type="submit"] {
+    margin-inline-start: auto;
+    border-radius: 16px;
+  }
+
+  & .play-group-composer-outer {
+    min-height: 0;
+  }
+}

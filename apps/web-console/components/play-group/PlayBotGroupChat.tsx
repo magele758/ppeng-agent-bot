@@ -621,8 +621,9 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
             </div>
           </div>
         </div>
+        <div className="chat-composer-outer play-group-composer-outer">
         <form
-          className={composerClassName('play-group-composer')}
+          className={composerClassName('chat-composer play-group-composer')}
           data-testid="composer-drop-target"
           data-surface="group"
           onDragOver={ignoreComposerDrop}
@@ -704,6 +705,7 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
             {busy ? t('play.group.sending') : t('play.group.send')}
           </button>
         </form>
+        </div>
         <ComposerNotice text={contextNotice} />
         {room && room.status !== 'active' ? <p className="play-group-hint">{t('play.group.paused')}</p> : null}
       </div>
