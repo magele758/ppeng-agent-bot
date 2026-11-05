@@ -1,0 +1,12 @@
+id: sidebar-unified-menu
+title: 统一群聊和分组菜单
+status: implemented
+requirement: |
+  群聊的也按bot的加一个菜单，用类似的菜单
+  这个列表里很多功能都是重复的，看看哪些可以聚合，哪些可以放到一个统一入口，哪些可以放到更深的菜单里，让这个列表更清爽
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 群聊和功能分组显示在侧栏
+    when: 浏览列表并点击更多操作
+    then: 群聊打开和删除操作、分组改名和删除操作收进各自菜单，置顶拖动说明不常驻占行

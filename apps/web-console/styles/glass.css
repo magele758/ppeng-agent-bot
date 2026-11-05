@@ -240,8 +240,8 @@ html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .chat-pane
 
 html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell {
   & .list-item.list-item--session {
-    border: 1px solid transparent;
-    border-radius: 12px;
+    border: 0;
+    border-radius: 0;
     box-shadow: none;
     background: transparent;
   }
@@ -271,4 +271,71 @@ html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell
   & .play-group-composer-outer {
     min-height: 0;
   }
+}
+
+/* Floating chat identity and compact actions sit above the transcript. */
+.lab-shell .play-main.chat-panel:has(> .chat-panel-header--bot) { position: relative; }
+.lab-shell .play-main.chat-panel > .chat-panel-header--bot {
+  position: absolute;
+  inset: 10px 12px auto;
+  z-index: 30;
+  padding: 0;
+  min-height: 0;
+  height: auto;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+.lab-shell .chat-panel-header--bot .chat-panel-header__text {
+  flex: 0 1 auto;
+  max-width: calc(100% - 108px);
+  padding: 5px 12px 5px 6px;
+  border-radius: 24px;
+  background: var(--ui-surface);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+  pointer-events: auto;
+}
+.lab-shell .chat-panel-header--bot .chat-panel-header__actions {
+  display: flex;
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
+  transform: none;
+  gap: 2px;
+  width: auto;
+  padding: 4px;
+  border-radius: 24px;
+  background: var(--ui-surface);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.08);
+  pointer-events: auto;
+}
+.lab-shell .chat-panel-header--bot .chat-panel-header__face { width: 32px; height: 32px; }
+.lab-shell .play-main:has(> .chat-panel-header--bot) .chat-feed { padding-top: 76px; scroll-padding-top: 76px; }
+.lab-shell .play-main.chat-panel .session-recap {
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  color: var(--ui-text-muted);
+}
+.lab-shell .session-recap__text { font-size: 12px; line-height: 1.5; }
+.lab-shell .list-item.list-item--session,
+html[data-theme="light"] .lab-shell .list-item.list-item--session {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.lab-shell .play-main:has(> .chat-panel-header--bot) .chat-panel-body:has(.goal-status-card) { padding-top: 64px; }
+@media (max-width: 760px) {
+  .lab-shell .play-main.chat-panel > .chat-panel-header--bot.is-mobile-open {
+    position: relative;
+    inset: auto;
+    margin: 10px 12px;
+    flex-shrink: 0;
+  }
+  .lab-shell .play-main:has(> .chat-panel-header--bot.is-mobile-open) .chat-panel-body { padding-top: 0; }
 }

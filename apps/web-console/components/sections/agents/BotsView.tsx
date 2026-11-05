@@ -219,9 +219,7 @@ function BotRosterCard({
       </span>
       {subtitle ? <span className="ag-card__sub">{subtitle}</span> : null}
       {bot.description ? <p className="ag-card__desc">{bot.description}</p> : null}
-      <span className="ag-chips">
-        <span className="chip chip-muted">{agentLabel}</span>
-      </span>
+      <span className="ag-card__agent" title={agentLabel}>{agentLabel}</span>
     </button>
   );
 }

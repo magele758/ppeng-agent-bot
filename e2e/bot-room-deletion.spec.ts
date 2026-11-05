@@ -17,39 +17,28 @@ async function mockRoom(page: Page, failFirst = false) {
 }
 
 async function clickGroupDelete(row: Locator) {
-  await row.hover();
+  await row.getByRole('button',{name:'Deletion test room 的更多操作'}).click();
   await row.getByTestId('play-group-delete').click();
 }
 
-test('group row hides the delete word until hover or keyboard focus [AC:play-group-delete-menu#AC-1] [AC:play-group-delete-menu#AC-2]', async ({ page }) => {
+test('group deletion stays behind the menu [AC:play-group-delete-menu#AC-1] [AC:play-group-delete-menu#AC-2]', async ({ page }) => {
   await mockRoom(page);
-  const row = page.getByTestId('play-group-row').filter({ hasText: 'Deletion test room' });
-  const button = row.getByTestId('play-group-delete');
-  await expect(row).toBeVisible();
-  await expect(button).toBeHidden();
-  await expect(row.getByRole('button', { name: '删除', exact: true })).toHaveCount(0);
-  await row.hover();
-  await expect(button).toBeVisible();
-  await expect(button.locator('svg')).toBeVisible();
-  await expect(button).toHaveAttribute('aria-label', '删除群聊 Deletion test room');
-  await page.mouse.move(900, 500);
-  await expect(button).toBeHidden();
-  await row.focus();
-  await expect(button).toBeVisible();
-  await page.keyboard.press('Tab');
-  await expect(button).toBeFocused();
+  const row=page.getByTestId('play-group-row').filter({hasText:'Deletion test room'});
+  await expect(row.getByTestId('play-group-delete')).toBeHidden();
+  const trigger=row.getByRole('button',{name:'Deletion test room 的更多操作'});
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(row.getByTestId('play-group-delete')).toBeVisible();
+  await expect(row.getByTestId('play-group-delete')).toHaveAttribute('aria-label','删除群聊 Deletion test room');
 });
-
-test.describe('touch browser', () => {
-  test.use({ hasTouch: true });
-test('touch devices show the group delete icon without hover [AC:play-group-delete-menu#AC-2]', async ({ page }) => {
-  await mockRoom(page);
-  const button = page.getByTestId('play-group-row').filter({ hasText: 'Deletion test room' }).getByTestId('play-group-delete');
-  await expect(button).toBeVisible();
-  await expect(button.locator('svg')).toBeVisible();
-  await expect(button).toHaveAttribute('aria-label', '删除群聊 Deletion test room');
-});
-
+test.describe('touch browser',()=>{
+  test.use({hasTouch:true});
+  test('touch opens the same menu [AC:play-group-delete-menu#AC-2]',async({page})=>{
+    await mockRoom(page);
+    const row=page.getByTestId('play-group-row').filter({hasText:'Deletion test room'});
+    await row.getByRole('button',{name:'Deletion test room 的更多操作'}).tap();
+    await expect(row.getByTestId('play-group-delete')).toBeVisible();
+  });
 });
 
 test('confirming deletion removes a room after refresh [AC:bot-functional-groups#AC-1] [AC:bot-entry-simplification#AC-7] [AC:play-group-delete-menu#AC-3]', async ({ page }) => {

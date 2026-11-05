@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 366 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 375 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -18,10 +18,11 @@
 - `agent-learning-governance` 纠错评测、技能验证、输入授权与事件调度
 - `agent-skill-management` Agent 在对话中管理自身技能
 
-## agents（1）
+## agents（2）
 
 需求正文见 [other](other.md)。
 
+- `agents-clean-layout` Bot 管理页清爽布局
 - `agents-management` Bots / Agents / Teams / Skills 管理页清晰易用
 
 ## always（1）
@@ -57,12 +58,13 @@
 - `assistant-repeat-collapse` 助手正文里相邻的重复行收成一行
 - `assistant-run-spacing` 连续助手消息省略标题后不留大段空白
 
-## auto（2）
+## auto（3）
 
 需求正文见 [other](other.md)。
 
 - `auto-review-authorized-by` Auto-review 批准回执记录授权引用
 - `auto-review-shell-mcp` Auto-review 工具级审批卡（高危 Shell/MCP）
+- `auto-source-continuity` Auto 对话连续执行
 
 ## background（1）
 
@@ -76,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（111）
+## bot（113）
 
 需求正文见 [bot](bot.md)。
 
@@ -100,6 +102,7 @@
 - `bot-daydream-local` Bot 每日独立复盘
 - `bot-daydream-missing-session` 缺少固定对话时每日复盘继续
 - `bot-daydream-ui` Bot 每日复盘配置与治理界面
+- `bot-delete` 删除 Bot 并保留对话历史
 - `bot-detail-child-tasks-tab` 子任务改到详情页签
 - `bot-detail-menu` Bot 对话右侧详情菜单
 - `bot-detail-skill-management` 在 Bot 详情中查看可选技能并管理技能
@@ -169,6 +172,7 @@
 - `bot-rooms` 多 Bot 群会话与可靠发言
 - `bot-routine-lifecycle` Bot 可靠例行任务
 - `bot-routine-main-session` Bot 定时任务跟自己的会话走
+- `bot-row-menu` Bot 列表操作菜单
 - `bot-runtime-log-regressions` Bot 实际运行日志回归
 - `bot-scoped-skill-sharing` Bot 私有技能沉淀与指定 Bot 共享
 - `bot-session-row` 单 Bot 会话行显示名字、问题和活体脸
@@ -214,17 +218,21 @@
 - `bypass-skill-write` bypass 的 Bot 写技能不再被额外确认拦住
 - `bypass-source-scope` permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
-## chat（7）
+## chat（11）
 
 需求正文见 [chat](chat.md)。
 
 - `chat-approval-inline` 待审批嵌在对话流里
 - `chat-basics` 对话基础体验
 - `chat-bubble-written-stamp` 对话气泡不展示写入时间戳
+- `chat-clean-theme` 清爽的浅色阅读界面
+- `chat-column` 对话区对齐与阅读留白
 - `chat-experience` 对话页简洁易用
+- `chat-floating-chrome` 浮动聊天标题与低干扰摘要
 - `chat-inline-history` 单行附件入口与自动加载聊天历史
 - `chat-more-menu-on-top` 对话头部「⋯」更多菜单在最上层且不透明
 - `chat-tail-kept` 对话结束时助手正文留在对话里
+- `chat-width` 内容展示宽度
 
 ## child（1）
 
@@ -658,7 +666,7 @@
 - `play-context-replay` Play 上下文回放
 - `play-context-stack` Play 右侧栏模型上下文
 - `play-feed-window` 对话记录按页加载并窗口渲染
-- `play-group-delete-menu` 群聊行的删除收进悬停图标菜单
+- `play-group-delete-menu` 群聊行的删除收进更多菜单
 - `play-rail-default-closed` 对话页右侧栏默认关闭
 - `play-sidebar-collapse` 对话页会话列表可收起
 
@@ -864,6 +872,12 @@
 需求正文见 [other](other.md)。
 
 - `shopping-mandatory-skill` 捆绑 shopping 强制技能可加载并解锁购物面
+
+## sidebar（1）
+
+需求正文见 [other](other.md)。
+
+- `sidebar-unified-menu` 统一群聊和分组菜单
 
 ## single（1）
 

@@ -991,7 +991,7 @@ export function PlayPanel({
     } finally { setDeleting(false); }
   };
   const removalProps = (s: SessionSummary, rowBot: BotInfo | undefined) => {
-    if (rowBot) return { rowActions: <BotRowMenu bot={rowBot} details={() => {
+    if (rowBot) return { rowActions: <BotRowMenu bot={rowBot} onDeleted={() => setBots(previous => previous.filter(bot => bot.id !== rowBot.id))} details={() => {
       setOpenGroupId(null); setMobileSessionsOpen(false); onSelectSession(s.id); setBotDetailOpen(true);
     }} remove={() => void removeBot(rowBot)} /> };
     if (!onDeleteSessions) return {};
@@ -1164,7 +1164,7 @@ export function PlayPanel({
                 sessions={sessions}
                 rooms={sidebarRooms}
                 selectedRoomId={openGroupId}
-                renderFallbackActions={bot => <BotRowMenu bot={bot} remove={() => void removeBot(bot)} details={() => {
+                renderFallbackActions={bot => <BotRowMenu bot={bot} onDeleted={() => setBots(previous => previous.filter(entry => entry.id !== bot.id))} remove={() => void removeBot(bot)} details={() => {
                   setOpenGroupId(null); setMobileSessionsOpen(false); void chat.selectBot(bot.id); setBotDetailOpen(true);
                 }} />}
                 renderSession={renderSession}

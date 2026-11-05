@@ -21,6 +21,11 @@ Agent 在对话中管理自身技能
 
 然后这个共享skill、沉淀skill、修改skill、管理更新删除的能力，我想要agent也具备自己去操作的能力
 
+## agents-clean-layout
+Bot 管理页清爽布局
+
+这个界面里很多ui都是乱的，检查优化一下
+
 ## agents-management
 Bots / Agents / Teams / Skills 管理页清晰易用
 
@@ -66,6 +71,11 @@ Lab already has approvals/Risk/approve; tree has NO AutoReview / request_smart_m
 Slice: high-risk spawn/Shell/MCP default-block → native approval card → same-action retry with approval flag; denial = final; no bypass routes.
 Accept: risky shell/MCP blocked by default, card shown, same-params retry after approve, deny terminal.
 Auto-review approval cards must clearly show a kind badge (Shell vs MCP / tool kind) and the human-readable blockReason from the Auto-review gate, so the owner can decide without guessing why it blocked.
+
+## auto-source-continuity
+Auto 对话连续执行
+
+auto的权限太低了，一点也不auto，这种怎么都要我审批，简直不能用，导致我只有bypass的能用
 
 ## background-job-restart
 重启后中断无人执行的后台命令
@@ -859,6 +869,12 @@ Repo ships skills/shopping (SKILL.md + sibling Manifest). load_skill(shopping)
 unlocks vault_fill / checkout-marked browser_click|browser_type; without load
 they stay fail-closed. Skill body: read then dispatch; no plaintext; no Grok/Canvas
 commerce UI clone; separate from login Secure Form track.
+
+## sidebar-unified-menu
+统一群聊和分组菜单
+
+群聊的也按bot的加一个菜单，用类似的菜单
+这个列表里很多功能都是重复的，看看哪些可以聚合，哪些可以放到一个统一入口，哪些可以放到更深的菜单里，让这个列表更清爽
 
 ## single-host-bot-completion
 单机 Bot 工作收尾与默认入口

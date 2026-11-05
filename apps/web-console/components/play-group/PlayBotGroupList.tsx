@@ -32,7 +32,7 @@ import {
   FUNCTIONAL_GROUPS_CHANGED_EVENT,
   looseRooms,
 } from '@/lib/functional-group-view';
-import { WorkspaceIcon } from '../WorkspaceIcon';
+import { RowActionMenu } from '../RowActionMenu';
 import { GroupFace, type GroupMemberFace } from './GroupFace';
 import './play-group.css';
 
@@ -132,23 +132,10 @@ export function PlayGroupRow({
           <span className="session-item__agent">{names}</span>
         </div>
       </div>
-      <div className="play-group-menu" data-testid="play-group-menu">
-        <button
-          type="button"
-          className="btn btn-ghost btn-icon btn-sm play-group-delete"
-          aria-label={t('play.group.deleteAria', { title: room.title })}
-          title={busy ? t('play.group.deleting') : t('play.group.deleteLabel')}
-          aria-busy={busy}
-          disabled={disabled}
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete();
-          }}
-          data-testid="play-group-delete"
-        >
-          <WorkspaceIcon kind="trash" />
-        </button>
-      </div>
+      <RowActionMenu label={t('play.rowMenu.label',{name:room.title})}>
+        <button type="button" onClick={onOpen}>{t('play.group.openAria',{title:room.title})}</button>
+        <button type="button" data-testid="play-group-delete" aria-label={t('play.group.deleteAria',{title:room.title})} disabled={disabled} aria-busy={busy} onClick={onDelete}>{t('play.group.deleteLabel')}</button>
+      </RowActionMenu>
     </div>
   );
 }

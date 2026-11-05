@@ -1,0 +1,17 @@
+id: chat-floating-chrome
+title: 浮动聊天标题与低干扰摘要
+status: implemented
+requirement: |
+  这个整个做成浮层的吧，参考grok bot的那个小刘海模式，右边的2个icon做成一个浮动的按钮，把2个功能按键放进去
+  这个可以弱化一点，避免抢视觉焦点
+  选中态不要圆框，就带个背景色就行了
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 打开 Bot 对话
+    when: 阅读和滚动
+    then: 名称和右侧操作分别位于悬浮胶囊内，顶部整行不再占据布局空间
+  - id: AC-2
+    given: 侧栏选中 Bot 并显示摘要
+    when: 阅读聊天
+    then: 选中态仅有背景色，摘要为低对比度文字且无卡片边框
