@@ -708,7 +708,7 @@ export class PromptBuilder {
     const routeStarted = Date.now();
     let routing!: SkillRoutingResult;
     try {
-      routing = await buildSkillRoutingCooperative(userText, defaultSkillCandidates(skills), { mode, topK, useFusion: config.fusion });
+      routing = await buildSkillRoutingCooperative(userText, defaultSkillCandidates(skills, [...(readAllowedSkillNames(ctx.session.metadata) ?? []), ...readBotSkillSelection(this.deps.store, sessionBotId(ctx.session.metadata)).ids]), { mode, topK, useFusion: config.fusion });
       const shortlistCandidates = [
         ...routing.routed.map((r) => ({
           id: r.skill.id,
