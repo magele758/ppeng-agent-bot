@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 378 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 382 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,12 +78,13 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（113）
+## bot（114）
 
 需求正文见 [bot](bot.md)。
 
 - `bot-activity-open-session` 活动卡点击打开所属会话
 - `bot-activity-rail` Lab activity rail 展示 Bot 在途工作，并按 owner 隔离
+- `bot-async-summary` Bot 历史摘要后台更新
 - `bot-autonomous-execution-coverage` Bot 自动选择并完整承接原有执行能力
 - `bot-bloub-dynamic` Bloub 动态头像风格
 - `bot-chat-header` Bot 对话头部只显示名字、活脸和权限入口
@@ -218,7 +219,7 @@
 - `bypass-skill-write` bypass 的 Bot 写技能不再被额外确认拦住
 - `bypass-source-scope` permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
-## chat（12）
+## chat（13）
 
 需求正文见 [chat](chat.md)。
 
@@ -232,6 +233,7 @@
 - `chat-header-menu-only` 聊天顶部只保留更多入口
 - `chat-inline-history` 单行附件入口与自动加载聊天历史
 - `chat-more-menu-on-top` 对话头部「⋯」更多菜单在最上层且不透明
+- `chat-reading` 会话正文阅读节奏
 - `chat-tail-kept` 对话结束时助手正文留在对话里
 - `chat-width` 内容展示宽度
 
@@ -272,10 +274,11 @@
 
 - `command-hardline` 危险命令硬拦截与密钥脱敏
 
-## compact（2）
+## compact（3）
 
 需求正文见 [other](other.md)。
 
+- `compact-archive-pointer` 压缩摘要带上原文位置
 - `compact-bot-secondary-tabs` 精简 Bot 能力与权限及记录页
 - `compact-bot-settings` Bot 设置优先展示基本信息与已有定时任务
 
@@ -500,6 +503,12 @@
 
 - `lcu-app-grant` 桌面操作应用授权：全自动免审批，批准一次后同会话记住
 - `lcu-computer-use` 本机 LCU 桌面操作接入
+
+## lean（1）
+
+需求正文见 [other](other.md)。
+
+- `lean-default-skills` 精简默认技能并保留按需发现
 
 ## live（1）
 

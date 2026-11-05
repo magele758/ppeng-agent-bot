@@ -136,6 +136,7 @@ import {
 } from '../turn/prepare-view.js';
 import type { TurnKernelHost } from '../turn/host.js';
 import { autoCompactSession } from './compact-host.js';
+import { autoCompactForTurn, waitForBotSummary } from './bot-summary-background.js';
 import { applyNormalSessionRequestBudget } from './normal-request-guard.js';
 import { resolveMaxContextTokens } from '../session/session-budget.js';
 import {
@@ -344,7 +345,15 @@ async function invokeContextModel(
     // Overhead can put the send ceiling under the 50% tier. Compact first, then apply it.
     if (estimated >= budget.structuredTokens || estimated > budget.historyTokens) {
       const host = compactFrom(rt);
-      const result = await autoCompactSession(host, {session, agent:input.agent, repoRoot:rt.repoRoot, stateDir:rt.stateDir}, {force:true});
+      const context = {session, agent:input.agent, repoRoot:rt.repoRoot, stateDir:rt.stateDir};
+      // A hard overflow cannot be sent safely. Ordinary threshold maintenance never blocks.
+      if (estimated > budget.historyTokens) {
+        await autoCompactForTurn(host, context, { force: true });
+        await waitForBotSummary(rt.store, session.id);
+      }
+      const refreshed = rt.store.foldMessages(session.id);
+      const changed = refreshed.map(m => m.id).join() !== input.messages.map(m => m.id).join();
+      const result = changed ? { replaced: true } : await autoCompactForTurn(host, context);
       if (result.replaced) {
         compacted = true;
         const prepared = await host.prepareMessagesForModel(session, rt.store.foldMessages(session.id));
@@ -863,7 +872,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       markGoalWaitingUser(tryGoalStore(rt.store), sessionId);
     },
     mergedFilePolicy: () => rt.mergedFilePolicy(),
-    autoCompact: (context, opts) => autoCompactSession(compactFrom(rt), context, opts),
+    autoCompact: (context, opts) => autoCompactForTurn(compactFrom(rt), context, opts),
     prepareMessagesForModel: async (session, messages) => {
       const prepared = await prepareMessagesForModelView(prepareViewFrom(rt), session, messages);
       const taskText = lastUserQueryFromMessages(messages);

@@ -1372,6 +1372,12 @@ Host parks durable wait for owned bg_run
 
 - `packages/core/test/bg-run-host-park.test.js`
 
+### bot-async-summary
+
+Bot 历史摘要后台更新
+
+- `packages/core/test/bot-async-summary.test.js`
+
 ### bot-bloub-dynamic
 
 Bloub 动态头像风格
@@ -1816,6 +1822,15 @@ permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
 - `apps/web-console/styles/chat-more-menu.test.ts`
 
+### chat-reading
+
+会话正文阅读节奏
+
+- `apps/web-console/components/ChatMarkdownHost.test.ts`
+- `apps/web-console/components/ReadableMessage.test.ts`
+- `apps/web-console/lib/markdown.test.ts`
+- `apps/web-console/styles/chat-prose.test.ts`
+
 ### chat-tail-kept
 
 对话结束时助手正文留在对话里
@@ -1921,6 +1936,13 @@ CI audit P1/P2 release gate hardening
 - `packages/core/test/command-hardline.test.js`
 - `packages/core/test/result-redaction.test.js`
 - `packages/core/test/sandbox.test.js`
+
+### compact-archive-pointer
+
+压缩摘要带上原文位置
+
+- `packages/agent-loop/src/session/auto-compact-archive.test.ts`
+- `packages/core/test/compact-archive-path.test.ts`
 
 ### compact-bot-secondary-tabs
 
@@ -2419,6 +2441,12 @@ Lab 会话显示启动耗时
 - `e2e/lcu-computer-use.spec.ts`
 - `packages/agent-loop/src/runtime/tool-loop.test.ts`
 - `packages/core/test/lcu-computer-use.test.js`
+
+### lean-default-skills
+
+精简默认技能并保留按需发现
+
+- `packages/core/test/lean-default-skills.test.js`
 
 ### live-bot-quality
 

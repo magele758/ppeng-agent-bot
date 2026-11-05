@@ -1551,6 +1551,13 @@
       ]
     },
     {
+      "id": "bot-async-summary",
+      "title": "Bot 历史摘要后台更新",
+      "tests": [
+        "packages/core/test/bot-async-summary.test.js"
+      ]
+    },
+    {
       "id": "bot-bloub-dynamic",
       "title": "Bloub 动态头像风格",
       "tests": [
@@ -2058,6 +2065,16 @@
       ]
     },
     {
+      "id": "chat-reading",
+      "title": "会话正文阅读节奏",
+      "tests": [
+        "apps/web-console/components/ChatMarkdownHost.test.ts",
+        "apps/web-console/components/ReadableMessage.test.ts",
+        "apps/web-console/lib/markdown.test.ts",
+        "apps/web-console/styles/chat-prose.test.ts"
+      ]
+    },
+    {
       "id": "chat-tail-kept",
       "title": "对话结束时助手正文留在对话里",
       "tests": [
@@ -2175,6 +2192,14 @@
         "packages/core/test/command-hardline.test.js",
         "packages/core/test/result-redaction.test.js",
         "packages/core/test/sandbox.test.js"
+      ]
+    },
+    {
+      "id": "compact-archive-pointer",
+      "title": "压缩摘要带上原文位置",
+      "tests": [
+        "packages/agent-loop/src/session/auto-compact-archive.test.ts",
+        "packages/core/test/compact-archive-path.test.ts"
       ]
     },
     {
@@ -2741,6 +2766,13 @@
         "e2e/lcu-computer-use.spec.ts",
         "packages/agent-loop/src/runtime/tool-loop.test.ts",
         "packages/core/test/lcu-computer-use.test.js"
+      ]
+    },
+    {
+      "id": "lean-default-skills",
+      "title": "精简默认技能并保留按需发现",
+      "tests": [
+        "packages/core/test/lean-default-skills.test.js"
       ]
     },
     {

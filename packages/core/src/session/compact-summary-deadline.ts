@@ -18,20 +18,27 @@ export function summaryCoolingDown(store: object, sessionId: string): boolean {
 export async function summarizeWithinDeadline(
   store: object,
   sessionId: string,
-  summarize: (signal: AbortSignal) => Promise<string>
+  summarize: (signal: AbortSignal) => Promise<string>,
+  timeoutMs = COMPACT_SUMMARY_TIMEOUT_MS,
+  signal?: AbortSignal
 ): Promise<string> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let rejectAbort: (reason: unknown) => void;
+  const aborted = new Promise<never>((_, reject) => { rejectAbort = reject; });
+  const onAbort = () => { controller.abort(signal?.reason); rejectAbort(signal?.reason ?? new Error('Summary cancelled')); };
+  signal?.addEventListener('abort', onAbort, { once: true });
+  if (signal?.aborted) onAbort();
   const deadline = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
       const error = new CompactSummaryTimeout();
       reject(error);
       controller.abort(error);
-    }, COMPACT_SUMMARY_TIMEOUT_MS);
+    }, timeoutMs);
   });
   try {
     // Race also bounds custom adapters that ignore the cancellation signal.
-    const summary = await Promise.race([Promise.resolve().then(() => summarize(controller.signal)), deadline]);
+    const summary = await Promise.race([Promise.resolve().then(() => summarize(controller.signal)), deadline, aborted]);
     cooldowns.get(store)?.delete(sessionId);
     return summary;
   } catch (error) {
@@ -43,5 +50,6 @@ export async function summarizeWithinDeadline(
     throw error;
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
   }
 }

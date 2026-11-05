@@ -1,7 +1,7 @@
 id: long-session-compact
 title: 长会话能真正做摘要而不是只丢历史
 status: implemented
-notes: 'assumedApproval: standing-order-2026-10-22'
+notes: 'assumedApproval: standing-order-2026-10-22; 2026-11-05 按用户要求，Bot 自动维护改为仅按 token 压缩线触发，AC-2 的条数触发仅保留普通会话或显式压缩。'
 requirement: |
   长会话大量 compact_skipped reason=context_budget，真正的 compact 很少，
   fold_budget_drop 把历史硬切到大约 8 条。应让自动摘要在长会话或历史已经超过
@@ -13,7 +13,7 @@ criteria:
     when: 准备这一轮的上下文
     then: 写入一条摘要并替换更早的消息，而不是因为没到一半窗口就跳过
   - id: AC-2
-    given: 普通会话或 Bot 会话已经有很多条消息，但总 token 仍低于原来的压缩阈值
+    given: 普通会话已有很多条消息，或用户显式要求压缩 Bot 历史，但总 token 仍低于原来的压缩阈值
     when: 考虑压缩
     then: 用模型摘要替换更早的消息，而不是只靠把视图硬切短
   - id: AC-3

@@ -140,6 +140,16 @@ No new WorkItem table/system. No RAW_AGENT_* flags.
 无论 Agent 处在哪个权限档位（包括 bypass），都不能执行毁灭性的系统命令；
 命令输出里的密钥不能回流给模型。
 
+## compact-archive-pointer
+压缩摘要带上原文位置
+
+runAutoCompact 成功做闭区间 replace 时，把归档相对路径写进同一条 summary。有记忆附录时 working-log tail 不会贴上，所以路径必须在摘要正文里，不能靠另一条 appendix。
+摘要空则 empty_summary 跳过。这段逻辑不要改。
+在 replace 之前拿到 archive 路径。路径要同时出现在 replacement 的 text 和 session.summary 里。
+没有路径（archive 未提供或返回空）时，摘要文本与今天一致。
+有路径时加一两行，说明这是被压缩掉的原文位置，只在摘要缺了具体代码或报错时再读。不要把归档正文塞进摘要。
+如果 compact 的 archive 没返回模型能 read_file 的相对路径，让它返回这种路径，再让 auto-compact 写进摘要。
+
 ## compact-bot-secondary-tabs
 精简 Bot 能力与权限及记录页
 
@@ -380,6 +390,11 @@ Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Compute
 本机 LCU 桌面操作接入
 
 那你去接一下
+
+## lean-default-skills
+精简默认技能并保留按需发现
+
+按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动
 
 ## live-bot-quality
 真实 Bot 任务评估与版本准入

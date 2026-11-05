@@ -1,0 +1,27 @@
+id: bot-async-summary
+title: Bot 历史摘要后台更新
+status: implemented
+requirement: |
+  我觉得这个可以异步处理，会话更新了异步更新，只留一份就行了，这样长会话的bot，又能知道历史上下文，又不会每次开始就直接开始compact，导致启动时间增长？
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: Bot 有需要总结且仍可装入当前模型窗口的历史
+    when: 用户启动下一轮对话
+    then: 回答准备不等待摘要模型返回，使用当前有效摘要及尚未覆盖的消息
+  - id: AC-2
+    given: 同一 Bot 摘要尚在生成
+    when: 会话继续更新并重复请求摘要
+    then: 同时最多一个摘要请求，成功后更新当前摘要，新增消息仍保留
+  - id: AC-3
+    given: 后台摘要失败或生成期间历史被替换
+    when: 摘要任务结束
+    then: 保留当前有效摘要和未覆盖历史，不使用过期结果覆盖新摘要，失败后退避重试
+  - id: AC-4
+    given: Bot 一轮对话结束
+    when: 历史达到摘要阈值
+    then: 自动触发后台更新，摘要及覆盖区间在重启后仍可读取
+  - id: AC-5
+    given: Bot 持续对话，存在已保存摘要和未压缩新消息
+    when: 未达到 token 压缩线或历史自上次检查没有变化
+    then: 不发起重复摘要请求；达到压缩线后更新摘要并保留原始历史供检索
