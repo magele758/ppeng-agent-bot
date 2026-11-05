@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 381,
+    "implemented": 382,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -153,6 +153,13 @@
       "requirement": "Lab 右侧活动栏（GET /api/sessions/:id/activity）为当前打开的 Bot 会话展示\n正在运行或最近完成的后台工作（routine 跑批、后台 job、子代理会话）。\n只展示属于同一个 owner 的工作；其他用户的工作绝不出现在该 Bot 的活动栏里。\n单用户本地模式（无 userId）下所有工作均可见，不要求登录。",
       "verificationStage": "software",
       "file": "acceptance/bot-activity-rail.yaml"
+    },
+    {
+      "id": "bot-async-summary",
+      "title": "Bot 历史摘要后台更新",
+      "requirement": "我觉得这个可以异步处理，会话更新了异步更新，只留一份就行了，这样长会话的bot，又能知道历史上下文，又不会每次开始就直接开始compact，导致启动时间增长？",
+      "verificationStage": "software",
+      "file": "acceptance/bot-async-summary.yaml"
     },
     {
       "id": "bot-autonomous-execution-coverage",

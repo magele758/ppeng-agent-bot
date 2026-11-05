@@ -13,6 +13,11 @@ Lab 右侧活动栏（GET /api/sessions/:id/activity）为当前打开的 Bot �
 只展示属于同一个 owner 的工作；其他用户的工作绝不出现在该 Bot 的活动栏里。
 单用户本地模式（无 userId）下所有工作均可见，不要求登录。
 
+## bot-async-summary
+Bot 历史摘要后台更新
+
+我觉得这个可以异步处理，会话更新了异步更新，只留一份就行了，这样长会话的bot，又能知道历史上下文，又不会每次开始就直接开始compact，导致启动时间增长？
+
 ## bot-autonomous-execution-coverage
 Bot 自动选择并完整承接原有执行能力
 

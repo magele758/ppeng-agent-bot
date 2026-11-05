@@ -1372,6 +1372,12 @@ Host parks durable wait for owned bg_run
 
 - `packages/core/test/bg-run-host-park.test.js`
 
+### bot-async-summary
+
+Bot 历史摘要后台更新
+
+- `packages/core/test/bot-async-summary.test.js`
+
 ### bot-bloub-dynamic
 
 Bloub 动态头像风格
