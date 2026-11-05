@@ -723,6 +723,7 @@ let rawVisible: any;
 let promptCtx: any;
 let drainedAdvisory: any;
 let systemPrompt: any;
+let cacheStablePrefix: string | undefined;
 let beforeHook: any;
 let lastTurn: any;
 let picked: any;
@@ -904,9 +905,15 @@ drainedAdvisory = advisoryQueue.drainCombined();
 if (drainedAdvisory) {
         host.store.appendMessage(sid, 'system', [textPart(drainedAdvisory)]);
       }
-systemPrompt = await timeKernelPhase(startup, 'build_system_prompt', () =>
-        host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible)
-      );
+systemPrompt = await timeKernelPhase(startup, 'build_system_prompt', async () => {
+        if (host.promptBuilder.buildSystemPromptParts) {
+          const parts = await host.promptBuilder.buildSystemPromptParts(promptCtx, rawVisible);
+          cacheStablePrefix = parts.stable;
+          return parts.text;
+        }
+        cacheStablePrefix = undefined;
+        return host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible);
+      });
 if (turn === 0) {
 const __gateSignal = await __gate146();
 if (__gateSignal) return __gateSignal;
@@ -980,6 +987,7 @@ turnInput = {
           ? (assetId: string) => host.resolveImageDataUrl!(assetId, context.session.id)
           : undefined,
         ...(promptCacheKey ? { promptCacheKey } : {}),
+        ...(cacheStablePrefix ? { cacheStablePrefix } : {}),
       };
 preTurn = await timeOptionalKernelPhase(
         startup,

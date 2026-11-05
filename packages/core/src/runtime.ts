@@ -131,8 +131,10 @@ import type { ArtifactIndexRecord } from './stores/artifact-store.js';
 import { WorkspaceManager } from './workspaces.js';
 import { McpManager } from './mcp/mcp-manager.js';
 import { discoverPlugins, mergePlugins, pluginDirsFromEnv } from './plugins/plugin-loader.js';
+import { pluginMcpConnectPlan } from './plugins/plugin-mcp.js';
+import { ensureRepoTrust, filterUntrustedRepoHooks, isRepoTrusted, repoOwnedPath } from './trust/repo-trust.js';
 import type { LoadedPlugin } from './plugins/plugin-loader.js';
-import { ConnectorRegistry, mergeGrantedConnectorTools } from './connectors/registry.js';
+import { ConnectorRegistry, mergeGrantedConnectorTools, pluginConnectorId } from './connectors/registry.js';
 import type { AssetStorage, EventBufferRepository } from './storage/interfaces.js';
 import { defaultTenantIdFromEnv, defaultUserIdFromEnv } from './storage/provider-config.js';
 import { AgentLoopHandle, type AgentLoopLatch } from './runtime/agent-loop.js';
@@ -492,8 +494,12 @@ export class RawAgentRuntime {
 
     const pluginStarted = Date.now();
     this.loadedPlugins = discoverPlugins(pluginDirsFromEnv(process.env));
+    const repoTrust = ensureRepoTrust(this.stateDir, this.repoRoot);
     const mergedPlugins = mergePlugins(this.loadedPlugins);
-    for (const [k, v] of Object.entries(mergedPlugins.hookEnv)) {
+    const visiblePluginSkills = mergePlugins(
+      repoTrust.trusted ? this.loadedPlugins : this.loadedPlugins.filter((plugin) => !repoOwnedPath(this.repoRoot, plugin.root))
+    ).skills;
+    for (const [k, v] of Object.entries(filterUntrustedRepoHooks(mergedPlugins.hookEnv, this.repoRoot, repoTrust.trusted))) {
       if (!process.env[k]?.trim()) process.env[k] = v;
     }
     logStartupPhase(undefined, { phase: 'plugin_discover', scope: 'boot', durationMs: Date.now() - pluginStarted });
@@ -508,7 +514,7 @@ export class RawAgentRuntime {
       store: this.store,
       repoRoot: this.repoRoot,
       stateDir: this.stateDir,
-      extraSkills: [...(options.extraSkills ?? []), ...mergedPlugins.skills],
+      extraSkills: [...(options.extraSkills ?? []), ...visiblePluginSkills],
       cloudSkillsLoader: options.cloudSkillsLoader,
       sharedSkills: id => this.daydream.sharedSkills(id),
       sharedMemory: (id, query) => this.daydream.sharedMemory(id, query),
@@ -735,7 +741,22 @@ export class RawAgentRuntime {
         }
       })
     );
-    this.mcpManager = new McpManager({ stateDir: this.stateDir, tools: this.tools, env: process.env, log: this.log });
+    this.mcpManager = new McpManager({
+      stateDir: this.stateDir,
+      tools: this.tools,
+      env: process.env,
+      log: this.log,
+      pluginMcpConfigs: () => {
+        const granted = new Set(
+          this.connectors.listConnectors().filter((row) => row.source === 'plugin' && row.granted).map((row) => row.id)
+        );
+        return pluginMcpConnectPlan(this.loadedPlugins, {
+          granted: (plugin) => granted.has(pluginConnectorId(plugin.manifest.id)),
+          repoRoot: this.repoRoot,
+          repoTrusted: isRepoTrusted(this.stateDir, this.repoRoot)
+        });
+      }
+    });
     this.connectors.setMcpInvoker(async (name, args, ctx) => {
       await this.mcpManager.ensureLoaded(ctx.session.id);
       const tool = this.tools.find((candidate) => candidate.name === name && (name === 'mcp_invoke' || name.startsWith('mcp_')));

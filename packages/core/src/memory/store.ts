@@ -1,4 +1,4 @@
-import { MemorySuppressedError, readSuppressions, sameSuppressionScope, suppressionFactKey, type MemorySuppression } from './deletion-suppression.js';
+import { EVICTED_SUPPRESSION_TTL_MS, EXPIRED_SUPPRESSION_TTL_MS, MemorySuppressedError, ensureMemorySuppressionSchema, readSuppressions, sameSuppressionScope, suppressionFactKey, type MemorySuppression, type MemorySuppressionReason } from './deletion-suppression.js';
 import type { DatabaseSync } from 'node:sqlite';
 import { createId, nowIso } from '../id.js';
 import type {
@@ -166,6 +166,7 @@ export class AgentMemoryStore {
   ) {
     this.limits = { ...DEFAULT_LIMITS, ...limits };
     this.ensureEmbeddingTable();
+    ensureMemorySuppressionSchema(this.db);
   }
 
   private hasFts(): boolean {
@@ -230,7 +231,7 @@ export class AgentMemoryStore {
       if (blocked) {
         this.db.prepare('UPDATE memory_suppressions SET blocked_count=blocked_count+1,last_blocked_at=? WHERE id=?').run(nowIso(), blocked.id);
         this.db.exec('RELEASE memory_write');
-        throw new MemorySuppressedError();
+        throw new MemorySuppressedError(blocked.reason);
       }
       const entry = this.setAllowed(memory);
       this.db.exec('RELEASE memory_write');
@@ -363,18 +364,37 @@ export class AgentMemoryStore {
     return row ? this.withSources(row) : null;
   }
 
-  listSuppressions(): MemorySuppression[] { return readSuppressions(this.db); }
+  listSuppressions(): MemorySuppression[] { return this.liveSuppressions(); }
+
+  private liveSuppressions(): MemorySuppression[] {
+    const now = Date.now();
+    const live: MemorySuppression[] = [];
+    for (const row of readSuppressions(this.db)) {
+      if (row.reason !== 'user_deleted' && row.expiresAt && Date.parse(row.expiresAt) <= now) {
+        this.db.prepare('DELETE FROM memory_suppressions WHERE id=?').run(row.id);
+        continue;
+      }
+      live.push(row);
+    }
+    return live;
+  }
 
   findSuppression(memory: Pick<AgentMemory, 'scope'|'userId'|'tenantId'|'sessionId'|'agentId'|'value'>): MemorySuppression | undefined {
     const key = suppressionFactKey(memory.value);
-    return this.listSuppressions().find(row => sameSuppressionScope(row.memory, memory) && suppressionFactKey(row.memory.value) === key);
+    return this.liveSuppressions().find(row => sameSuppressionScope(row.memory, memory) && suppressionFactKey(row.memory.value) === key);
   }
 
   assertNotSuppressed(memory: Parameters<AgentMemoryStore['findSuppression']>[0]): void {
     const blocked = this.findSuppression(memory);
     if (!blocked) return;
     this.db.prepare('UPDATE memory_suppressions SET blocked_count=blocked_count+1,last_blocked_at=? WHERE id=?').run(nowIso(), blocked.id);
-    throw new MemorySuppressedError();
+    throw new MemorySuppressedError(blocked.reason);
+  }
+
+  private insertSuppression(memory: AgentMemory, reason: MemorySuppressionReason, ttlMs?: number): void {
+    const expiresAt = ttlMs == null ? null : new Date(Date.now() + ttlMs).toISOString();
+    this.db.prepare('INSERT INTO memory_suppressions(id,memory_json,reason,created_at,expires_at) VALUES(?,?,?,?,?)')
+      .run(createId('msup'), JSON.stringify(memory), reason, nowIso(), expiresAt);
   }
 
   deleteAndSuppress(id: string): MemorySuppression | undefined {
@@ -383,7 +403,7 @@ export class AgentMemoryStore {
       const memory = this.getEntryById(id);
       if (!memory) { this.db.exec('RELEASE memory_delete'); return undefined; }
       const sid = createId('msup');
-      this.db.prepare('INSERT INTO memory_suppressions(id,memory_json,reason,created_at) VALUES(?,?,?,?)').run(sid, JSON.stringify(memory), 'user_deleted', nowIso());
+      this.db.prepare('INSERT INTO memory_suppressions(id,memory_json,reason,created_at,expires_at) VALUES(?,?,?,?,?)').run(sid, JSON.stringify(memory), 'user_deleted', nowIso(), null);
       this.delete(id);
       this.db.exec('RELEASE memory_delete');
       return this.listSuppressions().find(row => row.id === sid);
@@ -630,13 +650,26 @@ export class AgentMemoryStore {
     return rows.map(row => this.withSources(row));
   }
 
-  /** Delete expired entries; returns count deleted. */
+  /** Delete expired entries and suppress each one for {@link EXPIRED_SUPPRESSION_TTL_MS}. */
   expire(): number {
     const now = nowIso();
-    const result = this.db
-      .prepare(`DELETE FROM agent_memory WHERE expires_at IS NOT NULL AND expires_at < ?`)
-      .run(now);
-    return Number(result.changes);
+    const rows = this.db
+      .prepare(`SELECT id FROM agent_memory WHERE expires_at IS NOT NULL AND expires_at < ?`)
+      .all(now) as Array<{ id: string }>;
+    if (rows.length === 0) return 0;
+    this.db.exec('SAVEPOINT memory_expire');
+    try {
+      for (const row of rows) {
+        const memory = this.getEntryById(String(row.id));
+        if (memory) this.insertSuppression(memory, 'expired', EXPIRED_SUPPRESSION_TTL_MS);
+        this.delete(String(row.id));
+      }
+      this.db.exec('RELEASE memory_expire');
+      return rows.length;
+    } catch (error) {
+      this.db.exec('ROLLBACK TO memory_expire; RELEASE memory_expire');
+      throw error;
+    }
   }
 
   /**
@@ -668,9 +701,17 @@ export class AgentMemoryStore {
       )
       .all(...evictArgs) as Array<{ id: string }>;
 
-    const stmt = this.db.prepare(`DELETE FROM agent_memory WHERE id = ?`);
-    for (const row of evictRows) {
-      stmt.run(row.id);
+    this.db.exec('SAVEPOINT memory_evict');
+    try {
+      for (const row of evictRows) {
+        const memory = this.getEntryById(String(row.id));
+        if (memory) this.insertSuppression(memory, 'evicted', EVICTED_SUPPRESSION_TTL_MS);
+        this.delete(String(row.id));
+      }
+      this.db.exec('RELEASE memory_evict');
+    } catch (error) {
+      this.db.exec('ROLLBACK TO memory_evict; RELEASE memory_evict');
+      throw error;
     }
   }
 

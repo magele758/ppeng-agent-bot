@@ -742,6 +742,7 @@ let rawVisible: any;
 let promptCtx: any;
 let drainedAdvisory: any;
 let systemPrompt: any;
+let cacheStablePrefix: string | undefined;
 let stablePrefixHash: any;
 let routing: any;
 let resolveImageDataUrl: any;
@@ -927,11 +928,17 @@ async function __gate71() {
 if (drainedAdvisory) {
         host.store.appendMessage(sid, 'system', [textPart(drainedAdvisory)]);
       }
-systemPrompt = await timeKernelPhase(host, sid, startup, 'build_system_prompt', () =>
-        host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible)
-      );
+systemPrompt = await timeKernelPhase(host, sid, startup, 'build_system_prompt', async () => {
+        if (host.promptBuilder.buildSystemPromptParts) {
+          const parts = await host.promptBuilder.buildSystemPromptParts(promptCtx, rawVisible);
+          cacheStablePrefix = parts.stable;
+          return parts.text;
+        }
+        cacheStablePrefix = undefined;
+        return host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible);
+      });
 stablePrefixHash = createHash('sha256')
-        .update(host.promptBuilder.buildStablePrefix(promptCtx))
+        .update(cacheStablePrefix ?? host.promptBuilder.buildStablePrefix(promptCtx))
         .digest('hex')
         .slice(0, 16);
 routing = host.promptBuilder.getRouting(sid);
@@ -1051,6 +1058,7 @@ turnInput = {
         sessionId: sid,
         resolveImageDataUrl,
         promptCacheKey: selectedTools.promptCacheKey,
+        ...(cacheStablePrefix ? { cacheStablePrefix } : {}),
         ...(llmPromptDebugEnabled(process.env)
           ? { debugLlmContext: { stateDir: host.stateDir, sessionId: sid } }
           : {})

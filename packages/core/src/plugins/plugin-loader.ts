@@ -58,6 +58,13 @@ export interface PluginManifest {
       string
     >
   >;
+  /** Stdio MCP server. Not connected until the plugin is granted. */
+  mcp?: PluginMcpSpec;
+}
+
+export interface PluginMcpSpec {
+  command: string;
+  args?: string[];
 }
 
 export interface LoadedPlugin {
@@ -77,6 +84,8 @@ export interface LoadedPlugin {
   secretEnv?: string;
   headerName?: string;
   hookEnv: Record<string, string>;
+  /** Present only when plugin.json declared a command. Connection is separate. */
+  mcp?: PluginMcpSpec;
 }
 
 function readJson<T>(path: string): T | undefined {
@@ -317,6 +326,7 @@ export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
   }
 
   const auth = parseAuth(manifest.auth);
+  const mcp = parsePluginMcp(manifest.mcp);
   return {
     root,
     manifest,
@@ -328,8 +338,26 @@ export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
     authKind: auth.authKind,
     ...(auth.secretEnv ? { secretEnv: auth.secretEnv } : {}),
     ...(auth.headerName ? { headerName: auth.headerName } : {}),
-    hookEnv
+    hookEnv,
+    ...(mcp ? { mcp } : {})
   };
+}
+
+function parsePluginMcp(raw: PluginMcpSpec | undefined): PluginMcpSpec | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const command = typeof raw.command === 'string' ? raw.command.trim() : '';
+  if (!command) return undefined;
+  const args = Array.isArray(raw.args) ? raw.args.filter((arg): arg is string => typeof arg === 'string') : [];
+  return { command, ...(args.length ? { args } : {}) };
+}
+
+/** The command to connect. Returns nothing until the connector grant exists. */
+export function pluginMcpCommand(
+  plugin: LoadedPlugin,
+  granted: boolean
+): { command: string; args: string[] } | undefined {
+  if (!granted || !plugin.mcp?.command) return undefined;
+  return { command: plugin.mcp.command, args: plugin.mcp.args ?? [] };
 }
 
 /**

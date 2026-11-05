@@ -1,3 +1,4 @@
+import { defaultSkillCandidates } from '../skills/default-skill-candidates.js';
 import { RUNTIME_CAPABILITIES_KEY, runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import { HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
 import { toolDirectory } from '../tools/tool-exposure.js';
@@ -20,6 +21,7 @@ import {
   loadWorkspaceSkills,
   mergeSkillsByName
 } from '../skills/builtin-skills.js';
+import { ensureRepoTrust } from '../trust/repo-trust.js';
 import {
   buildSkillRoutingCooperative,
   type SkillRoutingMode,
@@ -336,7 +338,7 @@ export class PromptBuilder {
   private skillGeneration = 0;
   private readonly sessionSkillCache = new Map<string, { key: string; skills: SkillSpec[] }>();
   private readonly stablePrefixCache = new Map<string, { key: string; text: string }>();
-  private readonly assembledBySession = new Map<string, { key: string; text: string; routing?: SkillRoutingResult }>();
+  private readonly assembledBySession = new Map<string, { key: string; text: string; stable: string; dynamic: string; routing?: SkillRoutingResult }>();
   private readonly routingBySession = new Map<string, SkillRoutingResult>();
   private readonly searchHitsBySession = new Map<string, string[]>();
   /** Exposes last cognitive phase info by session (set externally by runtime). */
@@ -706,7 +708,7 @@ export class PromptBuilder {
     const routeStarted = Date.now();
     let routing!: SkillRoutingResult;
     try {
-      routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK, useFusion: config.fusion });
+      routing = await buildSkillRoutingCooperative(userText, defaultSkillCandidates(skills, [...(readAllowedSkillNames(ctx.session.metadata) ?? []), ...readBotSkillSelection(this.deps.store, sessionBotId(ctx.session.metadata)).ids]), { mode, topK, useFusion: config.fusion });
       const shortlistCandidates = [
         ...routing.routed.map((r) => ({
           id: r.skill.id,
@@ -819,27 +821,41 @@ export class PromptBuilder {
 
   /** Full system prompt = stable prefix + dynamic context (memory excluded). */
   async buildSystemPrompt(ctx: PromptContext, messages: SessionMessage[]): Promise<string> {
+    return (await this.buildSystemPromptParts(ctx, messages)).text;
+  }
+
+  /**
+   * `stable` is the cacheable prefix. `dynamic` already includes runtime
+   * instructions. Joining them reproduces today's system prompt.
+   */
+  async buildSystemPromptParts(
+    ctx: PromptContext,
+    messages: SessionMessage[]
+  ): Promise<{ stable: string; dynamic: string; text: string }> {
     const skillSelect = chainHas(resolveJevChain(this.deps.store), 'skillSelect');
     const skills = await this.skillsForSession(ctx.session.id);
     const key = skillSelect ? '' : this.assembledPromptKey(ctx, messages, skills);
     const hit = skillSelect ? undefined : this.assembledBySession.get(ctx.session.id);
     if (hit && hit.key === key) {
       if (hit.routing) this.routingBySession.set(ctx.session.id, hit.routing);
-      return hit.text;
+      return { stable: hit.stable, dynamic: hit.dynamic, text: hit.text };
     }
     const started = Date.now();
     try {
-      const stablePrefix = this.buildStablePrefix(ctx);
+      const stable = this.buildStablePrefix(ctx);
       const dynamicContext = await this.buildDynamicContext(ctx, messages);
-      const text = [stablePrefix, dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
+      const dynamic = [dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
+      const text = [stable, dynamic].filter(Boolean).join('\n\n---\n\n');
       if (!skillSelect) {
         this.assembledBySession.set(ctx.session.id, {
           key,
           text,
+          stable,
+          dynamic,
           routing: this.routingBySession.get(ctx.session.id)
         });
       }
-      return text;
+      return { stable, dynamic, text };
     } finally {
       emitStartupPhase(ctx.session.id, {
         phase: 'system_prompt',
@@ -890,8 +906,9 @@ export class PromptBuilder {
   async allSkills(): Promise<SkillSpec[]> {
     if (!this.workspaceSkillsPromise) {
       this.workspaceSkillsPromise = (async () => {
+        const repoTrusted = !this.deps.stateDir || ensureRepoTrust(this.deps.stateDir, this.deps.repoRoot).trusted;
         const [ws, user, ag] = await Promise.all([
-          loadWorkspaceSkills(this.deps.repoRoot),
+          repoTrusted ? loadWorkspaceSkills(this.deps.repoRoot) : Promise.resolve([]),
           loadStateDirSkills(this.deps.stateDir),
           loadAgentsDirSkills()
         ]);

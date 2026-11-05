@@ -44,7 +44,7 @@ export interface GatedWriteResult {
 
 export function gatedMemorySet(store: AgentMemoryStore, input: GatedWriteInput): GatedWriteResult {
   try { return gatedMemorySetInner(store, input); }
-  catch (error) { if (error instanceof MemorySuppressedError) return { ok: false, reason: 'user_deleted' }; throw error; }
+  catch (error) { if (error instanceof MemorySuppressedError) return { ok: false, reason: error.reason }; throw error; }
 }
 function gatedMemorySetInner(store: AgentMemoryStore, input: GatedWriteInput): GatedWriteResult {
   const gate = evaluateMemoryWrite({

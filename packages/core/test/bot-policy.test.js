@@ -422,6 +422,7 @@ test('allowedSkills: validated on save, filters the shortlist and search, and ga
     assert.ok(traces.some((event) => event.payload?.reason === 'not_in_allowed_skills'));
 
     updateBot(host, bot.id, { allowedSkills: [] }, { toolCatalog: [], skillCatalog: catalog });
+    await resolveSkillSearch(skillHost, 'beta-unique-topic', sid, 20);
     assert.ok((await resolveSkillLoad(skillHost, SKILL_B.name, sid)).content);
     store.db.close();
   } finally {

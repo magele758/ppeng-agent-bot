@@ -6,6 +6,7 @@ import {
   mergeSkillsByName,
   parseSkillFrontmatter
 } from './skill-registry.js';
+import { ensureRepoTrust } from '../trust/repo-trust.js';
 import { PLANNING_SKILL_MANIFEST } from './skill-manifest.js';
 
 export { loadAgentsDirSkills, loadStateDirSkills, loadWorkspaceSkills, mergeSkillsByName, parseSkillFrontmatter };
@@ -14,47 +15,36 @@ export const builtinSkills: SkillSpec[] = [
   {
     id: 'planning',
     name: 'Planning',
+    aliases: ['Tasks', 'tasks'],
     manifest: PLANNING_SKILL_MANIFEST,
-    description: 'Use TodoWrite for multi-step work and keep exactly one item in progress.',
+    description: 'Plan multi-step work with TodoWrite and track durable tasks with dependencies.',
     content:
       'Use this when the task has multiple concrete steps.\n\n' +
       'Workflow:\n' +
       '1. Break the work into a short todo list before broad edits.\n' +
       '2. Keep exactly one item in progress at a time.\n' +
       '3. Update the todo list as scope changes so the shared state stays accurate.\n' +
-      '4. Close the loop by marking completed work and calling out remaining risks.',
+      '4. Close the loop by marking completed work and calling out remaining risks.\n' +
+      '5. For work spanning turns, use task_create, task_update and task_list; record dependencies with blockedBy and keep status and handoff metadata current.',
     promptFragment: 'Break substantial work into a tracked todo list before making broad changes.',
-    triggerWords: ['plan', 'roadmap', 'steps', 'todo'],
+    triggerWords: ['plan', 'roadmap', 'steps', 'todo', 'task', 'dependency', 'blocked'],
     source: 'builtin'
   },
   {
     id: 'subagents',
     name: 'Subagents',
-    description: 'Use spawn_subagent for bounded exploration or isolated implementation work.',
+    aliases: ['Team', 'team'],
+    description: 'Delegate bounded work to subagents and coordinate teammates with explicit ownership.',
     content:
       'Use this when a task can be parallelized without sharing a large amount of context.\n\n' +
       'Guidelines:\n' +
       '1. Delegate only bounded tasks with a clear deliverable.\n' +
       '2. Keep ownership explicit so workers do not fight over the same files.\n' +
       '3. Do immediate critical-path work locally; avoid delegating what blocks the next step.\n' +
-      '4. Reuse the result to integrate or verify rather than redoing the delegated work.',
+      '4. Reuse the result to integrate or verify rather than redoing the delegated work.\n' +
+      '5. For asynchronous teamwork, use spawn_teammate and send_message through the mailbox; hand off scope, status and next action, and keep coordination artifacts readable.',
     promptFragment: 'Delegate only concrete, bounded tasks that benefit from clean context.',
-    triggerWords: ['delegate', 'subagent', 'parallel', 'research'],
-    source: 'builtin'
-  },
-  {
-    id: 'skills',
-    name: 'Skills',
-    description: 'Load workspace skills only when they are relevant.',
-    content:
-      'Use this when a named skill or a clearly relevant workflow exists.\n\n' +
-      'Guidelines:\n' +
-      '1. Check the routed shortlist first.\n' +
-      '2. Call load_skill(name) only for skills that materially help with the current turn.\n' +
-      '3. Prefer loading a small number of relevant skills over front-loading large reference text.\n' +
-      '4. If strict routing is enabled, load shortlisted skills or search_skills results. Your own saved Bot skills can be loaded directly; visibility and allowlists still apply.',
-    promptFragment: 'Use load_skill instead of front-loading large reference documents.',
-    triggerWords: ['skill', 'guide', 'reference'],
+    triggerWords: ['delegate', 'subagent', 'parallel', 'team', 'teammate', 'mailbox', 'handoff'],
     source: 'builtin'
   },
   {
@@ -76,50 +66,6 @@ export const builtinSkills: SkillSpec[] = [
     source: 'builtin'
   },
   {
-    id: 'compression',
-    name: 'Compression',
-    description: 'Compact context when sessions become large and preserve continuity in summaries.',
-    content:
-      'Use this when the session is getting large or handoffs are becoming fragile.\n\n' +
-      'Guidelines:\n' +
-      '1. Preserve active tasks, decisions, and unresolved risks.\n' +
-      '2. Prefer concise summaries over replaying large histories.\n' +
-      '3. Keep continuity artifacts current before compacting context.',
-    promptFragment: 'Keep context lean. Summaries should preserve active tasks, decisions, and risks.',
-    triggerWords: ['compact', 'summary', 'context'],
-    source: 'builtin'
-  },
-  {
-    id: 'tasks',
-    name: 'Tasks',
-    description: 'Represent long-lived work as persistent tasks with dependencies.',
-    content:
-      'Use this when work needs durable state beyond the current turn.\n\n' +
-      'Guidelines:\n' +
-      '1. Create persistent tasks for long-lived work.\n' +
-      '2. Record dependencies explicitly with blockedBy.\n' +
-      '3. Update status and metadata as execution progresses.\n' +
-      '4. Use tasks for handoffs and sequencing, not just temporary reminders.',
-    promptFragment: 'Use task_create, task_update, and task_list for durable multi-step work.',
-    triggerWords: ['task', 'dependency', 'blocked'],
-    source: 'builtin'
-  },
-  {
-    id: 'team',
-    name: 'Team',
-    description: 'Use teammates and mailbox messages for asynchronous coordination.',
-    content:
-      'Use this when multiple agents or long-running sessions need explicit coordination.\n\n' +
-      'Guidelines:\n' +
-      '1. Split work by ownership.\n' +
-      '2. Use teammates only when parallelism is real, not just possible in theory.\n' +
-      '3. Send concise handoffs with scope, status, and next action.\n' +
-      '4. Keep coordination artifacts readable enough for later recovery.',
-    promptFragment: 'When work is truly parallelizable, spawn_teammate and send_message with clear ownership.',
-    triggerWords: ['team', 'teammate', 'mailbox', 'handoff'],
-    source: 'builtin'
-  },
-  {
     id: 'harness-long-running',
     name: 'Long-running harness',
     description:
@@ -128,19 +74,20 @@ export const builtinSkills: SkillSpec[] = [
       'Use this for multi-hour or multi-feature work that benefits from durable artifacts and explicit checkpoints.\n\n' +
       'Workflow:\n' +
       '1. Planner expands the request into a product spec with sprint-sized chunks.\n' +
-      '2. Before coding, agree a sprint contract with scope and testable acceptance criteria.\n' +
+      '2. Before coding, record scope and testable acceptance criteria, then implement within the user authorization; ask only when a required decision is missing.\n' +
       '3. Generator implements one sprint at a time.\n' +
       '4. Evaluator or reviewer checks the result skeptically and records feedback.\n' +
       '5. Store product_spec, requirements_backlog (when applicable), sprint_contract, and evaluator_feedback under .raw-agent-harness/ and use task_create/task_update for dependencies and sequencing.',
     promptFragment:
-      'For multi-hour or multi-feature builds: (1) Planner expands a short prompt into a high-level product spec—deliverables and sprint-sized chunks, not fragile low-level API details; maintain requirements_backlog with numbered verifiable requirements when the shape is clear. (2) Generator implements one sprint at a time; before code, agree a sprint contract (scope + testable acceptance criteria); after implementation, prefer spawn_subagent(role=evaluator) or role=review for verification. (3) Evaluator is skeptical, checks edge cases, and records feedback—do not rubber-stamp. Use harness_write_spec for product_spec, requirements_backlog, sprint_contract, and evaluator_feedback under .raw-agent-harness/. Use task_create with blockedBy for feature ordering. On huge contexts, rely on compaction plus these files for handoff.',
+      'For multi-hour or multi-feature builds: (1) Planner expands a short prompt into a high-level product spec—deliverables and sprint-sized chunks, not fragile low-level API details; maintain requirements_backlog with numbered verifiable requirements when the shape is clear. (2) Generator implements one sprint at a time; before code, record scope and testable acceptance criteria without adding a redundant approval checkpoint; after implementation, prefer spawn_subagent(role=evaluator) or role=review for verification. (3) Evaluator is skeptical, checks edge cases, and records feedback—do not rubber-stamp. Use harness_write_spec for product_spec, requirements_backlog, sprint_contract, and evaluator_feedback under .raw-agent-harness/. Use task_create with blockedBy for feature ordering. On huge contexts, rely on compaction plus these files for handoff.',
     triggerWords: ['harness', 'sprint', 'planner', 'evaluator', 'long-running', 'spec', 'contract'],
     source: 'builtin'
   }
 ];
 
 export async function loadAllSkills(repoRoot: string = process.cwd(), stateDir?: string): Promise<SkillSpec[]> {
-  const ws = await loadWorkspaceSkills(repoRoot);
+  const repoTrusted = !stateDir || ensureRepoTrust(stateDir, repoRoot).trusted;
+  const ws = repoTrusted ? await loadWorkspaceSkills(repoRoot) : [];
   const user = await loadStateDirSkills(stateDir);
   const agents = await loadAgentsDirSkills();
   return mergeSkillsByName(mergeSkillsByName(mergeSkillsByName(builtinSkills, ws), user), agents);

@@ -22,8 +22,7 @@ export function filterSkillsByAllowlist<T extends { name: string }>(
   allowed: readonly string[] | undefined
 ): T[] {
   if (!allowed || allowed.length === 0) return skills;
-  const allow = new Set(allowed.map((name) => name.trim().toLowerCase()));
-  return skills.filter((skill) => allow.has(skill.name.trim().toLowerCase()));
+  return skills.filter((skill) => isSkillAllowed(skill, allowed));
 }
 
 export function isSkillAllowed(

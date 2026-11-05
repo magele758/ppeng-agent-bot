@@ -870,35 +870,45 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     }
   };
 
-  const editFileTool: ToolContract<{ path: string; oldText: string; newText: string }> = {
+  const editFileTool: ToolContract<{ path: string; oldText: string; newText: string; replace_all?: boolean }> = {
     name: 'edit_file',
-    description: 'Replace the first occurrence of oldText in a file.',
+    description:
+      'Replace oldText in a file. oldText must match exactly once. Pass replace_all to replace every non-overlapping match. Does not write when the match is missing or ambiguous.',
     inputSchema: {
       type: 'object',
       properties: {
         path: { type: 'string' },
         oldText: { type: 'string' },
-        newText: { type: 'string' }
+        newText: { type: 'string' },
+        replace_all: { type: 'boolean', description: 'Replace every non-overlapping match. Default false, which requires exactly one match.' }
       },
       required: ['path', 'oldText', 'newText']
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
     async execute(context, args) {
+      const oldText = args.oldText ?? '';
+      if (!oldText) {
+        return { ok: false, content: 'oldText must not be empty' };
+      }
       const target = repoPath(context, args.path);
       const original = await readFile(target, 'utf8');
-      if (!original.includes(args.oldText)) {
+      const count = countNonOverlapping(original, oldText);
+      if (count === 0) {
+        return { ok: false, content: `Text not found in ${args.path}` };
+      }
+      if (args.replace_all !== true && count !== 1) {
         return {
           ok: false,
-          content: `Text not found in ${args.path}`
+          content: `oldText matched ${count} times in ${args.path}. Pass replace_all: true to replace every match, or include more surrounding context so it matches once.`
         };
       }
-
-      await writeFile(target, original.replace(args.oldText, args.newText), 'utf8');
+      const next = args.replace_all === true ? original.split(oldText).join(args.newText) : original.replace(oldText, args.newText);
+      await writeFile(target, next, 'utf8');
       await persistCloudFolderAfterWrite(context, target);
       return {
         ok: true,
-        content: `Edited ${args.path}`
+        content: args.replace_all === true ? `Edited ${count} matches in ${args.path}` : `Edited ${args.path}`
       };
     }
   };
@@ -1156,7 +1166,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
   const loadSkillTool: ToolContract<{ name: string }> = {
     name: 'load_skill',
     description:
-      'Load a skill by name (repo `skills/` and `~/.agents/**/SKILL.md`; same name in ~/.agents overrides). If the catalog is not listed, call search_skills first.',
+      'Load a relevant skill by exact name or id. Prefer a small number of useful workflows over front-loading reference text. Search unlisted skills with search_skills first; your own enabled Bot skills can be loaded directly. Visibility and allowlists still apply.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1949,7 +1959,55 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     tools.push(...createExternalAiTools());
   }
 
-  return tools;
+  return stampBuiltinAccess(tools);
+}
+
+function countNonOverlapping(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  let count = 0;
+  let from = 0;
+  while (from <= haystack.length) {
+    const at = haystack.indexOf(needle, from);
+    if (at < 0) break;
+    count += 1;
+    from = at + needle.length;
+  }
+  return count;
+}
+
+const BUILTIN_ACCESS: Record<string, NonNullable<ToolContract['access']>> = {
+  read_file: 'read', grep_files: 'read', glob_files: 'read', spill_tool_result: 'read', retrieve_tool_result: 'read',
+  search_skills: 'read', load_skill: 'read', task_get: 'read', task_list: 'read', list_team: 'read', read_inbox: 'read',
+  bg_check: 'read', workspace_list: 'read', lsp_request: 'read', list_machines: 'read', list_email_inboxes: 'read',
+  check_email_inbox_availability: 'read', search_email_threads: 'read', read_email_thread: 'read',
+  memory_get: 'read', memory_search: 'read', memory_read: 'read', memory_prefetch: 'read',
+  history_search: 'read', history_read: 'read', read_artifact_page: 'read', search_artifact_content: 'read',
+  write_file: 'edit', edit_file: 'edit', notebook_edit: 'edit', harness_write_spec: 'edit', TodoWrite: 'edit',
+  task_create: 'edit', task_update: 'edit', record_summary: 'edit', memory_set: 'edit', memory_delete: 'edit',
+  handoff_state: 'edit', submit_plan: 'edit', request_confirmation: 'edit', confirm_plan: 'edit', start_step: 'edit',
+  complete_step: 'edit', fail_step: 'edit', ask_user: 'edit', save_user_info: 'edit', collect_credentials: 'edit',
+  secure_form: 'edit', register_machine: 'edit', unregister_machine: 'edit', copy_to_machine: 'edit',
+  copy_from_machine: 'edit', claim_email_inbox: 'edit', room_route_turn: 'delegate', compact_context: 'edit',
+  bash: 'bash', bg_run: 'bash', work_evidence: 'bash',
+  web_fetch: 'network', web_search: 'network', vision_analyze: 'network', schedule_social_post: 'network',
+  send_message: 'network',
+  spawn_subagent: 'delegate', spawn_teammate: 'delegate', a2ui_render: 'delegate', a2ui_delete_surface: 'delegate',
+  claude_code: 'delegate', codex_exec: 'delegate', cursor_agent: 'delegate'
+};
+
+function inferBuiltinAccess(name: string): NonNullable<ToolContract['access']> {
+  const known = BUILTIN_ACCESS[name];
+  if (known) return known;
+  if (/^(spawn_|a2ui_|claude_|codex_|cursor_|room_route_)/.test(name)) return 'delegate';
+  if (/^(web_|vision_|browser_|schedule_social_|send_message|tailscale_)/.test(name)) return 'network';
+  if (name === 'bash' || name === 'bg_run' || name === 'work_evidence') return 'bash';
+  if (/^(read_|grep_|glob_|spill_|retrieve_|search_|load_skill|task_get|task_list|list_|memory_get|memory_search|memory_read|memory_prefetch|history_|bg_check|workspace_list|lsp_|get_|vault_list|vault_get)/.test(name)) return 'read';
+  return 'edit';
+}
+
+/** Builtins always carry a class. `other` is reserved for unknown external tools. */
+function stampBuiltinAccess(tools: ToolContract<any>[]): ToolContract<any>[] {
+  return tools.map((tool) => (tool.access ? tool : { ...tool, access: inferBuiltinAccess(tool.name) }));
 }
 
 export { createExternalAiTools };

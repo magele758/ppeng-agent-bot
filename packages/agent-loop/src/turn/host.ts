@@ -126,6 +126,16 @@ export interface TurnKernelPrompt {
   buildSystemPrompt(ctx: PromptContext, messages: SessionMessage[]): Promise<string>;
 
   /**
+   * Same text as {@link buildSystemPrompt}, split so a provider can cache
+   * `stable` and leave `dynamic` (including runtime instructions) uncached.
+   * `text` is the joined prompt, identical to `buildSystemPrompt`.
+   */
+  buildSystemPromptParts?(
+    ctx: PromptContext,
+    messages: SessionMessage[]
+  ): Promise<{ stable: string; dynamic: string; text: string }>;
+
+  /**
    * Optional memory appendix injected at the end of the last user message.
    * Return empty string when memory is not available. May be async (host I/O).
    */

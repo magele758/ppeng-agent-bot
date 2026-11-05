@@ -178,7 +178,7 @@ test('a new user message routes skills again [AC:loop-prefix-cache#AC-4]', async
     const builder = new PromptBuilder({
       store: { ...kv(), getSession: () => session },
       repoRoot: '/nonexistent-repo-root-xyz',
-      extraSkills: [{ id: 'sk-zebra', name: 'Zebra Routing Unique', description: 'Unique zebra routing playbook for xy-test-query', content: 'body' }]
+      extraSkills: [{ id: 'sk-zebra', ownerBotId: 'bot-route', source: 'user', name: 'Zebra Routing Unique', description: 'Unique zebra routing playbook for xy-test-query', content: 'body' }]
     });
     const ctx = { agent: agent(), session, repoRoot: '/nonexistent-repo-root-xyz' };
     const first = await builder.buildSystemPrompt(ctx, [user(session.id, 'hello')]);
