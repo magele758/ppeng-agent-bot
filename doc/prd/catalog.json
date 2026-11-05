@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 382,
+    "implemented": 383,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2598,6 +2598,13 @@
       "file": "acceptance/tool-progress-guard.yaml"
     },
     {
+      "id": "tool-search-experiment",
+      "title": "可切换的增强工具检索实验",
+      "requirement": "那你用配置来配合，帮我完成这个功能开发吧，搞好了，我去实验下效果",
+      "verificationStage": "software",
+      "file": "acceptance/tool-search-experiment.yaml"
+    },
+    {
       "id": "turn-stats-end-time",
       "title": "对话轮次统计显示结束时间",
       "requirement": "我不是要求在这个地方，显示这个会话的结束时间吗？这里还没加上",
@@ -2865,6 +2872,11 @@
       "name": "agent-loop",
       "description": "Embeddable agent loop core SDK (@ppeng/agent-loop / @mage-ai-lab/agent-loop) providing turn kernel, model adapters, streaming watchdogs, loop guards, session state, and assembly presets (mini, normal, full, max). Use when: (1) Integrating or embedding the agent loop into an application or service, (2) Developing, modifying, or testing packages/agent-loop, (3) Assembling an agent loop using createAssembledLoop or createMiniAssembledLoop, (4) Managing mid-run steering, step-level control, or event folding via AgentLoopHandle, (5) Adding or configuring loop modules, watchdogs, or model adapters.",
       "path": "skills/agent-loop/SKILL.md"
+    },
+    {
+      "name": "Agent Tech Digest",
+      "description": "Rolling digest of agent-related feeds (maintained by capability-gateway).",
+      "path": "skills/agent-tech-digest/SKILL.md"
     },
     {
       "name": "login",

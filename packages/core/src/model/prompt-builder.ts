@@ -80,7 +80,7 @@ function timePromptSlice<T>(sessionId: string, phase: string, run: () => T, extr
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v15';
+export const STABLE_SYSTEM_VERSION = 'v16';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):

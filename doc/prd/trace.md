@@ -3365,6 +3365,14 @@ Slack Events 入站按线程唤醒例行任务
 - `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
 - `packages/core/test/session-loop-guard.test.js`
 
+### tool-search-experiment
+
+可切换的增强工具检索实验
+
+- `e2e/tool-exposure.spec.ts`
+- `packages/core/test/tool-search-experiment.test.js`
+- `scripts/test/settings-route-contracts.test.mjs`
+
 ### unified-bot-goal-lifecycle
 
 统一 Bot 目标生命周期与归档展示

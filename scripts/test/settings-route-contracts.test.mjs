@@ -36,3 +36,12 @@ test('tool exposure PATCH persists modes and groups without accepting unknown id
  await patch({});
  for(const body of [null,'bad',{mode:'bad'},{groups:[]},{agentId:'missing',groups:[]},{agentId:'general',groups:['bad']},{agentId:'general',groups:'bad'}])await assert.rejects(patch(body));
 });
+
+test('tool search strategy persists via PATCH without changing delivery mode [AC:tool-search-experiment#AC-1]',async()=>{
+ const patch=fixture(toolExposureRoutes);
+ assert.equal((await patch({searchStrategy:'enhanced'})).settings.searchStrategy,'enhanced');
+ assert.equal((await patch({mode:'full'})).settings.searchStrategy,'enhanced');
+ await assert.rejects(patch({mode:'progressive',searchStrategy:'invalid'}));
+ assert.equal((await patch({})).settings.mode,'full');
+ assert.equal((await patch({searchStrategy:'legacy'})).settings.searchStrategy,'legacy');
+});

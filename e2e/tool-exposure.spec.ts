@@ -5,6 +5,11 @@ test('tool settings distinguish modes, persist and explain visibility [AC:tool-e
     await page.addInitScript(() => { if (!localStorage.getItem('lab.locale'))
         localStorage.setItem('lab.locale', 'zh'); });
     await page.goto('/#/settings/tools');
+    await page.getByTestId('rail-foot-trigger').click();
+    await page.getByTestId('language-toggle').getByRole('button', { name: '中文', exact: true }).click();
+    await expect.poll(async () => (await (await request.get('/api/user/preferences')).json()).values['lab.locale']).toBe('zh');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
     const card = page.getByTestId('tool-exposure-settings');
     await expect(card).toBeVisible();
     await card.getByRole('combobox', { name: '工具提供方式', exact: true }).selectOption('full');
@@ -15,7 +20,10 @@ test('tool settings distinguish modes, persist and explain visibility [AC:tool-e
     await expect(card).toContainText('外部服务发现');
     await expect(card.getByTestId('tool-exposure-counts')).toContainText('已注册');
     await expect(card).toContainText('尚未加载');
-    await page.evaluate(() => localStorage.setItem('lab.locale', 'en'));
+    await page.getByTestId('rail-foot-trigger').click();
+    await page.getByTestId('language-toggle').getByRole('button', { name: 'English', exact: true }).click();
+    await expect.poll(async () => (await (await request.get('/api/user/preferences')).json()).values['lab.locale']).toBe('en');
+    await page.keyboard.press('Escape');
     await page.reload();
     await expect(card).toContainText('Tool delivery');
     await expect(card).toContainText('External service discovery');
@@ -39,6 +47,11 @@ test('session detail and clear route preserve messages [AC:tool-exposure-tiers#A
 test('pinning is saved for one agent and invalid settings are rejected [AC:tool-exposure-tiers#AC-6] [AC:tool-exposure-tiers#AC-11]', async ({ page, request }) => {
     await page.addInitScript(() => localStorage.setItem('lab.locale', 'zh'));
     await page.goto('/#/settings/tools');
+    await page.getByTestId('rail-foot-trigger').click();
+    await page.getByTestId('language-toggle').getByRole('button', { name: '中文', exact: true }).click();
+    await expect.poll(async () => (await (await request.get('/api/user/preferences')).json()).values['lab.locale']).toBe('zh');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
     const card = page.getByTestId('tool-exposure-settings');
     const group = card.getByRole('checkbox', { name: 'Bot 配置', exact: true });
     await group.click();
@@ -52,4 +65,36 @@ test('pinning is saved for one agent and invalid settings are rejected [AC:tool-
     expect((await request.patch('/api/tool-exposure/settings', { data: { agentId: 'general', groups: ['does-not-exist'] } })).status()).toBe(400);
     await group.click();
     await expect(group).not.toBeChecked();
+});
+
+test('search experiment selector persists and explains both strategies in both languages [AC:tool-search-experiment#AC-5]', async ({page,request}) => {
+    const previous = (await (await request.get('/api/tool-exposure/settings')).json()).settings;
+    try {
+        await page.addInitScript(() => { if (!localStorage.getItem('lab.locale')) localStorage.setItem('lab.locale','zh'); });
+        await page.goto('/#/settings/tools');
+    await page.getByTestId('rail-foot-trigger').click();
+    await page.getByTestId('language-toggle').getByRole('button', { name: '中文', exact: true }).click();
+    await expect.poll(async () => (await (await request.get('/api/user/preferences')).json()).values['lab.locale']).toBe('zh');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN');
+        const card = page.getByTestId('tool-exposure-settings');
+        const select = card.locator('#tool-search-strategy');
+        await select.selectOption('enhanced');
+        await expect.poll(async () => (await (await request.get('/api/tool-exposure/settings')).json()).settings.searchStrategy).toBe('enhanced');
+        await page.reload();
+        await expect(select).toHaveValue('enhanced');
+        await expect(card).toContainText('请用新会话比较');
+        await page.getByTestId('rail-foot-trigger').click();
+    await page.getByTestId('language-toggle').getByRole('button', { name: 'English', exact: true }).click();
+    await expect.poll(async () => (await (await request.get('/api/user/preferences')).json()).values['lab.locale']).toBe('en');
+    await page.keyboard.press('Escape');
+        await page.reload();
+        await expect(card).toContainText('Enhanced search (experimental)');
+        await expect(card).toContainText('Compare in fresh sessions');
+        await select.selectOption('legacy');
+        await expect.poll(async () => (await (await request.get('/api/tool-exposure/settings')).json()).settings.searchStrategy).toBe('legacy');
+        expect((await request.patch('/api/tool-exposure/settings',{data:{searchStrategy:'bad'}})).status()).toBe(400);
+    } finally {
+        await request.patch('/api/tool-exposure/settings',{data:{searchStrategy:previous.searchStrategy ?? 'legacy'}});
+    }
 });

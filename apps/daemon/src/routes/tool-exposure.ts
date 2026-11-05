@@ -19,6 +19,7 @@ export function toolExposureRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         { method: 'PATCH', pattern: '/api/tool-exposure/settings', handler: async ({ readBody, response }) => {
                 const body = await readBody() as {
                     mode?: unknown;
+                    searchStrategy?: unknown;
                     agentId?: unknown;
                     groups?: unknown;
                 };

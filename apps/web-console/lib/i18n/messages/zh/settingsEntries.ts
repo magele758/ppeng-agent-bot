@@ -1,5 +1,10 @@
 export const settingsEntries = {
   toolExposure: {
+  searchStrategy: '工具检索策略',
+  searchLegacy: '原有关键词',
+  searchEnhanced: '增强检索（实验）',
+  searchHint: '仅影响渐进加载。全量模式可作为基线；渐进模式可比较原有关键词与增强检索。增强检索支持常见中英文同义词、已加载工具查询和分类浏览，不是通用语义搜索。切换自动保存，下一次搜索生效。请用新会话比较，避免已加载工具影响结果。',
+
   "title": "工具提供方式",
   "keywords": "工具 全量 渐进 分层 搜索 加载 tool search",
   "desc": "日常工具常驻，其他能力按需加载。全量模式提供当前允许且配置可用的全部业务工具。",
