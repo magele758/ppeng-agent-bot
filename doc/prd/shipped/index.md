@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 379 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 381 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -218,7 +218,7 @@
 - `bypass-skill-write` bypass 的 Bot 写技能不再被额外确认拦住
 - `bypass-source-scope` permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
-## chat（12）
+## chat（13）
 
 需求正文见 [chat](chat.md)。
 
@@ -232,6 +232,7 @@
 - `chat-header-menu-only` 聊天顶部只保留更多入口
 - `chat-inline-history` 单行附件入口与自动加载聊天历史
 - `chat-more-menu-on-top` 对话头部「⋯」更多菜单在最上层且不透明
+- `chat-reading` 会话正文阅读节奏
 - `chat-tail-kept` 对话结束时助手正文留在对话里
 - `chat-width` 内容展示宽度
 
@@ -272,10 +273,11 @@
 
 - `command-hardline` 危险命令硬拦截与密钥脱敏
 
-## compact（2）
+## compact（3）
 
 需求正文见 [other](other.md)。
 
+- `compact-archive-pointer` 压缩摘要带上原文位置
 - `compact-bot-secondary-tabs` 精简 Bot 能力与权限及记录页
 - `compact-bot-settings` Bot 设置优先展示基本信息与已有定时任务
 

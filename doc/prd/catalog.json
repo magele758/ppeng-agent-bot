@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 379,
+    "implemented": 381,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1058,6 +1058,13 @@
       "file": "acceptance/chat-more-menu-on-top.yaml"
     },
     {
+      "id": "chat-reading",
+      "title": "会话正文阅读节奏",
+      "requirement": "我总觉得当前项目的web里面的对话的内容看起来很累，内容很挤，然后密密麻麻的，看起来不适合阅读，你看看怎么优化下会话里的对话内容展示，现在是markdown的渲染，有什么最佳的渲染实践吗？帮我先搜索研究一下，然后分多个agent去完成这块ui的提升",
+      "verificationStage": "software",
+      "file": "acceptance/chat-reading.yaml"
+    },
+    {
       "id": "chat-tail-kept",
       "title": "对话结束时助手正文留在对话里",
       "requirement": "会话和 Bot 里经常丢消息，特别是模型吐出来的内容。过程（工具、Trace）还在，输出完了内容就从对话流里消失；整页刷新后又出现。所以是已经落库，前端在结束时把刚写完的助手消息弄丢了，不是没存上。\n修好后的行为：模型输出结束后，助手正文留在对话里，不必刷新。工具过程仍在。之后的自动刷新不能再把这条正文冲掉。刷新页面仍然看得到。不要为了留住气泡去重发请求或造假消息。\nBot 房间回合和普通 session 都要保住。\n用户发出一条消息后，助手还在回答时，这条用户消息会在对话里显示 2 次，而且把更早的会话截断了。更早的对话不见了。\n修好后：回答过程中，刚发出的用户消息只出现一次。更早的会话还在，不被这次发送截成只剩当前这一问。不要把上次的修复退回去：流结束时助手正文仍要留在对话里，刷新后也在。不要为了去重把用户消息再发一次。",
@@ -1154,6 +1161,13 @@
       "requirement": "无论 Agent 处在哪个权限档位（包括 bypass），都不能执行毁灭性的系统命令；\n命令输出里的密钥不能回流给模型。",
       "verificationStage": "software",
       "file": "acceptance/command-hardline.yaml"
+    },
+    {
+      "id": "compact-archive-pointer",
+      "title": "压缩摘要带上原文位置",
+      "requirement": "runAutoCompact 成功做闭区间 replace 时，把归档相对路径写进同一条 summary。有记忆附录时 working-log tail 不会贴上，所以路径必须在摘要正文里，不能靠另一条 appendix。\n摘要空则 empty_summary 跳过。这段逻辑不要改。\n在 replace 之前拿到 archive 路径。路径要同时出现在 replacement 的 text 和 session.summary 里。\n没有路径（archive 未提供或返回空）时，摘要文本与今天一致。\n有路径时加一两行，说明这是被压缩掉的原文位置，只在摘要缺了具体代码或报错时再读。不要把归档正文塞进摘要。\n如果 compact 的 archive 没返回模型能 read_file 的相对路径，让它返回这种路径，再让 auto-compact 写进摘要。",
+      "verificationStage": "software",
+      "file": "acceptance/compact-archive-pointer.yaml"
     },
     {
       "id": "compact-bot-secondary-tabs",

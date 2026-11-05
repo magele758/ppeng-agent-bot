@@ -2058,6 +2058,16 @@
       ]
     },
     {
+      "id": "chat-reading",
+      "title": "会话正文阅读节奏",
+      "tests": [
+        "apps/web-console/components/ChatMarkdownHost.test.ts",
+        "apps/web-console/components/ReadableMessage.test.ts",
+        "apps/web-console/lib/markdown.test.ts",
+        "apps/web-console/styles/chat-prose.test.ts"
+      ]
+    },
+    {
       "id": "chat-tail-kept",
       "title": "对话结束时助手正文留在对话里",
       "tests": [
@@ -2175,6 +2185,14 @@
         "packages/core/test/command-hardline.test.js",
         "packages/core/test/result-redaction.test.js",
         "packages/core/test/sandbox.test.js"
+      ]
+    },
+    {
+      "id": "compact-archive-pointer",
+      "title": "压缩摘要带上原文位置",
+      "tests": [
+        "packages/agent-loop/src/session/auto-compact-archive.test.ts",
+        "packages/core/test/compact-archive-path.test.ts"
       ]
     },
     {

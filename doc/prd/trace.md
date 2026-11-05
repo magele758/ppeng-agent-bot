@@ -1816,6 +1816,15 @@ permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
 - `apps/web-console/styles/chat-more-menu.test.ts`
 
+### chat-reading
+
+会话正文阅读节奏
+
+- `apps/web-console/components/ChatMarkdownHost.test.ts`
+- `apps/web-console/components/ReadableMessage.test.ts`
+- `apps/web-console/lib/markdown.test.ts`
+- `apps/web-console/styles/chat-prose.test.ts`
+
 ### chat-tail-kept
 
 对话结束时助手正文留在对话里
@@ -1921,6 +1930,13 @@ CI audit P1/P2 release gate hardening
 - `packages/core/test/command-hardline.test.js`
 - `packages/core/test/result-redaction.test.js`
 - `packages/core/test/sandbox.test.js`
+
+### compact-archive-pointer
+
+压缩摘要带上原文位置
+
+- `packages/agent-loop/src/session/auto-compact-archive.test.ts`
+- `packages/core/test/compact-archive-path.test.ts`
 
 ### compact-bot-secondary-tabs
 
