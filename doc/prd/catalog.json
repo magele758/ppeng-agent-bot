@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 364,
+    "implemented": 365,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2330,6 +2330,13 @@
       "requirement": "这个我点了，就缩成一个小横条，带个关闭窗口就行了，好像沉淀的过程比较慢，会一直挡着\n这怎么还蹦出来2个？\n这还有问题，失败的无法关闭",
       "verificationStage": "software",
       "file": "acceptance/skill-operation-confirm-bar.yaml"
+    },
+    {
+      "id": "skill-pending-retry",
+      "title": "技能待确认请求重新授权",
+      "requirement": "修复下这个问题，既不能存储skill，一直不能生效了，帮我解决下这个链路的问题，把一些过度设计的安全拦截都去掉",
+      "verificationStage": "software",
+      "file": "acceptance/skill-pending-retry.yaml"
     },
     {
       "id": "skill-proposals",

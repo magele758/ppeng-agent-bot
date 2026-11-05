@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { COVERED_SMOKE_HARNESS_TIMEOUT_MS, PERFORMANCE_SPAWN_TIMEOUT_MS, SHARED_RUNNER_SMOKE_DRAIN_SECONDS, SHARED_RUNNER_SMOKE_READ_QUEUE_CAP, httpSoakOptionsFromArgv, smokeCoverageActive, smokeTimingForRun, soakTiming } from '../bot-release/http-fixture-timing.mjs';
+import { COVERED_SMOKE_HARNESS_TIMEOUT_MS, PERFORMANCE_SPAWN_TIMEOUT_MS, SHARED_RUNNER_SMOKE_DRAIN_SECONDS, SHARED_RUNNER_SMOKE_READ_QUEUE_CAP, httpSoakOptionsFromArgv, smokeCoverageActive, smokeFixedReadPendingCap, smokeTimingForRun, soakTiming } from '../bot-release/http-fixture-timing.mjs';
 import { performanceResult, performanceSoakArgs } from '../bot-release/soak-performance.mjs';
+
+test('covered fixed-window reads keep the planned queue instead of one slot per client [AC:ci-http-fixture-timing#AC-1]', () => {
+  assert.equal(smokeFixedReadPendingCap(20, false), 1);
+  assert.equal(smokeFixedReadPendingCap(20, true), 4);
+  assert.throws(() => smokeFixedReadPendingCap(0, true), /positive integer/);
+  assert.throws(() => smokeFixedReadPendingCap(1.5, false), /positive integer/);
+});
 
 test('shared runner smoke drain waits out notification tails without moving local or full-protocol drains [AC:ci-http-fixture-timing#AC-3]', () => {
   assert.equal(SHARED_RUNNER_SMOKE_DRAIN_SECONDS, 90);

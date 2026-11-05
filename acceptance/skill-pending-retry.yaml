@@ -1,0 +1,10 @@
+id: skill-pending-retry
+title: 技能待确认请求重新授权
+status: implemented
+requirement: 修复下这个问题，既不能存储skill，一直不能生效了，帮我解决下这个链路的问题，把一些过度设计的安全拦截都去掉
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 技能创建等待确认，会话随后开启全自动
+    when: 在同一条消息中重试创建
+    then: 原请求完成保存且技能可加载，不重复创建
