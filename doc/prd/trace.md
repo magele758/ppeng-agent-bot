@@ -1847,6 +1847,18 @@ CI audit P1/P2 release gate hardening
 - `apps/web-console/lib/skin.test.ts`
 - `apps/web-console/styles/glass.test.ts`
 
+### cli-bot
+
+命令行使用机器人
+
+- `scripts/test/cli-bot.test.mjs`
+
+### cli-session-permission
+
+命令行调整会话权限
+
+- `scripts/test/cli-permission.test.mjs`
+
 ### command-hardline
 
 危险命令硬拦截与密钥脱敏

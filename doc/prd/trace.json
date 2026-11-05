@@ -2091,6 +2091,20 @@
       ]
     },
     {
+      "id": "cli-bot",
+      "title": "命令行使用机器人",
+      "tests": [
+        "scripts/test/cli-bot.test.mjs"
+      ]
+    },
+    {
+      "id": "cli-session-permission",
+      "title": "命令行调整会话权限",
+      "tests": [
+        "scripts/test/cli-permission.test.mjs"
+      ]
+    },
+    {
       "id": "command-hardline",
       "title": "危险命令硬拦截与密钥脱敏",
       "tests": [
