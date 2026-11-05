@@ -124,3 +124,22 @@ test('删除 Bot 明确保留记录且可取消 [AC:bot-delete#AC-3]', async ({p
   await page.getByTestId('bot-row-actions').getByRole('button',{name:'删除 Bot',exact:true}).click();
   await expect(page.getByRole('alert').filter({hasText:'Task still running'})).toBeVisible();
 });
+
+test('顶部操作统一在更多菜单 [AC:chat-header-menu-only#AC-1]',async({page})=>{
+  await page.goto('/#/bot');
+  await page.locator('.list-item--bot-chat').first().click();
+  const header=page.locator('.chat-panel-header--bot:visible').first();
+  await expect(header.locator(':scope > .chat-panel-header__actions > .rail-toggle')).toHaveCount(0);
+  await expect(header.locator('#btnCancelSession')).toHaveCount(0);
+  const more=header.locator('.more-menu > button');
+  await more.click();
+  await expect(header.locator('#btnRunSession')).toHaveCount(0);
+  const toggle=header.getByRole('menuitem',{name:/信息栏/});
+  const initial=await toggle.getAttribute('aria-expanded');
+  await toggle.click();
+  await more.click();
+  await expect(toggle).toHaveAttribute('aria-expanded',String(initial!=='true'));
+  await toggle.click();
+  await more.click();
+  await expect(toggle).toHaveAttribute('aria-expanded',initial!);
+});
