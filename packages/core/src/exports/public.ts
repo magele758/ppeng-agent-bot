@@ -129,6 +129,23 @@ export {
   type PromptVariantSettingsPatch,
   type PromptVariantSettingsStore
 } from '../model/prompt-variant-settings.js';
+export {
+  THINKING_EFFORT_SETTINGS_KEY,
+  defaultThinkingEffortSettings,
+  isThinkingEffortLevel,
+  normalizeThinkingEffortSettings,
+  hasPersistedThinkingEffortSettings,
+  readThinkingEffortSettings,
+  writeThinkingEffortSettings,
+  resolveThinkingEffort,
+  thinkingEffortOptions,
+  applyThinkingEffortToTurn,
+  type ThinkingEffortLevel,
+  type ReasoningEffort,
+  type ThinkingEffortSettings,
+  type ThinkingEffortSettingsPatch,
+  type ThinkingEffortSettingsStore
+} from '../model/thinking-effort-settings.js';
 export type {
   DynToolRecord,
   DynToolSettings,
@@ -801,6 +818,8 @@ export {
 export type { BrowserErrorCode, BrowserErrorShape } from '../tools/browser-backend.js';
 export { runDoctor, formatDoctorReport } from '../doctor/doctor.js';
 export type { DoctorSeverity, DoctorCheck, DoctorReport, DoctorOptions } from '../doctor/doctor.js';
+export { analyzeExecutionLog, attachExecutionFindings } from '../stores/analyze-execution-log.js';
+export type { ExecutionFinding, ExecutionFindingCode, ExecutionLogEvent } from '../stores/analyze-execution-log.js';
 export {
   EVOLUTION_DISABLED_CODE,
   EVOLUTION_SURFACE_ENABLED,

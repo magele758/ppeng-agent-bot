@@ -13,9 +13,12 @@ export interface RuntimeEnvConfig {
   modelMaxRetries: number;
 }
 
+/** Tool calls inside one turn. Unset RAW_AGENT_MAX_PARALLEL_TOOLS uses this. */
+export const DEFAULT_PARALLEL_TOOL_CALLS = 32;
+
 export function loadRuntimeEnvConfig(env: NodeJS.ProcessEnv = process.env): RuntimeEnvConfig {
   return {
-    maxParallelToolCalls: envInt(env, 'RAW_AGENT_MAX_PARALLEL_TOOLS', 8),
+    maxParallelToolCalls: envInt(env, 'RAW_AGENT_MAX_PARALLEL_TOOLS', DEFAULT_PARALLEL_TOOL_CALLS),
     maxTurnsPerRun: envInt(env, 'RAW_AGENT_MAX_TURNS', 0),
     approvalPolicy: parseApprovalPolicyFromEnv(env),
     streamEnabled: envBool(env, 'RAW_AGENT_STREAM', true),

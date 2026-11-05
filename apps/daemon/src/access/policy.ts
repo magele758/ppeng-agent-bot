@@ -517,6 +517,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['PATCH /api/dyn-tools/settings', ADMIN],
     ['GET /api/prompt-variant/settings', AUTHENTICATED],
     ['PATCH /api/prompt-variant/settings', ADMIN],
+    ['GET /api/thinking-effort/settings', AUTHENTICATED],
+    ['PATCH /api/thinking-effort/settings', ADMIN],
     ['GET /api/jev/settings', AUTHENTICATED],
     ['PATCH /api/jev/settings', ADMIN],
     ['POST /api/jev/probe', ADMIN],

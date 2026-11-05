@@ -1,0 +1,27 @@
+id: session-eval-baseline
+title: 会话评估能留下基准并发现短板
+status: implemented
+requirement: |
+  新的评估集，结果如何？我觉得2个问题，一个这个模型基准，在这套harness上不要降低，第二，是否有提升？还有有没有专门针对agent能力的评估集？分多个agent去研究和分析一下，然后看看当前项目怎么做harness 评估比较好，帮我完成一版，让我发现短板，建立基准，以后也好持续提升
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 一次只跑当前模型、没有另一版对照的会话评估
+    when: 查看结果
+    then: 能看到每道没有全部重复通过的题和失败原因，并且结果写明这是基准，不是能力提升
+  - id: AC-2
+    given: 一份已经冻结的基准，其中某道题每次重复都通过
+    when: 以后同题有一次没通过
+    then: 结果写明基准下降了，并且不会把这次下降叫做能力提升
+  - id: AC-3
+    given: 只有基准结果，或者回归题只是没有变差
+    when: 问这次有没有把 agent 变强
+    then: 答案是还不能称为提升
+  - id: AC-4
+    given: 原来的回归题，以及单独一套更难的 agent 行为题
+    when: 检查这套评估
+    then: 原来的题还在且验收没有放宽；更难题仍是单独的能力卷；三十题、三次重复和五个百分点的线没有下调
+  - id: AC-5
+    given: 模型的最终回答和题目要求一致，但前面多了一行 harness 写入时间
+    when: 给这次试验打分
+    then: 这一行时间不会造成失败；回答本身不对仍然失败

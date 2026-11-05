@@ -60,7 +60,7 @@ Permission Mode → Env Policy → File Policy → Tool 自身 approvalMode → 
 
 ### 阶段 3：执行 (executeToolCalls)
 
-- **并行批次**：`maxParallelToolCalls`（默认 8，`RAW_AGENT_MAX_PARALLEL_TOOLS`）——模型一次可能输出多个 tool_call，按上限分块，块内 `Promise.all` 并行、块间串行
+- **并行批次**：`maxParallelToolCalls`（默认 32，`RAW_AGENT_MAX_PARALLEL_TOOLS`）——模型一次可能输出多个 tool_call，按上限分块，块内 `Promise.all` 并行、块间串行
 - **生命周期钩子**：`pre_tool_use` → execute → `post_tool_use`，外部脚本可拦截/注入
 - **故障隔离**：单个工具超时/异常 → 该工具返回 `ok: false` + error content，**其余工具不受影响**
 

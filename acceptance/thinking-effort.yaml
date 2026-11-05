@@ -1,0 +1,23 @@
+id: thinking-effort
+title: 思考力度
+status: implemented
+requirement: |
+  现在这个有没有thinking Effect level的控制？没有就规划一下，加一个
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 还没有保存过思考力度
+    when: 发起下一轮对话
+    then: 发给模型的请求不包含思考力度，和加上这个控制之前一样
+  - id: AC-2
+    given: 在行为设置里把思考力度保存为低、中或高
+    when: 发起下一轮对话，并重新打开这项设置
+    then: 这一轮按刚保存的力度要求模型思考，设置仍是这一档，不用重启
+  - id: AC-3
+    given: 思考力度已经是高
+    when: 再把它保存为关闭，然后发起下一轮对话
+    then: 这一轮不再向模型要求思考力度
+  - id: AC-4
+    given: 思考力度已经是高
+    when: 系统自己做摘要或内部判断
+    then: 那次请求不带思考力度

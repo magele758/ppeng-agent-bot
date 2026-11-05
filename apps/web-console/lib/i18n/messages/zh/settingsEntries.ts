@@ -123,6 +123,25 @@ export const settingsEntries = {
     effective: '生效值',
     rollbackHint: '回退：在此选择 legacy 并保存。'
   },
+  thinkingEffort: {
+    title: '思考力度',
+    keywords: '思考 推理 力度 thinking effect level reasoning effort 低 中 高',
+    desc: '控制下一轮对话让模型思考多深。默认关闭，请求里不带力度，和现在一样。选低、中或高后，下一轮按这个力度思考，不用重启。',
+    fields: {
+      level: {
+        label: '力度',
+        hint: '下一轮对话生效。关闭时不向模型要求额外思考力度。'
+      }
+    },
+    options: {
+      off: { label: '关闭' },
+      low: { label: '低' },
+      medium: { label: '中' },
+      high: { label: '高' }
+    },
+    effective: '生效值',
+    note: '只影响对话回复。摘要和内部判断仍按原来的方式调用模型。上游若不接受这个力度，请改回关闭。'
+  },
   agentLoopEngine: {
     title: 'Agent 运行引擎',
     keywords: '内核 kernel 组装 档位 assembly drain 工具发射 消息堆积 inbox overflow 上限 底层 调度',

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   ValidationError,
+  attachExecutionFindings,
   buildOptionalToolGroupsPayload,
   canAccessSession,
   loadOptionalToolGroupsFromEnv,
@@ -247,7 +248,11 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
         guardSession(runtime, sessionId, auth);
         const limit = Number(url.searchParams.get('limit') ?? '500');
         const page = await runtime.listTracePage(sessionId, Number.isFinite(limit) ? limit : 500);
-        json(response, 200, { sessionId, events: page.events, omittedEarlier: page.omittedEarlier });
+        json(response, 200, attachExecutionFindings({
+          sessionId,
+          events: page.events,
+          omittedEarlier: page.omittedEarlier,
+        }));
       }
     },
     {

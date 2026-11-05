@@ -6,6 +6,7 @@ import {CorrectionCapture} from './LearningWorkbench';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { SystemMessageContent } from './SystemMessageContent';
 import { ModelRetryStatus } from './ModelRetryStatus';
+import { StreamLiveStatus } from './StreamLiveStatus';
 import type { RetryProgress } from '@/lib/model-retry';
 import type { StreamSegment } from '@/lib/stream-segments';
 import { formatStreamToolArgs } from '@/lib/stream-segments';
@@ -1183,11 +1184,8 @@ export function ChatTurnStreaming({
               {shown.hidden.map(renderSeg)}
             </SessionBriefDisclosure>
           ) : null}
-          {shown.segments.length === 0 ? (
-            shown.hidden.length > 0 ? null : <div className="chat-stream-placeholder muted">…</div>
-          ) : (
-            shown.segments.map(renderSeg)
-          )}
+          <StreamLiveStatus segments={segments} visibleCount={shown.segments.length} hiddenCount={shown.hidden.length} />
+          {shown.segments.length === 0 ? null : shown.segments.map(renderSeg)}
         </div>
       </div>
     </div>

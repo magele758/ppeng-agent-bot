@@ -683,6 +683,22 @@ export const play = {
     streaming: '助手（生成中）'
   },
 
+  live: {
+    summary: '点开查看已用时间、字数和速度',
+    waiting: '等待模型',
+    thinking: '正在思考',
+    writing: '正在写',
+    tool: '正在调用 {name}',
+    card: '正在画界面',
+    speed: '{rate} 字/秒',
+    speedNone: '还没有输出',
+    elapsedLabel: '已用',
+    speedLabel: '速度',
+    charsLabel: '已写出',
+    chars: '{count} 字',
+    doingLabel: '正在做'
+  },
+
   turns: {
     dispatchSubagent: '🤖 派发 SubAgent',
     createTeammate: '👥 创建协同队友',
