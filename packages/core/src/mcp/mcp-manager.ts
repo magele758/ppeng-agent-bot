@@ -20,6 +20,8 @@ export interface McpManagerDeps {
   tools: ToolContract<any>[];
   env: Record<string, string | undefined>;
   log: { warn: (msg: string) => void };
+  /** Granted plugin stdio servers. Called again on later turns so a new grant can connect. */
+  pluginMcpConfigs?: () => Array<{ command: string; args?: string[]; env?: Record<string, string>; cwd?: string }>;
 }
 
 function fenceMcp(label: string, body: string): string {
@@ -74,6 +76,9 @@ export class McpManager {
   private mcpExpansionDone = false;
   private readonly mcpStdioSessions: McpStdioSession[] = [];
   private readonly mcpSchemaMinifyLevel: number;
+  private readonly connectedPluginMcp = new Set<string>();
+  private pluginMcpSync: Promise<void> = Promise.resolve();
+  private nextStdioIndex = 0;
 
   constructor(private readonly deps: McpManagerDeps) {
     this.mcpSchemaMinifyLevel = parseMcpSchemaMinifyLevel(deps.env as NodeJS.ProcessEnv);
@@ -93,11 +98,13 @@ export class McpManager {
   }
 
   async ensureLoaded(sessionId: string): Promise<void> {
-    if (this.mcpExpansionDone) return;
-    if (!this.mcpToolsPromise) {
-      this.mcpToolsPromise = this.performMcpExpansion(sessionId);
+    if (!this.mcpExpansionDone) {
+      if (!this.mcpToolsPromise) {
+        this.mcpToolsPromise = this.performMcpExpansion(sessionId);
+      }
+      await this.mcpToolsPromise;
     }
-    await this.mcpToolsPromise;
+    await this.syncGrantedPluginMcp(sessionId);
   }
 
   /**
@@ -290,14 +297,38 @@ export class McpManager {
     }
   }
 
+  private syncGrantedPluginMcp(sessionId: string): Promise<void> {
+    const run = this.pluginMcpSync.then(() => this.syncGrantedPluginMcpOnce(sessionId));
+    this.pluginMcpSync = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }
+
+  private async syncGrantedPluginMcpOnce(sessionId: string): Promise<void> {
+    const configs = this.deps.pluginMcpConfigs?.() ?? [];
+    const fresh: Array<{ command: string; args?: string[]; env?: Record<string, string>; cwd?: string }> = [];
+    for (const cfg of configs) {
+      if (!cfg.command) continue;
+      const key = `${cfg.command}\0${(cfg.args ?? []).join('\0')}`;
+      if (this.connectedPluginMcp.has(key)) continue;
+      this.connectedPluginMcp.add(key);
+      fresh.push(cfg);
+    }
+    if (fresh.length === 0) return;
+    const expandStdio = envBool(this.deps.env as NodeJS.ProcessEnv, 'RAW_AGENT_MCP_EXPAND_STDIO', true);
+    await this.connectStdioMcpServers(fresh, expandStdio, sessionId);
+  }
+
   private async connectStdioMcpServers(
     stdioConfigs: ReturnType<typeof parseMcpStdioConfigs>,
     expandStdio: boolean,
     sessionId: string
   ): Promise<void> {
-    for (let si = 0; si < stdioConfigs.length; si++) {
-      const cfg = stdioConfigs[si];
+    for (const cfg of stdioConfigs) {
       if (!cfg) continue;
+      const si = this.nextStdioIndex++;
       const session = new McpStdioSession(si, cfg);
       try {
         await session.connect();

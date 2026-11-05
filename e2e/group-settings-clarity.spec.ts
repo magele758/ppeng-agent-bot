@@ -14,6 +14,7 @@ test('member mentions omit sidebar groups [AC:group-settings-clarity#AC-1]', asy
 test('settings are divided and still save [AC:group-settings-clarity#AC-2] [AC:group-settings-clarity#AC-3]', async ({ page }) => {
   await page.setViewportSize({ width: 857, height: 804 });
   const state = await setup(page);
+  await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
   await page.getByTestId('play-group-chat').getByRole('button', { name: '群聊设置', exact: true }).click();
   const settings = page.getByTestId('room-settings');
   await expect(settings.getByRole('group', { name: '基本信息' })).toBeVisible();

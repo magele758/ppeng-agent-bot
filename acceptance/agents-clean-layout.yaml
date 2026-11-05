@@ -1,0 +1,11 @@
+id: agents-clean-layout
+title: Bot 管理页清爽布局
+status: implemented
+requirement: |
+  这个界面里很多ui都是乱的，检查优化一下
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: Bot 名称、简介与 Agent 标识很长
+    when: 在桌面或窄屏浏览管理页
+    then: 内容不会越过卡片或产生页面横向滚动，卡片使用清晰的名称、简介和次要标识层级

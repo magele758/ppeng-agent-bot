@@ -7,11 +7,13 @@ test('task collaboration setting persists after reload and leaves old modes sele
   try {
     await page.goto('/#/bot');
     await page.getByRole('button', { name: `打开群聊 ${room.title}`, exact: true }).click();
+    await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
     await page.getByTestId('play-group-chat').getByRole('button', { name: '群聊设置', exact: true }).click();
     await page.getByTestId('group-reply-mode-task-collaboration').check();
     await expect.poll(async () => (await (await request.get(`/api/bot-rooms/${room.id}`)).json()).room.replyMode).toBe('task-collaboration');
     await page.reload();
     await page.getByRole('button', { name: `打开群聊 ${room.title}`, exact: true }).click();
+    await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
     await page.getByTestId('play-group-chat').getByRole('button', { name: '群聊设置', exact: true }).click();
     await expect(page.getByTestId('group-reply-mode-task-collaboration')).toBeChecked();
     await expect(page.getByTestId('group-reply-mode-coordinator')).toBeEnabled();

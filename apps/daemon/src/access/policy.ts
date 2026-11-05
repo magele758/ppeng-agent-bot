@@ -350,6 +350,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/bots', selfFiltered('bot')],
     ['GET /api/bots/:id', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],
     ['PATCH /api/bots/:id', owner('bot', byParam('id', (id) => botRef(l, id)), 'admin')],
+    ['DELETE /api/bots/:id', owner('bot', byParam('id', (id) => botRef(l, id)), 'admin')],
     ['POST /api/bots/:id/open', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],
     ['GET /api/bots/:id/materials', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],
     ['POST /api/bots/:id/materials/:materialId/reveal', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],

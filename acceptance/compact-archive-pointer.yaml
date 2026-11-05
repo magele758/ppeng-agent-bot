@@ -1,0 +1,24 @@
+id: compact-archive-pointer
+title: 压缩摘要带上原文位置
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  runAutoCompact 成功做闭区间 replace 时，把归档相对路径写进同一条 summary。有记忆附录时 working-log tail 不会贴上，所以路径必须在摘要正文里，不能靠另一条 appendix。
+  摘要空则 empty_summary 跳过。这段逻辑不要改。
+  在 replace 之前拿到 archive 路径。路径要同时出现在 replacement 的 text 和 session.summary 里。
+  没有路径（archive 未提供或返回空）时，摘要文本与今天一致。
+  有路径时加一两行，说明这是被压缩掉的原文位置，只在摘要缺了具体代码或报错时再读。不要把归档正文塞进摘要。
+  如果 compact 的 archive 没返回模型能 read_file 的相对路径，让它返回这种路径，再让 auto-compact 写进摘要。
+criteria:
+  - id: AC-1
+    given: 一段可以整段换成摘要的旧对话，并且压缩时能得到原文归档位置
+    when: 这次压缩成功，用一条摘要换掉那段旧对话
+    then: 换掉旧对话的那条摘要，以及会话上保存的摘要，是同一段文字，里面包含该归档位置，并说明这是被压缩掉的原文、只在摘要缺了具体代码或报错时再读；摘要里没有归档原文本身
+  - id: AC-2
+    given: 一段可以整段换成摘要的旧对话，但没有归档位置（没有归档，或归档没有返回位置）
+    when: 这次压缩成功
+    then: 摘要正文与不记录归档位置时相同，没有多出来的归档说明
+  - id: AC-3
+    given: 被压缩的原文写在工作区里的状态目录下
+    when: 归档这些原文
+    then: 给出的位置是相对工作区的路径，按这个路径能读到原文，返回值里没有原文正文

@@ -35,5 +35,8 @@ test('formatSubagentSummary truncates', () => {
     sessionId: 'sub1',
     summaryMaxChars: 20
   });
+  assert.equal(s.truncated, true);
   assert.ok(s.text.includes('truncated'));
+  const short = formatSubagentSummary({ text: 'fits', sessionId: 'sub1', summaryMaxChars: 20 });
+  assert.equal(short.truncated, undefined);
 });

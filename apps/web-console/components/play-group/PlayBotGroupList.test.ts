@@ -21,37 +21,19 @@ function deleteButtonParts(source: string) {
   };
 }
 
-test('群聊行默认不显示删除文字按钮 [AC:play-group-delete-menu#AC-1]', () => {
-  const { children } = deleteButtonParts(list);
-  assert.match(css, /\.play-group-menu\s*\{[^}]*opacity:\s*0/);
-  assert.match(css, /\.play-group-menu\s*\{[^}]*pointer-events:\s*none/);
-  assert.doesNotMatch(children, /deleteLabel|deleting|删除|Delete/);
-  assert.equal(list.includes('>删除<'), false);
-  assert.equal(list.includes('>Delete<'), false);
+test('群聊删除仅放在更多菜单 [AC:play-group-delete-menu#AC-1]', () => {
+  const menu=readFileSync(new URL('../RowActionMenu.tsx',import.meta.url),'utf8');
+  assert.match(menu,/popover="auto"/);
+  assert.match(menu,/popoverTarget=\{id\}/);
+  assert.ok(list.indexOf('<RowActionMenu') < list.indexOf('data-testid="play-group-delete"'));
 });
 
-test('悬停、键盘聚焦和触摸设备露出可聚焦的删除图标 [AC:play-group-delete-menu#AC-2]', () => {
-  const { openTag, children } = deleteButtonParts(list);
-  const menuAt = list.indexOf('data-testid="play-group-menu"');
-  const buttonAt = list.indexOf('data-testid="play-group-delete"');
-  assert.ok(menuAt > 0 && menuAt < buttonAt);
-  assert.match(children, /<WorkspaceIcon kind="trash" \/>/);
-  assert.match(openTag, /btn-icon/);
-  assert.match(openTag, /play\.group\.deleteAria/);
-  assert.match(icons, /'trash'/);
-  assert.match(icons, /trash:\s*'[^']+'/);
-  assert.match(css, /\.list-item--group:hover\s*>\s*\.play-group-menu/);
-  assert.match(css, /\.list-item--group:focus-within\s*>\s*\.play-group-menu/);
-  assert.match(css, /\.play-group-menu:focus-within/);
-  const hoverAt = css.indexOf('.list-item--group:hover > .play-group-menu');
-  assert.match(css.slice(hoverAt, hoverAt + 320), /opacity:\s*1/);
-  const mediaAt = css.search(/@media\s*\(\s*hover:\s*none\s*\)\s*,\s*\(\s*pointer:\s*coarse\s*\)/);
-  assert.ok(mediaAt >= 0);
-  assert.match(css.slice(mediaAt, mediaAt + 240), /opacity:\s*1/);
-  assert.match(zh.play.group.deleteAria, /删除群聊 \{title\}/);
-  assert.match(en.play.group.deleteAria, /Delete group chat \{title\}/);
-  assert.notEqual(zh.play.group.deleteAria, en.play.group.deleteAria);
-  assert.notEqual(zh.play.group.deleteLabel, en.play.group.deleteLabel);
+test('菜单删除保留键盘入口与无障碍名称 [AC:play-group-delete-menu#AC-2]', () => {
+  const {openTag}=deleteButtonParts(list);
+  assert.match(openTag,/type="button"/);
+  assert.match(openTag,/play\.group\.deleteAria/);
+  assert.match(zh.play.group.deleteAria,/删除群聊 \{title\}/);
+  assert.match(en.play.group.deleteAria,/Delete group chat \{title\}/);
 });
 
 test('点删除图标仍先确认，取消或失败都不误删 [AC:play-group-delete-menu#AC-3]', () => {

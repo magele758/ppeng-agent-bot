@@ -1,3 +1,4 @@
+import { defaultSkillCandidates } from '../skills/default-skill-candidates.js';
 import { RUNTIME_CAPABILITIES_KEY, runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import { HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
 import { toolDirectory } from '../tools/tool-exposure.js';
@@ -20,6 +21,7 @@ import {
   loadWorkspaceSkills,
   mergeSkillsByName
 } from '../skills/builtin-skills.js';
+import { ensureRepoTrust } from '../trust/repo-trust.js';
 import {
   buildSkillRoutingCooperative,
   type SkillRoutingMode,
@@ -280,7 +282,7 @@ function buildShortlistSkillBlock(routing: SkillRoutingResult, strict: boolean):
   }
   lines.push(
     strict
-      ? 'Strict: only call load_skill for names listed above this turn.'
+      ? 'Strict: load skills listed above or returned by search_skills in this session. You may load your own saved Bot skills directly by exact name or id. All skill visibility and allowlists still apply.'
       : 'If you need a skill not listed, you may still call load_skill; off-shortlist loads are traced for routing quality.'
   );
   return lines.join('\n');
@@ -290,7 +292,7 @@ function buildLazySkillBlock(): string {
   return [
     'Skill disclosure (lazy). The skill catalog is not listed here.',
     'Call search_skills with a short task query, then load_skill(name) for the best match.',
-    'Use exact names returned by search_skills.'
+    'Use exact names or ids returned by search_skills. Your own saved Bot skills can be loaded directly without searching.'
   ].join('\n');
 }
 
@@ -336,7 +338,7 @@ export class PromptBuilder {
   private skillGeneration = 0;
   private readonly sessionSkillCache = new Map<string, { key: string; skills: SkillSpec[] }>();
   private readonly stablePrefixCache = new Map<string, { key: string; text: string }>();
-  private readonly assembledBySession = new Map<string, { key: string; text: string; routing?: SkillRoutingResult }>();
+  private readonly assembledBySession = new Map<string, { key: string; text: string; stable: string; dynamic: string; routing?: SkillRoutingResult }>();
   private readonly routingBySession = new Map<string, SkillRoutingResult>();
   private readonly searchHitsBySession = new Map<string, string[]>();
   /** Exposes last cognitive phase info by session (set externally by runtime). */
@@ -358,6 +360,11 @@ export class PromptBuilder {
     return readAllowedSkillNames(session?.metadata);
   }
 
+  isOwnSkill(sessionId: string, skill: SkillSpec): boolean {
+    const session = this.deps.store.getSession?.(sessionId);
+    return Boolean(skill.ownerBotId && skill.ownerBotId === sessionBotId(session?.metadata));
+  }
+
   getSkillRoutingSettings() {
     return resolveSkillRoutingSettings({store:this.deps.store,env:process.env});
   }
@@ -366,7 +373,7 @@ export class PromptBuilder {
     return resolveSkillDisclosureMode({ store: this.deps.store, env: process.env });
   }
 
-  /** Names returned by the latest search_skills call (lazy + strict load_skill). */
+  /** Names returned by the latest search_skills call (strict load_skill in shortlist or lazy mode). */
   getLastSkillSearchNames(sessionId: string): string[] | undefined {
     return this.searchHitsBySession.get(sessionId);
   }
@@ -701,7 +708,7 @@ export class PromptBuilder {
     const routeStarted = Date.now();
     let routing!: SkillRoutingResult;
     try {
-      routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK, useFusion: config.fusion });
+      routing = await buildSkillRoutingCooperative(userText, defaultSkillCandidates(skills), { mode, topK, useFusion: config.fusion });
       const shortlistCandidates = [
         ...routing.routed.map((r) => ({
           id: r.skill.id,
@@ -814,27 +821,41 @@ export class PromptBuilder {
 
   /** Full system prompt = stable prefix + dynamic context (memory excluded). */
   async buildSystemPrompt(ctx: PromptContext, messages: SessionMessage[]): Promise<string> {
+    return (await this.buildSystemPromptParts(ctx, messages)).text;
+  }
+
+  /**
+   * `stable` is the cacheable prefix. `dynamic` already includes runtime
+   * instructions. Joining them reproduces today's system prompt.
+   */
+  async buildSystemPromptParts(
+    ctx: PromptContext,
+    messages: SessionMessage[]
+  ): Promise<{ stable: string; dynamic: string; text: string }> {
     const skillSelect = chainHas(resolveJevChain(this.deps.store), 'skillSelect');
     const skills = await this.skillsForSession(ctx.session.id);
     const key = skillSelect ? '' : this.assembledPromptKey(ctx, messages, skills);
     const hit = skillSelect ? undefined : this.assembledBySession.get(ctx.session.id);
     if (hit && hit.key === key) {
       if (hit.routing) this.routingBySession.set(ctx.session.id, hit.routing);
-      return hit.text;
+      return { stable: hit.stable, dynamic: hit.dynamic, text: hit.text };
     }
     const started = Date.now();
     try {
-      const stablePrefix = this.buildStablePrefix(ctx);
+      const stable = this.buildStablePrefix(ctx);
       const dynamicContext = await this.buildDynamicContext(ctx, messages);
-      const text = [stablePrefix, dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
+      const dynamic = [dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
+      const text = [stable, dynamic].filter(Boolean).join('\n\n---\n\n');
       if (!skillSelect) {
         this.assembledBySession.set(ctx.session.id, {
           key,
           text,
+          stable,
+          dynamic,
           routing: this.routingBySession.get(ctx.session.id)
         });
       }
-      return text;
+      return { stable, dynamic, text };
     } finally {
       emitStartupPhase(ctx.session.id, {
         phase: 'system_prompt',
@@ -885,8 +906,9 @@ export class PromptBuilder {
   async allSkills(): Promise<SkillSpec[]> {
     if (!this.workspaceSkillsPromise) {
       this.workspaceSkillsPromise = (async () => {
+        const repoTrusted = !this.deps.stateDir || ensureRepoTrust(this.deps.stateDir, this.deps.repoRoot).trusted;
         const [ws, user, ag] = await Promise.all([
-          loadWorkspaceSkills(this.deps.repoRoot),
+          repoTrusted ? loadWorkspaceSkills(this.deps.repoRoot) : Promise.resolve([]),
           loadStateDirSkills(this.deps.stateDir),
           loadAgentsDirSkills()
         ]);

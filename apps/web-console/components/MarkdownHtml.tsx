@@ -1,23 +1,10 @@
 'use client';
 
 import { memo } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { renderMarkdown } from '@/lib/markdown';
 import { stripVisibleClockMarks } from '@/lib/visible-clock';
-
-/**
- * Memoized HTML host. React compares `dangerouslySetInnerHTML` with ===, so a new
- * `{__html}` object on every parent render replaces the DOM even when the string
- * is unchanged. That clears text selection and looks like the transcript is refreshing.
- */
-export const StaticHtml = memo(function StaticHtml({
-  html,
-  className
-}: {
-  html: string;
-  className?: string;
-}) {
-  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
-});
+import { ChatMarkdownHost } from './ChatMarkdownHost';
 
 export const MarkdownHtml = memo(function MarkdownHtml({
   text,
@@ -26,5 +13,13 @@ export const MarkdownHtml = memo(function MarkdownHtml({
   text: string;
   className?: string;
 }) {
-  return <StaticHtml className={className} html={renderMarkdown(stripVisibleClockMarks(text))} />;
+  const { t } = useI18n();
+  return (
+    <ChatMarkdownHost
+      className={className}
+      html={renderMarkdown(stripVisibleClockMarks(text))}
+      copyLabel={t('play.markdown.copyCode')}
+      copiedLabel={t('play.markdown.copied')}
+    />
+  );
 });

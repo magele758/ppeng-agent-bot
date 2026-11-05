@@ -24,7 +24,7 @@ export function ReadableMessage({ text, role, messageKey }: { text: string; role
   if (context) return <><details className="routine-context-card"><summary>{t('polish.routineContext')}</summary><pre>{context[0]}</pre></details><MarkdownHtml className="chat-bubble__body chat-bubble__md" text={body.slice(context[0].length)} /></>;
   if (body.length <= 4000) return <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={body} />;
   return <section className="long-message" data-testid="long-message">
-    {expanded ? <pre className="long-message__full">{body}</pre> : <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={body.slice(0, 1600) + '\n…'} />}
+    <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={expanded ? body : body.slice(0, 1600) + '\n…'} />
     <button type="button" className="btn btn-ghost" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{t(expanded ? 'polish.collapse' : 'polish.expand')}</button>
   </section>;
 }

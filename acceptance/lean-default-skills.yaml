@@ -1,0 +1,18 @@
+id: lean-default-skills
+title: 精简默认技能并保留按需发现
+status: implemented
+requirement: 按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 系统内置规划、任务、子代理和团队技能
+    when: 查看精简后的目录并加载旧名称
+    then: 规划与任务、子代理与团队各合并为一项，旧名称仍能找到合并后的内容
+  - id: AC-2
+    given: 默认使用短名单展示技能
+    when: 开始任务并搜索教学、长任务或其他外部技能
+    then: 共享默认推荐仅含两项合并技能，其他技能可搜索后加载，全目录展示仍可用
+  - id: AC-3
+    given: Bot 已有自建技能
+    when: 使用精简后的默认目录
+    then: 自建技能内容、启用状态、推荐和直接加载能力不变，仍受原有权限限制

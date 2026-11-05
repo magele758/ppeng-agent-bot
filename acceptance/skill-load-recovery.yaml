@@ -1,0 +1,20 @@
+id: skill-load-recovery
+title: 自建技能与搜索结果可加载
+status: implemented
+requirement: |
+  bot自己创建的skill是要能加载的，不然生成的skill都没意义了
+  而且其他的skill，按道理是要能通过skill-search找回来的啊，这个路径现在是通的吗？
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: Bot 已保存自己的技能且启用严格加载
+    when: 按名称或 ID 加载未进入短名单的自建技能
+    then: 能读取技能正文，无需先搜索，短名单和懒加载两种模式均可用
+  - id: AC-2
+    given: 严格模式下需要使用不在短名单的其他技能
+    when: 搜索命中后加载该技能
+    then: 在当前会话中加载成功，其他会话不能借用搜索结果
+  - id: AC-3
+    given: 技能被禁用、未授权共享或不在允许名单内
+    when: 直接加载或搜索后加载
+    then: 仍拒绝读取，搜索和自建技能路径不绕过已有权限与可见性

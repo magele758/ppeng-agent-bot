@@ -72,6 +72,8 @@ export interface ToolLoopResult {
   durationMs?: number;
   /** The execution log already has this attempt's tool_end. */
   traceLogged?: boolean;
+  /** pre_tool_use replaced the tool input before execute. */
+  hookRewrote?: boolean;
 }
 
 
@@ -309,6 +311,14 @@ function traceToolEndPayload(
   if (typeof result.durationMs === 'number') payload.durationMs = result.durationMs;
   if (result.problem?.code) payload.code = result.problem.code;
   if (result.hold === 'approval') payload.hold = 'approval';
+  if (result.hookRewrote) payload.hookRewrote = true;
+  const code = result.problem?.code ?? '';
+  payload.outcome = result.hold === 'approval' ? 'ask' : result.ok ? 'ok' : 'error';
+  payload.permission = result.hold === 'approval'
+    ? 'ask'
+    : code.startsWith('PERMISSION_') || code === 'PRE_TOOL_USE_BLOCKED'
+      ? 'deny'
+      : 'allow';
   const childSessionId = childSessionIdFromToolResult(result);
   if (childSessionId) payload.childSessionId = childSessionId;
   return payload;
@@ -427,6 +437,7 @@ export function checkToolApprovals(
     const modeGate = applyPermissionModeGate(permissionMode, tool.name, tool.approvalMode);
     if (modeGate?.action === 'deny') return false;
     if (modeGate?.action === 'require_approval') return true;
+    if (tool.access === 'other' && permissionMode !== 'bypass') return true;
     if (modeGate?.action === 'proceed' && (permissionMode === 'bypass' || permissionMode === 'acceptEdits')) return false;
 
     if (policyRequiresApproval(policy, tool.name)) return true;
@@ -726,7 +737,8 @@ function holdForHookAsk(
   tool: ToolContract<Record<string, unknown>>,
   toolCall: ToolCallPart,
   sessionId: string,
-  message: string | undefined
+  message: string | undefined,
+  hookRewrote?: boolean
 ): ToolLoopResult {
   const idemKey = hookAskKey(toolCall);
   host.createApproval({
@@ -744,6 +756,7 @@ function holdForHookAsk(
     content: '',
     hold: 'approval',
     traceLogged: true,
+    ...(hookRewrote ? { hookRewrote: true } : {}),
   };
   host.emitTrace(sessionId, { kind: 'tool_end', payload: traceToolEndPayload(host, held, toolCall) });
   return held;
@@ -757,14 +770,15 @@ function resolvePreToolAsk(
   sessionId: string,
   message: string | undefined,
   approvalFor: (key: string) => ApprovalRecord | undefined,
-  permissionMode: string
+  permissionMode: string,
+  hookRewrote?: boolean
 ): ToolLoopResult | undefined {
   const idemKey = hookAskKey(toolCall);
   const latest = approvalFor(idemKey);
   if (latest && latest.status === 'rejected') return userRejectedToolResult(toolCall, tool.name);
   if (latest && latest.status === 'approved') return undefined;
   if (permissionMode === 'bypass') return undefined;
-  return holdForHookAsk(host, tool, toolCall, sessionId, message);
+  return holdForHookAsk(host, tool, toolCall, sessionId, message, hookRewrote);
 }
 
 // ============================================================================
@@ -958,6 +972,8 @@ async function executeScopedTool(
     pre = read.pre;
   }
 
+  const hookRewrote = pre.input !== undefined && stableJson(pre.input) !== stableJson(toolCall.input);
+
   if (pre.permissionDecision === 'block') {
     return {
       toolCallId: toolCall.toolCallId,
@@ -971,11 +987,12 @@ async function executeScopedTool(
         pre.message ?? 'blocked by pre_tool_use hook',
         { title: 'Tool blocked by hook', status: 403 }
       ),
+      ...(hookRewrote ? { hookRewrote: true } : {}),
     };
   }
 
   if (pre.permissionDecision === 'ask') {
-    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message, approvalFor, resolvePermissionMode(context.session.metadata, host.env));
+    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message, approvalFor, resolvePermissionMode(context.session.metadata, host.env), hookRewrote);
     if (asked) return asked;
   }
 
@@ -1052,9 +1069,11 @@ async function executeScopedTool(
       media: result.media,
       artifacts: result.artifacts,
       metadata: result.metadata,
+      ...(hookRewrote ? { hookRewrote: true } : {}),
     };
   } catch (error) {
-    return toolExceptionResult(host, tool, toolCall, context, sessionId, execInput, snapshot, completed, exportSpan, error, attemptTrace(entered, startedAt));
+    const failed = await toolExceptionResult(host, tool, toolCall, context, sessionId, execInput, snapshot, completed, exportSpan, error, attemptTrace(entered, startedAt));
+    return hookRewrote ? { ...failed, hookRewrote: true } : failed;
   }
 }
 

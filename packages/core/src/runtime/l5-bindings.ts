@@ -228,6 +228,15 @@ export function fanoutKernelLatch<TEvent>(
   };
 }
 
+function systemPromptCtx<T extends { session: { id: string; summary?: string; todo?: unknown[] } }>(
+  rt: Partial<Pick<L5Bindable, 'store'>>,
+  ctx: T
+): T {
+  return rt.store && hasRevokedSharedContext(rt.store, ctx.session.id)
+    ? { ...ctx, session: { ...ctx.session, summary: undefined, todo: [] } }
+    : ctx;
+}
+
 export function bindMemoryAppendixPrompt(rt: Pick<L5Bindable, 'promptBuilder' | 'stateDir'> & Partial<Pick<L5Bindable, 'store'>>): TurnKernelHost['promptBuilder'] {
   const prompt = rt.promptBuilder;
   const sharedContext = rt.store ? new BotFunctionalGroupService(rt.store) : undefined;
@@ -237,10 +246,8 @@ export function bindMemoryAppendixPrompt(rt: Pick<L5Bindable, 'promptBuilder' | 
     },
     getRouting: (sessionId) => prompt.getRouting(sessionId),
     buildStablePrefix: (ctx) => prompt.buildStablePrefix(ctx),
-    buildSystemPrompt: (ctx, messages) => prompt.buildSystemPrompt(
-      rt.store && hasRevokedSharedContext(rt.store,ctx.session.id)
-        ? {...ctx,session:{...ctx.session,summary:undefined,todo:[]}}
-        : ctx, messages),
+    buildSystemPrompt: (ctx, messages) => prompt.buildSystemPrompt(systemPromptCtx(rt, ctx), messages),
+    buildSystemPromptParts: (ctx, messages) => prompt.buildSystemPromptParts(systemPromptCtx(rt, ctx), messages),
     buildMemoryAppendix: async (ctx, opts) => {
       const memory = await prompt.buildMemoryAppendixAsync(ctx, {
         query: opts?.query,

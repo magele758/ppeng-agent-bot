@@ -1991,20 +1991,23 @@ export class AnthropicMessagesAdapter implements ModelAdapter {
       input.resolveMediaDataUrl
     );
 
-    // Build system prompt array, merging refusal preservation reminder if present
+    // Cache only the stable prefix when the caller split it out. Dynamic
+    // context, the last-turn nudge, and the refusal reminder stay uncached.
+    // With no prefix, the last block is cached, matching the previous payload.
     const systemBlocks: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [];
-    systemBlocks.push({
-      type: 'text',
-      text: input.systemPrompt
-    });
-    if (refusalReminder) {
-      systemBlocks.push({
-        type: 'text',
-        text: refusalReminder
-      });
+    const stable = input.cacheStablePrefix;
+    const split = typeof stable === 'string' && stable.length > 0 && input.systemPrompt.startsWith(stable);
+    if (split) {
+      systemBlocks.push({ type: 'text', text: stable, cache_control: { type: 'ephemeral' } });
+      const rest = input.systemPrompt.slice(stable.length);
+      if (rest.length > 0) systemBlocks.push({ type: 'text', text: rest });
+    } else {
+      systemBlocks.push({ type: 'text', text: input.systemPrompt });
     }
-    // Only the last block gets cache_control so we can cache the base system prompt
-    systemBlocks[systemBlocks.length - 1]!.cache_control = { type: 'ephemeral' };
+    if (refusalReminder) {
+      systemBlocks.push({ type: 'text', text: refusalReminder });
+    }
+    if (!split) systemBlocks[systemBlocks.length - 1]!.cache_control = { type: 'ephemeral' };
 
     return {
       model: this.options.model,
