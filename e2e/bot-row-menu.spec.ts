@@ -53,3 +53,38 @@ test('分组与群聊写入选中的目标 [AC:bot-row-menu#AC-1]', async ({page
     await expect(page.getByRole('dialog')).toHaveCount(0);
   }
 });
+
+test('隐藏操作只出现在菜单且允许取消 [AC:bot-row-menu#AC-3]', async ({page}) => {
+  await page.goto('/#/bot');
+  const row = page.locator('.list-item--bot-chat').filter({has:page.getByTestId('bot-row-menu')}).first();
+  await row.hover();
+  await expect(row.locator('.session-item__delete')).toHaveCount(0);
+  await row.getByTestId('bot-row-menu').click();
+  page.once('dialog', async dialog => {
+    expect(dialog.message()).toContain('隐藏');
+    await dialog.dismiss();
+  });
+  await page.getByTestId('bot-row-actions').getByRole('button',{name:'隐藏 Bot',exact:true}).click();
+  await expect(row).toBeVisible();
+});
+
+test('目标弹窗长列表在小屏内滚动 [AC:bot-row-menu#AC-4]', async ({page}) => {
+  await page.route('**/api/bot-functional-groups',r=>r.fulfill({json:{groups:Array.from({length:30},(_,i)=>({id:String(i),name:'功能分组 '+i,botIds:[]}))}}));
+  await page.goto('/#/bot');
+  await page.getByTestId('bot-row-menu').first().click();
+  await page.getByTestId('bot-row-actions').getByRole('button',{name:'加入分组',exact:true}).click();
+  const dialog=page.getByRole('dialog');
+  for (const width of [907,360]) {
+    await page.setViewportSize({width,height:640});
+    const box=await dialog.boundingBox();
+    expect(box!.width).toBeLessThanOrEqual(480);
+    expect(box!.x).toBeGreaterThanOrEqual(12);
+    await expect(dialog.getByRole('button',{name:'取消',exact:true})).toBeInViewport();
+    const list=dialog.locator('.bot-row-dialog__body');
+    await expect(list).toHaveCSS('overflow-y','auto');
+    await expect(dialog.locator('.bot-row-dialog__head')).toHaveCSS('padding-left','24px');
+    await list.evaluate(node=>node.scrollTop=node.scrollHeight);
+    await expect(dialog.getByRole('button',{name:'功能分组 29',exact:true})).toBeInViewport();
+    await page.screenshot({path:`/tmp/bot-menu-modal-${width}.png`});
+  }
+});

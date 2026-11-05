@@ -110,7 +110,7 @@ export const play = {
     saveFailed: '回复方式没有保存',
     saved: '已保存',
   },
-  rowMenu: { advanced: '高级设置与用量', label: '{name} 的更多操作', details: '查看详情', cron: '查看定时任务', group: '加入分组', room: '加入群聊', remove: '从列表移除', empty: '没有可加入的目标' },
+  rowMenu: { loading: '正在加载…', advanced: '高级设置与用量', label: '{name} 的更多操作', details: '查看详情', cron: '查看定时任务', group: '加入分组', room: '加入群聊', remove: '隐藏 Bot', empty: '没有可加入的目标' },
   entry: { new: '新建', remove: '移除', confirmRemove: '确认移除', removeBot: '移除 Bot「{name}」', removeBotConfirm: '移除 Bot「{name}」？它将从 Bot 列表隐藏，已有对话、群聊和任务会保留；这不会删除会话。', removeFailed: '移除失败：{error}' },
   groupModel: {
     settings: "默认模型",

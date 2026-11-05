@@ -44,8 +44,10 @@ export function sourceScopeVerdict(
   tool: Pick<ToolContract<any>, 'name' | 'sideEffectLevel'>,
   args: unknown
 ): SourceScopeVerdict {
+  const approval = latestScopeApproval(store, ledger, sid, tool.name, args);
+  if (approval?.status === 'rejected') return 'rejected';
   if (ledger.allowed(sid, tool.name, tool.sideEffectLevel, args)) return 'allowed';
-  return latestScopeApproval(store, ledger, sid, tool.name, args)?.status ?? 'missing';
+  return approval?.status ?? 'missing';
 }
 
 /** A person is watching this root chat; routines, subagents and unattended wakes are not. */

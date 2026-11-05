@@ -71,6 +71,7 @@ test('an Auto-review card approved after exposure authorizes the same call carry
 test('a scope-refused call in an attended chat gets one approval card, runs once approved, stays refused when rejected [AC:local-source-unlock#AC-2]', async (t) => {
   const f = fixture(t);
   await exposeWithLocalRead(f);
+  new SourceLedger(f.store).configure(f.session.id, { allowedEffects: [] });
   assert.equal(f.gate({ command: COUNT }, 'g1'), 'waiting');
   assert.equal(f.gate({ command: COUNT, requestSmartModeApproval: true }, 'g2'), 'waiting');
   const cards = f.store.listApprovals().filter((a) => a.sessionId === f.session.id);
@@ -99,4 +100,31 @@ test('routine and unattended sessions keep the immediate scope denial without a 
   assert.equal(f.store.listApprovals().length, 0);
   assert.match((await f.run({ command: COUNT }, 'r')).content, /source_scope_denied/);
   assert.deepEqual(f.ran, []);
+});
+
+test('Auto direct chat continues ordinary diagnostics after output [AC:auto-source-continuity#AC-1]', async t => {
+  const f = fixture(t);
+  await exposeWithLocalRead(f);
+  const input = { command: 'ps -o pid,ppid,etime,command -p 56921; lsof -iTCP -sTCP:LISTEN; curl -sS -m 3 http://127.0.0.1:28790/' };
+  assert.equal(f.gate(input, 'diagnostic'), 'proceed');
+  assert.equal((await f.run(input, 'diagnostic')).ok, true);
+  assert.equal(f.store.listApprovals().length, 0);
+});
+
+test('Auto source continuity honors explicit scope and high risk [AC:auto-source-continuity#AC-2]', async t => {
+  const f = fixture(t);
+  await exposeWithLocalRead(f);
+  assert.equal(f.gate({command:'rm -rf /tmp/sample', requestSmartModeApproval:true},'risk'),'waiting');
+  new SourceLedger(f.store).configure(f.session.id, {allowedEffects:[]});
+  assert.equal(f.gate({command:'ps aux'},'scope'),'waiting');
+});
+
+test('Auto continuity never overrides an explicit rejection [AC:auto-source-continuity#AC-2]', async t => {
+  const f = fixture(t);
+  await exposeWithLocalRead(f);
+  const input = {command:'ps aux'};
+  const card=f.store.createApproval({sessionId:f.session.id,toolName:'bash',args:input,reason:'source scope',idempotencyKey:'source-scope:diagnostic'});
+  f.store.updateApproval(card.id,'rejected');
+  assert.match((await f.run(input,'denied')).content,/source_scope_denied/);
+  assert.deepEqual(f.ran,[LS]);
 });
