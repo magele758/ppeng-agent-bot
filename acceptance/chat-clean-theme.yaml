@@ -1,0 +1,19 @@
+id: chat-clean-theme
+title: 清爽的浅色阅读界面
+status: implemented
+requirement: |
+  感觉页面特别脏，帮我把markdown的渲染和整个页面配色和背景再调整一下，要干净清爽
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 使用经典浅色外观
+    when: 浏览页面和阅读 Markdown
+    then: 页面以纯色分区，正文使用柔和深色，输入区无玻璃高光和投影
+  - id: AC-2
+    given: 用户发言和助手回复交替出现
+    when: 使用经典浅色主题阅读和输入
+    then: 用户消息为浅灰圆角气泡，助手回复之间有留白，输入区为白底，文本框位于操作按钮上方
+  - id: AC-3
+    given: 在经典浅色下浏览会话或群聊
+    when: 选择列表条目并在群聊中输入
+    then: 两种列表使用相同的圆角选中样式，群聊输入框与会话共用内容栏宽和上下两行布局

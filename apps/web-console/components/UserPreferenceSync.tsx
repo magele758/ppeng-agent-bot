@@ -5,10 +5,12 @@ import { createPreferenceSync } from '@/lib/user-preference-sync';
 import { acknowledgePreferences, scopedLegacyPreferences, pendingPreferences, receivePreferences } from '@/lib/user-preference-storage';
 import { currentTheme, THEME_CHANGED_EVENT } from '@/lib/theme';
 import { paintSkinAttribute, readSkin, SKIN_CHANGED_EVENT } from '@/lib/skin';
+import { applyChatWidth } from '@/lib/chat-width';
 import { normalizeFontSize } from '@/lib/font-size';
 import { SESSION_BRIEF_CHANGED_EVENT } from '@/lib/session-brief';
 
 function applyAppearance(): void {
+ applyChatWidth();
  const root = document.documentElement;
  root.setAttribute('data-theme',currentTheme());
  paintSkinAttribute(root, readSkin());

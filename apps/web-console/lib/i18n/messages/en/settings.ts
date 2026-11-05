@@ -1,4 +1,5 @@
 export const settings = {
+  chatWidth: { title: 'Content width', keywords: 'chat width margins spacing', mode: 'Layout', center: 'Centered', full: 'Full width', gap: 'Extra side spacing', pixels: '{value} px' },
   debugDisplay: {
   "title": "Debug information",
   "keywords": "debug goals progress trace internals",
