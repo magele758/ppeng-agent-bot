@@ -33,6 +33,7 @@ test('classic actual work switches list idle motion to continuous work and back 
  counts={};await expect(face(a.name)).toHaveAttribute('data-face-working','false');
  await expect(page.getByTestId('room-working-members')).toHaveCount(0);
  await expect(bob).toHaveCSS('animation-name','bot-face-idle-body');
+ await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
  await page.getByRole('button', { name: '群聊设置', exact: true }).click();
  const member=page.getByTestId(`room-member-face-${a.id}`).locator('[data-bob]');
  const stillA=await member.getAttribute('transform');await page.waitForTimeout(420);expect(await member.getAttribute('transform')).toEqual(stillA);

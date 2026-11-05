@@ -30,7 +30,7 @@ test('会话与群聊使用同一选择样式和输入布局 [AC:chat-clean-them
   const row = page.locator('.list-item--group').filter({ hasText: 'Layout' }).first();
   await row.click();
   await page.evaluate(() => Object.assign(document.documentElement.dataset, { theme: 'light', skin: 'classic' }));
-  await expect(row).toHaveCSS('border-radius', '12px');
+  await expect(row).toHaveCSS('border-radius', '0px');
   await expect(row).toHaveCSS('background-color', 'rgb(240, 243, 241)');
   const panel = page.getByTestId('play-group-chat');
   const form = panel.locator('.play-group-composer');

@@ -7,6 +7,7 @@ import type { PromptBuilder } from '../model/prompt-builder.js';
 import { isSkillAllowed } from '../skills/skill-allowlist.js';
 import type { SkillManifest } from '../skills/skill-manifest.js';
 import { discloseSkillBody, formatDisclosedSkillContent } from '../skills/skill-disclosure.js';
+import type { SkillSpec } from '../types.js';
 import type { TraceEvent } from '../stores/trace.js';
 
 export interface SkillLoadHost {
@@ -63,6 +64,20 @@ export async function resolveSkillSearch(
   };
 }
 
+function requiresSkillDiscovery(host: SkillLoadHost, skill: SkillSpec, sessionId: string): boolean {
+  if (host.promptBuilder.isOwnSkill?.(sessionId, skill)) return false;
+  const names = host.promptBuilder.getLastSkillSearchNames(sessionId) ?? [];
+  return !names.includes(skill.id) && !names.includes(skill.name);
+}
+
+function strictSkillDiscovery(host: SkillLoadHost, skill: SkillSpec, sessionId: string): boolean {
+  const disclosure = host.promptBuilder.getSkillDisclosure();
+  const settings = host.promptBuilder.getSkillRoutingSettings();
+  if (disclosure === 'full' || !settings.strictLoad) return false;
+  if (disclosure !== 'lazy' && settings.routingMode === 'legacy') return false;
+  return requiresSkillDiscovery(host, skill, sessionId);
+}
+
 export async function resolveSkillLoad(
   host: SkillLoadHost,
   name: string,
@@ -115,10 +130,7 @@ export async function resolveSkillLoad(
       ? true
       : shortlist.has(found.name) || shortlist.has(found.id);
   const inSearch = searchNames.has(found.name) || searchNames.has(found.id);
-  const isStrict =
-    disclosure !== 'full' &&
-    settings.strictLoad &&
-    (disclosure === 'lazy' || mode !== 'legacy');
+  const isStrict = strictSkillDiscovery(host, found, sessionId);
 
   if (isStrict && disclosure === 'lazy') {
     if (searchNames.size === 0) {

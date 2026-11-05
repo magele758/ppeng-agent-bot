@@ -11,6 +11,7 @@ test('群聊设置改名称后能保存，不必等历史，保存就在名称�
   try {
     await page.goto('/#/bot');
     await page.getByRole('button', { name: `打开群聊 ${title}`, exact: true }).click();
+    await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
     await page.getByTestId('play-group-chat').getByRole('button', { name: '群聊设置', exact: true }).click();
     const settings = page.getByTestId('room-settings');
     await expect(settings.getByTestId('room-save')).toBeVisible();
@@ -31,6 +32,7 @@ test('群聊设置改名称后能保存，不必等历史，保存就在名称�
     await expect.poll(async () => (await (await request.get(`/api/bot-rooms/${room.id}`)).json()).room.title).toBe(renamed);
     await page.reload();
     await page.getByRole('button', { name: `打开群聊 ${renamed}`, exact: true }).click();
+    await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
     await page.getByTestId('play-group-chat').getByRole('button', { name: '群聊设置', exact: true }).click();
     await expect(page.getByTestId('room-settings-title')).toHaveValue(renamed);
   } finally {

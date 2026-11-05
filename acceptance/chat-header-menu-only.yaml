@@ -1,0 +1,12 @@
+id: chat-header-menu-only
+title: 聊天顶部只保留更多入口
+status: implemented
+requirement: |
+  这个感觉就没用啊
+  这个里面的展开和收起边栏的功能也放到菜单里，我看还有停止的按钮，那个在对话框里就有，不用保留
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 打开 Bot 对话
+    when: 查看顶部和更多菜单
+    then: 顶部没有重复停止按钮，菜单没有重新运行会话，展开和收起边栏在菜单内并可正常切换

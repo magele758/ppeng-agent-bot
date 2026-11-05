@@ -23,7 +23,7 @@ async function destinations(kind: Picker, botId: string): Promise<Destination[]>
   return rooms.filter(room => room.status !== 'paused' && !room.botIds.includes(botId)).map(room => ({id:room.id, name:room.title}));
 }
 
-export function BotRowMenu({bot, details, remove}: {bot:BotInfo; details:()=>void; remove:()=>void}) {
+export function BotRowMenu({bot, details, remove, onDeleted}: {bot:BotInfo; details:()=>void; remove:()=>void; onDeleted:()=>void}) {
   const { t } = useI18n();
   const id = useId();
   const pop = useRef<HTMLDivElement>(null);
@@ -50,6 +50,17 @@ export function BotRowMenu({bot, details, remove}: {bot:BotInfo; details:()=>voi
     } catch (cause) { setError(String(cause)); }
     finally { setBusy(false); }
   }
+  async function destroy() {
+    closeMenu();
+    if (!window.confirm(t('play.rowMenu.deleteConfirm',{name:bot.name}))) return;
+    setBusy(true); setError('');
+    try {
+      await api('/api/bots/'+encodeURIComponent(bot.id),{method:'DELETE'});
+      window.dispatchEvent(new Event('lab-bot-placement-saved'));
+      onDeleted();
+    } catch(cause) { setError(String(cause)); }
+    finally { setBusy(false); }
+  }
   const label = t('play.rowMenu.label',{name:bot.name});
   return <span onKeyDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
     <button type="button" className="btn btn-ghost bot-row-trigger" data-testid="bot-row-menu" aria-label={label} popoverTarget={id}
@@ -63,7 +74,9 @@ export function BotRowMenu({bot, details, remove}: {bot:BotInfo; details:()=>voi
       <button onClick={()=>void choose('group')}>{t('play.rowMenu.group')}</button>
       <button onClick={()=>void choose('room')}>{t('play.rowMenu.room')}</button>
       <button onClick={()=>{closeMenu(); remove();}}>{t('play.rowMenu.remove')}</button>
+      <button disabled={busy} className="bot-row-danger" onClick={()=>void destroy()}>{t('play.rowMenu.delete')}</button>
     </div>
+    <BotMenuError error={error} hidden={Boolean(view)} onClose={()=>setError('')} />
     {view && createPortal(<BotEntryDialog label={label}>
       <div className="bot-row-dialog" data-view={view}>
         <header className="bot-row-dialog__head">
@@ -84,4 +97,14 @@ export function BotRowMenu({bot, details, remove}: {bot:BotInfo; details:()=>voi
       </div>
     </BotEntryDialog>, document.body)}
   </span>;
+}
+
+function BotMenuError({error,hidden,onClose}:{error:string;hidden:boolean;onClose:()=>void}) {
+  const {t}=useI18n();
+  if(hidden || !error) return null;
+  return createPortal(<BotEntryDialog label={t('play.rowMenu.delete')}><div className="bot-row-dialog">
+    <header className="bot-row-dialog__head"><h3>{t('play.rowMenu.delete')}</h3></header>
+    <div className="bot-row-dialog__body"><p role="alert">{error}</p></div>
+    <footer className="bot-row-dialog__foot"><button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button></footer>
+  </div></BotEntryDialog>,document.body);
 }
