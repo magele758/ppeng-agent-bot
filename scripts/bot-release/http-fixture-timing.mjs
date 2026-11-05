@@ -43,6 +43,13 @@ export function resolveSmokeReadQueueCap(readQueueCap, coverage = false) {
   return readQueueCap;
 }
 
+/** Coverage slows fixed-window reads. One pending slot per client then rejects planned reads. */
+export function smokeFixedReadPendingCap(clients, coverage) {
+  if (!Number.isInteger(clients) || clients < 1) throw new Error('Fixed read clients must be a positive integer');
+  if (!coverage) return 1;
+  return Math.ceil(SHARED_RUNNER_SMOKE_READ_QUEUE_CAP / clients);
+}
+
 export function soakTiming(smoke, smokeSeconds, readEveryMs, readQueueCap, drainSeconds, coverage = false) {
   return {
     mode: smoke ? 'compressed-harness-fixture' : 'full-http-soak',
