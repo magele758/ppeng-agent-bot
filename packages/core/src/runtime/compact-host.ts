@@ -12,7 +12,7 @@ function compactForce(opts: { force?: boolean } | undefined, messageCount: numbe
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import { lifecycleBlocks, runLifecycleHook } from '../hooks/lifecycle-hooks.js';
 import { createLogger } from '../logger.js';
 import { resolveBotMemoryAgentId } from '../memory/bot-memory-scope.js';
@@ -169,6 +169,19 @@ export interface CompactHost {
   prepareMessagesForModel(session: SessionRecord, messages: SessionMessage[]): Promise<SessionMessage[]>;
 }
 
+/**
+ * read_file resolves a relative path against the workspace. stateDir defaults
+ * to `<workspace>/.agent-state`, so the parent of stateDir is that root.
+ * Falls back to an absolute path only when the file is outside that parent.
+ */
+function archivePathForModel(stateDir: string, filePath: string): string {
+  const rel = relative(resolve(stateDir, '..'), resolve(filePath));
+  if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')) {
+    return resolve(filePath);
+  }
+  return rel.split(sep).join('/');
+}
+
 export async function archiveMessages(
   stateDir: string,
   sessionId: string,
@@ -176,9 +189,9 @@ export async function archiveMessages(
 ): Promise<string> {
   const dir = join(stateDir, 'transcripts', sessionId);
   await mkdir(dir, { recursive: true });
-  const path = join(dir, `${Date.now()}.jsonl`);
+  const path = resolve(dir, `${Date.now()}.jsonl`);
   await writeFile(path, messages.map((message) => JSON.stringify(message)).join('\n'), 'utf8');
-  return path;
+  return archivePathForModel(stateDir, path);
 }
 
 export async function autoCompactSession(

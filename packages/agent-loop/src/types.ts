@@ -283,6 +283,12 @@ export interface ToolContract<Args extends Record<string, unknown> = Record<stri
   inputSchema: Record<string, unknown>;
   approvalMode: ApprovalMode;
   sideEffectLevel: SideEffectLevel;
+  /**
+   * Side-effect class. Only `other` forces approval (bypass still skips).
+   * A missing value keeps the tool's existing approvalMode, so untagged MCP
+   * tools do not suddenly start asking.
+   */
+  access?: 'read' | 'edit' | 'bash' | 'network' | 'delegate' | 'other';
   execute: (context: RunContext, args: Args) => Promise<ToolExecutionResult>;
   needsApproval?: (context: RunContext, args: Args) => boolean;
   /** Marks the tool as coming from an external AI CLI (e.g. claude_code, codex_exec). */
@@ -346,6 +352,11 @@ export interface ModelTurnInput {
    * effort field and the provider keeps its own default.
    */
   reasoningEffort?: 'low' | 'medium' | 'high';
+  /**
+   * Byte-stable system prefix. Anthropic puts the cache breakpoint on this
+   * block only. Dynamic context and the last-turn nudge stay after it.
+   */
+  cacheStablePrefix?: string;
 }
 
 export interface ModelTurnResult {

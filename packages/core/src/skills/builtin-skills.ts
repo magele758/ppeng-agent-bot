@@ -6,6 +6,7 @@ import {
   mergeSkillsByName,
   parseSkillFrontmatter
 } from './skill-registry.js';
+import { ensureRepoTrust } from '../trust/repo-trust.js';
 import { PLANNING_SKILL_MANIFEST } from './skill-manifest.js';
 
 export { loadAgentsDirSkills, loadStateDirSkills, loadWorkspaceSkills, mergeSkillsByName, parseSkillFrontmatter };
@@ -85,7 +86,8 @@ export const builtinSkills: SkillSpec[] = [
 ];
 
 export async function loadAllSkills(repoRoot: string = process.cwd(), stateDir?: string): Promise<SkillSpec[]> {
-  const ws = await loadWorkspaceSkills(repoRoot);
+  const repoTrusted = !stateDir || ensureRepoTrust(stateDir, repoRoot).trusted;
+  const ws = repoTrusted ? await loadWorkspaceSkills(repoRoot) : [];
   const user = await loadStateDirSkills(stateDir);
   const agents = await loadAgentsDirSkills();
   return mergeSkillsByName(mergeSkillsByName(mergeSkillsByName(builtinSkills, ws), user), agents);

@@ -30,7 +30,8 @@ import { quietRoutineResult } from '@/lib/routine-quiet';
 import { presentGoalUpdate, readMessageSessionId } from '@/lib/goal-update-notice';
 import { A2uiSurface } from './a2ui/A2uiSurface';
 import { ReadableMessage } from './ReadableMessage';
-import { MarkdownHtml, StaticHtml } from './MarkdownHtml';
+import { MarkdownHtml } from './MarkdownHtml';
+import { ChatMarkdownHost } from './ChatMarkdownHost';
 import { foldA2uiMessages } from './a2ui/fold';
 import { surfacePartKey, useSurfaceContext } from './a2ui/SurfaceContext';
 import type { A2uiMessage, SurfaceState } from './a2ui/types';
@@ -1119,10 +1120,11 @@ export function ChatTurnPlain({
 }
 
 function StreamBody({ raw, html, brief }: { raw: string; html: string; brief: boolean }) {
+  const { t } = useI18n();
   const text = collapseRepeatedLines(brief ? stripLeakedMonologue(raw) : raw);
   if (!text.trim()) return null;
   if (!brief && text === raw) {
-    return <StaticHtml className="chat-bubble__body chat-bubble__md chat-stream-fold__text" html={html} />;
+    return <ChatMarkdownHost className="chat-bubble__body chat-bubble__md chat-stream-fold__text" html={html} copyLabel={t('play.markdown.copyCode')} copiedLabel={t('play.markdown.copied')} />;
   }
   return <MarkdownHtml className="chat-bubble__body chat-bubble__md chat-stream-fold__text" text={text} />;
 }

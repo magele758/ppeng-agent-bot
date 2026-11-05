@@ -1041,3 +1041,65 @@ describe('selective steer cancellation', () => {
     expect(release).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('tool access class', () => {
+  const session = { id: 's1', metadata: {} } as unknown as SessionRecord;
+
+  it('asks for access other unless permission mode is bypass', () => {
+    const mystery = tool('mystery', async () => ({ ok: true, content: '' }), { approvalMode: 'never', access: 'other' });
+    expect(checkToolApprovals(host(), [mystery], [call('mystery', {}, 'm1')], ctx, undefined, session, undefined)).toBe('waiting');
+    const bypass = { id: 's1', metadata: { permissionMode: 'bypass' } } as unknown as SessionRecord;
+    expect(checkToolApprovals(host(), [mystery], [call('mystery', {}, 'm1')], ctx, undefined, bypass, undefined)).toBe('proceed');
+  });
+
+  it('does not ask for a delegate tool whose approval mode is never', () => {
+    const spawn = tool('spawn_subagent', async () => ({ ok: true, content: '' }), { approvalMode: 'never', access: 'delegate' });
+    expect(checkToolApprovals(host(), [spawn], [call('spawn_subagent', {}, 's')], ctx, undefined, session, undefined)).toBe('proceed');
+  });
+});
+
+describe('tool_end outcome and permission', () => {
+  it('marks ok, permission deny, and a hook rewrite', async () => {
+    const { h, payloads } = captureHost();
+    processToolResults(
+      h,
+      [
+        { toolCallId: 'ok', name: 'read_file', ok: true, content: 'x' },
+        {
+          toolCallId: 'deny',
+          name: 'bash',
+          ok: false,
+          content: 'no',
+          problem: { title: 'no', detail: 'no', code: 'PERMISSION_MODE_PLAN_READONLY' }
+        }
+      ],
+      [call('read_file', {}, 'ok'), call('bash', {}, 'deny')],
+      ctx.session,
+      undefined,
+      's1'
+    );
+    expect(payloads[0]?.payload).toMatchObject({ outcome: 'ok', permission: 'allow', toolCallId: 'ok' });
+    expect(payloads[1]?.payload).toMatchObject({ outcome: 'error', permission: 'deny', toolCallId: 'deny' });
+
+    const rewritten = await executeSingleTool(
+      host({
+        runLifecycleHook: async () => ({ input: { command: 'rewritten' } }),
+        emitTrace: (_sid, event) => {
+          payloads.push(event as { kind: string; payload?: Record<string, unknown> });
+        }
+      }),
+      [tool('bash', async () => ({ ok: true, content: 'ran' }))],
+      call('bash', { command: 'original' }, 'bash-rewrite'),
+      ctx,
+      false,
+      's1'
+    );
+    expect(rewritten.hookRewrote).toBe(true);
+    processToolResults(h, [rewritten], [call('bash', { command: 'original' }, 'bash-rewrite')], ctx.session, undefined, 's1');
+    expect(payloads.find((event) => event.kind === 'tool_end' && event.payload?.toolCallId === 'bash-rewrite')?.payload).toMatchObject({
+      hookRewrote: true,
+      outcome: 'ok',
+      permission: 'allow'
+    });
+  });
+});

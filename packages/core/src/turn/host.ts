@@ -69,6 +69,11 @@ export interface TurnKernelPrompt {
   ): string | Promise<string>;
   buildStablePrefix(ctx: PromptContext): string;
   buildSystemPrompt(ctx: PromptContext, messages: SessionMessage[]): Promise<string>;
+  /** Stable block plus the dynamic remainder. `text` matches `buildSystemPrompt`. */
+  buildSystemPromptParts?(
+    ctx: PromptContext,
+    messages: SessionMessage[]
+  ): Promise<{ stable: string; dynamic: string; text: string }>;
 }
 
 /**

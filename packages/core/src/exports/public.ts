@@ -754,9 +754,14 @@ export {
   loadPluginFromDir,
   discoverPlugins,
   mergePlugins,
-  pluginDirsFromEnv
+  pluginDirsFromEnv,
+  pluginMcpCommand
 } from '../plugins/plugin-loader.js';
-export type { PluginManifest, LoadedPlugin, PluginAuthSpec, PluginToolDecl, PluginAuthKind } from '../plugins/plugin-loader.js';
+export { connectGrantedPluginMcp, pluginMcpConnectPlan } from '../plugins/plugin-mcp.js';
+export type { PluginMcpConnectConfig } from '../plugins/plugin-mcp.js';
+export type { PluginManifest, LoadedPlugin, PluginAuthSpec, PluginToolDecl, PluginAuthKind, PluginMcpSpec } from '../plugins/plugin-loader.js';
+export { ensureRepoTrust, setRepoTrust, isRepoTrusted, filterUntrustedRepoHooks, repoOwnedPath } from '../trust/repo-trust.js';
+export type { RepoTrustRecord } from '../trust/repo-trust.js';
 export {
   CONNECTOR_GRANTS_KEY,
   ConnectorRegistry,

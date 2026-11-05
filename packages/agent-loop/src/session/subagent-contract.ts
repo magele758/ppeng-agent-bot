@@ -29,6 +29,8 @@ export interface SubagentSummary {
   lowConfidence: boolean;
   sessionId: string;
   role?: string;
+  /** Set when `text` was cut to `summaryMaxChars`. Does not change success. */
+  truncated?: boolean;
 }
 
 const CONFIDENCE_RE =
@@ -51,8 +53,10 @@ export function formatSubagentSummary(input: {
 }): SubagentSummary {
   const max = input.summaryMaxChars && input.summaryMaxChars > 0 ? input.summaryMaxChars : 4000;
   let text = (input.text || '(subagent returned no text)').trim();
+  let truncated = false;
   if (text.length > max) {
     text = `${text.slice(0, max)}\n…[truncated]`;
+    truncated = true;
   }
   const confidence = parseConfidenceFromText(text);
   const needsGate =
@@ -73,7 +77,8 @@ export function formatSubagentSummary(input: {
     confidence,
     lowConfidence: Boolean(lowConfidence),
     sessionId: input.sessionId,
-    role: input.role
+    role: input.role,
+    ...(truncated ? { truncated: true } : {})
   };
 }
 

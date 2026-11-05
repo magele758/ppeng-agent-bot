@@ -289,3 +289,9 @@ await loop.run(session.id, { onModelStreamChunk: chunk => console.log(chunk) });
 ### Bypass 全自动（2026-11-02）
 
 产品宿主把已保存的 bypass 视为工具操作授权，覆盖常规审批、Auto-review、来源范围和受支持的 LCU 应用确认；来源文本不能设置权限模式。SDK 的 pre-tool ask 在 bypass 下直接继续，pre-tool block 和已有精确调用拒绝仍失败。命令硬拒绝、路径封锁与工具执行错误不是审批，不因此取消。Shell 风险关键词有词边界，不把 nodeterm / agent-term 等名字中的 rm 当删除命令。
+
+## 本地能力整合（2026-11-05）
+
+- `ModelTurnRequest.cacheStablePrefix` 可标记稳定 system 前缀；Anthropic 只在该块设置缓存断点，动态上下文留在其后。宿主可提供 `buildSystemPromptParts`，无分块实现时继续使用原有完整提示。
+- 工具 `access` 声明 read/edit/bash/network/delegate/other 类别；未知外部工具的 other 类别在非 bypass 模式需要审批。`hookRewrote` 在执行日志标记 pre_tool_use 改写参数。
+- 自动压缩返回的归档路径用于后续检索，子任务上下文保持来源标记；mini 的无 Node 静态依赖约束不变。

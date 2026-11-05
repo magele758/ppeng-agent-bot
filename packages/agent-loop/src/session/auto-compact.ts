@@ -104,6 +104,16 @@ function resultBeforeCall(slice: SessionMessage[]): boolean {
   return false;
 }
 
+/**
+ * Memory appendix replaces the working-log tail, so the archive path has to
+ * live in this summary. No path leaves the capped text unchanged.
+ */
+function summaryWithArchiveLocation(summary: string, archivePath: string | undefined): string {
+  const path = archivePath?.trim();
+  if (!path) return summary;
+  return `${summary}\n\nCompacted original transcript: ${path}\nRead this file with read_file only when the summary is missing specific code or an error.`;
+}
+
 function isClosedSummaryCut(messages: SessionMessage[], start: number, end: number): boolean {
   if (end <= start) return false;
   const slice = messages.slice(start, end);
@@ -232,22 +242,21 @@ export async function runAutoCompact(input: RunAutoCompactInput): Promise<AutoCo
     if (!summary.trim()) return { didCompact: false, pruned: false, skippedReason: 'empty_summary' };
     const capped = input.capSummary ? input.capSummary(summary) : summary;
     if (!capped.trim()) return { didCompact: false, pruned: false, skippedReason: 'empty_summary' };
+    const archived = input.archive ? await input.archive(range.older) : undefined;
+    const text = summaryWithArchiveLocation(capped, archived);
     input.store.appendReplacement(input.session.id, {
       startSeq: range.startSeq,
       endSeq: range.endSeq,
       role: 'system',
-      parts: [{ type: 'text', text: capped }],
+      parts: [{ type: 'text', text }],
       key: 'compact-summary'
     });
-    input.store.updateSession(input.session.id, { summary: capped });
-    if (input.archive) {
-      await input.archive(range.older);
-    }
+    input.store.updateSession(input.session.id, { summary: text });
     return {
       didCompact: true,
       pruned: false,
       replaced: { startSeq: range.startSeq, endSeq: range.endSeq },
-      summary: capped
+      summary: text
     };
   }
 

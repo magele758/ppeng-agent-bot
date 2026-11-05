@@ -82,6 +82,12 @@ export async function createFullAssembledLoop(
     const inner = assembled.host.promptBuilder;
     assembled.host.promptBuilder = {
       buildSystemPrompt: (ctx, messages) => inner.buildSystemPrompt(ctx, messages),
+      ...(inner.buildSystemPromptParts
+        ? {
+            buildSystemPromptParts: (ctx: Parameters<typeof inner.buildSystemPrompt>[0], messages: Parameters<typeof inner.buildSystemPrompt>[1]) =>
+              inner.buildSystemPromptParts!(ctx, messages)
+          }
+        : {}),
       buildMemoryAppendix: (ctx, opts) => {
         const query = opts?.query ?? '';
         const sources = io.recallContextSources!({

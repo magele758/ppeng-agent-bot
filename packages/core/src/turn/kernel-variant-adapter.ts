@@ -17,6 +17,12 @@ export function adaptCoreHostToAgentLoop(core: CoreHost): LoopHost {
     modelAdapter: core.modelAdapter,
     promptBuilder: {
       buildSystemPrompt: (ctx, messages) => core.promptBuilder.buildSystemPrompt(ctx, messages),
+      ...(core.promptBuilder.buildSystemPromptParts
+        ? {
+            buildSystemPromptParts: (ctx: Parameters<CoreHost['promptBuilder']['buildSystemPrompt']>[0], messages: Parameters<CoreHost['promptBuilder']['buildSystemPrompt']>[1]) =>
+              core.promptBuilder.buildSystemPromptParts!(ctx, messages)
+          }
+        : {}),
       buildMemoryAppendix: (ctx, opts) => {
         const bound = opts as { query?: string; stateDir?: string } | undefined;
         return core.promptBuilder.buildMemoryAppendix(ctx, {
