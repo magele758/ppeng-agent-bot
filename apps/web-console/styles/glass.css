@@ -185,3 +185,55 @@ html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell
 html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell .chat-bubble__md a {
   color: #38644f;
 }
+
+/* A quiet reading surface with just one filled bubble per exchange. */
+html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .chat-panel-body {
+  & .chat-turn--user .chat-bubble {
+    border: 0;
+    border-radius: 18px;
+    background: #f4f4f4;
+    padding: 10px 16px;
+    box-shadow: none;
+  }
+
+  & .chat-turn--user,
+  & .chat-turn--assistant:not(.chat-turn--continued) {
+    margin-block-start: clamp(20px, 3vh, 32px);
+  }
+
+  & .chat-turn--assistant .chat-turn__label:not(.chat-turn__label--bare) {
+    width: 100%;
+    padding-block-end: 8px;
+    margin-block-end: 12px;
+    border-block-end: 1px solid #ebebeb;
+    color: #707070;
+    font: inherit;
+    font-size: 0.85em;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  & .chat-composer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid #e3e3e3;
+    border-radius: 20px;
+    background: white;
+  }
+
+  & .chat-composer-field {
+    order: -1;
+    flex: 0 0 100%;
+  }
+
+  & .chat-composer__attach {
+    margin-inline-end: auto;
+  }
+
+  & .chat-composer:focus-within {
+    border-color: #999;
+  }
+}
