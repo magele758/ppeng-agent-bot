@@ -205,6 +205,7 @@ function loadTsx(filename: string, reactMod: object): Record<string, unknown> {
 }
 
 function resolveImport(fromFile: string, id: string, reactMod: object): unknown {
+  if (id === '@/lib/chat-width') return { applyChatWidth() {} };
   if (id === 'react') return reactMod;
   if (id === 'react/jsx-runtime' || id === 'react/jsx-dev-runtime' || id === 'react-dom') return createRequire(fromFile)(id);
   if (id === '@/lib/api') return { api: async () => ({ scope: 'user-1', values: { ...apiState.values } }) };
