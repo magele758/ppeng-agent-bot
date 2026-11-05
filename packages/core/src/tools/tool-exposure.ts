@@ -446,6 +446,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
 export const TOOL_EXPOSURE_KEY = 'tool_exposure_settings';
 export interface ToolExposureSettings {
     mode: 'progressive' | 'full';
+    searchStrategy: 'legacy' | 'enhanced';
     pinnedGroups: Record<string, string[]>;
 }
 export function toolGroup(name: string): ToolGroup {
@@ -453,14 +454,20 @@ export function toolGroup(name: string): ToolGroup {
 }
 export function readToolExposure(store?: WebSettingsReadStore): ToolExposureSettings {
     const raw = store?.getDaemonControl?.(TOOL_EXPOSURE_KEY) as Partial<ToolExposureSettings> | undefined;
-    return { mode: raw?.mode === 'full' ? 'full' : 'progressive', pinnedGroups: raw?.pinnedGroups ?? {} };
+    return { mode: raw?.mode === 'full' ? 'full' : 'progressive', searchStrategy: raw?.searchStrategy === 'enhanced' ? 'enhanced' : 'legacy', pinnedGroups: raw?.pinnedGroups ?? {} };
 }
 export function writeToolExposure(store: Pick<SqliteStateStore, 'getDaemonControl' | 'setDaemonControl'>, patch: {
     mode?: unknown;
+    searchStrategy?: unknown;
     agentId?: unknown;
     groups?: unknown;
 }): ToolExposureSettings {
     const next = readToolExposure(store);
+    if (patch.searchStrategy !== undefined) {
+        if (patch.searchStrategy !== 'legacy' && patch.searchStrategy !== 'enhanced')
+            throw new ValidationError('Invalid tool search strategy');
+        next.searchStrategy = patch.searchStrategy;
+    }
     if (patch.mode !== undefined) {
         if (patch.mode !== 'full' && patch.mode !== 'progressive')
             throw new ValidationError('Invalid tool delivery mode');
@@ -485,5 +492,7 @@ export function clearToolExposure(store: Pick<SqliteStateStore, 'getSession' | '
 export function toolDirectory(store?: WebSettingsReadStore): string {
     if (readToolExposure(store).mode === 'full')
         return 'All currently authorized tools are provided directly. Do not search or load tools.';
+    if (readToolExposure(store).searchStrategy === 'enhanced')
+        return 'Tool delivery is progressive. Use provided tools directly. When a capability is missing, call tool_search with a short intent or exact tool name. It searches authorized tools, including already loaded tools. Hits marked already_loaded are callable now; newly loaded tools are callable next turn. Never execute tools absent from the current tools list. If no match, use the returned groups: search with query="" and group=<id>, then nextOffset to browse further. No match is not proof that a capability is absent; try a shorter query or browse a group. Loading never executes a tool or grants permission.';
     return 'Tool delivery is progressive. Daily tools are provided directly. Search other capabilities with tool_search; matching tools are loaded automatically (up to 5), callable next turn. Never execute tools absent from the current tools list. Capability groups: ' + TOOL_GROUPS.filter(g => g.tier > 1).map(g => g.id + ': ' + g.labelEn + ' / ' + g.labelZh).join('; ') + '; extensions: unclassified registered tools. Availability still depends on permissions and configuration.';
 }

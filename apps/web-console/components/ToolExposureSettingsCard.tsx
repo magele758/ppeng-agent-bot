@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
+import { ToolSearchStrategyControl } from './ToolSearchStrategyControl';
 import { SettingsGroup } from './ui';
 type Item = {
     name: string;
@@ -18,6 +19,7 @@ type View = {
 type Config = View & {
     settings: {
         mode: string;
+        searchStrategy: string;
         pinnedGroups: Record<string, string[]>;
     };
     groups: {
@@ -93,6 +95,7 @@ export function ToolExposureSettingsCard({ sessionId }: {
  {error ? <p role="alert">{label('error')}</p> : null}
  {data && view ? <>
  <label htmlFor="tool-delivery-mode">{label('mode')}</label><select id="tool-delivery-mode" value={data.settings.mode} disabled={busy} onChange={e => void save({ mode: e.target.value })}><option value="progressive">{label('progressive')}</option><option value="full">{label('full')}</option></select>
+ <ToolSearchStrategyControl value={data.settings.searchStrategy} busy={busy} save={save}/>
  <p>{label('discoveryHint')}</p>
  <label htmlFor="tool-delivery-agent">{label('agent')}</label><select id="tool-delivery-agent" value={agent} disabled={busy} onChange={e => { setAgent(e.target.value); setSid(''); }}>{data.agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
  <fieldset disabled={busy}><legend>{label('pins')}</legend>{data.groups.filter(g => g.tier > 1).map(g => <label key={g.id} style={{ display: 'block' }}><input type="checkbox" checked={pins.includes(g.id)} onChange={e => void save({ agentId: agent, groups: e.target.checked ? [...pins, g.id] : pins.filter(id => id !== g.id) })}/>{locale === 'zh' ? g.labelZh : g.labelEn}</label>)}</fieldset>

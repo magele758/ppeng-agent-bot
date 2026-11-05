@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 382 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 383 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -973,7 +973,7 @@
 
 - `thinking-effort` 思考力度
 
-## tool（6）
+## tool（7）
 
 需求正文见 [tool](tool.md)。
 
@@ -983,6 +983,7 @@
 - `tool-loop-same-call` 工具循环按同一次调用判断
 - `tool-observation-thumbnails` 工具观察截图缩略图
 - `tool-progress-guard` 重复工具调用按实际进展判断
+- `tool-search-experiment` 可切换的增强工具检索实验
 
 ## turn（1）
 

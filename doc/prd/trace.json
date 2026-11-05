@@ -3820,6 +3820,15 @@
       ]
     },
     {
+      "id": "tool-search-experiment",
+      "title": "可切换的增强工具检索实验",
+      "tests": [
+        "e2e/tool-exposure.spec.ts",
+        "packages/core/test/tool-search-experiment.test.js",
+        "scripts/test/settings-route-contracts.test.mjs"
+      ]
+    },
+    {
       "id": "unified-bot-goal-lifecycle",
       "title": "统一 Bot 目标生命周期与归档展示",
       "tests": [

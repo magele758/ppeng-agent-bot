@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 382,
+    "implemented": 383,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2596,6 +2596,13 @@
       "requirement": "按你说的方向改吧，先把目标的两套状态和展示统一起来，完成或失败的保留历史但别一直挂底部，再把重复调用检测改成看有没有实际进展。Jev我已经恢复了，不用管了。群聊组织模式，可以按你说的再新增一种模式，我对比看看执行效果。\n\n分多个agent去推进",
       "verificationStage": "software",
       "file": "acceptance/tool-progress-guard.yaml"
+    },
+    {
+      "id": "tool-search-experiment",
+      "title": "可切换的增强工具检索实验",
+      "requirement": "那你用配置来配合，帮我完成这个功能开发吧，搞好了，我去实验下效果",
+      "verificationStage": "software",
+      "file": "acceptance/tool-search-experiment.yaml"
     },
     {
       "id": "turn-stats-end-time",

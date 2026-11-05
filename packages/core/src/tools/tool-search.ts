@@ -1,4 +1,5 @@
-import { toolGroup } from './tool-exposure.js';
+import { enhancedToolSearch, type ToolSearchArgs } from './tool-search-enhanced.js';
+import { readToolExposure, toolGroup } from './tool-exposure.js';
 /**
  * Tool Search meta-tools — progressive disclosure for bound capabilities.
  */
@@ -141,7 +142,7 @@ export function createToolSearchTools(services: ToolSearchServices): ToolContrac
     services.isEnabled?.() ??
     resolveDiscoveryEnabled(services.settingsStore, env());
 
-  const toolSearch: ToolContract<{ query: string; limit?: number }> = {
+  const toolSearch: ToolContract<ToolSearchArgs> = {
     name: 'tool_search',
     description:
       'Search authorized local tools by name, capability group or keyword. Automatically load up to 5 matches for the next turn without executing them. External capability cards, when enabled, are informational and loaded by id separately.',
@@ -149,7 +150,9 @@ export function createToolSearchTools(services: ToolSearchServices): ToolContrac
       type: 'object',
       properties: {
         query: { type: 'string' },
-        limit: { type: 'number' }
+        limit: { type: 'number' },
+        group: { type: 'string', description: 'Enhanced strategy: capability group id from search results; query may be empty to browse.' },
+        offset: { type: 'integer', minimum: 0, description: 'Enhanced strategy: nextOffset from the previous page.' }
       },
       required: ['query']
     },
@@ -159,11 +162,10 @@ export function createToolSearchTools(services: ToolSearchServices): ToolContrac
       const discoveryOn = isOn();
       const budget = Math.min(5, Math.max(1, toolDisclosureBudget(env())));
       const limit = Math.min(
-        Number.isFinite(args.limit) && (args.limit as number) > 0 ? Math.floor(Number(args.limit)) : budget,
+        Number.isFinite(args.limit) && (args.limit as number) > 0 ? Math.max(1, Math.floor(Number(args.limit))) : budget,
         budget
       );
       const query = String(args.query ?? '');
-      const deferred = deferredToolHits(hiddenOnDemandTools(ctx, services), query, limit);
 
       const capability = discoveryOn
         ? searchBoundCapabilities(services.getRegistry(), query, limit).map((hit) => ({
@@ -171,6 +173,10 @@ export function createToolSearchTools(services: ToolSearchServices): ToolContrac
             source: 'capability' as const
           }))
         : [];
+      if (readToolExposure(services.settingsStore).searchStrategy === 'enhanced') {
+        return enhancedToolSearch(ctx, args, services, limit, capability, discoveryOn);
+      }
+      const deferred = deferredToolHits(hiddenOnDemandTools(ctx, services), query, limit);
       const loaded: string[] = [];
       const failures: Array<{name:string;reason:string}> = [];
       for(const hit of deferred) {
@@ -182,7 +188,7 @@ export function createToolSearchTools(services: ToolSearchServices): ToolContrac
       const hits = [...deferred, ...capability].slice(0,limit);
       return {
         ok: failures.length === 0,
-        content: JSON.stringify({ budget, count: hits.length, hits, loaded, failures, status: failures.length?'load_failed':hits.length?'matched':'no_match', externalDiscoveryEnabled: discoveryOn }, null, 2)
+        content: JSON.stringify({ strategy: 'legacy', budget, count: hits.length, hits, loaded, failures, status: failures.length?'load_failed':hits.length?'matched':'no_match', externalDiscoveryEnabled: discoveryOn }, null, 2)
       };
     }
   };

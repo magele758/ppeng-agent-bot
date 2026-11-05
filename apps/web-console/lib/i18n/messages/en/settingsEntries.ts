@@ -3,6 +3,11 @@ import type {
 
 export const settingsEntries = {
   toolExposure: {
+  searchStrategy: 'Tool search strategy',
+  searchLegacy: 'Original keywords',
+  searchEnhanced: 'Enhanced search (experimental)',
+  searchHint: 'Applies to progressive delivery only. Use full delivery as a baseline, then compare original and enhanced search in progressive mode. Enhanced search supports common bilingual aliases, already loaded tools and group browsing; it is not general semantic search. Changes save automatically and apply to the next search. Compare in fresh sessions to avoid previously loaded tools affecting results.',
+
   "title": "Tool delivery",
   "keywords": "tools full progressive tiers search load",
   "desc": "Daily tools stay available; other capabilities load on demand. Full mode provides all permitted and configured business tools.",
