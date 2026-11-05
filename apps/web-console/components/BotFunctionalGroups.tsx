@@ -44,6 +44,11 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
   const [insert, setInsert] = useState<string | null>(null);
   const [deletingRoomId, setDeletingRoomId] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const refresh = () => setRetry(value => value + 1);
+    window.addEventListener('lab-bot-placement-saved', refresh);
+    return () => window.removeEventListener('lab-bot-placement-saved', refresh);
+  }, []);
   useEffect(() => { if (createRequest) { setError(''); setEditing({ name: '' }); } }, [createRequest]);
 
   useEffect(() => {

@@ -4,7 +4,8 @@ const condition = '完整目标：检查所有数据，保留原始证据，确�
 const settings = { maxConcurrent: 2, defaultBudgetUsd: 10, maxAttempts: 8, maxNoProgress: 3, leaseMs: 60000, preferredStrategy: 'auto' };
 async function openChat(page: Page, width: number) {
   await page.setViewportSize({ width, height: 844 });
-  await page.addInitScript(() => localStorage.setItem('lab.locale', 'zh'));
+  await page.route('**/api/user/preferences', r => r.fulfill({json:{scope:'density-test',values:{'lab.debugDisplay':'1','lab.locale':'zh'}}}));
+  await page.addInitScript(() => { localStorage.setItem('lab.locale', 'zh'); localStorage.setItem('lab.debugDisplay', '1'); });
   const bots = ['a','b'].map(id=>({ id:`density-${id}`,name:`Density ${id}`,agentId:'general',canonicalSessionId:`density-session-${id}`,hidden:false }));
   const sessions = bots.map(bot=>({ id:bot.canonicalSessionId,title:bot.name,mode:'chat',status:'idle',agentId:'general',metadata:{botId:bot.id,canonicalBotChat:true,usageTotals:{inputTokens:100,outputTokens:10,totalTokens:110,requests:1},usageCostUsd:0.01} }));
   await page.route(url=>url.pathname==='/api/bots',r=>r.fulfill({json:{bots}}));
@@ -17,8 +18,8 @@ async function openChat(page: Page, width: number) {
     await page.route(url=>url.pathname===`/api/bots/${bot.id}`,r=>r.fulfill({json:{bot}}));
     await page.route(url=>url.pathname===`/api/bots/${bot.id}/open`,r=>r.fulfill({json:{bot,session}}));
     await page.route(url=>url.pathname===`/api/sessions/${session.id}`,r=>r.fulfill({json:{session,messages:Array.from({length:16},(_,n)=>({id:`m-${n}`,sessionId:session.id,seq:n+1,role:n%2?'assistant':'user',parts:[{type:'text',text:`聊天记录 ${n}`}],createdAt:new Date(1700000000000+n).toISOString()}))}}));
-    await page.route(url=>url.pathname===`/api/sessions/${session.id}/goal`,r=>r.fulfill({json:{goal:{goalId:'review',source:'bot',status:'pending_review',condition,turnsUsed:1,maxTurns:8}}}));
-    await page.route(url=>url.pathname===`/api/bots/${bot.id}/goals`,r=>r.fulfill({json:{goals:[{id:'review',title:'核对完整报告',status:'pending_review',progress:'报告已保存',priority:0,evidence:[],budgetUsd:10,costUsd:0.01}],settings}}));
+    await page.route(url=>url.pathname===`/api/sessions/${session.id}/goal`,r=>r.fulfill({json:{goal:{goalId:'review',source:'bot',status:'active',condition,turnsUsed:1,maxTurns:8}}}));
+    await page.route(url=>url.pathname===`/api/bots/${bot.id}/goals`,r=>r.fulfill({json:{goals:[{id:'review',title:'核对完整报告',status:'blocked',progress:'报告已保存',priority:0,evidence:[],budgetUsd:10,costUsd:0.01}],settings}}));
   }
   await page.goto('/#/bot');
   if(width<=760) await page.getByTestId('mobile-sessions-toggle').click();
@@ -74,7 +75,10 @@ test('desktop preserves existing cards and attention panel after viewport change
  await openChat(page,1280);
  await expect(page.getByTestId('mobile-bot-bar-toggle')).toBeHidden();
  await expect(page.getByTestId('mobile-goal-card-toggle')).toBeHidden();
+ const more = page.locator('.chat-panel-header .more-menu > button');
+ await more.click();await page.locator('.bot-header-secondary summary').click();
  await expect(page.locator('#playMeta')).toBeVisible();
+ await more.click();
  await expect(page.locator('.goal-status-card__body')).toBeVisible();
  const panel=page.getByTestId('bot-goal-attention');await expect(panel.locator('.bot-goals__body')).toBeVisible();
  await page.setViewportSize({width:390,height:844});await expect(panel.locator('.bot-goals__body')).toBeHidden();

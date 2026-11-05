@@ -38,7 +38,7 @@ export function BotPinArea({
   bots,
   sessions,
   rooms = [],
-  renderSession,
+  renderSession, renderFallbackActions,
   onOpenSession,
   onOpenRoom,
   onRoomDeleted,
@@ -49,6 +49,7 @@ export function BotPinArea({
   bots: readonly BotInfo[];
   sessions: readonly SessionSummary[];
   rooms?: readonly SidebarRoom[];
+  renderFallbackActions?: (bot: BotInfo) => ReactNode;
   renderSession: (session: SessionSummary) => ReactNode;
   onOpenSession: (sessionId: string) => void;
   onOpenRoom?: (roomId: string) => void;
@@ -215,6 +216,7 @@ export function BotPinArea({
                   <div className="session-item__body">
                     <div className="session-item__title">{bot.name}</div>
                   </div>
+                  {renderFallbackActions?.(bot)}
                 </div>
               )}
             </div>

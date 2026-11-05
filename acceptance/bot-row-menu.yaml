@@ -1,0 +1,15 @@
+id: bot-row-menu
+title: Bot 列表操作菜单
+status: implemented
+requirement: |
+  给bot列表里的bot加一个三个点的点击菜单，里面包含查看他详情、查看他的定时任务、加入到某个分组、加入到某个群聊、删除等这些操作
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: Bot 列表有可用 Bot
+    when: 点击该行的更多操作
+    then: 可查看该 Bot 详情与定时任务，选择目标分组或群聊，或确认移除
+  - id: AC-2
+    given: 正在和 Bot 聊天
+    when: 浏览聊天顶部
+    then: 名称可打开详情，右侧操作悬浮显示，权限与用量收在更多操作里
