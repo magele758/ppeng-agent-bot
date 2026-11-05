@@ -1523,6 +1523,13 @@
       ]
     },
     {
+      "id": "auto-source-continuity",
+      "title": "Auto 对话连续执行",
+      "tests": [
+        "packages/core/test/local-source-unlock.test.js"
+      ]
+    },
+    {
       "id": "background-job-restart",
       "title": "重启后中断无人执行的后台命令",
       "tests": [
@@ -1800,6 +1807,13 @@
       ]
     },
     {
+      "id": "bot-row-menu",
+      "title": "Bot 列表操作菜单",
+      "tests": [
+        "e2e/bot-row-menu.spec.ts"
+      ]
+    },
+    {
       "id": "bot-runtime-log-regressions",
       "title": "Bot 实际运行日志回归",
       "tests": [
@@ -1979,6 +1993,20 @@
       ]
     },
     {
+      "id": "chat-clean-theme",
+      "title": "清爽的浅色阅读界面",
+      "tests": [
+        "e2e/chat-clean-theme.spec.ts"
+      ]
+    },
+    {
+      "id": "chat-column",
+      "title": "对话区对齐与阅读留白",
+      "tests": [
+        "e2e/chat-column.spec.ts"
+      ]
+    },
+    {
       "id": "chat-experience",
       "title": "对话页简洁易用",
       "tests": [
@@ -2007,6 +2035,13 @@
         "apps/web-console/lib/feed-window.test.ts",
         "apps/web-console/lib/history-window.test.ts",
         "apps/web-console/lib/live-turn-session.test.ts"
+      ]
+    },
+    {
+      "id": "chat-width",
+      "title": "内容展示宽度",
+      "tests": [
+        "e2e/chat-width.spec.ts"
       ]
     },
     {
@@ -3518,6 +3553,13 @@
       "title": "技能沉淀确认后能把正文存下来",
       "tests": [
         "packages/core/test/skill-capture.test.js"
+      ]
+    },
+    {
+      "id": "skill-load-recovery",
+      "title": "自建技能与搜索结果可加载",
+      "tests": [
+        "packages/core/test/skill-load-recovery.test.js"
       ]
     },
     {

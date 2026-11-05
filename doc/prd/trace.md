@@ -1348,6 +1348,12 @@ Auto-review 工具级审批卡（高危 Shell/MCP）
 - `packages/agent-loop/src/approval/auto-review.test.ts`
 - `packages/core/test/model-sandbox-isolation.test.js`
 
+### auto-source-continuity
+
+Auto 对话连续执行
+
+- `packages/core/test/local-source-unlock.test.js`
+
 ### background-job-restart
 
 重启后中断无人执行的后台命令
@@ -1591,6 +1597,12 @@ Bot 间通信在聊天流里显示为紧凑通信条，点击弹窗看全文
 - `packages/core/test/bot-room-work-runtime.test.js`
 - `scripts/test/bot-room-work-continuity-http.test.mjs`
 
+### bot-row-menu
+
+Bot 列表操作菜单
+
+- `e2e/bot-row-menu.spec.ts`
+
 ### bot-runtime-log-regressions
 
 Bot 实际运行日志回归
@@ -1748,6 +1760,18 @@ permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 - `apps/web-console/components/chat-bubble-written-stamp.test.ts`
 - `apps/web-console/lib/visible-clock.test.ts`
 
+### chat-clean-theme
+
+清爽的浅色阅读界面
+
+- `e2e/chat-clean-theme.spec.ts`
+
+### chat-column
+
+对话区对齐与阅读留白
+
+- `e2e/chat-column.spec.ts`
+
 ### chat-experience
 
 对话页简洁易用
@@ -1774,6 +1798,12 @@ permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 - `apps/web-console/lib/feed-window.test.ts`
 - `apps/web-console/lib/history-window.test.ts`
 - `apps/web-console/lib/live-turn-session.test.ts`
+
+### chat-width
+
+内容展示宽度
+
+- `e2e/chat-width.spec.ts`
 
 ### child-wake-workitem
 
@@ -3104,6 +3134,12 @@ Secure Form fill-from-Vault
 技能沉淀确认后能把正文存下来
 
 - `packages/core/test/skill-capture.test.js`
+
+### skill-load-recovery
+
+自建技能与搜索结果可加载
+
+- `packages/core/test/skill-load-recovery.test.js`
 
 ### skill-manifest-boundary
 

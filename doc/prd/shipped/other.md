@@ -67,6 +67,11 @@ Slice: high-risk spawn/Shell/MCP default-block → native approval card → same
 Accept: risky shell/MCP blocked by default, card shown, same-params retry after approve, deny terminal.
 Auto-review approval cards must clearly show a kind badge (Shell vs MCP / tool kind) and the human-readable blockReason from the Auto-review gate, so the owner can decide without guessing why it blocked.
 
+## auto-source-continuity
+Auto 对话连续执行
+
+auto的权限太低了，一点也不auto，这种怎么都要我审批，简直不能用，导致我只有bypass的能用
+
 ## background-job-restart
 重启后中断无人执行的后台命令
 

@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 366 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 372 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -57,12 +57,13 @@
 - `assistant-repeat-collapse` 助手正文里相邻的重复行收成一行
 - `assistant-run-spacing` 连续助手消息省略标题后不留大段空白
 
-## auto（2）
+## auto（3）
 
 需求正文见 [other](other.md)。
 
 - `auto-review-authorized-by` Auto-review 批准回执记录授权引用
 - `auto-review-shell-mcp` Auto-review 工具级审批卡（高危 Shell/MCP）
+- `auto-source-continuity` Auto 对话连续执行
 
 ## background（1）
 
@@ -76,7 +77,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（111）
+## bot（112）
 
 需求正文见 [bot](bot.md)。
 
@@ -169,6 +170,7 @@
 - `bot-rooms` 多 Bot 群会话与可靠发言
 - `bot-routine-lifecycle` Bot 可靠例行任务
 - `bot-routine-main-session` Bot 定时任务跟自己的会话走
+- `bot-row-menu` Bot 列表操作菜单
 - `bot-runtime-log-regressions` Bot 实际运行日志回归
 - `bot-scoped-skill-sharing` Bot 私有技能沉淀与指定 Bot 共享
 - `bot-session-row` 单 Bot 会话行显示名字、问题和活体脸
@@ -214,17 +216,20 @@
 - `bypass-skill-write` bypass 的 Bot 写技能不再被额外确认拦住
 - `bypass-source-scope` permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
-## chat（7）
+## chat（10）
 
 需求正文见 [chat](chat.md)。
 
 - `chat-approval-inline` 待审批嵌在对话流里
 - `chat-basics` 对话基础体验
 - `chat-bubble-written-stamp` 对话气泡不展示写入时间戳
+- `chat-clean-theme` 清爽的浅色阅读界面
+- `chat-column` 对话区对齐与阅读留白
 - `chat-experience` 对话页简洁易用
 - `chat-inline-history` 单行附件入口与自动加载聊天历史
 - `chat-more-menu-on-top` 对话头部「⋯」更多菜单在最上层且不透明
 - `chat-tail-kept` 对话结束时助手正文留在对话里
+- `chat-width` 内容展示宽度
 
 ## child（1）
 
@@ -871,13 +876,14 @@
 
 - `single-host-bot-completion` 单机 Bot 工作收尾与默认入口
 
-## skill（8）
+## skill（9）
 
 需求正文见 [skill](skill.md)。
 
 - `skill-capture-dismissal` 技能沉淀完成提示可收起和关闭
 - `skill-capture-intent-confirmation` 模型判断技能沉淀并在提炼前请求确认
 - `skill-capture-save` 技能沉淀确认后能把正文存下来
+- `skill-load-recovery` 自建技能与搜索结果可加载
 - `skill-manifest-boundary` 技能能力边界
 - `skill-operation-card-dismissal` 技能管理结果可收起关闭且不干扰对话
 - `skill-operation-confirm-bar` 技能操作确认后收成可关闭的小横条

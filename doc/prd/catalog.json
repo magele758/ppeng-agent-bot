@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 366,
+    "implemented": 372,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -111,6 +111,13 @@
       "requirement": "Auto-review / tool-level approval card aligned with Grok behavior:\nLab already has approvals/Risk/approve; tree has NO AutoReview / request_smart_mode.\nSlice: high-risk spawn/Shell/MCP default-block → native approval card → same-action retry with approval flag; denial = final; no bypass routes.\nAccept: risky shell/MCP blocked by default, card shown, same-params retry after approve, deny terminal.\nAuto-review approval cards must clearly show a kind badge (Shell vs MCP / tool kind) and the human-readable blockReason from the Auto-review gate, so the owner can decide without guessing why it blocked.",
       "verificationStage": "software",
       "file": "acceptance/auto-review-shell-mcp.yaml"
+    },
+    {
+      "id": "auto-source-continuity",
+      "title": "Auto 对话连续执行",
+      "requirement": "auto的权限太低了，一点也不auto，这种怎么都要我审批，简直不能用，导致我只有bypass的能用",
+      "verificationStage": "software",
+      "file": "acceptance/auto-source-continuity.yaml"
     },
     {
       "id": "background-job-restart",
@@ -750,6 +757,13 @@
       "file": "acceptance/bot-routine-main-session.yaml"
     },
     {
+      "id": "bot-row-menu",
+      "title": "Bot 列表操作菜单",
+      "requirement": "给bot列表里的bot加一个三个点的点击菜单，里面包含查看他详情、查看他的定时任务、加入到某个分组、加入到某个群聊、删除等这些操作",
+      "verificationStage": "software",
+      "file": "acceptance/bot-row-menu.yaml"
+    },
+    {
       "id": "bot-runtime-log-regressions",
       "title": "Bot 实际运行日志回归",
       "requirement": "那就按v2计划开始改，先把日志里这些真实问题复现成测试，再逐项修好，验收通过后review、提交PR并合并，不要停下来等我确认。",
@@ -981,6 +995,20 @@
       "file": "acceptance/chat-bubble-written-stamp.yaml"
     },
     {
+      "id": "chat-clean-theme",
+      "title": "清爽的浅色阅读界面",
+      "requirement": "感觉页面特别脏，帮我把markdown的渲染和整个页面配色和背景再调整一下，要干净清爽",
+      "verificationStage": "software",
+      "file": "acceptance/chat-clean-theme.yaml"
+    },
+    {
+      "id": "chat-column",
+      "title": "对话区对齐与阅读留白",
+      "requirement": "这个跟上面对话的边要对齐，下面的对话框也要对齐，现在对话的内容，还是比较密集，黑白色混一起，看起来对话框的内容感觉很脏的视觉效果，这几个问题再优化下",
+      "verificationStage": "software",
+      "file": "acceptance/chat-column.yaml"
+    },
+    {
       "id": "chat-experience",
       "title": "对话页简洁易用",
       "requirement": "对话页配置太多、输入区拥挤、同一设置在多处重复。目标：输入区默认干净、次要选项收进一个紧凑的「会话设置」面板\n（常用在前，其余放进「高级」），全局设置只在「设置」页出现一次；会话列表清晰；工具调用 / 思考块默认折叠、可读。",
@@ -1007,6 +1035,13 @@
       "requirement": "会话和 Bot 里经常丢消息，特别是模型吐出来的内容。过程（工具、Trace）还在，输出完了内容就从对话流里消失；整页刷新后又出现。所以是已经落库，前端在结束时把刚写完的助手消息弄丢了，不是没存上。\n修好后的行为：模型输出结束后，助手正文留在对话里，不必刷新。工具过程仍在。之后的自动刷新不能再把这条正文冲掉。刷新页面仍然看得到。不要为了留住气泡去重发请求或造假消息。\nBot 房间回合和普通 session 都要保住。\n用户发出一条消息后，助手还在回答时，这条用户消息会在对话里显示 2 次，而且把更早的会话截断了。更早的对话不见了。\n修好后：回答过程中，刚发出的用户消息只出现一次。更早的会话还在，不被这次发送截成只剩当前这一问。不要把上次的修复退回去：流结束时助手正文仍要留在对话里，刷新后也在。不要为了去重把用户消息再发一次。",
       "verificationStage": "software",
       "file": "acceptance/chat-tail-kept.yaml"
+    },
+    {
+      "id": "chat-width",
+      "title": "内容展示宽度",
+      "requirement": "在通用设置里，加一个内容展示宽度的设置，现在这种叫居中，再加个铺满的，然后可以配合调整旁边留白距离的拖拽的控制的",
+      "verificationStage": "software",
+      "file": "acceptance/chat-width.yaml"
     },
     {
       "id": "child-wake-workitem",
@@ -2316,6 +2351,13 @@
       "requirement": "我看现在skill沉淀的功能有问题，特别是最后存储的部分，已经失败好几次了，排查修复一下",
       "verificationStage": "software",
       "file": "acceptance/skill-capture-save.yaml"
+    },
+    {
+      "id": "skill-load-recovery",
+      "title": "自建技能与搜索结果可加载",
+      "requirement": "bot自己创建的skill是要能加载的，不然生成的skill都没意义了\n而且其他的skill，按道理是要能通过skill-search找回来的啊，这个路径现在是通的吗？",
+      "verificationStage": "software",
+      "file": "acceptance/skill-load-recovery.yaml"
     },
     {
       "id": "skill-manifest-boundary",
