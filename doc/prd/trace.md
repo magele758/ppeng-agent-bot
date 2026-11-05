@@ -2395,6 +2395,12 @@ Lab 会话显示启动耗时
 - `packages/agent-loop/src/runtime/tool-loop.test.ts`
 - `packages/core/test/lcu-computer-use.test.js`
 
+### lean-default-skills
+
+精简默认技能并保留按需发现
+
+- `packages/core/test/lean-default-skills.test.js`
+
 ### live-bot-quality
 
 真实 Bot 任务评估与版本准入

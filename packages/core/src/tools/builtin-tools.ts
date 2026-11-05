@@ -1156,7 +1156,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
   const loadSkillTool: ToolContract<{ name: string }> = {
     name: 'load_skill',
     description:
-      'Load a skill by name (repo `skills/` and `~/.agents/**/SKILL.md`; same name in ~/.agents overrides). If the catalog is not listed, call search_skills first.',
+      'Load a relevant skill by exact name or id. Prefer a small number of useful workflows over front-loading reference text. Search unlisted skills with search_skills first; your own enabled Bot skills can be loaded directly. Visibility and allowlists still apply.',
     inputSchema: {
       type: 'object',
       properties: {

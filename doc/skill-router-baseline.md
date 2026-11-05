@@ -14,3 +14,8 @@
 - 观测：`trace` 中 `skill_load` 记录 off-shortlist 加载；`buildSkillRouting` 返回 `confidence` 供 prompt 提示歧义场景。
 
 评测数据：`packages/core/test/skill-router-cases.json` + `skill-router.test.js`。
+
+
+### 精简默认技能
+
+内置目录由八项合并为四项：Planning（含 Tasks）、Subagents（含 Team）、Guided learning、Long-running harness。短名单共享推荐池仅保留前两项；其他仓库、本机和领域技能仍可搜索后加载，全目录显示保留。Bot 自建技能的内容、启用设置和推荐/加载行为不变。旧 Tasks/Team 名称及已保存选择兼容合并项。Skills 使用指引归入工具说明，Compression 的连续性规则由现有运行时摘要入口承担；长任务流程不重复索取已有授权。

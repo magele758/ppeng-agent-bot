@@ -23,5 +23,12 @@ export function selectBotSkills(
 ) {
   return selection.mode === "all"
     ? skills
-    : skills.filter((s) => selection.ids.includes(s.id));
+    : skills.filter((s) => selectedSkill(s, selection.ids));
+}
+
+function selectedSkill(skill: SkillSpec, ids: string[]): boolean {
+  if (ids.includes(skill.id)) return true;
+  if (skill.source !== 'builtin') return false;
+  const legacy: Record<string, string> = { planning: 'tasks', subagents: 'team' };
+  return ids.includes(legacy[skill.id] ?? '');
 }

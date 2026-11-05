@@ -323,7 +323,7 @@ export function manifestForSkillFile(
 /** Planning builtin example Manifest — least privilege for todo planning. */
 export const PLANNING_SKILL_MANIFEST: SkillManifest = {
   version: '1.0.0',
-  allowTools: ['TodoWrite', 'todo_write', 'load_skill', 'search_skills'],
+  allowTools: ['TodoWrite', 'todo_write', 'task_create', 'task_update', 'task_list', 'load_skill', 'search_skills'],
   denyTools: ['bash', 'bg_run', 'shell'],
   allowPaths: ['.', './'],
   network: { mode: 'none' },

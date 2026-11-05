@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 372,
+    "implemented": 373,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1609,6 +1609,13 @@
       "requirement": "那你去接一下",
       "verificationStage": "software",
       "file": "acceptance/lcu-computer-use.yaml"
+    },
+    {
+      "id": "lean-default-skills",
+      "title": "精简默认技能并保留按需发现",
+      "requirement": "按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动",
+      "verificationStage": "software",
+      "file": "acceptance/lean-default-skills.yaml"
     },
     {
       "id": "live-bot-quality",

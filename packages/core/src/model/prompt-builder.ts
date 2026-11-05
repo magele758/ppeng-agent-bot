@@ -1,3 +1,4 @@
+import { defaultSkillCandidates } from '../skills/default-skill-candidates.js';
 import { RUNTIME_CAPABILITIES_KEY, runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import { HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
 import { toolDirectory } from '../tools/tool-exposure.js';
@@ -706,7 +707,7 @@ export class PromptBuilder {
     const routeStarted = Date.now();
     let routing!: SkillRoutingResult;
     try {
-      routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK, useFusion: config.fusion });
+      routing = await buildSkillRoutingCooperative(userText, defaultSkillCandidates(skills), { mode, topK, useFusion: config.fusion });
       const shortlistCandidates = [
         ...routing.routed.map((r) => ({
           id: r.skill.id,

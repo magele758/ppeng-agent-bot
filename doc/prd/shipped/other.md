@@ -376,6 +376,11 @@ Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Compute
 
 那你去接一下
 
+## lean-default-skills
+精简默认技能并保留按需发现
+
+按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动
+
 ## live-bot-quality
 真实 Bot 任务评估与版本准入
 
