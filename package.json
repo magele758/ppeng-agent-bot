@@ -98,7 +98,9 @@
     "test:bot:soak:performance": "node scripts/bot-release/soak-performance.mjs",
     "agent:quality:baseline": "node scripts/agent-eval/compare.mjs --config scripts/agent-eval/experiments/bot-p0.json --baseline-only",
     "agent:quality:compare": "node scripts/agent-eval/compare.mjs --config scripts/agent-eval/experiments/bot-p0.json",
-    "agent:quality:gate": "node scripts/agent-eval/quality-gate.mjs"
+    "agent:quality:gate": "node scripts/agent-eval/quality-gate.mjs",
+    "agent:session:regression-baseline": "node scripts/agent-eval/compare.mjs --config scripts/agent-eval/experiments/session-regression.json --baseline-only",
+    "agent:session:capability-baseline": "node scripts/agent-eval/compare.mjs --config scripts/agent-eval/experiments/session-capability.json --baseline-only"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

@@ -683,6 +683,22 @@ export const play = {
     streaming: 'Assistant (generating)'
   },
 
+  live: {
+    summary: 'Open for elapsed time, characters, and speed',
+    waiting: 'Waiting on the model',
+    thinking: 'Thinking',
+    writing: 'Writing',
+    tool: 'Calling {name}',
+    card: 'Drawing a card',
+    speed: '{rate} chars/s',
+    speedNone: 'No output yet',
+    elapsedLabel: 'Elapsed',
+    speedLabel: 'Speed',
+    charsLabel: 'Written',
+    chars: '{count} chars',
+    doingLabel: 'Doing'
+  },
+
   turns: {
     dispatchSubagent: '🤖 Dispatch SubAgent',
     createTeammate: '👥 Create teammate',

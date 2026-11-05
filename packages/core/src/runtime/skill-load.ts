@@ -28,6 +28,10 @@ export async function resolveSkillSearch(
 ): Promise<{ content: string }> {
   const q = String(query ?? '').trim();
   if (!q) {
+    void host.emitTrace(sessionId, {
+      kind: 'skill_search',
+      payload: { query: q, limit: 0, hitCount: 0, names: [], rejected: true, reason: 'empty_query' }
+    });
     return { content: JSON.stringify({ query: q, hits: [], hint: 'Provide a short task query.' }, null, 2) };
   }
   const topK = clampSearchLimit(limit, host.promptBuilder.getSkillRoutingSettings().topK);
@@ -71,9 +75,19 @@ export async function resolveSkillLoad(
     return lookupKeys.some((candidate) => candidate.trim().toLowerCase() === normalizedName);
   });
   const exact = matches.find(s => s.ownerBotId && s.id.toLowerCase() === normalizedName);
-  if (!exact && matches.length > 1) return { error: `Ambiguous skill "${name}". Choose an id: ${matches.map(s => `${s.id} (Bot ${s.ownerBotId ?? 'shared'})`).join(', ')}` };
+  if (!exact && matches.length > 1) {
+    void host.emitTrace(sessionId, {
+      kind: 'skill_load',
+      payload: { name, rejected: true, reason: 'ambiguous' }
+    });
+    return { error: `Ambiguous skill "${name}". Choose an id: ${matches.map(s => `${s.id} (Bot ${s.ownerBotId ?? 'shared'})`).join(', ')}` };
+  }
   const found = exact ?? matches[0];
   if (!found?.content) {
+    void host.emitTrace(sessionId, {
+      kind: 'skill_load',
+      payload: { name, rejected: true, reason: 'not_found' }
+    });
     return { error: `Skill "${name}" not found.` };
   }
   if (!isSkillAllowed(found, host.promptBuilder.getAllowedSkills(sessionId))) {

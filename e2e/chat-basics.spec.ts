@@ -21,7 +21,10 @@ test.describe('Chat basics', () => {
     const box = page.locator('#playMessages');
     await expect(box.locator('.chat-turn--user .chat-bubble__body').last()).toContainText(content);
     await expect(page.locator('#playInput')).toHaveValue('');
-    await expect(box.locator('.chat-turn--streaming .chat-stream-placeholder')).toHaveText('…');
+    const live = box.locator('.chat-turn--streaming .stream-live');
+    await expect(live.locator('.stream-live__dot')).toHaveCount(3);
+    await expect(live.locator('.stream-live__phase')).toHaveText('等待模型');
+    await expect(live.locator('.stream-live__pace')).toHaveText(/\d+\.\ds/);
 
     release();
     await expect(box.locator('.chat-turn--streaming')).toHaveCount(0, { timeout: 60_000 });

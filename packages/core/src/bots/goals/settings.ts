@@ -1,6 +1,10 @@
 import type { GoalSettings, GoalStore } from './types.js';
 const KEY = 'bot_multi_goal_settings';
-export const DEFAULT_GOAL_SETTINGS: GoalSettings = { maxConcurrent: 4, defaultBudgetUsd: 10, maxAttempts: 20, maxNoProgress: 3, leaseMs: 300000, preferredStrategy: 'auto' };
+/** Unsaved chats run this many goals at once. A saved Lab value replaces it. */
+export const DEFAULT_GOAL_CONCURRENCY = 32;
+/** One message may become this many goals before it stays intact for the judge. */
+export const GOAL_INTAKE_SPLIT_LIMIT = 32;
+export const DEFAULT_GOAL_SETTINGS: GoalSettings = { maxConcurrent: DEFAULT_GOAL_CONCURRENCY, defaultBudgetUsd: 10, maxAttempts: 20, maxNoProgress: 3, leaseMs: 300000, preferredStrategy: 'auto' };
 export function readGoalSettings(store: GoalStore, scope?: string): GoalSettings { return { ...DEFAULT_GOAL_SETTINGS, ...store.getDaemonControl<Partial<GoalSettings>>(scope ? `${KEY}:${scope}` : KEY) }; }
 export function writeGoalSettings(store: GoalStore, patch: Partial<GoalSettings>, scope?: string): GoalSettings {
  for (const key of Object.keys(patch)) if (!(key in DEFAULT_GOAL_SETTINGS)) throw new Error(`Unknown setting ${key}`);

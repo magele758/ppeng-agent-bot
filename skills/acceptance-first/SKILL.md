@@ -44,6 +44,7 @@ criteria:
    1. 每条标准至少一个测试，标题带标签，先确认它失败（红）；
    2. 再实现直到测试通过（绿）；
    3. 跑 `pnpm run test:acceptance`（及相关测试），通过后把 `status` 改为 `implemented`。
+   改了用户能看到的行为时，按 `skills/product-prd/SKILL.md` 同步产品需求目录。
 3. 本轮若只写了 yaml、只贴了 Given/When/Then、或以「确认后我再改 / 这些标准是否正确完整」结束，视为没做完，必须继续写测试和实现。
 4. 派子任务时写明「直接 approved 并实现到测试通过」。禁止派「只起草标准 / 确认前不改代码」的任务。
 5. 和已有 `approved` / `implemented` 规格冲突时：同一轮改标准、改测试、改实现。不要为此停下来问。弱化或删除标准来迁就已写代码仍然禁止；需求取消才 `retired` 并填 `retiredReason`。

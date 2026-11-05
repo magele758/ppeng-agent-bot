@@ -2,6 +2,8 @@ import { nowIso } from '../id.js';
 import type { TeamGateChecker, TeamWorkspaceSyncMode } from './types.js';
 
 export const TEAMS_DAG_SETTINGS_KEY = 'teams_dag_settings';
+export const DEFAULT_TEAM_CONCURRENCY = 16;
+export const TEAM_CONCURRENCY_LIMIT = 256;
 
 export interface TeamGateSettings {
   enabled: boolean;
@@ -73,7 +75,7 @@ function normalizeGate(
 export function defaultTeamsDagSettings(): TeamsDagSettings {
   return {
     enabled: true,
-    maxConcurrent: 3,
+    maxConcurrent: DEFAULT_TEAM_CONCURRENCY,
     workspaceSyncMode: 'directory-copy',
     usePlannerLlm: true,
     gates: {
@@ -90,7 +92,7 @@ export function normalizeTeamsDagSettings(raw: Partial<TeamsDagSettings & { requ
   if (!raw || typeof raw !== 'object') return base;
   const max =
     typeof raw.maxConcurrent === 'number' && Number.isFinite(raw.maxConcurrent)
-      ? Math.max(1, Math.min(16, Math.floor(raw.maxConcurrent)))
+      ? Math.max(1, Math.min(TEAM_CONCURRENCY_LIMIT, Math.floor(raw.maxConcurrent)))
       : base.maxConcurrent;
   const sync =
     raw.workspaceSyncMode === 'git-worktree' ? 'git-worktree' : base.workspaceSyncMode;

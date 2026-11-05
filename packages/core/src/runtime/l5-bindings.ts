@@ -40,6 +40,7 @@ import { envInt } from '../env.js';
 import { checkToolBindingPin, markBindingNeedsReverify } from '../discovery/cbom.js';
 import { resolveDiscoveryEnabled } from '../discovery/settings.js';
 import { resolveSessionModelAdapter, type ModelRef } from '../model/provider-catalog.js';
+import { applyThinkingEffortToTurn } from '../model/thinking-effort-settings.js';
 import { planModelFallback, rememberServedBy, runWithFallbackChain } from '../model/fallback-chain.js';
 import { resolveModelRoute, withProviderFallback } from '../model/registry-router.js';
 import { waitSteeringChildrenIdle } from '../session/steering-subagent.js';
@@ -727,7 +728,7 @@ function fitProductModelRequest(
     if (slot && fitted.sessionId && fitted.messages) {
       linkPrepareSlot(rt.store, fitted.sessionId, fitted.messages, slot);
     }
-    return fitted;
+    return applyThinkingEffortToTurn(fitted, rt.store);
   });
 }
 

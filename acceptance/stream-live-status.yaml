@@ -1,0 +1,27 @@
+id: stream-live-status
+title: 生成中的速度与正在做什么
+status: implemented
+requirement: |
+  [Image #1]  我想要在他生成的时候知道他在干嘛怎么办？加个交互，让我知道他的速度和在干嘛，另外这里的三个 ... 可以加点动效，免得太静态了
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 助手正在生成，回复正文还没出来，画面上只有三个点
+    when: 用户看着这一条
+    then: 三个点有持续的错落动效，旁边能看到它正在等待，以及已经等了多久
+  - id: AC-2
+    given: 助手正在写出文字或思考
+    when: 用户看着生成中的这一条
+    then: 能看到它正在写或正在思考，以及当前输出速度
+  - id: AC-3
+    given: 助手正在调用某个工具
+    when: 用户看着生成中的这一条
+    then: 能看到正在调用的工具名字
+  - id: AC-4
+    given: 生成中的状态行
+    when: 用户点开它
+    then: 能看到已用时间、已写出的字数，以及速度；还没有输出时速度说明还没有输出
+  - id: AC-5
+    given: 系统开启了减少动态效果
+    when: 生成中的三个点出现
+    then: 点不再跳动

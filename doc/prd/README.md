@@ -1,0 +1,48 @@
+# 产品需求目录
+
+这套目录在根目录 README 之外。README 负责怎么跑起来、代码怎么分；这里负责产品：现在能做什么、已经做出了哪些功能、接下来还没有做的是什么。
+
+Bot 的交互细则仍以 [Bot 产品书](../bot/README.md) 为准。本目录写能力说明和功能台账，并链到产品书与验收规格，不另写一套互相矛盾的交互规则。验收规格 [`acceptance/*.yaml`](../../acceptance) 决定一条功能算不算已经交付。
+
+## 怎么读
+
+| 块 | 路径 | 谁维护 | 回答什么 |
+|----|------|--------|----------|
+| 现在已有的功能 | [current/](current/README.md) | 手写说明。改了用户能看到的行为时改对应章节 | 用户现在能做什么、从哪进入、哪些还不能当成已经交付 |
+| 已经开发的功能 | [shipped/](shipped/index.md) | 脚本生成，不要手改 | 每一条已经实现的验收规格：名称和用户需求 |
+| 未来待开发 | [backlog/](backlog/README.md) | 未实现规格由脚本生成；没有规格的方向手写，并且写明还不是承诺 | 接下来要做、但现在还不能当现成功能用的东西 |
+| 仓库技能对照 | [current/skills.md](current/skills.md) | 脚本从各技能说明生成，不要手改 | 本仓库每份技能的名称和用途 |
+| 现状与测试对照 | [trace.md](trace.md) | 脚本生成，不要手改 | 每一章点名且已经实现的规格，以及带该规格验收标签的测试 |
+| 核心用例 | [core-cases.md](core-cases.md) | 手写 [core-cases.yaml](core-cases.yaml)，页面由脚本生成 | 人能走完的几条路径；命令只跑这些路径点名的测试 |
+
+生成或刷新台账、对照表和核心用例页面：
+
+```bash
+node scripts/prd/build-catalog.mjs
+```
+
+只列出或只运行核心用例点名的测试：
+
+```bash
+node scripts/prd/core-cases.mjs --list
+node scripts/prd/core-cases.mjs
+```
+
+编码助手在改用户能看到的行为、或增删仓库技能时，按 [product-prd 技能](../../skills/product-prd/SKILL.md) 更新本目录。
+
+## 状态词
+
+和验收规格一致：
+
+| 状态 | 在本目录里的意思 |
+|------|------------------|
+| implemented | 已经交付。只出现在「已经开发的功能」，并可以写进「现在已有的功能」 |
+| approved | 标准已定，还没做完。只出现在「未来待开发」 |
+| draft | 还没定。不是当前产品 |
+| retired | 需求取消。不是待开发，也不要写成现在能用 |
+
+## 不要做的事
+
+- 不要把本目录的正文搬进根目录 README。README 最多留一处入口链接。
+- 不要把草稿或仅批准的规格写成「用户现在可以」。
+- 不要手改 `shipped/`、`backlog/from-acceptance.md`、`current/skills.md`、`trace.md`、`trace.json`、`core-cases.md`。改验收规格、技能说明、现状章节的依据或 `core-cases.yaml` 后重新生成。

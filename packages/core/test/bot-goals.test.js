@@ -55,7 +55,7 @@ test('scoped goals and preferences never expose another chat',t=>{
  const g=a.create({botId:'bot',sessionId:'a',title:'Private',objective:'Private'});
  assert.equal(b.list('bot').length,0);assert.equal(b.get('bot',g.id),undefined);
  assert.throws(()=>b.control('bot',g.id,'cancel'),/not found/);
- a.updateSettings({maxConcurrent:1});assert.equal(b.readSettings().maxConcurrent,4);
+ a.updateSettings({maxConcurrent:1});assert.equal(b.readSettings().maxConcurrent,32);
  assert.throws(()=>a.updateSettings({unknown:1}),/Unknown/);
 });
 test('result arriving before wait registration is retained [AC:bot-multi-goal-coordination#AC-8]',t=>{

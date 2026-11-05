@@ -11,6 +11,7 @@ Bot 创建、统一设置面板、热配置的作用范围与生效时机见 [BO
 | 目标 / Goal | 推荐顺序 / Route |
 |-------------|------------------|
 | 审阅产品功能 / Review product | [Bot 完整功能说明](bot/00-functional-guide.md) → [分章规则与状态](bot/README.md) |
+| 审阅产品需求目录 / Review product requirements | [doc/prd/README.md](prd/README.md) |
 | 第一次使用 / Run locally | [README 快速开始](../README.zh.md#快速开始) → [Lab 接入](harness/from-zero/09-web-console.md) → [测试与排障](TESTING.md) |
 | 学习 Agent 原理 / Learn the runtime | [Harness 地图](harness/README.md) → [从零教程](harness/from-zero/README.md) → 按问题查 00–20 专题 |
 | 嵌入循环 / Embed the loop | [Agent Loop 包](../packages/agent-loop/README.md) → [SDK 指南](../skills/agent-loop/SKILL.md) → [装配模块与端口](../skills/agent-loop/references/modules-and-ports.md) |
