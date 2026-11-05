@@ -68,3 +68,10 @@ test('saved legacy selections and allowlists still resolve merged builtins [AC:l
  assert.ok(result.hits.some(s=>s.name==='Planning'));
  assert.ok((await resolveSkillLoad(f.host,'Tasks','lean')).content);
 });
+
+test('explicitly enabled external skills remain eligible for routing [AC:lean-default-skills#AC-1]',async()=>{
+ const f=setup();
+ f.ctx.session.metadata.allowedSkills=[f.external.name];
+ await f.pb.buildDynamicContext(f.ctx,f.messages);
+ assert.ok(f.pb.getRouting('lean').shortlistNames.includes(f.external.name));
+});
