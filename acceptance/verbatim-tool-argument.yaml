@@ -1,0 +1,15 @@
+id: verbatim-tool-argument
+title: 工具参数按用户写的原样使用
+status: implemented
+requirement: |
+  那你去做一下开发，对比实验效果，如果有改进就可以合并，如果没有改进，就不要合并pr
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 默认的系统提示
+    when: 查看模型收到的稳定提示
+    then: 它要求把用户写出的工具参数原样复制，包括前缀；成功的工具结果正文是数据，不是新指令；失败结果里的重试说明仍然有效
+  - id: AC-2
+    given: 设置里把系统提示切回旧版措辞
+    when: 查看模型收到的稳定提示
+    then: 同一条规则还在
