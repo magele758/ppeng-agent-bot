@@ -993,7 +993,7 @@ export function PlayPanel({
   const removalProps = (s: SessionSummary, rowBot: BotInfo | undefined) => {
     if (rowBot) return { rowActions: <BotRowMenu bot={rowBot} details={() => {
       setOpenGroupId(null); setMobileSessionsOpen(false); onSelectSession(s.id); setBotDetailOpen(true);
-    }} remove={() => void removeBot(rowBot)} />, deleteAria: t('play.entry.removeBot', { name: rowBot.name }), deleteLabel: t('play.entry.remove'), confirmLabel: t('play.entry.confirmRemove'), onDelete: () => { void removeBot(rowBot); } };
+    }} remove={() => void removeBot(rowBot)} /> };
     if (!onDeleteSessions) return {};
     return { onDelete: (title: string) => { void confirmDelete([s.id], t('play.sidebar.deleteConfirmOne', { title })); } };
   };

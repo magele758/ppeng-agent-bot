@@ -14,7 +14,7 @@ criteria:
     when: 同一调用重试执行
     then: 来源范围检查认这张批准，命令执行，不再返回 source_scope_denied
   - id: AC-2
-    given: 已暴露会话里一条有副作用的调用没有任何匹配批准
+    given: 已暴露会话保存了严格来源策略，一条有副作用的调用没有任何匹配批准
     when: 执行该调用
     then: 返回 source_scope_denied 并为这次精确参数创建一张待批审批卡（不重复创建）；批准后同一调用执行，拒绝后仍被拒；routine/事件来源的会话同样只能靠这张卡或已保存范围放行
   - id: AC-3

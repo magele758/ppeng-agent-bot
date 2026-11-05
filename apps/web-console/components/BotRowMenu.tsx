@@ -7,6 +7,7 @@ import type { BotInfo } from '@/lib/types';
 import { BOT_GROUPS_CHANGED_EVENT } from '@/lib/bot-group';
 import type { FunctionalGroup } from '@/lib/functional-group-view';
 import type { SidebarRoom } from './play-group/PlayBotGroupList';
+import './BotRowMenu.css';
 import { BotEntryDialog } from './BotEntryDialog';
 import { BotDetailMenu } from './BotDetailMenu';
 
@@ -64,15 +65,23 @@ export function BotRowMenu({bot, details, remove}: {bot:BotInfo; details:()=>voi
       <button onClick={()=>{closeMenu(); remove();}}>{t('play.rowMenu.remove')}</button>
     </div>
     {view && createPortal(<BotEntryDialog label={label}>
-      <h3>{bot.name}</h3>
-      {view === 'cron' ? <BotDetailMenu botId={bot.id} botName={bot.name}/> :
-        <div className="bot-row-picker" aria-busy={busy}>
-          <h4>{t(view === 'group' ? 'play.rowMenu.group' : 'play.rowMenu.room')}</h4>
-          {options.map(option=><button type="button" disabled={busy} key={option.id} onClick={()=>void join(option.id)}>{option.name}</button>)}
-          {!busy && !error && !options.length && <p>{t('play.rowMenu.empty')}</p>}
-          {error && <p role="alert">{error}</p>}
-        </div>}
-      <button type="button" disabled={busy} onClick={()=>setView(null)}>{t('common.cancel')}</button>
+      <div className="bot-row-dialog" data-view={view}>
+        <header className="bot-row-dialog__head">
+          <div><h3>{t(view === 'cron' ? 'play.rowMenu.cron' : view === 'group' ? 'play.rowMenu.group' : 'play.rowMenu.room')}</h3><p>{bot.name}</p></div>
+        </header>
+        <div className="bot-row-dialog__body" aria-busy={busy}>
+          {view === 'cron' ? <BotDetailMenu botId={bot.id} botName={bot.name}/> :
+            <div className="bot-row-picker">
+              {busy && <p role="status">{t('play.rowMenu.loading')}</p>}
+              {options.map(option => <button type="button" disabled={busy} key={option.id} onClick={() => void join(option.id)}><span>{option.name}</span><span aria-hidden="true">›</span></button>)}
+              {!busy && !error && !options.length && <p>{t('play.rowMenu.empty')}</p>}
+              {error && <p role="alert">{error}</p>}
+            </div>}
+        </div>
+        <footer className="bot-row-dialog__foot">
+          <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setView(null)}>{t('common.cancel')}</button>
+        </footer>
+      </div>
     </BotEntryDialog>, document.body)}
   </span>;
 }

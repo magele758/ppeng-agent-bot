@@ -1,0 +1,15 @@
+id: auto-source-continuity
+title: Auto 对话连续执行
+status: implemented
+requirement: |
+  auto的权限太低了，一点也不auto，这种怎么都要我审批，简直不能用，导致我只有bypass的能用
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 用户直接发起 Auto 对话且未设置更严格的来源范围
+    when: 工具返回内容后继续执行正常风险等级的 shell 命令
+    then: 不额外触发来源范围审批
+  - id: AC-2
+    given: 命令属于高风险或来源是外部事件、定时任务、子任务，或用户保存了严格来源策略
+    when: 执行命令
+    then: 原有审批和来源限制继续生效

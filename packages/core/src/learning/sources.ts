@@ -1,3 +1,4 @@
+import { isHighRiskAutoReviewCall } from '@ppeng/agent-loop';
 import type { SqliteStateStore } from '../storage.js';
 import { readApprovalWake } from '../approval/unattended-approval.js';
 import { effectiveSourcePolicy, normalizeSourcePolicy, sourcePolicyAllows, type SourcePolicy } from './source-policy.js';
@@ -136,7 +137,18 @@ export class SourceLedger {
             if (policy && !sourcePolicyAllows(policy, name, args))
                 return false;
         }
+        if (this.autoShellGrant(sid, name, args, chain)) return true;
         return constrained.every(id => sourcePolicyAllows(this.settings(id), name, args));
+    }
+    /** Direct Auto chats use the ordinary shell review after reading tool output.
+     * Explicit source restrictions and delegated/event authority remain binding.
+     */
+    private autoShellGrant(sid: string, name: string, args: unknown, chain: string[]): boolean {
+        if (!this.directUser(sid) || this.store.getSession(sid)?.metadata?.permissionMode !== 'auto') return false;
+        if (readApprovalWake(this.store.getSession(sid)?.metadata)?.kind === 'unattended') return false;
+        if (chain.some(id => this.store.getDaemonControl('source-policy:' + id) !== undefined)) return false;
+        if (!['bash', 'bg_run', 'shell', 'work_evidence'].includes(name)) return false;
+        return !isHighRiskAutoReviewCall(name, args);
     }
     /** Saved permissionMode=bypass is explicit user authorization for automatic tool use; source text cannot set this mode. */
     bypassGrant(sid: string): boolean {

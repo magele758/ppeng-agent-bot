@@ -58,10 +58,12 @@ test('Bot removal names its preserved data and failure preserves the Bot [AC:bot
  const {bots}=await(await page.request.get('/api/bots')).json();const bot=bots.find((b:any)=>!b.hidden);expect(bot).toBeTruthy();let writes=0;let fail=true;let removed=false;
  await page.route('**/api/bots',route=>route.fulfill({json:{bots:bots.map((b:any)=>b.id===bot.id&&removed?{...b,hidden:true}:b)}}));
  await page.route(`**/api/bots/${bot.id}`,route=>{writes++;if(!fail)removed=true;return fail?route.fulfill({status:503,json:{error:'Removal unavailable'}}):route.fulfill({json:{bot:{...bot,hidden:true}}});});
- await page.goto('/#/bot');const remove=page.getByRole('button',{name:`移除 Bot「${bot.name}」`,exact:true});await expect(remove).toBeVisible();
- page.once('dialog',async d=>{expect(d.message()).toContain(bot.name);expect(d.message()).toContain('不会删除会话');await d.dismiss();});await remove.click();expect(writes).toBe(0);await expect(remove).toBeVisible();
- page.once('dialog',d=>d.accept());await remove.click();await expect(page.getByRole('alert').filter({hasText:'Removal unavailable'})).toBeVisible();await expect(remove).toBeVisible();
- fail=false;page.once('dialog',d=>d.accept());await remove.click();await expect(remove).toHaveCount(0);await expect(page.getByLabel(`移动 ${bot.name} 到功能分组`,{exact:true})).toHaveCount(0);expect(writes).toBe(2);
+ await page.goto('/#/bot');const trigger=page.getByRole('button',{name:`${bot.name} 的更多操作`,exact:true});
+ const remove=page.getByTestId('bot-row-actions').getByRole('button',{name:'隐藏 Bot',exact:true});
+ const hide=async()=>{await trigger.click();await remove.click();};await expect(trigger).toBeVisible();
+ page.once('dialog',async d=>{expect(d.message()).toContain(bot.name);expect(d.message()).toContain('不会删除会话');await d.dismiss();});await hide();expect(writes).toBe(0);await expect(trigger).toBeVisible();
+ page.once('dialog',d=>d.accept());await hide();await expect(page.getByRole('alert').filter({hasText:'Removal unavailable'})).toBeVisible();await expect(trigger).toBeVisible();
+ fail=false;page.once('dialog',d=>d.accept());await hide();await expect(trigger).toHaveCount(0);await expect(page.getByLabel(`移动 ${bot.name} 到功能分组`,{exact:true})).toHaveCount(0);expect(writes).toBe(2);
 });
 
 test('functional group deletion confirms retained members and preserves them on cancellation or failure [AC:bot-entry-simplification#AC-7]',async({page})=>{
@@ -82,7 +84,7 @@ test('Bot rows have no move control or footer while chat and confirmed removal r
  const bot = bots.find((item: { hidden?: boolean }) => !item.hidden);
  expect(bot).toBeTruthy();
  await page.goto('/#/bot');
- const row = page.locator('#sessionListMini [draggable="true"]').filter({ has: page.getByRole('button', { name: `移除 Bot「${bot.name}」`, exact: true }) });
+ const row = page.locator('#sessionListMini [draggable="true"]').filter({ has: page.getByRole('button', { name: `${bot.name} 的更多操作`, exact: true }) });
  await expect(row).toHaveCount(1);
  await expect(page.getByRole('combobox', { name: /^移动 .* 到功能分组$/ })).toHaveCount(0);
  const chatRow = row.locator('.list-item--session');
@@ -94,7 +96,8 @@ test('Bot rows have no move control or footer while chat and confirmed removal r
  await expect(page.locator('#playTitle')).toContainText(bot.name);
  let confirms = 0;
  page.once('dialog', async dialog => { confirms++; expect(dialog.message()).toContain(bot.name); await dialog.dismiss(); });
- await row.getByRole('button', { name: `移除 Bot「${bot.name}」`, exact: true }).click();
+ await row.getByRole('button', { name: `${bot.name} 的更多操作`, exact: true }).click();
+ await page.getByTestId('bot-row-actions').getByRole('button',{name:'隐藏 Bot',exact:true}).click();
  expect(confirms).toBe(1);
  await expect(row).toBeVisible();
 });
