@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 375,
+    "implemented": 377,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1035,6 +1035,13 @@
       "requirement": "这个整个做成浮层的吧，参考grok bot的那个小刘海模式，右边的2个icon做成一个浮动的按钮，把2个功能按键放进去\n这个可以弱化一点，避免抢视觉焦点\n选中态不要圆框，就带个背景色就行了",
       "verificationStage": "software",
       "file": "acceptance/chat-floating-chrome.yaml"
+    },
+    {
+      "id": "chat-header-menu-only",
+      "title": "聊天顶部只保留更多入口",
+      "requirement": "这个感觉就没用啊\n这个里面的展开和收起边栏的功能也放到菜单里，我看还有停止的按钮，那个在对话框里就有，不用保留",
+      "verificationStage": "software",
+      "file": "acceptance/chat-header-menu-only.yaml"
     },
     {
       "id": "chat-inline-history",
@@ -2323,6 +2330,13 @@
       "requirement": "让配置真正可用：模型配置做成简单的向导流程（选服务商、填 key、选模型、测试连接），\n有合理默认值，高级选项放在开关后面；设置搜索要好用，保存/未保存状态要清楚；\n没配置模型时给首次引导提示；登录页要精致；并增加网关/IM 设置卡片（飞书/企业微信的\ntoken、encryptKey、secret、发送者白名单、botId），密钥永不回显。",
       "verificationStage": "software",
       "file": "acceptance/settings-models-onboarding.yaml"
+    },
+    {
+      "id": "shared-chat-header",
+      "title": "会话和群聊统一浮动顶部",
+      "requirement": "群聊和普通会话的顶部也按这个方式统一一下，重复的按钮都收一收，保持整个 UI 一致",
+      "verificationStage": "software",
+      "file": "acceptance/shared-chat-header.yaml"
     },
     {
       "id": "shared-info-compact",

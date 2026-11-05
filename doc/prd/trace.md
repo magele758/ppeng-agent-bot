@@ -1798,6 +1798,12 @@ permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
 - `e2e/bot-row-menu.spec.ts`
 
+### chat-header-menu-only
+
+聊天顶部只保留更多入口
+
+- `e2e/bot-row-menu.spec.ts`
+
 ### chat-inline-history
 
 单行附件入口与自动加载聊天历史
@@ -3101,6 +3107,12 @@ Secure Form fill-from-Vault
 - `apps/web-console/lib/model-providers.test.ts`
 - `apps/web-console/lib/settings-search.test.ts`
 - `e2e/settings-models.spec.ts`
+
+### shared-chat-header
+
+会话和群聊统一浮动顶部
+
+- `e2e/shared-chat-header.spec.ts`
 
 ### shared-info-compact
 

@@ -852,6 +852,11 @@ transcript. Separate track from browser vault_fill.
 没配置模型时给首次引导提示；登录页要精致；并增加网关/IM 设置卡片（飞书/企业微信的
 token、encryptKey、secret、发送者白名单、botId），密钥永不回显。
 
+## shared-chat-header
+会话和群聊统一浮动顶部
+
+群聊和普通会话的顶部也按这个方式统一一下，重复的按钮都收一收，保持整个 UI 一致
+
 ## shared-info-compact
 共享信息紧凑入口
 

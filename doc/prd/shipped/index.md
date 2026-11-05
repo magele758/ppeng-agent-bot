@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 375 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 377 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -218,7 +218,7 @@
 - `bypass-skill-write` bypass 的 Bot 写技能不再被额外确认拦住
 - `bypass-source-scope` permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
-## chat（11）
+## chat（12）
 
 需求正文见 [chat](chat.md)。
 
@@ -229,6 +229,7 @@
 - `chat-column` 对话区对齐与阅读留白
 - `chat-experience` 对话页简洁易用
 - `chat-floating-chrome` 浮动聊天标题与低干扰摘要
+- `chat-header-menu-only` 聊天顶部只保留更多入口
 - `chat-inline-history` 单行附件入口与自动加载聊天历史
 - `chat-more-menu-on-top` 对话头部「⋯」更多菜单在最上层且不透明
 - `chat-tail-kept` 对话结束时助手正文留在对话里
@@ -855,10 +856,11 @@
 - `settings-categories` 设置页「行为 / 安全 / 工具 / 集成」分类易用化
 - `settings-models-onboarding` 设置：模型向导、首次引导、搜索与保存状态
 
-## shared（1）
+## shared（2）
 
 需求正文见 [other](other.md)。
 
+- `shared-chat-header` 会话和群聊统一浮动顶部
 - `shared-info-compact` 共享信息紧凑入口
 
 ## shell（1）

@@ -250,18 +250,22 @@ async function runSessionMessage(command: string, subcommand: string | undefined
     latestAssistant?: string;
     session?: { status?: string };
   };
-  if (result.session?.status === 'waiting_approval') {
-    console.error('waiting_approval — use: approve <approvalId> approve|reject');
-    const approvals = (await request('/api/approvals')) as {
-      approvals?: Array<{ id: string; toolName: string }>;
-    };
-    for (const a of approvals.approvals ?? []) {
-      console.error(`  pending ${a.id} ${a.toolName}`);
-    }
-  }
-  if (result.latestAssistant) {
-    console.log(result.latestAssistant);
-  }
+  await printMessageResult(result);
+}
+
+function printAssistant(result: { latestAssistant?: string }): void {
+  if (result.latestAssistant) console.log(result.latestAssistant);
+}
+
+async function printMessageResult(result: { latestAssistant?: string; session?: { status?: string } }): Promise<void> {
+  if (result.session?.status === 'waiting_approval') await printPendingApprovals();
+  printAssistant(result);
+}
+
+async function printPendingApprovals(): Promise<void> {
+  console.error('waiting_approval — use: approve <approvalId> approve|reject');
+  const approvals = await request<{ approvals?: Array<{ id: string; toolName: string }> }>('/api/approvals');
+  for (const a of approvals.approvals ?? []) console.error(`  pending ${a.id} ${a.toolName}`);
 }
 
 async function runStream(subcommand: string | undefined, rest: string[]): Promise<void> {
@@ -361,9 +365,7 @@ async function runTeam(subcommand: string | undefined, rest: string[]): Promise<
     latestAssistant?: string;
   };
   console.log(result.session.id);
-  if (result.latestAssistant) {
-    console.log(result.latestAssistant);
-  }
+  printAssistant(result);
 }
 
 async function createSession(rest: string[]): Promise<void> {
@@ -388,24 +390,22 @@ async function replSession(rest: string[]): Promise<void> {
       const line = (await rl.question('> ')).trim();
       if (!line) continue;
       if (line === 'quit' || line === 'exit') break;
-      if (noStream) {
-        const result = (await request(`/api/sessions/${sessionId}/messages`, {
-          method: 'POST',
-          body: JSON.stringify({ message: line })
-        })) as { latestAssistant?: string };
-        if (result.latestAssistant) {
-          console.log(result.latestAssistant);
-        }
-        continue;
-      }
-      const session = await streamTurn(sessionId, line);
-      if (session?.status === 'waiting_approval') {
-        console.error('waiting_approval — use: approve <approvalId> approve|reject');
-      }
+      await sendReplMessage(sessionId, line, noStream);
     }
   } finally {
     rl.close();
   }
+}
+
+async function sendReplMessage(sessionId: string, line: string, noStream: boolean): Promise<void> {
+  if (noStream) {
+    printAssistant(await request<{ latestAssistant?: string }>(`/api/sessions/${sessionId}/messages`, {
+      method: 'POST', body: JSON.stringify({ message: line })
+    }));
+    return;
+  }
+  const session = await streamTurn(sessionId, line);
+  if (session?.status === 'waiting_approval') console.error('waiting_approval — use: approve <approvalId> approve|reject');
 }
 
 async function showSessionTeam(rest: string[]): Promise<void> {
