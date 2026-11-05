@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 373,
+    "implemented": 379,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -34,6 +34,13 @@
       "requirement": "然后这个共享skill、沉淀skill、修改skill、管理更新删除的能力，我想要agent也具备自己去操作的能力",
       "verificationStage": "software",
       "file": "acceptance/agent-skill-management.yaml"
+    },
+    {
+      "id": "agents-clean-layout",
+      "title": "Bot 管理页清爽布局",
+      "requirement": "这个界面里很多ui都是乱的，检查优化一下",
+      "verificationStage": "software",
+      "file": "acceptance/agents-clean-layout.yaml"
     },
     {
       "id": "agents-management",
@@ -272,6 +279,13 @@
       "requirement": "按照这个开发计划，帮我分多个agent去完成开发",
       "verificationStage": "software",
       "file": "acceptance/bot-daydream-ui.yaml"
+    },
+    {
+      "id": "bot-delete",
+      "title": "删除 Bot 并保留对话历史",
+      "requirement": "删除bot的选项呢？我怎么没看到\n删除 Bot 和定时任务，保留历史会话、群聊记录",
+      "verificationStage": "software",
+      "file": "acceptance/bot-delete.yaml"
     },
     {
       "id": "bot-detail-child-tasks-tab",
@@ -1014,6 +1028,20 @@
       "requirement": "对话页配置太多、输入区拥挤、同一设置在多处重复。目标：输入区默认干净、次要选项收进一个紧凑的「会话设置」面板\n（常用在前，其余放进「高级」），全局设置只在「设置」页出现一次；会话列表清晰；工具调用 / 思考块默认折叠、可读。",
       "verificationStage": "software",
       "file": "acceptance/chat-experience.yaml"
+    },
+    {
+      "id": "chat-floating-chrome",
+      "title": "浮动聊天标题与低干扰摘要",
+      "requirement": "这个整个做成浮层的吧，参考grok bot的那个小刘海模式，右边的2个icon做成一个浮动的按钮，把2个功能按键放进去\n这个可以弱化一点，避免抢视觉焦点\n选中态不要圆框，就带个背景色就行了",
+      "verificationStage": "software",
+      "file": "acceptance/chat-floating-chrome.yaml"
+    },
+    {
+      "id": "chat-header-menu-only",
+      "title": "聊天顶部只保留更多入口",
+      "requirement": "这个感觉就没用啊\n这个里面的展开和收起边栏的功能也放到菜单里，我看还有停止的按钮，那个在对话框里就有，不用保留",
+      "verificationStage": "software",
+      "file": "acceptance/chat-header-menu-only.yaml"
     },
     {
       "id": "chat-inline-history",
@@ -1906,7 +1934,7 @@
     },
     {
       "id": "play-group-delete-menu",
-      "title": "群聊行的删除收进悬停图标菜单",
+      "title": "群聊行的删除收进更多菜单",
       "requirement": "这个太扎眼了，搞成iconfont，隐藏的hover菜单里",
       "verificationStage": "software",
       "file": "acceptance/play-group-delete-menu.yaml"
@@ -2311,6 +2339,13 @@
       "file": "acceptance/settings-models-onboarding.yaml"
     },
     {
+      "id": "shared-chat-header",
+      "title": "会话和群聊统一浮动顶部",
+      "requirement": "群聊和普通会话的顶部也按这个方式统一一下，重复的按钮都收一收，保持整个 UI 一致",
+      "verificationStage": "software",
+      "file": "acceptance/shared-chat-header.yaml"
+    },
+    {
       "id": "shared-info-compact",
       "title": "共享信息紧凑入口",
       "requirement": "这里展示优化一下，太乱了，界面占用太多了",
@@ -2330,6 +2365,13 @@
       "requirement": "Repo ships skills/shopping (SKILL.md + sibling Manifest). load_skill(shopping)\nunlocks vault_fill / checkout-marked browser_click|browser_type; without load\nthey stay fail-closed. Skill body: read then dispatch; no plaintext; no Grok/Canvas\ncommerce UI clone; separate from login Secure Form track.",
       "verificationStage": "software",
       "file": "acceptance/shopping-mandatory-skill.yaml"
+    },
+    {
+      "id": "sidebar-unified-menu",
+      "title": "统一群聊和分组菜单",
+      "requirement": "群聊的也按bot的加一个菜单，用类似的菜单\n这个列表里很多功能都是重复的，看看哪些可以聚合，哪些可以放到一个统一入口，哪些可以放到更深的菜单里，让这个列表更清爽",
+      "verificationStage": "software",
+      "file": "acceptance/sidebar-unified-menu.yaml"
     },
     {
       "id": "single-host-bot-completion",

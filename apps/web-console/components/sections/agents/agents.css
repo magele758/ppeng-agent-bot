@@ -59,7 +59,7 @@
 
 .ag-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: var(--ui-space-3);
 }
 
@@ -650,4 +650,44 @@
 /* Dedicated Bot creation stays readable instead of sharing a column with the roster. */
 .ag-bot-create-surface {
   max-width: 720px;
+}
+
+/* Management surfaces share the quiet reading palette. */
+.lab-shell .ag-card,
+.lab-shell .ag-panel,
+.lab-shell .ag-run,
+.lab-shell .ag-task,
+.lab-shell .ag-mail__item {
+  background: var(--ui-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.lab-shell .ag-card { padding: 20px; gap: 12px; border-radius: 14px; }
+.ag-card > * { max-width: 100%; min-width: 0; }
+.ag-card__identity { width: 100%; }
+.ag-card__identity .bot-face { flex-shrink: 0; }
+.ag-card__agent {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-xs);
+  margin-top: auto;
+  padding-top: 4px;
+}
+.ag-chips { min-width: 0; max-width: 100%; }
+.ag-chips .chip { min-width: 0; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.ag-block { min-width: 0; gap: 16px; }
+.ag-grid { min-width: 0; gap: 16px; }
+.ag-toolbar__grow { min-width: 0; }
+.ag-search, .ag-input { box-sizing: border-box; }
+.ag-panel__head > * { min-width: 0; }
+.ag-panel__head { flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .ag-toolbar__grow { flex-basis: 100%; }
+  .ag-toolbar__meta { margin-right: auto; }
+  .lab-shell .ag-card { padding: 16px; }
 }

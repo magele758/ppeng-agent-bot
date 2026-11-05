@@ -153,10 +153,10 @@ export function BotPinArea({
       onDrop={onDrop}
     >
       <div className={styles.heading}>
-        <h3 id="bot-pin-title">{t('play.pin.title')}</h3>
+        <h3 id="bot-pin-title" title={t('play.pin.hint')}>{t('play.pin.title')}</h3>
       </div>
       {deleteError ? <p role="alert" className="play-group-error">{deleteError}</p> : null}
-      {ordered.length === 0 ? <p className={styles.empty}>{t('play.pin.empty')}</p> : <p className={styles.hint}>{t('play.pin.hint')}</p>}
+      {ordered.length === 0 ? <p className={styles.empty}>{t('play.pin.empty')}</p> : null}
       {ordered.map((entry) => {
         const place = insert?.startsWith(`${entry.kind}:${entry.id}:`) ? insert.slice(entry.kind.length + entry.id.length + 1) : '';
         const insertClass = place === 'before' ? styles.insertBefore : place === 'after' ? styles.insertAfter : '';

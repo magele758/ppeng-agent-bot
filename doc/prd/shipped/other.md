@@ -21,6 +21,11 @@ Agent 在对话中管理自身技能
 
 然后这个共享skill、沉淀skill、修改skill、管理更新删除的能力，我想要agent也具备自己去操作的能力
 
+## agents-clean-layout
+Bot 管理页清爽布局
+
+这个界面里很多ui都是乱的，检查优化一下
+
 ## agents-management
 Bots / Agents / Teams / Skills 管理页清晰易用
 
@@ -852,6 +857,11 @@ transcript. Separate track from browser vault_fill.
 没配置模型时给首次引导提示；登录页要精致；并增加网关/IM 设置卡片（飞书/企业微信的
 token、encryptKey、secret、发送者白名单、botId），密钥永不回显。
 
+## shared-chat-header
+会话和群聊统一浮动顶部
+
+群聊和普通会话的顶部也按这个方式统一一下，重复的按钮都收一收，保持整个 UI 一致
+
 ## shared-info-compact
 共享信息紧凑入口
 
@@ -869,6 +879,12 @@ Repo ships skills/shopping (SKILL.md + sibling Manifest). load_skill(shopping)
 unlocks vault_fill / checkout-marked browser_click|browser_type; without load
 they stay fail-closed. Skill body: read then dispatch; no plaintext; no Grok/Canvas
 commerce UI clone; separate from login Secure Form track.
+
+## sidebar-unified-menu
+统一群聊和分组菜单
+
+群聊的也按bot的加一个菜单，用类似的菜单
+这个列表里很多功能都是重复的，看看哪些可以聚合，哪些可以放到一个统一入口，哪些可以放到更深的菜单里，让这个列表更清爽
 
 ## single-host-bot-completion
 单机 Bot 工作收尾与默认入口

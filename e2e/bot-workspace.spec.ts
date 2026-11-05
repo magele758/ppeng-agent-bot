@@ -55,12 +55,14 @@ test("create and reopen a room with persistent membership [AC:bot-rooms#AC-1] [A
   await dialog.locator('button[type=submit]').click();
   await page.getByRole('button', { name: `打开群聊 Room ${bot.id}`, exact: true }).click();
   const rooms = page.getByTestId('bot-rooms');
+  await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
   await page.getByText('群聊设置', { exact: true }).click();
   await rooms.getByText('群聊运行状态', { exact: true }).click();
   await rooms.getByTestId('room-stop').click();
   await expect(rooms.getByTestId('room-status')).toHaveText(/已暂停/);
   await page.reload();
   await page.getByRole('button', { name: `打开群聊 Room ${bot.id}`, exact: true }).click();
+  await page.getByTestId('play-group-chat').getByRole('button', { name: '更多', exact: true }).click();
   await page.getByText('群聊设置', { exact: true }).click();
   await expect(rooms.getByTestId('room-status')).toHaveText(/已暂停/);
 });

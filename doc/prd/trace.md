@@ -1267,6 +1267,12 @@ Agent 在对话中管理自身技能
 - `e2e/bot-detail-skills.spec.ts`
 - `packages/core/test/agent-skill-management.test.js`
 
+### agents-clean-layout
+
+Bot 管理页清爽布局
+
+- `e2e/agents-clean-layout.spec.ts`
+
 ### agents-management
 
 Bots / Agents / Teams / Skills 管理页清晰易用
@@ -1425,6 +1431,13 @@ Bot 每日独立复盘
 Bot 每日复盘配置与治理界面
 
 - `e2e/bot-daydream.spec.ts`
+
+### bot-delete
+
+删除 Bot 并保留对话历史
+
+- `apps/daemon/test/bot-delete.test.ts`
+- `e2e/bot-row-menu.spec.ts`
 
 ### bot-dialog-solid
 
@@ -1778,6 +1791,18 @@ permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
 - `e2e/agent-home-features.spec.ts`
 - `e2e/chat-experience.spec.ts`
+
+### chat-floating-chrome
+
+浮动聊天标题与低干扰摘要
+
+- `e2e/bot-row-menu.spec.ts`
+
+### chat-header-menu-only
+
+聊天顶部只保留更多入口
+
+- `e2e/bot-row-menu.spec.ts`
 
 ### chat-inline-history
 
@@ -2692,7 +2717,7 @@ Play 右侧栏模型上下文
 
 ### play-group-delete-menu
 
-群聊行的删除收进悬停图标菜单
+群聊行的删除收进更多菜单
 
 - `apps/web-console/components/play-group/PlayBotGroupList.test.ts`
 - `e2e/bot-room-deletion.spec.ts`
@@ -3089,6 +3114,12 @@ Secure Form fill-from-Vault
 - `apps/web-console/lib/settings-search.test.ts`
 - `e2e/settings-models.spec.ts`
 
+### shared-chat-header
+
+会话和群聊统一浮动顶部
+
+- `e2e/shared-chat-header.spec.ts`
+
 ### shared-info-compact
 
 共享信息紧凑入口
@@ -3108,6 +3139,12 @@ Secure Form fill-from-Vault
 捆绑 shopping 强制技能可加载并解锁购物面
 
 - `packages/core/test/shopping-mandatory-skill.test.js`
+
+### sidebar-unified-menu
+
+统一群聊和分组菜单
+
+- `e2e/sidebar-unified-menu.spec.ts`
 
 ### single-host-bot-completion
 
