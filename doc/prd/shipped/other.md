@@ -114,6 +114,16 @@ No new WorkItem table/system. No RAW_AGENT_* flags.
 
 经典主题黑色要纯色的，不要搞一些毛玻璃效果。
 
+## cli-bot
+命令行使用机器人
+
+当前项目的cli模式，是否完整？分多个agent去检查下入口、功能、链路、以及新加入的bot模式是否支持在cli模式里使用？如果要能使用，要做什么？分多个agent去快速排查和补齐
+
+## cli-session-permission
+命令行调整会话权限
+
+当前项目的cli模式，是否完整？分多个agent去检查下入口、功能、链路、以及新加入的bot模式是否支持在cli模式里使用？如果要能使用，要做什么？分多个agent去快速排查和补齐
+
 ## command-hardline
 危险命令硬拦截与密钥脱敏
 

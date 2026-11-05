@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 364,
+    "implemented": 366,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1070,6 +1070,20 @@
       "requirement": "经典主题黑色要纯色的，不要搞一些毛玻璃效果。",
       "verificationStage": "software",
       "file": "acceptance/classic-solid-dark.yaml"
+    },
+    {
+      "id": "cli-bot",
+      "title": "命令行使用机器人",
+      "requirement": "当前项目的cli模式，是否完整？分多个agent去检查下入口、功能、链路、以及新加入的bot模式是否支持在cli模式里使用？如果要能使用，要做什么？分多个agent去快速排查和补齐",
+      "verificationStage": "software",
+      "file": "acceptance/cli-bot.yaml"
+    },
+    {
+      "id": "cli-session-permission",
+      "title": "命令行调整会话权限",
+      "requirement": "当前项目的cli模式，是否完整？分多个agent去检查下入口、功能、链路、以及新加入的bot模式是否支持在cli模式里使用？如果要能使用，要做什么？分多个agent去快速排查和补齐",
+      "verificationStage": "software",
+      "file": "acceptance/cli-session-permission.yaml"
     },
     {
       "id": "command-hardline",

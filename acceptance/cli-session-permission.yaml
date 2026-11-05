@@ -1,0 +1,11 @@
+id: cli-session-permission
+title: 命令行调整会话权限
+status: implemented
+requirement: |
+  当前项目的cli模式，是否完整？分多个agent去检查下入口、功能、链路、以及新加入的bot模式是否支持在cli模式里使用？如果要能使用，要做什么？分多个agent去快速排查和补齐
+criteria:
+  - id: AC-1
+    given: 一个会话再升一档就会进入免审批
+    when: 用户在命令行提升该会话的权限，或直接把它设为免审批
+    then: 命令成功结束，输出里能看到免审批已经生效
+notes: 'assumedApproval: standing-order-2026-10-22'
