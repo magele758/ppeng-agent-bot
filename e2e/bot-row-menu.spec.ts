@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(()=>localStorage.setItem('lab.botPins',JSON.stringify({ids:[],roomIds:[],customized:true})));
   const bot = { id: 'menu-bot', name: 'Menu Bot', canonicalSessionId: 'menu-session', agentId: 'general' };
   const session = { id: bot.canonicalSessionId, title: bot.name, mode:'chat', status:'idle', agentId:'general', metadata:{botId:bot.id, canonicalBotChat:true} };
   await page.route('**/api/bot-functional-groups', r => r.fulfill({json:{groups:[]}}));
-  await page.route('**/api/user/preferences', r => r.fulfill({json:{preferences:{locale:'zh',botPins:{version:1,botIds:[],roomIds:[],customized:true}}}}));
+  await page.route('**/api/user/preferences', r => r.fulfill({json:{scope:'menu-test',values:{'lab.locale':'zh','lab.botPins':JSON.stringify({ids:[],roomIds:[],customized:true})}}}));
   await page.route('**/api/bots', r => r.fulfill({json:{bots:[bot]}}));
   await page.route('**/api/sessions', r => r.fulfill({json:{sessions:[session]}}));
   await page.route('**/api/bots/menu-bot/open', r => r.fulfill({json:{bot,session}}));
@@ -112,7 +113,7 @@ test('标题浮层和低干扰摘要 [AC:chat-floating-chrome#AC-1] [AC:chat-flo
 
 test('删除 Bot 明确保留记录且可取消 [AC:bot-delete#AC-3]', async ({page})=>{
   await page.goto('/#/bot');
-  const trigger=page.getByTestId('bot-row-menu').first();
+  const trigger=page.getByRole('button',{name:'Menu Bot 的更多操作',exact:true}).first();
   await trigger.click();
   page.once('dialog',async dialog=>{expect(dialog.message()).toContain('保留');await dialog.dismiss();});
   await page.getByTestId('bot-row-actions').getByRole('button',{name:'删除 Bot',exact:true}).click();
