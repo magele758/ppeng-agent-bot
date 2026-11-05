@@ -2874,11 +2874,6 @@
       "path": "skills/agent-loop/SKILL.md"
     },
     {
-      "name": "Agent Tech Digest",
-      "description": "Rolling digest of agent-related feeds (maintained by capability-gateway).",
-      "path": "skills/agent-tech-digest/SKILL.md"
-    },
-    {
       "name": "login",
       "description": "Sign-in / credential collection workflow. Load before collect_credentials or vault_get. Prefer UserVault list then Secure Form fill-from-vault (vaultEntryId/entryId); never put plaintext secrets in the model or conversation. Separate from browser vault_fill.",
       "path": "skills/login/SKILL.md"
