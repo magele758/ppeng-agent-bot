@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSpec } from '../acceptance/acceptance-lib.mjs';
+import { writeTraceAndCoreCases } from './trace-model.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const GENERATED = '<!-- 本文件由 scripts/prd/build-catalog.mjs 生成，不要手改。改验收规格或技能说明后重新运行该脚本。 -->';
@@ -344,4 +345,9 @@ skills.sort((a, b) => cmp(a.path, b.path));
 const { counts, shipped, pending, retired } = partition(specs);
 const groups = buildGroups(shipped);
 writeCatalog(catalogOf({ counts, shipped, pending, retired, skills }), groups, pending, retired, skills);
+const traceErrors = writeTraceAndCoreCases(root, specs);
+if (traceErrors.length) {
+  for (const error of traceErrors) console.error(error);
+  process.exit(1);
+}
 console.log(`implemented ${counts.implemented}, approved ${counts.approved}, draft ${counts.draft}, retired ${counts.retired}, skills ${skills.length}`);

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 356,
+    "implemented": 362,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -321,6 +321,13 @@
       "requirement": "那就按你建议的顺序直接改，先把 P0 的分类路由、压缩丢证据、完成验证和执行提示修好，参考 grok-build 的实现，做好测试和 review 后提交合并。",
       "verificationStage": "software",
       "file": "acceptance/bot-execution-p0.yaml"
+    },
+    {
+      "id": "bot-extreme-concurrency",
+      "title": "Bot 以高并发同时推进多件工作",
+      "requirement": "现在bot的并发能力和并发机制是什么样的？我想要极致的并发能力，来快速完成各种任务，分多个agent去分析和完成提升",
+      "verificationStage": "software",
+      "file": "acceptance/bot-extreme-concurrency.yaml"
     },
     {
       "id": "bot-face-readable-shapes",
@@ -1310,6 +1317,13 @@
       "file": "acceptance/email-webhook-replay.yaml"
     },
     {
+      "id": "execution-log-analysis",
+      "title": "执行日志能查出问题并指到具体调用",
+      "requirement": "帮我看看现在的agent的执行日志是否记录完成，我想要构建一套基于日志分析agent行为，发现问题，自己去排查问题，解决问题，提升整体能力的方案，分多个agent去帮我检查，如果没有就分多个agent去快速补全",
+      "verificationStage": "software",
+      "file": "acceptance/execution-log-analysis.yaml"
+    },
+    {
       "id": "experimental-settings",
       "title": "设置里的实验特性菜单",
       "requirement": "用户刚得知 Jev 评估藏在「设置 → 集成与可观测 → 显示高级」里，说这样太深了。要求：把这些高级配置单独抽一个配置菜单，名字叫「实验特性」。\n\n先读设置信息架构：apps/web-console 的 nav（lib/nav.ts）、设置分类 sections/settings/categories/*.tsx、advanced 默认隐藏的机制、doc/UI_REDESIGN.md 里和设置相关的部分。弄清现在哪些条目被标成 advanced、入口在侧栏还是设置内部。\n\n要做成：\n1. 有一个一眼能看到的配置菜单，文案是「实验特性」（英文 Experimental）。不要再要求先打开「显示高级」才能看见这些配置。\n2. 现在被 advanced 收起来的设置项（含 Jev 评估，以及同一套 advanced 机制里的其它高级项）挪进这个菜单。原位置不要留空壳重复入口。若「显示高级」只是为了露出这些项，挪走后这个开关也不要再挡路；如果它还控制别的东西，只把实验项移走，其余行为保持。\n3. 菜单放在现有设置导航里，作为和「模型」「集成与可观测」同级、默认可见的一项（hash 路由跟现有 #/settings/... 一致）。不要新造一套与 Lab 导航无关的页面，也不要只在搜索里才能找到。\n4. 文案走 i18n，zh 与 en 同一套 key。不要硬编码中英文。不要新增 RAW_AGENT_*。\n5. 只搬入口和分组，不要改这些配置的保存、字段和生效逻辑。\n\n后续：实验特性里每一项都要能一眼看出开/关，并且有自己的开关。每一项一行：名称、一句它做什么、一个开关。关：这项不生效（Jev 就是不调用，等同关闭档）。开：这项生效，它自己的配置出现在这一项下面（Jev 的地址、Key、档位仍用现有保存逻辑）。已有关闭/精简/标准这类档位的，菜单上的开关是总闸：关=不调用；开=使用该项里保存的档位，若保存的档位本身是关闭，打开开关时落到该项原来的默认启用档（Jev 用标准）。持久化走现有 Lab 配置，不要新增 RAW_AGENT_*。上面第 5 条「不改生效逻辑」由这一条代替。",
@@ -1870,6 +1884,13 @@
       "file": "acceptance/pr152-approval-followups.yaml"
     },
     {
+      "id": "prd-test-trace",
+      "title": "产品需求与测试对照",
+      "requirement": "按这个做对照表、核心用例和命令",
+      "verificationStage": "software",
+      "file": "acceptance/prd-test-trace.yaml"
+    },
+    {
       "id": "product-prd",
       "title": "产品需求目录",
       "requirement": "我想要在readme之外，构建一套产品的prd体系，一个是现有的功能的说明，一个是开发了具体哪些feature，还有未来待开发的功能的特性，然后还有一个这个项目使用的skill也要同步的配套更新，分多个agent去完成这几件事情",
@@ -2150,6 +2171,13 @@
       "file": "acceptance/session-brief.yaml"
     },
     {
+      "id": "session-eval-baseline",
+      "title": "会话评估能留下基准并发现短板",
+      "requirement": "新的评估集，结果如何？我觉得2个问题，一个这个模型基准，在这套harness上不要降低，第二，是否有提升？还有有没有专门针对agent能力的评估集？分多个agent去研究和分析一下，然后看看当前项目怎么做harness 评估比较好，帮我完成一版，让我发现短板，建立基准，以后也好持续提升",
+      "verificationStage": "software",
+      "file": "acceptance/session-eval-baseline.yaml"
+    },
+    {
       "id": "session-eval-lift",
       "title": "会话评估能区分能力提升和下降",
       "requirement": "结合最新代码，这个评估集，需要做什么升级和配合来检测新的功能是带来提升还是下降？\n分多个agent去帮我开发完成",
@@ -2339,6 +2367,13 @@
       "file": "acceptance/steer-tool-continuity.yaml"
     },
     {
+      "id": "stream-live-status",
+      "title": "生成中的速度与正在做什么",
+      "requirement": "[Image #1]  我想要在他生成的时候知道他在干嘛怎么办？加个交互，让我知道他的速度和在干嘛，另外这里的三个 ... 可以加点动效，免得太静态了",
+      "verificationStage": "software",
+      "file": "acceptance/stream-live-status.yaml"
+    },
+    {
       "id": "stream-text-once",
       "title": "流式输出时助手文字只出现一次",
       "requirement": "你在仓库 /Users/penglei/developer/self-test-grounding/ppeng-agent-core 里排查并修复：对话流式输出时，经常出现重复的消息。直接改代码并跑相关测试。不要 commit，不要 push，不要重启 daemon。\n\n现象：用户跟 bot 聊天，流式输出过程中，同一段助手文字会重复出现。不是偶发整页刷新，是流式过程中经常重复。\n\n已知客户端拼接（先读再改，行号可能已变）：\n- apps/web-console/components/usePlayChat.ts 里 applySseModelText：event===model 且 type===text_delta 时，把 p.text 追加到最后一个 text segment 的 raw。如果最后一个不是 text，就新开一段。reasoning_delta 同样追加。\n- 同文件有 stream_reset：回滚到 turnCheckpoint。如果服务端先发了一段全文，又发 stream_reset 再发一遍，或 text_delta 里装的是累计全文而不是增量，界面就会重复。\n- 不要假设只有这一处。也查：SSE 重连后把已播过的 delta 再播一遍；乐观消息和会话快照各渲染一次；同一 message id 插进列表两次；daemon 把 model delta 转发了两次。\n\n要求：\n1. 先定位重复是「delta 实际是累计全文」「同一 delta 发了两次」还是「同一条已完成消息又被列表渲染一次」。用代码路径说明，不要只猜。可以看 apps/daemon 的 SSE 转发和 packages/agent-loop 或 packages/core 里发出 text_delta 的地方。\n2. 修到流式过程中同一段文字只出现一次。已完成的历史消息也不会因为快照再贴一遍正在流的内容。\n3. 按仓库规则：先写 acceptance/<kebab-id>.yaml（status: approved）和带 [AC:<feature-id>#<criterion-id>] 的失败测试，再实现。只跑你改到的 node:test 文件。\n4. 不要顺手改预算、回顾、子任务、启动 trace。工作区里已有这些未提交改动，保留它们，不要回滚，也不要在那些文件上再改，除非重复 bug 的根就在其中一个文件里。那样的话在 /tmp/omp-stream-dup/result.txt 里写明为什么必须改它。\n\n跑完把：根因（文件和机制）、改了哪些文件、测试命令和退出码，写入 /tmp/omp-stream-dup/result.txt。",
@@ -2372,6 +2407,13 @@
       "requirement": "顺便把聊天里其他这种裸的系统消息也检查一遍，统一加上合适的 UI，长内容默认折叠，原始详情保留，别漏了。",
       "verificationStage": "software",
       "file": "acceptance/system-message-ui.yaml"
+    },
+    {
+      "id": "thinking-effort",
+      "title": "思考力度",
+      "requirement": "现在这个有没有thinking Effect level的控制？没有就规划一下，加一个",
+      "verificationStage": "software",
+      "file": "acceptance/thinking-effort.yaml"
     },
     {
       "id": "tool-call-pairing-batch-dedup",
@@ -2711,7 +2753,7 @@
     },
     {
       "name": "product-prd",
-      "description": "在 ppeng-agent-core 改用户能看到的产品行为，或增删改 skills/**/SKILL.md 时，同步 doc/prd 产品需求目录。目录在根 README 之外：现状说明、已开发功能、待开发功能、仓库技能对照。Use when shipping or planning a user-visible feature, editing acceptance status, or changing a repo skill.",
+      "description": "在 ppeng-agent-core 改用户能看到的产品行为，或增删改 skills/**/SKILL.md 时，同步 doc/prd 产品需求目录。目录在根 README 之外：现状说明、已开发功能、待开发功能、仓库技能对照、现状与测试对照、核心用例。Use when shipping or planning a user-visible feature, editing acceptance status, changing a repo skill, or updating the core-case list.",
       "path": "skills/product-prd/SKILL.md"
     },
     {

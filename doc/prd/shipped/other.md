@@ -240,6 +240,11 @@ Card reads/writes only through the existing quiet-hours API. i18n zh+en.
 
 Fix: email webhook HMAC must cover X-Ppeng-Delivery (or equivalent delivery id) the same way GitHub now covers delivery id. Replaying within 5 minutes with the same signature and a new delivery id must not wake a second routine. Do not weaken Slack or the GitHub format from #114. No new env vars. Acceptance-first, user asked to fix now, tests first. Open a PR and merge when the relevant checks are green. Do not publish npm. Do not edit browser, cron secretEnv, compact, or the web console.
 
+## execution-log-analysis
+执行日志能查出问题并指到具体调用
+
+帮我看看现在的agent的执行日志是否记录完成，我想要构建一套基于日志分析agent行为，发现问题，自己去排查问题，解决问题，提升整体能力的方案，分多个agent去帮我检查，如果没有就分多个agent去快速补全
+
 ## experimental-settings
 设置里的实验特性菜单
 
@@ -614,6 +619,11 @@ Assert that cancelling a parked session also rejects the pending approval record
 Add a comment noting that the createdAt >= string compare relies on ISO 8601 lexicographic ordering.
 Run the packages/agent-loop tests and build, plus packages/core bot-work test. Report per item.
 
+## prd-test-trace
+产品需求与测试对照
+
+按这个做对照表、核心用例和命令
+
 ## product-prd
 产品需求目录
 
@@ -887,6 +897,11 @@ Required outcomes:
 
 那就按这个方案改，普通插话立即进入会话，不要跳过或中断工具；只有明确要求停止，或者结合上下文确实需要取消时，才中断对应的工具，不要把整个会话停掉。
 
+## stream-live-status
+生成中的速度与正在做什么
+
+[Image #1]  我想要在他生成的时候知道他在干嘛怎么办？加个交互，让我知道他的速度和在干嘛，另外这里的三个 ... 可以加点动效，免得太静态了
+
 ## stream-text-once
 流式输出时助手文字只出现一次
 
@@ -929,6 +944,11 @@ Super Bot 独立配好多机软件工厂
 统一聊天系统消息展示
 
 顺便把聊天里其他这种裸的系统消息也检查一遍，统一加上合适的 UI，长内容默认折叠，原始详情保留，别漏了。
+
+## thinking-effort
+思考力度
+
+现在这个有没有thinking Effect level的控制？没有就规划一下，加一个
 
 ## turn-stats-end-time
 对话轮次统计显示结束时间

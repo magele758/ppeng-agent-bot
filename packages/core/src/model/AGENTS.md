@@ -15,3 +15,7 @@
 ## Prompt variant A/B (Lab UI)
 
 Stable system prefix has two wordings: `anthropic5` (default) and `legacy`. Operators pick the active variant in Lab **Settings → Behavior → System prompt variant**. To roll back, select `legacy` and save — no env switch.
+
+## Thinking effort (Lab UI)
+
+Chat turns can ask the model to think at `low` | `medium` | `high`. Operators pick the level in Lab **Settings → Behavior → Thinking effort**. Default is `off`, which omits the field. The choice is read on the next turn from daemon control. No env switch. This is separate from catalog `thinkingMode` (`on` | `off` | `auto`), which only filters which model is routed.
