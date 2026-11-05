@@ -144,3 +144,44 @@ html:is(:not([data-skin]), [data-skin="classic"])[data-theme="dark"] :is(.lab-ra
   border-color: var(--ui-border, var(--color-border-strong));
   box-shadow: none;
 }
+
+/* Classic light uses matte surfaces throughout the console. */
+html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) {
+  --glass-filter: none;
+  --glass-highlight: none;
+  --glass-sheen: none;
+  --glass-shadow: none;
+  --glass-fill: #fff;
+  --glass-fill-strong: #f6f8f7;
+  --glass-edge: #dce2df;
+  background: #f6f8f7;
+}
+
+html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) body {
+  background: #f6f8f7;
+}
+
+html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) :is(.chat-panel-body, .chat-panel-header, .chat-composer-outer) {
+  background: white;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) :is(.chat-composer, .session-recap) {
+  background: #f7f9f8;
+  border-color: var(--glass-edge);
+  box-shadow: none;
+}
+
+html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell .chat-bubble__body.chat-bubble__md {
+  color: #333c39;
+}
+
+html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell .chat-bubble__md :is(pre, blockquote, th) {
+  background: #f4f6f5;
+}
+
+html[data-theme="light"]:is([data-skin="classic"], :not([data-skin])) .lab-shell .chat-bubble__md a {
+  color: #38644f;
+}

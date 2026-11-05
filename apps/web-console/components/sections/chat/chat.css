@@ -582,12 +582,16 @@
 
 /* Keep the transcript and its two writing surfaces on one responsive column. */
 .chat-panel-body {
-  --chat-column-width: 36rem;
+  --chat-column-width: calc(36rem - 2 * var(--chat-extra-gap, 0px));
   --chat-column-gutter: clamp(12px, 2vw, 24px);
 }
 
 .lab-shell .chat-panel-body :is(.chat-feed, .chat-composer-outer) {
-  padding-inline: var(--chat-column-gutter);
+  padding-inline: min(25%, calc(var(--chat-column-gutter) + var(--chat-extra-gap, 0px)));
+}
+
+html[data-chat-width="full"] .chat-panel-body {
+  --chat-column-width: 100%;
 }
 
 .chat-panel-body :is(.chat-feed__track, .session-recap-bar, .chat-composer) {

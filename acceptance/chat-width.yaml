@@ -1,0 +1,11 @@
+id: chat-width
+title: 内容展示宽度
+status: implemented
+requirement: |
+  在通用设置里，加一个内容展示宽度的设置，现在这种叫居中，再加个铺满的，然后可以配合调整旁边留白距离的拖拽的控制的
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 打开通用设置
+    when: 切换到铺满并调整左右留白
+    then: 设置立即应用并随用户偏好保存

@@ -1,4 +1,5 @@
 export const settings = {
+  chatWidth: { title: '内容展示宽度', keywords: '聊天 对话 宽度 边距 留白', mode: '展示方式', center: '居中', full: '铺满', gap: '两侧额外留白', pixels: '{value} px' },
   debugDisplay: {
   "title": "调试信息",
   "keywords": "调试 目标 进展 Trace 内部机制",
