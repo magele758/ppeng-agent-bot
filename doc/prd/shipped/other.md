@@ -614,6 +614,11 @@ Repo ships skills/payment (SKILL.md + sibling Manifest). load_skill(payment)
 unlocks secure_form/vault_fill when touching cardNumber/CVV/card; without load
 they stay fail-closed. Secrets NEVER enter the model; separate from login Secure Form.
 
+## pm2-service
+用 PM2 启动并管理服务
+
+帮我加 ecosystem 配置和 pm2:start 脚本，然后用pm2启动和管理
+
 ## pnpm-migration
 全仓库迁移至 pnpm 并完成回归
 

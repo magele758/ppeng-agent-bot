@@ -1,0 +1,19 @@
+id: pm2-service
+title: 用 PM2 启动并管理服务
+status: implemented
+requirement: |
+  帮我加 ecosystem 配置和 pm2:start 脚本，然后用pm2启动和管理
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 服务已经构建，本机装有 PM2
+    when: 执行服务的 PM2 启动脚本
+    then: 进程管理器只拉起一个常驻服务，入口是监督进程，单实例运行，工作目录是本仓库，并按本机环境文件里的端口探活
+  - id: AC-2
+    given: 服务正由 PM2 管理
+    when: 执行停止脚本
+    then: 监督进程和它拉起的服务一起退出；收尾时间不少于 10 秒，服务拒不退出时会在此之前被强制结束，不留下占用端口的进程
+  - id: AC-3
+    given: 同一台机器上还有夜间 evolution 的 PM2 任务
+    when: 启动、停止、重启、看日志或删除这个服务
+    then: 这些操作只作用于这个服务，夜间 evolution 任务保持不动
