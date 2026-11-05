@@ -15,6 +15,12 @@
 
 我看现在skill沉淀的功能有问题，特别是最后存储的部分，已经失败好几次了，排查修复一下
 
+## skill-load-recovery
+自建技能与搜索结果可加载
+
+bot自己创建的skill是要能加载的，不然生成的skill都没意义了
+而且其他的skill，按道理是要能通过skill-search找回来的啊，这个路径现在是通的吗？
+
 ## skill-manifest-boundary
 技能能力边界
 

@@ -3599,6 +3599,13 @@
       ]
     },
     {
+      "id": "skill-load-recovery",
+      "title": "自建技能与搜索结果可加载",
+      "tests": [
+        "packages/core/test/skill-load-recovery.test.js"
+      ]
+    },
+    {
       "id": "skill-manifest-boundary",
       "title": "技能能力边界",
       "tests": [

@@ -280,7 +280,7 @@ function buildShortlistSkillBlock(routing: SkillRoutingResult, strict: boolean):
   }
   lines.push(
     strict
-      ? 'Strict: only call load_skill for names listed above this turn.'
+      ? 'Strict: load skills listed above or returned by search_skills in this session. You may load your own saved Bot skills directly by exact name or id. All skill visibility and allowlists still apply.'
       : 'If you need a skill not listed, you may still call load_skill; off-shortlist loads are traced for routing quality.'
   );
   return lines.join('\n');
@@ -290,7 +290,7 @@ function buildLazySkillBlock(): string {
   return [
     'Skill disclosure (lazy). The skill catalog is not listed here.',
     'Call search_skills with a short task query, then load_skill(name) for the best match.',
-    'Use exact names returned by search_skills.'
+    'Use exact names or ids returned by search_skills. Your own saved Bot skills can be loaded directly without searching.'
   ].join('\n');
 }
 
@@ -358,6 +358,11 @@ export class PromptBuilder {
     return readAllowedSkillNames(session?.metadata);
   }
 
+  isOwnSkill(sessionId: string, skill: SkillSpec): boolean {
+    const session = this.deps.store.getSession?.(sessionId);
+    return Boolean(skill.ownerBotId && skill.ownerBotId === sessionBotId(session?.metadata));
+  }
+
   getSkillRoutingSettings() {
     return resolveSkillRoutingSettings({store:this.deps.store,env:process.env});
   }
@@ -366,7 +371,7 @@ export class PromptBuilder {
     return resolveSkillDisclosureMode({ store: this.deps.store, env: process.env });
   }
 
-  /** Names returned by the latest search_skills call (lazy + strict load_skill). */
+  /** Names returned by the latest search_skills call (strict load_skill in shortlist or lazy mode). */
   getLastSkillSearchNames(sessionId: string): string[] | undefined {
     return this.searchHitsBySession.get(sessionId);
   }

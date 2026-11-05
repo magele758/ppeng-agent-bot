@@ -3172,6 +3172,12 @@ Secure Form fill-from-Vault
 
 - `packages/core/test/skill-capture.test.js`
 
+### skill-load-recovery
+
+自建技能与搜索结果可加载
+
+- `packages/core/test/skill-load-recovery.test.js`
+
 ### skill-manifest-boundary
 
 技能能力边界

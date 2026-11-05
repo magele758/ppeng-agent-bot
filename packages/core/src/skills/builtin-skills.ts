@@ -52,7 +52,7 @@ export const builtinSkills: SkillSpec[] = [
       '1. Check the routed shortlist first.\n' +
       '2. Call load_skill(name) only for skills that materially help with the current turn.\n' +
       '3. Prefer loading a small number of relevant skills over front-loading large reference text.\n' +
-      '4. If strict routing is enabled, stay within the current shortlist.',
+      '4. If strict routing is enabled, load shortlisted skills or search_skills results. Your own saved Bot skills can be loaded directly; visibility and allowlists still apply.',
     promptFragment: 'Use load_skill instead of front-loading large reference documents.',
     triggerWords: ['skill', 'guide', 'reference'],
     source: 'builtin'
