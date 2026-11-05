@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 363,
+    "implemented": 364,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1868,6 +1868,13 @@
       "requirement": "用户指着对话页左侧的会话/Bot 列表（aside#mobile-session-list.play-sidebar，在 PlayPanel 里），说这个列表也要能收起。附图是现在展开的 220px 侧栏：置顶、功能分组、Bot 和群聊。\n\n要做成：\n- 有一个明显的收起/展开控制。收起后列表不再占对话旁边的宽度，对话区变宽；再点可以展开。不要把最左侧的图标轨（lab-rail）和这个列表混为一谈。\n- 收起状态记在本机界面偏好里（localStorage 即可，和语言偏好一样），刷新还在。不要新增 RAW_AGENT_*，也不必进 daemon。\n- 文案走 i18n，zh 与 en 同一套 key。按钮要有可访问名称。\n- 收起时不要丢掉当前会话，展开后列表和选中项还在。置顶、分组、拖拽取消置顶的行为不要改。",
       "verificationStage": "software",
       "file": "acceptance/play-sidebar-collapse.yaml"
+    },
+    {
+      "id": "pm2-service",
+      "title": "用 PM2 启动并管理服务",
+      "requirement": "帮我加 ecosystem 配置和 pm2:start 脚本，然后用pm2启动和管理",
+      "verificationStage": "software",
+      "file": "acceptance/pm2-service.yaml"
     },
     {
       "id": "pnpm-migration",

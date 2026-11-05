@@ -2661,6 +2661,12 @@ Play 右侧栏模型上下文
 
 - `apps/web-console/lib/play-sidebar-collapsed.test.ts`
 
+### pm2-service
+
+用 PM2 启动并管理服务
+
+- `scripts/test/pm2-service.test.mjs`
+
 ### pnpm-migration
 
 全仓库迁移至 pnpm 并完成回归

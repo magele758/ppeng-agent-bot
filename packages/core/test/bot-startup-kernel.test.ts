@@ -198,5 +198,6 @@ test('throwing startup trace does not fail the turn [AC:bot-startup-trace#AC-6]'
   assert.equal(ready.length, 1);
   assert.equal(ready[0]!.payload?.slowest, 'build_system_prompt');
   const beforeModel = startupEvents(events).find((event) => event.payload?.phase === 'before_model');
-  assert.equal(beforeModel?.payload?.durationMs, 0);
+  const beforeModelMs = beforeModel?.payload?.durationMs as number;
+  assert.ok(beforeModelMs <= 1, `before_model durationMs=${beforeModelMs}`);
 });

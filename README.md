@@ -136,6 +136,7 @@ Deeper architecture: [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md).
 | `pnpm run test --workspace=@ppeng/agent-loop` | Loop SDK Vitest suite |
 | `pnpm run ci` | build + unit + formal + fast eval + quality-engine simulation + package smoke + CRAP gate + regression + integration + e2e |
 | `pnpm run start:daemon` / `start:supervised` | daemon / supervisor |
+| `pnpm run pm2:start` / `pm2:stop` / `pm2:restart` | PM2-managed supervised daemon (`ecosystem.config.cjs`) |
 | `pnpm run start:cli` | CLI (`self-heal`, `chat`, …) |
 | `pnpm run dev:lab` | dev helper (Next + daemon proxy) |
 | `pnpm run evolution --help` | unified evolution entry, see all options |
