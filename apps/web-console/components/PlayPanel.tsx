@@ -311,7 +311,6 @@ export function PlayPanel({
   onSelectSession,
   onDeleteSessions,
   onNewSession,
-  onRunSession,
   onCancelSession,
   onOpenTrace,
   onApprovalsChanged,
@@ -991,7 +990,7 @@ export function PlayPanel({
     } finally { setDeleting(false); }
   };
   const removalProps = (s: SessionSummary, rowBot: BotInfo | undefined) => {
-    if (rowBot) return { rowActions: <BotRowMenu bot={rowBot} details={() => {
+    if (rowBot) return { rowActions: <BotRowMenu bot={rowBot} onDeleted={() => setBots(previous => previous.filter(bot => bot.id !== rowBot.id))} details={() => {
       setOpenGroupId(null); setMobileSessionsOpen(false); onSelectSession(s.id); setBotDetailOpen(true);
     }} remove={() => void removeBot(rowBot)} /> };
     if (!onDeleteSessions) return {};
@@ -1164,7 +1163,7 @@ export function PlayPanel({
                 sessions={sessions}
                 rooms={sidebarRooms}
                 selectedRoomId={openGroupId}
-                renderFallbackActions={bot => <BotRowMenu bot={bot} remove={() => void removeBot(bot)} details={() => {
+                renderFallbackActions={bot => <BotRowMenu bot={bot} onDeleted={() => setBots(previous => previous.filter(entry => entry.id !== bot.id))} remove={() => void removeBot(bot)} details={() => {
                   setOpenGroupId(null); setMobileSessionsOpen(false); void chat.selectBot(bot.id); setBotDetailOpen(true);
                 }} />}
                 renderSession={renderSession}
@@ -1215,11 +1214,10 @@ export function PlayPanel({
   );
 
   const renderChatHeader = () => (
-            <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}${mobileBotBarOpen ? ' is-mobile-open' : ''}`}>
+            <header className={`chat-panel-header chat-panel-header--floating${headerBotName ? ' chat-panel-header--bot' : ''}${mobileBotBarOpen ? ' is-mobile-open' : ''}`}>
       <div className="chat-panel-header__text">
         {renderTitleRow()}
-        {!headerBotId && renderHeaderDetails()}
-        {mobileBotBarOpen && headerBotId && <div className="mobile-bot-secondary">{renderHeaderDetails()}<BotPermissionsLink botId={headerBotId} botName={headerTitle} /></div>}
+        {mobileBotBarOpen && <div className="mobile-bot-secondary">{renderHeaderDetails()}{headerBotId && <BotPermissionsLink botId={headerBotId} botName={headerTitle} />}</div>}
       </div>
       {renderHeaderActions()}
     </header>
@@ -1292,15 +1290,6 @@ export function PlayPanel({
   const renderHeaderActions = () => (
               <div className="chat-panel-header__actions play-toolbar">
                 <DebugOnly><GoalHistory key={selectedSessionId} sessionId={selectedSessionId} botId={headerBotId ?? undefined} /></DebugOnly>
-                <button type="button" className="btn btn-ghost rail-toggle" aria-label={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} title={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} aria-expanded={!railCollapsed} onClick={() => {
-                  const feed = chat.playMessagesRef.current;
-                  const anchor = readFeedAnchor(feed);
-                  const nearBottom = feedNearBottom(feed);
-                  if (!nearBottom) chat.playStickToBottomRef.current = false;
-                  const absoluteTop = (feed?.getBoundingClientRect().top ?? 0) + (anchor.offset ?? 0);
-                  chat.feedScrollIntentRef.current = railToggleIntent(nearBottom, anchor, absoluteTop);
-                  togglePlayRail();
-                }}><WorkspaceIcon kind="panel" /></button>
                 {accountMenu}
                 <DebugOnly><button
                   type="button"
@@ -1311,18 +1300,6 @@ export function PlayPanel({
                 >
                   {t('play.trace')}
                 </button></DebugOnly>
-                {sessionBusy ? (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-secondary"
-                    id="btnCancelSession"
-                    disabled={!selectedSessionId}
-                    title={t('play.stopMenu.thisTurnHint')}
-                    onClick={onCancelSession}
-                  >
-                    {t('play.stop')}
-                  </button>
-                ) : null}
                 <div className="more-menu" ref={moreMenuRef}>
                   <button
                     type="button"
@@ -1337,9 +1314,19 @@ export function PlayPanel({
                   </button>
                   {moreMenuOpen ? (
                     <div className="more-menu__pop" role="menu">
-                      {headerBotId && !mobileBotBarOpen && <details className="bot-header-secondary"><summary>{t('play.rowMenu.advanced')}</summary>
+                      <button type="button" role="menuitem" className="more-menu__item more-menu__action rail-toggle" aria-label={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} title={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} aria-expanded={!railCollapsed} onClick={() => {
+                        const feed = chat.playMessagesRef.current;
+                        const anchor = readFeedAnchor(feed);
+                        const nearBottom = feedNearBottom(feed);
+                        if (!nearBottom) chat.playStickToBottomRef.current = false;
+                        const absoluteTop = (feed?.getBoundingClientRect().top ?? 0) + (anchor.offset ?? 0);
+                        chat.feedScrollIntentRef.current = railToggleIntent(nearBottom, anchor, absoluteTop);
+                        togglePlayRail();
+                        setMoreMenuOpen(false);
+                      }}><WorkspaceIcon kind="panel" />{t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')}</button>
+                      {!mobileBotBarOpen && <details className="bot-header-secondary"><summary>{t('play.rowMenu.advanced')}</summary>
                         {renderHeaderDetails()}
-                        <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />
+                        {headerBotId && <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />}
                       </details>}
                       <SessionBriefToggle compact />
                       <label
@@ -1355,20 +1342,6 @@ export function PlayPanel({
                         />
                         <span>{t('play.modelView')}</span>
                       </label>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        id="btnRunSession"
-                        className="more-menu__item more-menu__action"
-                        disabled={!selectedSessionId || sessionBusy}
-                        title={t('play.header.runHint')}
-                        onClick={() => {
-                          setMoreMenuOpen(false);
-                          onRunSession();
-                        }}
-                      >
-                        {t('play.header.run')}
-                      </button>
                     </div>
                   ) : null}
                 </div>

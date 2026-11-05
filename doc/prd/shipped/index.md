@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 372 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 378 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -18,10 +18,11 @@
 - `agent-learning-governance` 纠错评测、技能验证、输入授权与事件调度
 - `agent-skill-management` Agent 在对话中管理自身技能
 
-## agents（1）
+## agents（2）
 
 需求正文见 [other](other.md)。
 
+- `agents-clean-layout` Bot 管理页清爽布局
 - `agents-management` Bots / Agents / Teams / Skills 管理页清晰易用
 
 ## always（1）
@@ -77,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（112）
+## bot（113）
 
 需求正文见 [bot](bot.md)。
 
@@ -101,6 +102,7 @@
 - `bot-daydream-local` Bot 每日独立复盘
 - `bot-daydream-missing-session` 缺少固定对话时每日复盘继续
 - `bot-daydream-ui` Bot 每日复盘配置与治理界面
+- `bot-delete` 删除 Bot 并保留对话历史
 - `bot-detail-child-tasks-tab` 子任务改到详情页签
 - `bot-detail-menu` Bot 对话右侧详情菜单
 - `bot-detail-skill-management` 在 Bot 详情中查看可选技能并管理技能
@@ -216,7 +218,7 @@
 - `bypass-skill-write` bypass 的 Bot 写技能不再被额外确认拦住
 - `bypass-source-scope` permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
-## chat（10）
+## chat（12）
 
 需求正文见 [chat](chat.md)。
 
@@ -226,6 +228,8 @@
 - `chat-clean-theme` 清爽的浅色阅读界面
 - `chat-column` 对话区对齐与阅读留白
 - `chat-experience` 对话页简洁易用
+- `chat-floating-chrome` 浮动聊天标题与低干扰摘要
+- `chat-header-menu-only` 聊天顶部只保留更多入口
 - `chat-inline-history` 单行附件入口与自动加载聊天历史
 - `chat-more-menu-on-top` 对话头部「⋯」更多菜单在最上层且不透明
 - `chat-tail-kept` 对话结束时助手正文留在对话里
@@ -663,7 +667,7 @@
 - `play-context-replay` Play 上下文回放
 - `play-context-stack` Play 右侧栏模型上下文
 - `play-feed-window` 对话记录按页加载并窗口渲染
-- `play-group-delete-menu` 群聊行的删除收进悬停图标菜单
+- `play-group-delete-menu` 群聊行的删除收进更多菜单
 - `play-rail-default-closed` 对话页右侧栏默认关闭
 - `play-sidebar-collapse` 对话页会话列表可收起
 
@@ -852,10 +856,11 @@
 - `settings-categories` 设置页「行为 / 安全 / 工具 / 集成」分类易用化
 - `settings-models-onboarding` 设置：模型向导、首次引导、搜索与保存状态
 
-## shared（1）
+## shared（2）
 
 需求正文见 [other](other.md)。
 
+- `shared-chat-header` 会话和群聊统一浮动顶部
 - `shared-info-compact` 共享信息紧凑入口
 
 ## shell（1）
@@ -869,6 +874,12 @@
 需求正文见 [other](other.md)。
 
 - `shopping-mandatory-skill` 捆绑 shopping 强制技能可加载并解锁购物面
+
+## sidebar（1）
+
+需求正文见 [other](other.md)。
+
+- `sidebar-unified-menu` 统一群聊和分组菜单
 
 ## single（1）
 

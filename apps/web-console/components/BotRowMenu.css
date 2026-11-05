@@ -60,3 +60,4 @@ html body .bot-entry-dialog[role="dialog"]:has(.bot-row-dialog[data-view="cron"]
 @media (max-width: 480px) {
   .bot-entry-backdrop:has(.bot-row-dialog) { padding: 12px; }
 }
+.bot-row-pop .bot-row-danger { color: var(--ui-danger); border-top: 1px solid var(--ui-border); }

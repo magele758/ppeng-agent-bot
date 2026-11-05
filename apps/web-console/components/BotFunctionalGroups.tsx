@@ -6,6 +6,7 @@ import { botForCanonicalSession } from '@/lib/bots';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import styles from './BotFunctionalGroups.module.css';
+import { RowActionMenu } from './RowActionMenu';
 import { BotEntryDialog } from './BotEntryDialog';
 import { SharedFactsPanel } from './SharedFactsPanel';
 
@@ -239,12 +240,12 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
       <div className={styles.heading}>
         <h3>{presentation.name}</h3>
         <span className={styles.count}>{ordered.length}</span>
-        {group ? <>
+        {group ? <RowActionMenu label={t('play.rowMenu.label',{name:group.name})}>
           <button className="btn btn-ghost btn-sm" disabled={pending} aria-label={t('play.functionalGroups.rename')} title={t('play.functionalGroups.rename')}
             onClick={() => setEditing({ id: group.id, name: group.name })}>{t('play.functionalGroups.renameShort')}</button>
           <button className="btn btn-ghost btn-sm" disabled={pending} aria-label={t('play.functionalGroups.delete')} title={t('play.functionalGroups.delete')}
             onClick={() => { void remove(group); }}>{t('play.functionalGroups.deleteShort')}</button>
-        </> : null}
+        </RowActionMenu> : null}
       </div>
       {ordered.map((entry) => {
         const placeKey = `${orderRegionKey(region)}:${entry.kind}:${entry.id}:`;

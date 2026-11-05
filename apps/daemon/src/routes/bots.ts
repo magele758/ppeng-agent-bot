@@ -1,3 +1,4 @@
+import { deleteBotPreservingHistory } from '../bot-delete.js';
 import { BotFunctionalGroupService, setBotDefinitionOwner, resolveBotPrincipal } from '@ppeng/agent-core';
 /**
  * Named Bot roster + canonical session.
@@ -19,6 +20,10 @@ import { visibleBots } from '../access/visibility.js';
 
 export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   return [
+    { method: 'DELETE', pattern: '/api/bots/:id', handler: ({requireParam,response}) => {
+      deleteBotPreservingHistory(runtime,requireParam('id'));
+      json(response,200,{ok:true});
+    } },
     {
       method: 'GET',
       pattern: '/api/bots',

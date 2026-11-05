@@ -1,0 +1,20 @@
+id: bot-delete
+title: 删除 Bot 并保留对话历史
+status: implemented
+requirement: |
+  删除bot的选项呢？我怎么没看到
+  删除 Bot 和定时任务，保留历史会话、群聊记录
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: Bot 已停止运行
+    when: 确认删除
+    then: Bot 与其定时任务被删除，历史会话和群聊记录仍然保留
+  - id: AC-2
+    given: Bot 正在执行任务
+    when: 请求删除
+    then: 拒绝删除并说明需先停止任务，数据保持完整
+  - id: AC-3
+    given: 打开 Bot 更多操作
+    when: 点击删除 Bot
+    then: 确认提示明确保留历史记录，取消不发送删除请求，失败显示错误
