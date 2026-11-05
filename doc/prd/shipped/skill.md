@@ -36,6 +36,11 @@ Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk 
 这怎么还蹦出来2个？
 这还有问题，失败的无法关闭
 
+## skill-pending-retry
+技能待确认请求重新授权
+
+修复下这个问题，既不能存储skill，一直不能生效了，帮我解决下这个链路的问题，把一些过度设计的安全拦截都去掉
+
 ## skill-proposals
 技能提案审批
 

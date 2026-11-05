@@ -429,3 +429,16 @@ test('restart reconciles interrupted management against installed effects withou
   assert.equal((await recovered.catalog('a:1')).length,1);
  });
 });
+
+test('pending retry observes updated authorization [AC:skill-pending-retry#AC-1]', async (t) => {
+  const x = fixture(t);
+  x.deps.requestKey = () => 'same-message';
+  const input = { action: 'create', name: 'retry-check', description: 'check', reason: 'Success', summary: 'Record checks' };
+  const pending = await x.service.request('a:1', 'agent', input);
+  assert.equal(pending.status, 'pending');
+  x.authorize();
+  const saved = await x.service.request('a:1', 'agent', input);
+  assert.equal(saved.status, 'saved', JSON.stringify(saved));
+  assert.equal(saved.id, pending.id);
+  assert.equal((await x.service.catalog('a:1')).filter(s => s.name === input.name).length, 1);
+});
