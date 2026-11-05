@@ -13,6 +13,11 @@ Lab 右侧活动栏（GET /api/sessions/:id/activity）为当前打开的 Bot �
 只展示属于同一个 owner 的工作；其他用户的工作绝不出现在该 Bot 的活动栏里。
 单用户本地模式（无 userId）下所有工作均可见，不要求登录。
 
+## bot-async-summary
+Bot 历史摘要后台更新
+
+我觉得这个可以异步处理，会话更新了异步更新，只留一份就行了，这样长会话的bot，又能知道历史上下文，又不会每次开始就直接开始compact，导致启动时间增长？
+
 ## bot-autonomous-execution-coverage
 Bot 自动选择并完整承接原有执行能力
 
@@ -113,6 +118,12 @@ Bot 每日独立复盘
 Bot 每日复盘配置与治理界面
 
 按照这个开发计划，帮我分多个agent去完成开发
+
+## bot-delete
+删除 Bot 并保留对话历史
+
+删除bot的选项呢？我怎么没看到
+删除 Bot 和定时任务，保留历史会话、群聊记录
 
 ## bot-detail-child-tasks-tab
 子任务改到详情页签
@@ -531,6 +542,11 @@ Bot 可靠例行任务
 Bot 定时任务跟自己的会话走
 
 bot 的定时任务怎么还是通过新建会话来执行的？而且权限也没继承？我不是说要 bot 的定时任务是跟着 bot 的会话一起走的吗？
+
+## bot-row-menu
+Bot 列表操作菜单
+
+给bot列表里的bot加一个三个点的点击菜单，里面包含查看他详情、查看他的定时任务、加入到某个分组、加入到某个群聊、删除等这些操作
 
 ## bot-runtime-log-regressions
 Bot 实际运行日志回归

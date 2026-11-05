@@ -197,7 +197,7 @@ export async function archiveMessages(
 export async function autoCompactSession(
   host: CompactHost,
   context: RunContext,
-  opts?: { force?: boolean }
+  opts?: { force?: boolean; summaryTimeoutMs?: number; thresholdOnly?: boolean; summarySignal?: AbortSignal; summaryIsCurrent?: () => boolean }
 ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
   const preCompact = await runLifecycleHook(process.env, {
     phase: 'pre_compact',
@@ -238,7 +238,7 @@ export async function autoCompactSession(
   const session = host.store.getSession(context.session.id) ?? context.session;
   const force = compactForce(opts, host.store.foldMessages(session.id).length);
   if (isCanonicalBotChat(session)) {
-    return maybeCompactCanonicalBot(host, context, force, opts?.force);
+    return maybeCompactCanonicalBot(host, context, opts?.thresholdOnly ? opts.force === true : force, opts?.force, opts?.summaryTimeoutMs, opts?.summarySignal, opts?.summaryIsCurrent);
   }
 
   const tokenThreshold = resolveHistoryTokenBudget(
@@ -308,13 +308,16 @@ async function maybeCompactCanonicalBot(
   host: CompactHost,
   context: RunContext,
   force: boolean,
-  explicitForce?: boolean
+  explicitForce?: boolean,
+  summaryTimeoutMs?: number,
+  summarySignal?: AbortSignal,
+  summaryIsCurrent?: () => boolean
 ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
   if (!explicitForce && summaryCoolingDown(host.store, context.session.id)) {
     void host.emitTrace(context.session.id, { kind: 'compact_skipped', payload: { reason: 'summary_cooldown' } });
     return {};
   }
-  return compactCanonicalBot(host, context, { force });
+  return compactCanonicalBot(host, context, { force, summaryTimeoutMs, summarySignal, summaryIsCurrent });
 }
 
 /**
@@ -325,7 +328,7 @@ async function maybeCompactCanonicalBot(
 async function compactCanonicalBot(
   host: CompactHost,
   context: RunContext,
-  opts?: { force?: boolean }
+  opts?: { force?: boolean; summaryTimeoutMs?: number; thresholdOnly?: boolean; summarySignal?: AbortSignal; summaryIsCurrent?: () => boolean }
 ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
   const session = host.store.getSession(context.session.id) ?? context.session;
   const foldStarted = Date.now();
@@ -360,9 +363,10 @@ async function compactCanonicalBot(
     return pruneOneLargeToolResult(host, session.id, folded);
   }
 
+  const sourceSnapshot = JSON.stringify(range.older.map(m => [m.id, m.parts]));
   const prior = session.summary?.trim() ?? '';
   const instruction = botCompactInstruction(tier, prior);
-  const pruned = pruneLargeToolOutputs(range.older);
+  const pruned = pruneLargeToolOutputs(prior ? range.older.filter(message => message.key !== 'compact-summary') : range.older);
   const adapter = actualAdapter;
   let summary: string;
   try {
@@ -377,7 +381,7 @@ async function compactCanonicalBot(
         agent: context.agent,
         messages: [...pruned, instructionMessage(session.id, instruction)],
         reason: `bot ${tier} compact session ${session.id}`
-      }));
+      }), opts?.summaryTimeoutMs, opts?.summarySignal);
   } catch (error) {
     persistBotCompactLong(host, context, range.older);
     void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: error instanceof CompactSummaryTimeout ? 'summary_timeout' : 'summary_failed', tier, message: error instanceof Error ? error.message : String(error) } });
@@ -401,15 +405,30 @@ async function compactCanonicalBot(
     void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: 'empty_summary', tier } });
     return {};
   }
+  host.store.db.exec('SAVEPOINT bot_summary_publish');
+  try {
+    const current = host.store.getSession(session.id);
+    const sourceIds = new Set(range.older.map(m => m.id));
+    const liveSource = host.store.foldMessages(session.id).filter(m => sourceIds.has(m.id));
+    if (opts?.summaryIsCurrent?.() === false || !current || (current.summary?.trim() ?? '') !== prior || JSON.stringify(liveSource.map(m => [m.id, m.parts])) !== sourceSnapshot) {
+      host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: 'stale_summary' } });
+      host.store.db.exec('RELEASE bot_summary_publish');
+      return {};
+    }
+    host.store.appendReplacement(session.id, {
+      startSeq: range.startSeq,
+      endSeq: range.endSeq,
+      role: 'assistant',
+      parts: [textPart(HISTORICAL_SUMMARY_NOTICE + bounded.text)],
+      key: 'compact-summary'
+    });
+    host.store.updateSession(session.id, { summary: capped });
+    host.store.db.exec('RELEASE bot_summary_publish');
+  } catch (error) {
+    host.store.db.exec('ROLLBACK TO bot_summary_publish; RELEASE bot_summary_publish');
+    throw error;
+  }
   persistBotCompactLong(host, context, range.older, adapter.name === 'heuristic' ? undefined : capped);
-  host.store.appendReplacement(session.id, {
-    startSeq: range.startSeq,
-    endSeq: range.endSeq,
-    role: 'assistant',
-    parts: [textPart(HISTORICAL_SUMMARY_NOTICE + bounded.text)],
-    key: 'compact-summary'
-  });
-  host.store.updateSession(session.id, { summary: capped });
   await archiveMessages(host.stateDir, session.id, range.older);
   noteCompact(host, session.id, { startSeq: range.startSeq, endSeq: range.endSeq }, tier);
   return { replaced: { startSeq: range.startSeq, endSeq: range.endSeq } };

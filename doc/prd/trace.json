@@ -1431,6 +1431,13 @@
       ]
     },
     {
+      "id": "agents-clean-layout",
+      "title": "Bot 管理页清爽布局",
+      "tests": [
+        "e2e/agents-clean-layout.spec.ts"
+      ]
+    },
+    {
       "id": "agents-management",
       "title": "Bots / Agents / Teams / Skills 管理页清晰易用",
       "tests": [
@@ -1523,6 +1530,13 @@
       ]
     },
     {
+      "id": "auto-source-continuity",
+      "title": "Auto 对话连续执行",
+      "tests": [
+        "packages/core/test/local-source-unlock.test.js"
+      ]
+    },
+    {
       "id": "background-job-restart",
       "title": "重启后中断无人执行的后台命令",
       "tests": [
@@ -1534,6 +1548,13 @@
       "title": "Host parks durable wait for owned bg_run",
       "tests": [
         "packages/core/test/bg-run-host-park.test.js"
+      ]
+    },
+    {
+      "id": "bot-async-summary",
+      "title": "Bot 历史摘要后台更新",
+      "tests": [
+        "packages/core/test/bot-async-summary.test.js"
       ]
     },
     {
@@ -1603,6 +1624,14 @@
       "title": "Bot 每日复盘配置与治理界面",
       "tests": [
         "e2e/bot-daydream.spec.ts"
+      ]
+    },
+    {
+      "id": "bot-delete",
+      "title": "删除 Bot 并保留对话历史",
+      "tests": [
+        "apps/daemon/test/bot-delete.test.ts",
+        "e2e/bot-row-menu.spec.ts"
       ]
     },
     {
@@ -1800,6 +1829,13 @@
       ]
     },
     {
+      "id": "bot-row-menu",
+      "title": "Bot 列表操作菜单",
+      "tests": [
+        "e2e/bot-row-menu.spec.ts"
+      ]
+    },
+    {
       "id": "bot-runtime-log-regressions",
       "title": "Bot 实际运行日志回归",
       "tests": [
@@ -1979,11 +2015,39 @@
       ]
     },
     {
+      "id": "chat-clean-theme",
+      "title": "清爽的浅色阅读界面",
+      "tests": [
+        "e2e/chat-clean-theme.spec.ts"
+      ]
+    },
+    {
+      "id": "chat-column",
+      "title": "对话区对齐与阅读留白",
+      "tests": [
+        "e2e/chat-column.spec.ts"
+      ]
+    },
+    {
       "id": "chat-experience",
       "title": "对话页简洁易用",
       "tests": [
         "e2e/agent-home-features.spec.ts",
         "e2e/chat-experience.spec.ts"
+      ]
+    },
+    {
+      "id": "chat-floating-chrome",
+      "title": "浮动聊天标题与低干扰摘要",
+      "tests": [
+        "e2e/bot-row-menu.spec.ts"
+      ]
+    },
+    {
+      "id": "chat-header-menu-only",
+      "title": "聊天顶部只保留更多入口",
+      "tests": [
+        "e2e/bot-row-menu.spec.ts"
       ]
     },
     {
@@ -2001,12 +2065,29 @@
       ]
     },
     {
+      "id": "chat-reading",
+      "title": "会话正文阅读节奏",
+      "tests": [
+        "apps/web-console/components/ChatMarkdownHost.test.ts",
+        "apps/web-console/components/ReadableMessage.test.ts",
+        "apps/web-console/lib/markdown.test.ts",
+        "apps/web-console/styles/chat-prose.test.ts"
+      ]
+    },
+    {
       "id": "chat-tail-kept",
       "title": "对话结束时助手正文留在对话里",
       "tests": [
         "apps/web-console/lib/feed-window.test.ts",
         "apps/web-console/lib/history-window.test.ts",
         "apps/web-console/lib/live-turn-session.test.ts"
+      ]
+    },
+    {
+      "id": "chat-width",
+      "title": "内容展示宽度",
+      "tests": [
+        "e2e/chat-width.spec.ts"
       ]
     },
     {
@@ -2111,6 +2192,14 @@
         "packages/core/test/command-hardline.test.js",
         "packages/core/test/result-redaction.test.js",
         "packages/core/test/sandbox.test.js"
+      ]
+    },
+    {
+      "id": "compact-archive-pointer",
+      "title": "压缩摘要带上原文位置",
+      "tests": [
+        "packages/agent-loop/src/session/auto-compact-archive.test.ts",
+        "packages/core/test/compact-archive-path.test.ts"
       ]
     },
     {
@@ -2680,6 +2769,13 @@
       ]
     },
     {
+      "id": "lean-default-skills",
+      "title": "精简默认技能并保留按需发现",
+      "tests": [
+        "packages/core/test/lean-default-skills.test.js"
+      ]
+    },
+    {
       "id": "live-bot-quality",
       "title": "真实 Bot 任务评估与版本准入",
       "tests": [
@@ -3008,7 +3104,7 @@
     },
     {
       "id": "play-group-delete-menu",
-      "title": "群聊行的删除收进悬停图标菜单",
+      "title": "群聊行的删除收进更多菜单",
       "tests": [
         "apps/web-console/components/play-group/PlayBotGroupList.test.ts",
         "e2e/bot-room-deletion.spec.ts"
@@ -3462,6 +3558,13 @@
       ]
     },
     {
+      "id": "shared-chat-header",
+      "title": "会话和群聊统一浮动顶部",
+      "tests": [
+        "e2e/shared-chat-header.spec.ts"
+      ]
+    },
+    {
       "id": "shared-info-compact",
       "title": "共享信息紧凑入口",
       "tests": [
@@ -3482,6 +3585,13 @@
       "title": "捆绑 shopping 强制技能可加载并解锁购物面",
       "tests": [
         "packages/core/test/shopping-mandatory-skill.test.js"
+      ]
+    },
+    {
+      "id": "sidebar-unified-menu",
+      "title": "统一群聊和分组菜单",
+      "tests": [
+        "e2e/sidebar-unified-menu.spec.ts"
       ]
     },
     {
@@ -3518,6 +3628,13 @@
       "title": "技能沉淀确认后能把正文存下来",
       "tests": [
         "packages/core/test/skill-capture.test.js"
+      ]
+    },
+    {
+      "id": "skill-load-recovery",
+      "title": "自建技能与搜索结果可加载",
+      "tests": [
+        "packages/core/test/skill-load-recovery.test.js"
       ]
     },
     {

@@ -218,6 +218,7 @@ import { flushPreparedContextSnapshots,
   type L5Bindable
 } from './runtime/l5-bindings.js';
 import { autoCompactSession } from './runtime/compact-host.js';
+import { scheduleSummaryAfterTurn, stopBotSummaries } from './runtime/bot-summary-background.js';
 import {
   createCronJob as createCronJobFn,
   deleteCronJob as deleteCronJobFn,
@@ -2206,6 +2207,7 @@ export class RawAgentRuntime {
 
   /** Gracefully shut down all in-flight work, MCP sessions, and release SQLite. */
   async destroy(): Promise<void> {
+    await stopBotSummaries(this.store);
     this.libraryIndex?.stop();
     await this.daydreamHost?.close();
     await this.skillCaptures.close();
@@ -2235,6 +2237,11 @@ export class RawAgentRuntime {
     if (rawEvent.kind === 'startup_phase' && rawEvent.payload) {
       const startup = startupPhaseFromRecord(rawEvent.payload);
       if (startup) logStartupPhase(sessionId, startup);
+    }
+    if (rawEvent.kind === 'turn_end') {
+      const session = this.store.getSession(sessionId);
+      const agent = session && this.store.getAgent(session.agentId);
+      if (session && agent) scheduleSummaryAfterTurn(compactFrom(this.l5()), { session, agent, repoRoot: this.repoRoot, stateDir: this.stateDir }, rawEvent);
     }
     const event = attachServedByToTrace(sessionId, rawEvent);
     const write = appendTraceEvent(this.stateDir, sessionId, event, this.traceCloudOptions);

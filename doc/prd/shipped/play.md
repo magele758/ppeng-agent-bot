@@ -46,7 +46,7 @@ Do not change what is stored, and do not change the model prepare / context-stac
 This is only how the Lab loads and paints the transcript.
 
 ## play-group-delete-menu
-群聊行的删除收进悬停图标菜单
+群聊行的删除收进更多菜单
 
 这个太扎眼了，搞成iconfont，隐藏的hover菜单里
 

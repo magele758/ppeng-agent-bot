@@ -21,6 +21,11 @@ Agent 在对话中管理自身技能
 
 然后这个共享skill、沉淀skill、修改skill、管理更新删除的能力，我想要agent也具备自己去操作的能力
 
+## agents-clean-layout
+Bot 管理页清爽布局
+
+这个界面里很多ui都是乱的，检查优化一下
+
 ## agents-management
 Bots / Agents / Teams / Skills 管理页清晰易用
 
@@ -66,6 +71,11 @@ Lab already has approvals/Risk/approve; tree has NO AutoReview / request_smart_m
 Slice: high-risk spawn/Shell/MCP default-block → native approval card → same-action retry with approval flag; denial = final; no bypass routes.
 Accept: risky shell/MCP blocked by default, card shown, same-params retry after approve, deny terminal.
 Auto-review approval cards must clearly show a kind badge (Shell vs MCP / tool kind) and the human-readable blockReason from the Auto-review gate, so the owner can decide without guessing why it blocked.
+
+## auto-source-continuity
+Auto 对话连续执行
+
+auto的权限太低了，一点也不auto，这种怎么都要我审批，简直不能用，导致我只有bypass的能用
 
 ## background-job-restart
 重启后中断无人执行的后台命令
@@ -129,6 +139,16 @@ No new WorkItem table/system. No RAW_AGENT_* flags.
 
 无论 Agent 处在哪个权限档位（包括 bypass），都不能执行毁灭性的系统命令；
 命令输出里的密钥不能回流给模型。
+
+## compact-archive-pointer
+压缩摘要带上原文位置
+
+runAutoCompact 成功做闭区间 replace 时，把归档相对路径写进同一条 summary。有记忆附录时 working-log tail 不会贴上，所以路径必须在摘要正文里，不能靠另一条 appendix。
+摘要空则 empty_summary 跳过。这段逻辑不要改。
+在 replace 之前拿到 archive 路径。路径要同时出现在 replacement 的 text 和 session.summary 里。
+没有路径（archive 未提供或返回空）时，摘要文本与今天一致。
+有路径时加一两行，说明这是被压缩掉的原文位置，只在摘要缺了具体代码或报错时再读。不要把归档正文塞进摘要。
+如果 compact 的 archive 没返回模型能 read_file 的相对路径，让它返回这种路径，再让 auto-compact 写进摘要。
 
 ## compact-bot-secondary-tabs
 精简 Bot 能力与权限及记录页
@@ -370,6 +390,11 @@ Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Compute
 本机 LCU 桌面操作接入
 
 那你去接一下
+
+## lean-default-skills
+精简默认技能并保留按需发现
+
+按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动
 
 ## live-bot-quality
 真实 Bot 任务评估与版本准入
@@ -842,6 +867,11 @@ transcript. Separate track from browser vault_fill.
 没配置模型时给首次引导提示；登录页要精致；并增加网关/IM 设置卡片（飞书/企业微信的
 token、encryptKey、secret、发送者白名单、botId），密钥永不回显。
 
+## shared-chat-header
+会话和群聊统一浮动顶部
+
+群聊和普通会话的顶部也按这个方式统一一下，重复的按钮都收一收，保持整个 UI 一致
+
 ## shared-info-compact
 共享信息紧凑入口
 
@@ -859,6 +889,12 @@ Repo ships skills/shopping (SKILL.md + sibling Manifest). load_skill(shopping)
 unlocks vault_fill / checkout-marked browser_click|browser_type; without load
 they stay fail-closed. Skill body: read then dispatch; no plaintext; no Grok/Canvas
 commerce UI clone; separate from login Secure Form track.
+
+## sidebar-unified-menu
+统一群聊和分组菜单
+
+群聊的也按bot的加一个菜单，用类似的菜单
+这个列表里很多功能都是重复的，看看哪些可以聚合，哪些可以放到一个统一入口，哪些可以放到更深的菜单里，让这个列表更清爽
 
 ## single-host-bot-completion
 单机 Bot 工作收尾与默认入口
