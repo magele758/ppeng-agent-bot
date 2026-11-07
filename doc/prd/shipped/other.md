@@ -938,16 +938,6 @@ Required outcomes:
 4) No ain work. Avoid colliding #302-305. No force-push. Protect main.
 5) Author magele758; every commit trailer Machine: 4090. Final acceptance by lei pending.
 
-## steer-timeline-order
-实时插话前后的回复保持时间线位置
-
-实时插话显示的位置应该是时间轴上一致的，现在是我插话，自动把模型返回整体后挪了，这个跟真实逻辑有差距
-
-## steer-tool-continuity
-插话即时入会话与按工具取消
-
-那就按这个方案改，普通插话立即进入会话，不要跳过或中断工具；只有明确要求停止，或者结合上下文确实需要取消时，才中断对应的工具，不要把整个会话停掉。
-
 ## stream-live-status
 生成中的速度与正在做什么
 

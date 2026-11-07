@@ -387,7 +387,11 @@ function cachedCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<Goal
  if(!cached?.report||cached.executionId!==executionIds(session!.metadata)?.executionId||cached.revision!==goal.revision)return undefined;
  try{return cached.fingerprint===completionFingerprint(verificationPacket(host,goal,assistant))?cached.report:undefined;}catch{return undefined;}
 }
-/** One corrective continuation per direct execution; settlement remains the only state writer. */
+function reusableCompletionReview(prior: CompletionReview | undefined, executionId: string, revision: number, packet: CompletionEvidence, fingerprint: string): boolean {
+ if(prior?.executionId!==executionId||prior.revision!==revision)return false;
+ return packet.userInstructions.length===0||prior.fingerprint===fingerprint;
+}
+/** Recheck additive steering while progress changes; the existing run budget still bounds work. */
 export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:string,signal?:AbortSignal):Promise<{met:boolean;action?:'continue';systemMessage?:string}|undefined> {
  const ctx=settleContext(host,sessionId);
  if(!ctx||ctx.execution.strategy!=='direct'||holdForApproval(host,sessionId,ctx.session,ctx.ids.executionId)||signal?.aborted)return undefined;
@@ -395,17 +399,17 @@ export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:s
  const cache=reviewCache(host);
  const prior=cache.get(sessionId);
  if(!prior&&cache.size>=512)return undefined;
- if(prior?.executionId===ctx.ids.executionId&&prior.revision===goal.revision)return {met:true};
- cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision});
  const {tail,assistant}=assistantTranscript(evidenceTranscript(host.store,sessionId),ctx.execution.startedAt);
  let packet:CompletionEvidence;try{packet=verificationPacket(host,goal,assistant);}catch{return undefined;}
  const fingerprint=completionFingerprint(packet);
+ if(reusableCompletionReview(prior,ctx.ids.executionId,goal.revision,packet,fingerprint))return {met:true};
+ cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision});
  const report=await verifyCompletion(host,goal,tail,assistant,baseReport(undefined,assistant,goal),sessionId,signal,packet);
  const live=settleContext(host,sessionId);
  if(!live||live.ids.executionId!==ctx.ids.executionId||signal?.aborted||live.scope.service.get(live.scope.botId,goal.id)?.revision!==goal.revision)return {met:true};
  cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision,fingerprint,report});
  if(report.kind!=='progress'||!report.nextStep||report.correctionNeeded===false)return {met:true};
- return {met:false,action:'continue',systemMessage:`[completion review] The requested outcome is not complete: ${report.nextStep}\nYou have one corrective continuation within the existing turn budget. Complete only this remaining work using existing observations. Do not replay confirmed side effects or create extra records just to preserve evidence. Honor the current user's exact output requirements. If a required action is blocked, honor any user-specified failure reply or stop condition exactly, without extra explanation; otherwise report the remaining gap honestly.`};
+ return {met:false,action:'continue',systemMessage:`[completion review] The requested outcome is not complete: ${report.nextStep}\nContinue within the existing turn budget until the original objective and all live user instructions are addressed. Complete only this remaining work using existing observations. Do not replay confirmed side effects or create extra records just to preserve evidence. Honor the current user's exact output requirements. If a required action is blocked, honor any user-specified failure reply or stop condition exactly, without extra explanation; otherwise report the remaining gap honestly.`};
 }
 async function maybeVerify(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId:string):Promise<GoalReport> {
  if(report.kind!=='candidate_completed'&&report.kind!=='progress')return report;

@@ -3,7 +3,8 @@ import { executeLoadsBeforeEffects, runWithSkillManifest } from '../skills/skill
 import type {SqliteStateStore} from '../storage.js';
 import { SOURCE_SCOPE_APPROVAL_PREFIX, planSourceScopeHold, sourceScopeVerdict } from '../learning/source-scope-approval.js';
 import { getBoundSandboxSettingsStore, resolveSandboxMode } from '../sandbox/sandbox-settings.js';
-import { registerSteerToolWave } from './steer-tools.js';
+import { highlightLatestSteer, registerSteerToolWave, steerRunningTools } from './steer-tools.js';
+import { resolveSessionModelAdapter } from '../model/provider-catalog.js';
 /**
  * Product adapter: ToolLoopDeps → A's ToolLoopHost.
  * Agent semantics (filter / approve / execute / persist / retry) live in A.
@@ -481,8 +482,24 @@ export async function executeToolCalls(
         deps.maxParallelToolCalls
       )
     );
-  try { return await runWithSecretRefs(secretValues, () => runWithCompensation(tx, run)); }
+  try {
+    await reviewUnreadSteerBeforeLaunch(deps, context, sessionId);
+    return await runWithSecretRefs(secretValues, () => runWithCompensation(tx, run));
+  }
   finally { wave.close(); }
+}
+
+/** An interjection may arrive during generation, before a live tool wave exists. */
+async function reviewUnreadSteerBeforeLaunch(deps: ToolLoopDeps, context: RunContext, sessionId: string): Promise<void> {
+  const store = deps.governanceStore;
+  const item = store?.listUnclaimedInbox(sessionId).findLast(item =>
+    item.target === 'next-step' && item.role === 'user' && item.key?.startsWith('human-steer:'));
+  if (!store || !item) return;
+  await steerRunningTools({
+    owner: deps.store, sessionId, text: item.text, messages: store.foldMessages(sessionId),
+    model: () => resolveSessionModelAdapter(store, store.getSession(sessionId) ?? context.session, process.env, deps.modelAdapter),
+    trace: event => deps.emitTrace(sessionId, event)
+  });
 }
 
 export function processToolResults(
@@ -511,5 +528,5 @@ export async function runTurnWithRetries(
   onStream?: (chunk: ModelStreamChunk) => void,
   opts?: { maxRetries?: number }
 ): Promise<ModelTurnResult> {
-  return runTurnWithRetriesA(envHost(), modelAdapter, input, onStream, opts);
+  return runTurnWithRetriesA(envHost(), modelAdapter, { ...input, messages: highlightLatestSteer(input.messages) }, onStream, opts);
 }
