@@ -21,7 +21,7 @@ test.describe('Blocked teammate result', () => {
   test('spawn_teammate blocked=true renders a prominent approval notice, other tools stay plain', async ({ page }) => {
     const sessionId = 'spawn-blocked-e2e';
     const session = { id: sessionId, title: 'spawn-blocked', mode: 'chat', status: 'idle', agentId: 'general' };
-    await page.route('**/api/sessions', (route) => {
+    await page.route(url => url.pathname === '/api/sessions', (route) => {
       void route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sessions: [session] }) });
     });
     await page.route(new RegExp(`/api/sessions/${sessionId}(?:\\?|$)`), (route) => {

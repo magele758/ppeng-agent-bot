@@ -16,7 +16,7 @@ async function openChat(page: Page, theme = 'light', botView = false) {
   await page.route('**/api/bots/retina-bot/open', route => route.fulfill({ json: { bot, session } }));
   await page.route('**/api/bot-functional-groups', route => route.fulfill({ json: { groups: [] } }));
   await page.route('**/api/bot-rooms', route => route.fulfill({ json: { rooms: [] } }));
-  await page.route('**/api/sessions', route => route.fulfill({ json: { sessions: [session] } }));
+  await page.route(url => url.pathname === '/api/sessions', route => route.fulfill({ json: { sessions: [session] } }));
   await page.route(/\/api\/sessions\/retina-readability(?:\?|$)/, route => route.fulfill({
     json: {
       session,

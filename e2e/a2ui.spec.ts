@@ -96,7 +96,7 @@ test.describe('A2UI', () => {
       ]
     };
 
-    await page.route('**/api/sessions', (route) => {
+    await page.route(url => url.pathname === '/api/sessions', (route) => {
       void route.fulfill({
         status: 200,
         contentType: 'application/json',

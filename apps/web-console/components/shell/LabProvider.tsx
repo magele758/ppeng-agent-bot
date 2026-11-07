@@ -1,4 +1,6 @@
 'use client';
+import { setDiagnosticSession } from '@/lib/client-errors';
+import { singleFlight } from '@/lib/single-flight';
 
 import {
   createContext,
@@ -250,6 +252,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
 
   const setSelectedSessionId = useCallback((id: string | null) => {
     selectedSessionRef.current = id;
+    setDiagnosticSession(id);
     setSelectedSessionIdState(id);
   }, []);
 
@@ -270,7 +273,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
     const sidNow = selectedSessionRef.current;
     const [sess, tasksRes, socialRes, appr, draftRes, ag, ws, jobsRes, swarmRes, orchRes, botsRes, mailRes] =
       await Promise.all([
-      api('/api/sessions').catch(() => ({ sessions: undefined })),
+      api('/api/sessions?view=summary').catch(() => ({ sessions: undefined })),
       fetchList(async () => {
         const r = (await api('/api/tasks')) as { tasks?: TaskSummary[] };
         return r.tasks ?? [];
@@ -355,6 +358,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       sessionListStickTopRef.current = false;
     }
   }, []);
+  const refreshOverview = useMemo(() => singleFlight(loadOverview), [loadOverview]);
 
   const upsertBot = useCallback((bot: BotInfo) => {
     setBots((prev) => {
@@ -370,10 +374,10 @@ export function LabProvider({ children }: { children: ReactNode }) {
     async (opts?: { includePlayPanel?: boolean }) => {
       const includePlayPanel = opts?.includePlayPanel !== false;
       await refreshMeta();
-      await loadOverview();
+      await refreshOverview();
       if (includePlayPanel) await chatBridgeRef.current?.refreshPlayPanel();
     },
-    [refreshMeta, loadOverview]
+    [refreshMeta, refreshOverview]
   );
 
   useEffect(() => {
@@ -438,7 +442,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       autoRefresh,
       setAutoRefresh,
       tick,
-      loadOverview,
+      loadOverview: refreshOverview,
       selectedSessionId,
       selectedSessionRef,
       setSelectedSessionId,
@@ -469,7 +473,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       serverMeta,
       autoRefresh,
       tick,
-      loadOverview,
+      refreshOverview,
       selectedSessionId,
       setSelectedSessionId,
       openSession,

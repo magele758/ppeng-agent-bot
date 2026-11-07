@@ -52,3 +52,9 @@ Bot 回复结束后，输入框是空的，可以用淡色字显示下一句建�
 - [完整功能说明：持续对话](../../bot/00-functional-guide.md#6-持续对话与输入)
 - [状态与维护](../../bot/10-status.md)
 - [单机收尾](../../SINGLE_HOST_COMPLETION.md)
+
+### 控制台刷新与异常诊断
+
+会话列表轮询使用 `GET /api/sessions?view=summary`，只返回列表所需身份、状态、时间和归属字段；完整接口与会话详情保留原有数据。未改变的摘要返回 304，重叠的概览刷新共享一次请求。
+
+浏览器未捕获异常、未处理 Promise 拒绝与 React 渲染异常记录时间、页面路径、会话 ID、构建版本、浏览器和堆栈，发送到同源 `POST /api/client-errors`。本机日志位于 `stateDir/logs/client-errors.jsonl`，达到约 2 MB 轮转为 `.1`；不主动采集对话或 DOM，移除页面查询参数并在服务端脱敏环境密钥。单页最多报告 10 种异常；上报失败静默处理，不能保证离线时保存。渲染失败提供重新加载入口。构建保留浏览器 source map，用同版本 `.next/static` 对照堆栈定位源代码。参见 `lab-poll-crash-diagnostics` 验收规格。

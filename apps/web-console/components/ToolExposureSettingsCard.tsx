@@ -65,7 +65,7 @@ export function ToolExposureSettingsCard({ sessionId }: {
             setError(true);
     } }, [agent, sid]);
     useEffect(() => { void reload(); return () => { version.current++; }; }, [reload]);
-    useEffect(() => { void api('/api/sessions').then(d => setSessions((d as {
+    useEffect(() => { void api('/api/sessions?view=summary').then(d => setSessions((d as {
         sessions: typeof sessions;
     }).sessions)).catch(() => setError(true)); }, []);
     const save = async (patch: Record<string, unknown>) => { setBusy(true); setSaved(false); try {

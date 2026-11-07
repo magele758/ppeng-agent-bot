@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 
 test('普通会话统一浮层 [AC:shared-chat-header#AC-1]',async({page})=>{
  const session={id:'header-chat',title:'Header Chat',mode:'chat',status:'idle',agentId:'general',metadata:{}};
- await page.route('**/api/sessions',r=>r.fulfill({json:{sessions:[session]}}));
+ await page.route(url => url.pathname === '/api/sessions',r=>r.fulfill({json:{sessions:[session]}}));
  await page.route('**/api/sessions/header-chat',r=>r.fulfill({json:{session,messages:[]}}));
  await page.goto('/#/chat');
  await page.locator('[data-session-id="header-chat"]').first().click();

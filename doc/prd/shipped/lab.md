@@ -15,6 +15,11 @@ markdown, copy /pages/:shareId, rotate share (old link dies), delete
 (gone from list; public HTML 404), and create new pages. Do not clone
 Grok/Canvas UI.
 
+## lab-poll-crash-diagnostics
+轻量会话列表与客户端异常诊断
+
+先把会话列表每次拉 23 MB 的问题修掉，再加上客户端异常日志，下次崩溃能直接定位原因。
+
 ## lab-registered-machines
 Lab Settings → Tools → Registered Machines panel
 

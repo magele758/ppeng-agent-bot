@@ -4,7 +4,7 @@ test('private confirmation shows owner and explicit recipients [AC:bot-scoped-sk
  const sid='scoped-capture-session';const session={id:sid,title:'scoped capture',mode:'chat',status:'idle',agentId:'general'};
  const capture={id:'sc_ui',name:'release-check',description:'Release',reason:'Success',summary:'Health checks',kind:'new',status:'pending',ownerBotId:'a',sharedBotIds:[]};
  await page.route('**/api/bots',r=>r.fulfill({json:{bots}}));
- await page.route('**/api/sessions',r=>r.fulfill({json:{sessions:[session]}}));
+ await page.route(url => url.pathname === '/api/sessions',r=>r.fulfill({json:{sessions:[session]}}));
  await page.route(new RegExp(`/api/sessions/${sid}(?:\\?|$)`),r=>r.fulfill({json:{session,messages:[]}}));
  await page.route(`**/api/sessions/${sid}/skill-captures`,r=>r.fulfill({json:{captures:[capture]}}));
  let body:unknown;

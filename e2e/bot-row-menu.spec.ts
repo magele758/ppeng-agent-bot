@@ -7,9 +7,9 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/bot-functional-groups', r => r.fulfill({json:{groups:[]}}));
   await page.route('**/api/user/preferences', r => r.fulfill({json:{scope:'menu-test',values:{'lab.locale':'zh','lab.botPins':JSON.stringify({ids:[],roomIds:[],customized:true})}}}));
   await page.route('**/api/bots', r => r.fulfill({json:{bots:[bot]}}));
-  await page.route('**/api/sessions', r => r.fulfill({json:{sessions:[session]}}));
+  await page.route(url => url.pathname === '/api/sessions', r => r.fulfill({json:{sessions:[session]}}));
   await page.route('**/api/bots/menu-bot/open', r => r.fulfill({json:{bot,session}}));
-  await page.route('**/api/sessions/menu-session', r => r.fulfill({json:{session,messages:[]}}));
+  await page.route(url => url.pathname === '/api/sessions/menu-session', r => r.fulfill({json:{session,messages:[]}}));
 });
 
 test('Bot 列表操作属于当前行 [AC:bot-row-menu#AC-1]', async ({page}) => {

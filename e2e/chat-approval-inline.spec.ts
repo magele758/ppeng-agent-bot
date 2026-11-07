@@ -22,7 +22,7 @@ test('pending approval sits in the transcript beside the waiting tool [AC:chat-a
     args: {},
     createdAt: '2026-10-15T00:00:00Z'
   };
-  await page.route('**/api/sessions', (route) => {
+  await page.route(url => url.pathname === '/api/sessions', (route) => {
     void route.fulfill({
       status: 200,
       contentType: 'application/json',

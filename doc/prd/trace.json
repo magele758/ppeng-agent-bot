@@ -2738,6 +2738,15 @@
       ]
     },
     {
+      "id": "lab-poll-crash-diagnostics",
+      "title": "轻量会话列表与客户端异常诊断",
+      "tests": [
+        "apps/daemon/test/lab-diagnostics.test.ts",
+        "apps/web-console/lib/client-errors.test.ts",
+        "e2e/client-diagnostics.spec.ts"
+      ]
+    },
+    {
       "id": "lab-registered-machines",
       "title": "Lab Settings → Tools → Registered Machines panel",
       "tests": [

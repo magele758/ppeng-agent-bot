@@ -11,7 +11,7 @@ async function setup(page: Page, messages = [message('m1', '这是一条可引�
   await page.route('**/api/bots/polish-bot/open', r => r.fulfill({ json: { bot, session } }));
   await page.route('**/api/bot-functional-groups', r => r.fulfill({ json: { groups: [] } }));
   await page.route('**/api/bot-rooms', r => r.fulfill({ json: { rooms: [] } }));
-  await page.route('**/api/sessions', r => r.fulfill({ json: { sessions: [session] } }));
+  await page.route(url => url.pathname === '/api/sessions', r => r.fulfill({ json: { sessions: [session] } }));
   await page.route(/\/api\/sessions\/polish-session(?:\?|$)/, r => r.fulfill({ json: { session, messages, latestAssistant: '' } }));
   await page.route('**/api/sessions/polish-session/goal', r => r.fulfill({ json: { goal: null } }));
   await page.goto('/#/bot');
@@ -228,7 +228,7 @@ test('ten session switches render long history within one second [AC:bot-workspa
   const otherSession = {...session,id:'polish-session-2',title:'Second Bot',metadata:{botId:otherBot.id,canonicalBotChat:true}};
   const history = Array.from({length:2000},(_,i)=>message(`m${i+1}`,i===1999?'长内容'.repeat(34000):`记录 ${i}`));
   await page.route('**/api/bots',r=>r.fulfill({json:{bots:[bot,otherBot]}}));
-  await page.route('**/api/sessions',r=>r.fulfill({json:{sessions:[session,otherSession]}}));
+  await page.route(url => url.pathname === '/api/sessions',r=>r.fulfill({json:{sessions:[session,otherSession]}}));
   await page.route('**/api/bots/polish-bot-2/open',r=>r.fulfill({json:{bot:otherBot,session:otherSession}}));
   await page.route(/\/api\/sessions\/polish-session(?:-2)?(?:\?|$)/,r=>r.fulfill({json:{session:r.request().url().includes('session-2')?otherSession:session,messages:history}}));
   await page.reload();

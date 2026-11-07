@@ -1,0 +1,23 @@
+id: lab-poll-crash-diagnostics
+title: 轻量会话列表与客户端异常诊断
+status: implemented
+requirement: |
+  先把会话列表每次拉 23 MB 的问题修掉，再加上客户端异常日志，下次崩溃能直接定位原因。
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 会话累积了大量运行日志和检查点
+    when: 控制台自动刷新会话列表
+    then: 只传列表展示和归属所需的轻量摘要，不携带内部日志，完整会话详情仍可读取
+  - id: AC-2
+    given: 列表内容未变或上一次刷新仍在进行
+    when: 自动刷新再次触发
+    then: 未变的摘要可复用缓存，同一页面不会并发堆积概览刷新
+  - id: AC-3
+    given: 用户已打开控制台
+    when: 出现未捕获异常、未处理的异步拒绝或 React 渲染异常
+    then: 记录错误堆栈、时间、页面、会话标识和版本，保存到本机诊断日志以供下次定位
+  - id: AC-4
+    given: 异常频繁重复或日志上报失败
+    when: 控制台收集异常
+    then: 限制重复上报和日志体积，上报失败不产生异常循环，不采集对话正文或页面查询参数，React 异常提供恢复入口
