@@ -26,7 +26,8 @@ test('browser exceptions are reported and a render failure offers recovery [AC:l
  await expect.poll(()=>logs.some(x=>x.kind==='error' && String(x.message).includes('diagnostic-runtime-probe'))).toBe(true);
  await expect.poll(()=>logs.some(x=>x.kind==='unhandledrejection')).toBe(true);
  expect(logs[0].sessionId).toBe(session.id);
- expect(logs[0].buildId).toBeTruthy();expect(logs[0].stack).toBeTruthy();
+ expect(logs[0].buildId).toBeTruthy();
+ expect(logs[0].buildId).toBe(await page.locator('html').getAttribute('data-build-id')); expect(logs[0].stack).toBeTruthy();
  // An invalid React child in a real list response exercises the mounted boundary.
  await page.route('**/api/bots',r=>r.fulfill({json:{bots:[{id:'invalid-probe',name:{invalid:'react child'},canonicalSessionId:'s',hidden:false}]}}));
  await expect(page.getByRole('alert').filter({hasText:'页面遇到异常'})).toBeVisible({timeout:20000});
