@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 383,
+    "implemented": 384,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1630,6 +1630,13 @@
       "requirement": "Add a minimal Lab Knowledge -> Pages panel over existing admin\n/api/library/pages* routes. Humans can list pages, open read-only or edit\nmarkdown, copy /pages/:shareId, rotate share (old link dies), delete\n(gone from list; public HTML 404), and create new pages. Do not clone\nGrok/Canvas UI.",
       "verificationStage": "software",
       "file": "acceptance/lab-library-pages.yaml"
+    },
+    {
+      "id": "lab-poll-crash-diagnostics",
+      "title": "轻量会话列表与客户端异常诊断",
+      "requirement": "先把会话列表每次拉 23 MB 的问题修掉，再加上客户端异常日志，下次崩溃能直接定位原因。",
+      "verificationStage": "software",
+      "file": "acceptance/lab-poll-crash-diagnostics.yaml"
     },
     {
       "id": "lab-registered-machines",

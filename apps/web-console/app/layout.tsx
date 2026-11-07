@@ -1,3 +1,4 @@
+import { ClientDiagnostics } from '@/components/ClientDiagnostics';
 import type { Metadata, Viewport } from 'next';
 import { I18nProvider } from '@/lib/i18n/I18nProvider';
 import './globals.css';
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning data-build-id={process.env.NEXT_PUBLIC_BUILD_ID}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: FONT_SIZE_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: SKIN_BOOTSTRAP }} />
@@ -43,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             backdrop-filter:var(--glass-filter, blur(14px) saturate(1.8));
           }
         `}</style>
-        <I18nProvider>{children}</I18nProvider>
+        <I18nProvider><ClientDiagnostics />{children}</I18nProvider>
       </body>
     </html>
   );

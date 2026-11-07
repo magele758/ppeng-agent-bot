@@ -1,3 +1,4 @@
+import { sendSessionList } from '../session-list-summary.js';
 import { goalScope } from '@ppeng/agent-core';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -397,11 +398,10 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'GET',
       pattern: '/api/sessions',
-      handler: ({ request, response, url, auth }) => {
-        const q = url.searchParams.get('q') ?? '';
-        if (!q.trim() && sendIfNotModified(request, response, etagFromState(runtime.getStateVersion()))) return;
-        const sessions = filterSessionsByQuery(listedSessions(runtime, auth), q);
-        json(response, 200, { sessions });
+      handler: (ctx) => {
+        const q = ctx.url.searchParams.get('q') ?? '';
+        const sessions = filterSessionsByQuery(listedSessions(runtime, ctx.auth), q);
+        sendSessionList(ctx, sessions, runtime.getStateVersion());
       }
     },
 

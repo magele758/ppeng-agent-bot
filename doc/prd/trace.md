@@ -2415,6 +2415,14 @@ Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 - `apps/web-console/components/sections/knowledge/library-pages-actions.test.ts`
 - `apps/web-console/components/sections/knowledge/library-pages-model.test.ts`
 
+### lab-poll-crash-diagnostics
+
+轻量会话列表与客户端异常诊断
+
+- `apps/daemon/test/lab-diagnostics.test.ts`
+- `apps/web-console/lib/client-errors.test.ts`
+- `e2e/client-diagnostics.spec.ts`
+
 ### lab-registered-machines
 
 Lab Settings → Tools → Registered Machines panel

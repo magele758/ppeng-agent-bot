@@ -1,4 +1,8 @@
 export const common = {
+  clientErrorTitle: 'Something went wrong',
+  clientErrorHint: 'We attempted to record diagnostics. Please reload the page.',
+  clientErrorReload: 'Reload',
+  clientErrorRetry: 'Retry',
   language: 'Language',
   languageHint: 'Interface language is saved on this device.',
   zh: 'Chinese',

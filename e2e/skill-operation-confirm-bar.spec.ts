@@ -37,7 +37,7 @@ async function openChat(page: Page, sessionId: string, title: string, operations
     if (request.method() === 'POST') posts.push(new URL(request.url()).pathname);
   });
   const session = { id: sessionId, title, mode: 'chat', status: 'idle', agentId: 'general' };
-  await page.route('**/api/sessions', (route) => route.fulfill({ json: { sessions: [session] } }));
+  await page.route(url => url.pathname === '/api/sessions', (route) => route.fulfill({ json: { sessions: [session] } }));
   await page.route(new RegExp(`/api/sessions/${sessionId}(?:\\?|$)`), (route) =>
     route.fulfill({ json: { session, messages: [{ id: 'text', role: 'assistant', parts: [{ type: 'text', text: '正文保留' }] }] } }),
   );

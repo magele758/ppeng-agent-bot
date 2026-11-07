@@ -7,7 +7,7 @@ test('approval explains operation and risk with visible actual command [AC:appro
   const approval={id:'explain-ui-1',sessionId:id,toolName:'bash',status:'pending',reason:'Auto-review (shell) blocked high-risk bash: Shell command matches a high-risk pattern. Prior note: duplicate reason',args:{command,timeout_ms:60000},createdAt:'2026-11-02T00:00:00Z'};
   let modelAvailable=true;
   await page.addInitScript(()=>localStorage.setItem('lab.locale','zh'));
-  await page.route('**/api/sessions',r=>r.fulfill({json:{sessions:[session]}}));
+  await page.route(url => url.pathname === '/api/sessions',r=>r.fulfill({json:{sessions:[session]}}));
   await page.route(new RegExp(`/api/sessions/${id}(?:\\?|$)`),r=>r.fulfill({json:{session,messages:[{id:'m1',seq:1,role:'assistant',parts:[{type:'tool_call',toolCallId:'c1',name:'bash',input:approval.args}]}],latestAssistant:''}}));
   await page.route('**/api/approvals**',r=>r.fulfill({json:{approvals:[approval]}}));
   await page.route('**/api/approval-explanations/**',r=>r.fulfill({json:{explanation:modelAvailable?{action:'下载仓库到临时目录，读完后清理。',risk:'rm -rf 会删除临时目录及其内容，请核对目标路径。'}:null}}));

@@ -5,7 +5,7 @@ test('confirm intent once, show automatic save, keep composer usable [AC:skill-c
   const session = { id: sid, title: 'capture-ui-check', mode: 'chat', status: 'idle', agentId: 'general' };
   const capture = { id: 'sc_123', name: 'release-check', description: '验证发布', reason: '发布流程已成功验证', summary: '检查构建与健康端点', kind: 'update', status: 'pending' };
   let confirmations = 0;
-  await page.route('**/api/sessions', route => route.fulfill({ json: { sessions: [session] } }));
+  await page.route(url => url.pathname === '/api/sessions', route => route.fulfill({ json: { sessions: [session] } }));
   await page.route(new RegExp(`/api/sessions/${sid}(?:\\?|$)`), route => route.fulfill({ json: { session, messages: [{ role: 'assistant', parts: [{ type: 'text', text: '发布验证完成。' }] }], latestAssistant: '发布验证完成。' } }));
   await page.route(`**/api/sessions/${sid}/skill-captures`, route => route.fulfill({ json: { captures: [capture] } }));
   await page.route(`**/api/sessions/${sid}/skill-captures/sc_123/confirm`, async route => {
@@ -34,7 +34,7 @@ test('reject persists across reload, failed capture is visible [AC:skill-capture
     { id: 'sc_reject', name: 'release-check', description: '验证发布', reason: '成功经验', summary: '发布步骤', kind: 'new', status: 'pending' },
     { id: 'sc_fail', name: 'health-check', description: '验证健康状态', reason: '成功经验', summary: '检查步骤', kind: 'update', status: 'pending', error: '' }
   ];
-  await page.route('**/api/sessions', route => route.fulfill({ json: { sessions: [session] } }));
+  await page.route(url => url.pathname === '/api/sessions', route => route.fulfill({ json: { sessions: [session] } }));
   await page.route(new RegExp(`/api/sessions/${sid}(?:\\?|$)`), route => route.fulfill({ json: { session, messages: [], latestAssistant: '' } }));
   await page.route(`**/api/sessions/${sid}/skill-captures`, route => route.fulfill({ json: { captures } }));
   await page.route(`**/api/sessions/${sid}/skill-captures/sc_reject/reject`, route => {

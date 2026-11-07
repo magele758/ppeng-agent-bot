@@ -7,7 +7,7 @@ async function setup(page: Page) {
   const writes: string[] = [];
   let polls = 0;
   page.on('request', request => { if (['POST', 'PATCH', 'DELETE'].includes(request.method()) && /skill|memory/.test(request.url())) writes.push(request.url()); });
-  await page.route('**/api/sessions', route => route.fulfill({ json: { sessions } }));
+  await page.route(url => url.pathname === '/api/sessions', route => route.fulfill({ json: { sessions } }));
   for (const session of sessions) {
     await page.route(new RegExp(`/api/sessions/${session.id}(?:\\?|$)`), route => route.fulfill({ json: { session, messages: [{ id: 'msg1', role: 'assistant', parts: [{ type: 'text', text: '对话内容仍可阅读' }] }], latestAssistant: '对话内容仍可阅读' } }));
     await page.route(`**/api/sessions/${session.id}/skill-captures`, route => { polls++; return route.fulfill({ json: { captures: session.id === 'dismiss-a' ? captures : [saved] } }); });

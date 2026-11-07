@@ -1,4 +1,8 @@
 export const common = {
+  clientErrorTitle: '页面遇到异常',
+  clientErrorHint: '已尝试记录诊断信息，请重新加载页面。',
+  clientErrorReload: '重新加载',
+  clientErrorRetry: '重试',
   language: '语言',
   languageHint: '界面语言，保存在本机，刷新后仍有效。',
   zh: '中文',

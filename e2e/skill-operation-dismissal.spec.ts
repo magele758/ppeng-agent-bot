@@ -6,7 +6,7 @@ async function setup(page: Page) {
   const captures = ['saved','rejected','failed'].map(status=>({id:status,name:`capture-${status}`,kind:'new',description:'Description',reason:'reason',summary:'summary',status,error:status==='failed'?'Capture failure '.repeat(100):undefined}));
   let polls=0; const writes:string[]=[];
   page.on('request',r=>{if(['POST','PATCH','DELETE'].includes(r.method()) && /skill|memory/.test(r.url())) writes.push(r.url());});
-  await page.route('**/api/sessions',r=>r.fulfill({json:{sessions}}));
+  await page.route(url => url.pathname === '/api/sessions',r=>r.fulfill({json:{sessions}}));
   for(const session of sessions){
     await page.route(new RegExp(`/api/sessions/${session.id}(?:\\?|$)`),r=>r.fulfill({json:{session,messages:[{id:'text',role:'assistant',parts:[{type:'text',text:'正文保留'}]}]}}));
     await page.route(`**/api/sessions/${session.id}/skill-operations`,r=>{polls++;return r.fulfill({json:{operations}});});

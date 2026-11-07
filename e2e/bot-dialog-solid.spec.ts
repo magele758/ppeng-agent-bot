@@ -4,7 +4,7 @@ test('Bot message island opens a solid dialog across skins and widths [AC:bot-di
   const id = 'solid-dialog-test';
   const session = { id, title: '弹窗验收', mode: 'chat', status: 'idle', agentId: 'general', metadata: {} };
   await page.addInitScript(() => localStorage.setItem('lab.locale', 'zh'));
-  await page.route('**/api/sessions', r => r.fulfill({ json: { sessions: [session] } }));
+  await page.route(url => url.pathname === '/api/sessions', r => r.fulfill({ json: { sessions: [session] } }));
   await page.route(new RegExp(`/api/sessions/${id}(?:\\?|$)`), r => r.fulfill({ json: { session, messages: [{ id: 'm1', seq: 1, role: 'user', parts: [{ type: 'text', text: 'Message from 4090 bot / bot_test: 健康检查结果\n\n- 服务正常\n- 消息正文清晰可读' }] }], latestAssistant: '' } }));
   await page.route('**/api/approvals**', r => r.fulfill({ json: { approvals: [] } }));
   await page.goto('/#/chat');

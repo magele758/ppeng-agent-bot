@@ -1,5 +1,6 @@
 'use client';
 
+import { ClientErrorBoundary } from './ClientDiagnostics';
 import { UserPreferenceSync } from './UserPreferenceSync';
 import { useState } from 'react';
 import type { AuthUser } from '@/lib/auth';
@@ -11,11 +12,11 @@ import { LabShell } from './shell/LabShell';
 export function AgentLabApp() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   return (
-    <AuthGate onUser={setAuthUser}>
+    <ClientErrorBoundary><AuthGate onUser={setAuthUser}>
       <LabProvider>
         <UserPreferenceSync key={authUser?.id ?? "local"} />
         <LabShell authUser={authUser} />
       </LabProvider>
-    </AuthGate>
+    </AuthGate></ClientErrorBoundary>
   );
 }

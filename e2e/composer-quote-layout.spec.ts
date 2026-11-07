@@ -11,7 +11,7 @@ async function setup(page: Page, messages = [message('m1', '这是一条可引�
   await page.route('**/api/bots/polish-bot/open', r => r.fulfill({ json: { bot, session } }));
   await page.route('**/api/bot-functional-groups', r => r.fulfill({ json: { groups: [] } }));
   await page.route('**/api/bot-rooms', r => r.fulfill({ json: { rooms: [] } }));
-  await page.route('**/api/sessions', r => r.fulfill({ json: { sessions: [session] } }));
+  await page.route(url => url.pathname === '/api/sessions', r => r.fulfill({ json: { sessions: [session] } }));
   await page.route(/\/api\/sessions\/polish-session(?:\?|$)/, r => r.fulfill({ json: { session, messages, latestAssistant: '' } }));
   await page.route('**/api/sessions/polish-session/goal', r => r.fulfill({ json: { goal: null } }));
   await page.goto('/#/bot');

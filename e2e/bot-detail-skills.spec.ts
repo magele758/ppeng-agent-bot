@@ -174,7 +174,7 @@ test("one operation confirmation completes without body review [AC:agent-skill-m
   };
   let confirmations = 0;
   await page.route("**/api/bots", (r) => r.fulfill({ json: { bots } }));
-  await page.route("**/api/sessions", (r) =>
+  await page.route(url => url.pathname === '/api/sessions', (r) =>
     r.fulfill({ json: { sessions: [session] } }),
   );
   await page.route(/\/api\/sessions\/manage-ui(?:\?|$)/, (r) =>
@@ -207,7 +207,7 @@ test("one operation confirmation completes without body review [AC:agent-skill-m
 
 test("chat detail exposes and manages current Bot skills [AC:bot-detail-skill-management#AC-1] [AC:bot-detail-skill-management#AC-3]", async ({ page }) => {
   const { policy } = await setup(page);
-  await page.route('**/api/sessions', r => r.fulfill({ json: { sessions: bots.map(b => ({ id: b.canonicalSessionId, title: b.name, agentId: b.agentId, status: 'idle', mode: 'chat', metadata: { botId: b.id } })) } }));
+  await page.route(url => url.pathname === '/api/sessions', r => r.fulfill({ json: { sessions: bots.map(b => ({ id: b.canonicalSessionId, title: b.name, agentId: b.agentId, status: 'idle', mode: 'chat', metadata: { botId: b.id } })) } }));
   await page.goto('/#/bot');
   await page.reload();
   await page.getByRole('button', { name: /^Bot A/ }).first().click();
@@ -225,7 +225,7 @@ test("chat detail exposes and manages current Bot skills [AC:bot-detail-skill-ma
 
 test('chat detail close icon works on narrow screens [AC:bot-detail-menu#AC-7]', async ({ page }) => {
   await setup(page);
-  await page.route('**/api/sessions', r => r.fulfill({ json: { sessions: bots.map(b => ({ id: b.canonicalSessionId, title: b.name, agentId: b.agentId, status: 'idle', mode: 'chat', metadata: { botId: b.id } })) } }));
+  await page.route(url => url.pathname === '/api/sessions', r => r.fulfill({ json: { sessions: bots.map(b => ({ id: b.canonicalSessionId, title: b.name, agentId: b.agentId, status: 'idle', mode: 'chat', metadata: { botId: b.id } })) } }));
   await page.setViewportSize({ width: 823, height: 804 });
   await page.goto('/#/bot');
   await page.reload();
@@ -242,7 +242,7 @@ test('chat detail close icon works on narrow screens [AC:bot-detail-menu#AC-7]',
 for (const width of [1280, 820]) test(`skills controls stay grouped at every font size at ${width} [AC:bot-skill-panel-layout#AC-1] [AC:bot-skill-panel-layout#AC-2] [AC:bot-skill-panel-layout#AC-3] [AC:bot-skill-panel-layout#AC-4]`, async ({page}) => {
   await page.setViewportSize({width,height:804});
   const {policy}=await setup(page, true);
-  await page.route('**/api/sessions',r=>r.fulfill({json:{sessions:bots.map(b=>({id:b.canonicalSessionId,title:b.name,agentId:b.agentId,status:'idle',mode:'chat',metadata:{botId:b.id}}))}}));
+  await page.route(url => url.pathname === '/api/sessions',r=>r.fulfill({json:{sessions:bots.map(b=>({id:b.canonicalSessionId,title:b.name,agentId:b.agentId,status:'idle',mode:'chat',metadata:{botId:b.id}}))}}));
   await page.goto('/#/bot'); await page.reload();await page.getByRole('button',{name:/^Bot A/}).first().click();
   const drawer=page.getByTestId('bot-detail-panel');await page.getByTestId('bot-detail-toggle').click();await expect(drawer).toBeVisible();
   await drawer.getByRole('tab',{name:'能力与权限',exact:true}).click();
