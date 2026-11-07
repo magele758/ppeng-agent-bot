@@ -3713,6 +3713,13 @@
       ]
     },
     {
+      "id": "steer-model-flight",
+      "title": "模型生成期间插话与旧工具启动前转向",
+      "tests": [
+        "packages/core/test/steer-tool-continuity.test.js"
+      ]
+    },
+    {
       "id": "steer-timeline-order",
       "title": "实时插话前后的回复保持时间线位置",
       "tests": [

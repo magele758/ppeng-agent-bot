@@ -182,3 +182,82 @@ test('dropping a steer invalidates its pending cancellation decision [AC:steer-t
   assert.ok([...f.signals.values()].every(s => !s.aborted));
   f.release.resolve(); await running;
 });
+
+async function modelFlightFixture(t, judge) {
+  const dir = mkdtempSync(join(tmpdir(), 'steer-flight-'));
+  const started = deferred(), release = deferred();
+  const inputs = [], executed = [];
+  const tools = ['install', 'inspect'].map(name => ({
+    name, description: name, inputSchema: { type: 'object', properties: {} }, approvalMode: 'never', sideEffectLevel: 'none',
+    async execute() { executed.push(name); return { ok: true, content: name + ' done' }; }
+  }));
+  const rt = new RawAgentRuntime({ repoRoot: dir, stateDir: join(dir, 'state'), extraTools: tools, modelAdapter: {
+    name: 'flight', summarizeMessages: async () => '', completeText: judge,
+    async runTurn(input) {
+      inputs.push(input);
+      if (inputs.length > 1) return text('updated');
+      started.resolve(); await release.promise;
+      return { stopReason: 'tool_use', assistantParts: tools.map(tool => ({ type: 'tool_call', toolCallId: tool.name + '-1', name: tool.name, input: {} })) };
+    }
+  } });
+  rt.store.setDaemonControl('tool_exposure_settings', { mode: 'full', pinnedGroups: {} });
+  const session = rt.createChatSession({ title: 'flight', message: 'install Scrapling and inspect logs' });
+  const running = rt.runSession(session.id);
+  t.after(async () => { release.resolve(); await running.catch(() => {}); await rt.destroy(); });
+  await started.promise;
+  return { rt, session, release, running, inputs, executed };
+}
+
+test('model-flight redirection cancels obsolete tools before launch [AC:steer-model-flight#AC-1]', { timeout: 15000 }, async t => {
+  const f = await modelFlightFixture(t, async () => '{"cancelToolCallIds":["install-1"],"reason":"User switched installation to claude-m"}');
+  const note = '你可以用ubuntu1机器上的claude-m干这个';
+  f.rt.enqueueSteer(f.session.id, note, { target: 'next-step' });
+  const before = messagesWith(f.rt, f.session.id, note);
+  assert.equal(before.length, 1);
+  f.release.resolve(); await f.running;
+  assert.deepEqual(f.executed, ['inspect']);
+  const results = f.inputs[1].messages.flatMap(m => m.parts).filter(p => p.type === 'tool_result');
+  assert.equal(results.filter(p => p.toolCallId === 'install-1').length, 1);
+  assert.equal(results.find(p => p.toolCallId === 'install-1').ok, false);
+  assert.equal(messagesWith(f.rt, f.session.id, note)[0].id, before[0].id);
+  assert.ok(f.inputs[1].messages.some(m => m.id === before[0].id));
+});
+
+test('model-flight additions and withdrawn steering preserve tools [AC:steer-model-flight#AC-2]', { timeout: 15000 }, async t => {
+  for (const drop of [false, true]) {
+    let judged = 0;
+    const f = await modelFlightFixture(t, async () => { judged++; return '{"cancelToolCallIds":[],"reason":"additional information"}'; });
+    const ack = f.rt.enqueueSteer(f.session.id, '搞好了，给我一下tailscale的地址', { target: 'next-step' });
+    if (drop) f.rt.dropSteerItem(f.session.id, ack.item.id);
+    f.release.resolve(); await f.running;
+    assert.deepEqual(f.executed.sort(), ['inspect', 'install']);
+    assert.equal(judged, drop ? 0 : 1);
+  }
+});
+
+test('latest steering is highlighted to the model without changing stored text [AC:steer-model-flight#AC-3]', { timeout: 15000 }, async t => {
+  const f = await modelFlightFixture(t, async () => '{"cancelToolCallIds":[],"reason":"additional information"}');
+  const note = '给我tailscale地址';
+  f.rt.enqueueSteer(f.session.id, note, { target: 'next-step' });
+  f.release.resolve(); await f.running;
+  const stored = messagesWith(f.rt, f.session.id, note)[0];
+  const sent = f.inputs[1].messages.find(m => m.id === stored.id);
+  assert.ok(sent.parts.some(p => p.type === 'text' && p.text.includes('[live user interjection]')));
+  assert.deepEqual(stored.parts, [{ type: 'text', text: note }]);
+});
+
+test('model-flight unavailable or timed-out judgement preserves work without hanging [AC:steer-model-flight#AC-2]', { timeout: 12000 }, async t => {
+  for (const judge of [async () => { throw new Error('offline'); }, () => new Promise(() => {})]) {
+    const f = await modelFlightFixture(t, judge);
+    f.rt.enqueueSteer(f.session.id, '你可以用claude-m干这个', { target: 'next-step' });
+    f.release.resolve(); await f.running;
+    assert.deepEqual(f.executed.sort(), ['inspect', 'install']);
+  }
+});
+
+test('explicit stop during model generation prevents the named tool from starting [AC:steer-model-flight#AC-1]', { timeout: 15000 }, async t => {
+  const f = await modelFlightFixture(t, async () => { throw new Error('must not need classifier'); });
+  f.rt.enqueueSteer(f.session.id, '停止 install', { target: 'next-step' });
+  f.release.resolve(); await f.running;
+  assert.deepEqual(f.executed, ['inspect']);
+});

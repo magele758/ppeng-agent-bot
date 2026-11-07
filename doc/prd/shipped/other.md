@@ -938,6 +938,11 @@ Required outcomes:
 4) No ain work. Avoid colliding #302-305. No force-push. Protect main.
 5) Author magele758; every commit trailer Machine: 4090. Final acceptance by lei pending.
 
+## steer-model-flight
+模型生成期间插话与旧工具启动前转向
+
+帮我排查一下插话的功能，我觉得我实时插话，好像并没有立刻插入到bot的对话流中，我这2个引导他既没有回复我，也没有改变现有的执行方向，先检查是否是立刻插入到了会话流中，其次，按道理，我第二个指导发出，他应该停止之前的工具，然后按照新的插话的方式去执行才对
+
 ## steer-timeline-order
 实时插话前后的回复保持时间线位置
 

@@ -3271,6 +3271,12 @@ Slack Events 入站按线程唤醒例行任务
 
 - `packages/core/test/startup-invariants.test.js`
 
+### steer-model-flight
+
+模型生成期间插话与旧工具启动前转向
+
+- `packages/core/test/steer-tool-continuity.test.js`
+
 ### steer-timeline-order
 
 实时插话前后的回复保持时间线位置
