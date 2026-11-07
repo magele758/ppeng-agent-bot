@@ -77,7 +77,6 @@ export function steerRunningTools(input: {
   const controller = new AbortController();
   wave.judge = controller;
   const timer = setTimeout(() => controller.abort(), 5000);
-  timer.unref();
   const history = input.messages.filter(message => message.role === 'user' || message.role === 'assistant').slice(-8)
     .map(message => ({ role: message.role, parts: message.parts.filter(part => part.type === 'text').map(part => part.text.slice(0, 2000)) }));
   const aborted = new Promise<undefined>(resolve => controller.signal.addEventListener('abort', () => resolve(undefined), { once: true }));
