@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 385,
+    "implemented": 386,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2498,6 +2498,13 @@
       "requirement": "Feature (minimal mergeable slice OK): Startup invariants for compact + stable prefix + repeatGuard (align with Grok改造 / ppeng-side concepts similar to ain #297; implement on ppeng only).\n\nContext: compact settings in apps/daemon/src/routes/compact.ts + core compact settings helpers; stablePrefix / stablePrefixHash in packages/core/src/model/prompt-builder.ts and turn/kernel.ts (doc/PROMPT_CACHE.md); repeatGuard in packages/agent-loop/src/recovery/repeat-guard.ts and loop_settings (default weak).\n\nRequired outcomes:\n1) On daemon/runtime startup (or first loop assembly), assert/normalize invariants:\n   - compact settings parse to a valid effective policy (keep_recent/after_any_assistant/after_text_assistant) with sane keepRecent bounds; persisted UI settings preferred over defaults; no new RAW_AGENT_* switches.\n   - stable prefix builder produces a non-empty identity+repo stable segment; stablePrefixHash is computed consistently for turn_start diagnostics.\n   - repeatGuard resolves to weak|all|off (default weak) from loop_settings before the first tool round; invalid values fall back safely.\n2) Fail closed or log+repair clearly if invariants are violated; do not silently run with undefined compact/prefix/guard state.\n3) Unit tests for startup/invariant helpers (core and/or agent-loop). Keep slice small and mergeable.\n4) No ain work. Avoid colliding #302-305. No force-push. Protect main.\n5) Author magele758; every commit trailer Machine: 4090. Final acceptance by lei pending.",
       "verificationStage": "software",
       "file": "acceptance/startup-invariants-compact.yaml"
+    },
+    {
+      "id": "steer-completion-coverage",
+      "title": "Bot 完成检查覆盖本次全部插话",
+      "requirement": "这个逻辑也不对，我3条指令发了，他没有干完我所有的任务就停了，推荐指令里都知道有下一个目标，为什么没完成我所有的指令？Ubuntu1 bot的会话",
+      "verificationStage": "software",
+      "file": "acceptance/steer-completion-coverage.yaml"
     },
     {
       "id": "steer-model-flight",

@@ -1,0 +1,21 @@
+id: steer-completion-coverage
+title: Bot 完成检查覆盖本次全部插话
+status: implemented
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  扩展当前 Bot 目标的完成核验；不把读取插话当作完成，不从推荐文案触发新工作。
+requirement: |
+  这个逻辑也不对，我3条指令发了，他没有干完我所有的任务就停了，推荐指令里都知道有下一个目标，为什么没完成我所有的指令？Ubuntu1 bot的会话
+criteria:
+  - id: AC-1
+    given: Bot 正在执行原目标且用户补充多个要求
+    when: Bot 只完成原目标就准备结束
+    then: 完成检查保留全部补充要求，遗漏任一要求不能标为完成，继续处理剩余工作且不重复已完成动作
+  - id: AC-2
+    given: 多条要求需要连续多轮补齐
+    when: 每轮结束仍有可处理的遗漏
+    then: 在既有执行预算内继续核验和补齐，不因只允许一次纠正而提前结束
+  - id: AC-3
+    given: 用户撤回插话、其他执行者引用指令或完成判断缺少逐条结论
+    when: 检查是否全部完成
+    then: 撤回内容和其他执行者引用不成为新要求，缺少结论不能冒充已完成，真实阻塞保留未完成状态

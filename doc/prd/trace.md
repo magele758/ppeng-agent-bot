@@ -3271,6 +3271,12 @@ Slack Events 入站按线程唤醒例行任务
 
 - `packages/core/test/startup-invariants.test.js`
 
+### steer-completion-coverage
+
+Bot 完成检查覆盖本次全部插话
+
+- `packages/core/test/bot-completion-reliability.test.js`
+
 ### steer-model-flight
 
 模型生成期间插话与旧工具启动前转向

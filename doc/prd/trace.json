@@ -3713,6 +3713,13 @@
       ]
     },
     {
+      "id": "steer-completion-coverage",
+      "title": "Bot 完成检查覆盖本次全部插话",
+      "tests": [
+        "packages/core/test/bot-completion-reliability.test.js"
+      ]
+    },
+    {
       "id": "steer-model-flight",
       "title": "模型生成期间插话与旧工具启动前转向",
       "tests": [

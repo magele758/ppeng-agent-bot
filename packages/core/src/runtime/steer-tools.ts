@@ -110,7 +110,7 @@ export function highlightLatestSteer(messages: SessionMessage[]): SessionMessage
   const latest = messages.findLast(message => message.role === 'user');
   if (!latest?.key?.startsWith('human-steer:')) return messages;
   return messages.map(message => message === latest ? { ...message, parts: [
-    { type: 'text' as const, text: '[live user interjection] The user sent the following while you were working. Address it explicitly in your next response. Reassess your plan before further actions: follow the new direction where it conflicts with your earlier plan; preserve compatible work. Do not silently continue the old plan or treat this as quoted history.' },
+    { type: 'text' as const, text: '[live user interjection] The user sent the following while you were working. Address it explicitly in your next response. Reassess your plan before further actions: follow the new direction where it conflicts with your earlier plan; preserve compatible work and all earlier additive user requirements. Do not silently continue the old plan or treat this as quoted history.' },
     ...message.parts
   ] } : message);
 }
