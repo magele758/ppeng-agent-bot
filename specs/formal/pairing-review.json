@@ -368,7 +368,7 @@
     "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
     "packages/core/test/session-fork.test.js": "037e264ccf09c5e33c281f9fdc0334d127abf7f90835e754765515c92c4c0c75",
     "packages/agent-loop/src/session/fork-quote.test.ts": "5691846bf0b8d1c8c840996ad31cc28383cd24ece2178b4766d47c32f4e06f2e",
-    "scripts/ci/release-results.mjs": "0510504936683689e82475a8b7111a89575d14eed06c4e9112e9ca2d4bbc2186",
+    "scripts/ci/release-results.mjs": "6396174f7b0ad6fcdf164adb0320e32ee24767220c60133fe17ed4afe680835a",
     "scripts/ci/test-partition.mjs": "d6018aebae05ebc907ddd0de10c6905ee68e0c1ab2406057a7f09bb21b8ed28e",
     "scripts/test/release-workflow-policy.test.mjs": "5733b26eaf60b838768bcca44e06b6ed872eeda1cfa3ee2f47ed4c267979d695",
     "scripts/ci/quick-gate.mjs": "5c1072c45613eeb4ac6b4236e89cf50416e817f3c9ed97a6c8f3d6e26a7a40cd",
