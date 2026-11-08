@@ -466,12 +466,18 @@ function wakeFinishedWait(host: GoalRuntimeHost, parent: SessionRecord, service:
  if (status === 'running' && notePendingApprovalWait(host, parent, service, botId, goal)) return;
  if (status && ended.has(status)) service.wake(botId, {...wakeWorkIdentity(host, goal, executions), completionCandidate:status==='completed', eventId:`${goal.wait!.source}:${goal.wait!.correlationId}:${status}:${goal.attempts}`, source:goal.wait!.source, correlationId:goal.wait!.correlationId, ...waitEvidence(host, parent, goal, status, executions)});
 }
-function deferredContinuation(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal): SessionRecord | undefined {
- return host.store.listSessions().find(s => s.parentSessionId === parent.id && s.metadata.botGoalId === goal.id && s.metadata.botGoalScopeSessionId === parent.id && !host.isRunning(s.id));
+function hasDeferredContinuation(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal): boolean {
+ const children = host.store.db.prepare(`
+   SELECT id FROM sessions WHERE parent_session_id = ?
+     AND CASE WHEN json_valid(metadata_json) THEN
+       json_extract(metadata_json, '$.botGoalId') = ? AND json_extract(metadata_json, '$.botGoalScopeSessionId') = ?
+     END
+ `).all(parent.id, goal.id, parent.id);
+ return children.some(child => !host.isRunning(String(child.id)));
 }
 function skipFreshQueued(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal): boolean {
  if (!(goal.attempts === 0 && goal.sourceMessageId)) return false;
- return !deferredContinuation(host, parent, goal) && !goal.resumeRequested;
+ return !goal.resumeRequested && !hasDeferredContinuation(host, parent, goal);
 }
 function atConcurrencyCap(service: GoalService, botId: string): boolean {
  return service.list(botId).filter(occupiesGoalCapacity).length >= service.readSettings().maxConcurrent;

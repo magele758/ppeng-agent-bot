@@ -28,8 +28,11 @@ import { join } from 'node:path';
 import { setBotDefinitionOwner } from '../dist/bots/bot-identity.js';
 test('daily evidence includes own multiple sessions and excludes other owners and dates [AC:bot-daydream-integration#AC-3]',t=>{
  const dir=mkdtempSync(join(tmpdir(),'daydream-evidence-'));const store=new SqliteStateStore(join(dir,'state.db'));t.after(()=>{store.db.close();rmSync(dir,{recursive:true,force:true});});
- const sessions=[{id:'s1',metadata:{botId:'a',userId:'u'}},{id:'s2',metadata:{botId:'a',userId:'u'}},{id:'s3',metadata:{botId:'a',userId:'other'}}];
- store.getBot=()=>({id:'a',canonicalSessionId:'s1'});store.getSession=id=>sessions.find(s=>s.id===id);store.listSessions=()=>sessions;setBotDefinitionOwner(store,'a',{userId:'u'});
+ const sessions = ['u', 'u', 'other'].map(userId => store.createSession({
+   title: 'chat', mode: 'chat', agentId: 'general', metadata: { botId: 'a', userId }
+ }));
+ store.getBot = () => ({id:'a', canonicalSessionId:sessions[0].id});
+ setBotDefinitionOwner(store,'a',{userId:'u'});
  store.listMessages=id=>[{id:id+'m',role:'user',parts:[{type:'text',text:'project fact'}],createdAt:'2026-11-02T23:00:00Z'},{id:id+'old',role:'user',parts:[],createdAt:'2026-10-01T00:00:00Z'}];
- assert.deepEqual(readBotDaydreamEvidence(store,'a','2026-11-03','Asia/Shanghai').map(m=>m.messageId),['s1m','s2m']);
+ assert.deepEqual(readBotDaydreamEvidence(store,'a','2026-11-03','Asia/Shanghai').map(m=>m.messageId).sort(),sessions.slice(0,2).map(s=>s.id+'m').sort());
 });

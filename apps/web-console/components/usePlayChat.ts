@@ -1656,12 +1656,12 @@ export function usePlayChat(deps: PlayChatDeps) {
         await openBotSession(id);
         requestScrollPlayToBottom();
         sessionListStickTopRef.current = true;
-        await tick({ includePlayPanel: true });
+        await Promise.all([refreshPlayPanel(), tick({ includePlayPanel: false })]);
       } catch (e) {
         setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
       }
     },
-    [applyBotSelection, onPlaySurfaceChange, openBotSession, requestScrollPlayToBottom, sessionListStickTopRef, tick]
+    [applyBotSelection, onPlaySurfaceChange, openBotSession, requestScrollPlayToBottom, sessionListStickTopRef, refreshPlayPanel, tick]
   );
 
   /**

@@ -1,0 +1,19 @@
+id: history-startup-contention
+title: 后台调度期间打开历史会话
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  现在我看刚才启动网页，拉取历史会话的时间还是特别长，帮我排查下原因，看看是否可以进一步提升，甚至可以加本地部署的其他中间件来提升这个性能，深度研究下，另外告诉我现在的日志记录是否完整
+criteria:
+  - id: AC-1
+    given: Bot 已有归属且对话很长
+    when: 后台复盘检查该 Bot 的身份
+    then: 无须加载完整会话，已删除会话的 Bot 仍不可运行
+  - id: AC-2
+    given: 多个新目标等待原始用户消息派送
+    when: 后台检查是否有可继续的子会话
+    then: 不再为每个目标重读所有历史会话，原始消息仍只派送一次
+  - id: AC-3
+    given: 已打开的 Bot 有历史消息，后台任务列表仍在加载
+    when: 进入 Bot 对话
+    then: 可以先读到历史正文

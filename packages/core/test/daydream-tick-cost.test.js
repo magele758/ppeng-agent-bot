@@ -57,3 +57,20 @@ test('scheduled review reads each bot conversation a bounded number of times and
   assert.ok(reads <= count * 10, `conversation reads ${reads} grew with bots squared`);
   assert.ok(runtime.listBots({ includeHidden: true }).length >= count);
 });
+
+test('owned bot lookup skips full session reads and detects a missing chat [AC:history-startup-contention#AC-1]', async t => {
+  const { tryBotDaydreamPrincipal } = await import('../dist/runtime/daydream-evidence.js');
+  const { setBotDefinitionOwner } = await import('../dist/bots/bot-identity.js');
+  const { SqliteStateStore } = await import('../dist/storage.js');
+  const dir = mkdtempSync(join(tmpdir(), 'history-owner-'));
+  const store = new SqliteStateStore(join(dir, 'db'));
+  t.after(() => { store.db.close(); rmSync(dir, { recursive: true, force: true }); });
+  const chat = store.createSession({ title: 'chat', agentId: 'general', mode: 'chat' });
+  store.getBot = () => ({ canonicalSessionId: chat.id });
+  const owner = { userId: 'owner', tenantId: 'tenant' };
+  setBotDefinitionOwner(store, 'owned', owner);
+  store.getSession = () => assert.fail('full session loaded for known owner');
+  assert.deepEqual(tryBotDaydreamPrincipal(store, 'owned'), owner);
+  store.db.prepare('DELETE FROM sessions WHERE id=?').run(chat.id);
+  assert.equal(tryBotDaydreamPrincipal(store, 'owned'), undefined);
+});

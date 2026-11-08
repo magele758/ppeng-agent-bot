@@ -2396,6 +2396,14 @@ GitHub 事件不能靠换投递号重放
 
 - `apps/web-console/lib/dev-overlays.test.ts`
 
+### history-startup-contention
+
+后台调度期间打开历史会话
+
+- `e2e/history-startup.spec.ts`
+- `packages/core/test/bot-goals-scheduler.test.js`
+- `packages/core/test/daydream-tick-cost.test.js`
+
 ### jev-model-settings
 
 在模型设置中配置 Jev 评估

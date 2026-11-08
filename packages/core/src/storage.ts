@@ -281,6 +281,7 @@ export class SqliteStateStore {
       );
 
       CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
+      CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id);
       CREATE INDEX IF NOT EXISTS idx_messages_session ON session_messages(session_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
