@@ -474,7 +474,7 @@
     "scripts/ci/validation-artifacts.mjs": "d0da148d709c698ad29e21cf769a84b4a5def4e82e2d636e52d994185ae82b6f",
     "scripts/test/ci-audit.test.mjs": "c355ce76ff525786fbaa2e7c520bf7b4507427b135bd5508deedd14d6e00d07f",
     "scripts/ci/validation-lane.mjs": "4bd43ff55f1c6708f6acc7c135a27693d4eb2ab00c26f988de84845c6af653be",
-    "scripts/ci/release-results.mjs": "0510504936683689e82475a8b7111a89575d14eed06c4e9112e9ca2d4bbc2186",
+    "scripts/ci/release-results.mjs": "6396174f7b0ad6fcdf164adb0320e32ee24767220c60133fe17ed4afe680835a",
     "scripts/ci/test-partition.mjs": "d6018aebae05ebc907ddd0de10c6905ee68e0c1ab2406057a7f09bb21b8ed28e",
     "scripts/ci/quick-gate.mjs": "5c1072c45613eeb4ac6b4236e89cf50416e817f3c9ed97a6c8f3d6e26a7a40cd",
     "scripts/test/ci-speedup-workflow.test.mjs": "d6917235f445c5c1c6fafaf48635868930d7f5309fd284456f953bbb2fa84489",
