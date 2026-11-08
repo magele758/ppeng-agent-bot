@@ -1,0 +1,11 @@
+id: bot-task-terminal-wait
+title: 已结束的委派能唤醒接收回执的 Bot
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  具体线索是，我用科研小助手发送的给RSI的，说是一直在队列里，但是没看到RSIbot执行
+criteria:
+  - id: AC-1
+    given: Bot 的委派在自动登记等待之前已经结束
+    when: 调度器检查当前或旧版本登记的自动等待
+    then: 同一份结果可唤醒一次，不要求接收方重新执行任务；显式要求等待下一次变化的等待仍然有效

@@ -523,7 +523,7 @@ function publishBotTaskResult(host:BotWorkHost,row:Record<string,unknown>,taskId
   const task=host.store.db.prepare('SELECT * FROM bot_work_tasks WHERE id=?').get(taskId) as Record<string,unknown>;
   const dest=openBotWorkContext(host,String(task.requester_bot),taskRow(task).principal);
   host.store.db.prepare(`INSERT INTO bot_work_messages(id,principal,sender_bot,target_bot,session_id,body,kind,idem,task_id,reply_to,wake,created_at,updated_at)
-    VALUES(?,?,?,?,?,?,'result',?,?,?,1,?,?) ON CONFLICT(principal,sender_bot,idem) DO NOTHING`).run(createId('bmsg'),String(row.principal),String(row.target_bot),String(task.requester_bot),dest.id,`Task ${task.id} ${status}: ${(failure??result).slice(0,3500)}`,`result:${task.id}:${task.attempt}`,taskId,String(row.id),nowIso(),nowIso());
+    VALUES(?,?,?,?,?,?,'result',?,?,?,0,?,?) ON CONFLICT(principal,sender_bot,idem) DO NOTHING`).run(createId('bmsg'),String(row.principal),String(row.target_bot),String(task.requester_bot),dest.id,`Task ${task.id} ${status}: ${(failure??result).slice(0,3500)}`,`result:${task.id}:${task.attempt}`,taskId,String(row.id),nowIso(),nowIso());
 }
 function persistProcessingResult(host:BotWorkHost,row:Record<string,unknown>,context:ProcessingContext,status:ProcessingStatus,result:string,failure:string|null,owner:string,fence:number):void {
   host.store.db.exec('BEGIN IMMEDIATE');
@@ -543,7 +543,7 @@ function persistProcessingResult(host:BotWorkHost,row:Record<string,unknown>,con
 }
 function completeProcessing(host:BotWorkHost,row:Record<string,unknown>,fence:number,owner:string,error?:unknown):void {
   if(!leaseValid(host.store,String(row.session_id),owner,fence))return;
-  if(botWorkRestartDefersCompletion(host.store, String(row.session_id)))return;
+  if(botWorkRestartDefersCompletion(host.store, String(row.session_id), String(row.updated_at)))return;
   const context=processingContext(host,row,error);
   if(processingAwaitsApproval(host,row,context))return;
   const result=lastAssistant(host.store,String(row.session_id),String(row.message_ref));
@@ -568,22 +568,38 @@ function pendingMessageCanRun(host:BotWorkHost,row:Record<string,unknown>):boole
   if(task.status!=='cancelled')host.store.db.prepare("UPDATE bot_work_tasks SET status='failed',failure_reason='Deadline elapsed before execution',updated_at=? WHERE id=?").run(nowIso(),String(row.task_id));
   return false;
 }
+function recordResultReceipt(host:BotWorkHost, session:SessionRecord, row:Record<string,unknown>, owner:string, fence:number):void {
+  host.store.db.prepare("UPDATE bot_work_messages SET wake=0,status='processed',message_ref=?,attempt=attempt+1,updated_at=? WHERE id=? AND status='pending'")
+    .run(String(row.message_ref),nowIso(),String(row.id));
+  releaseBotSession(host.store,session.id,owner,fence);
+}
+// Called inside the write transaction so a stale queue selection cannot append twice.
+function claimMessageForExecution(host:BotWorkHost,session:SessionRecord,row:Record<string,unknown>,owner:string):number|undefined {
+  if(!host.store.db.prepare("SELECT 1 FROM bot_work_messages WHERE id=? AND status='pending'").get(String(row.id)))return undefined;
+  const fence=claimBotSession(host.store,session.id,owner);
+  if(fence===undefined)return undefined;
+  const sender=host.store.getBot(String(row.sender_bot));
+  const fromRoom=row.source_room?` (from room ${row.source_room})`:'';
+  const written=host.store.appendMessage(session.id,'user',[{type:'text',text:`Message from ${sender?.name??row.sender_bot} / ${row.sender_bot}${fromRoom}: ${row.body}`}]);
+  row.message_ref=written.id;row.updated_at=nowIso();
+  if(row.kind==='result'){
+    recordResultReceipt(host,session,row,owner,fence);
+    return undefined;
+  }
+  return fence;
+}
 function claimPendingMessage(host:BotWorkHost,session:SessionRecord,row:Record<string,unknown>,owner:string):number|undefined {
   if(expireQueuedStatusRequest(host,String(row.id)))return undefined;
   const taskId=row.kind==='task'?String(row.task_id):undefined;
   host.store.db.exec('BEGIN IMMEDIATE');
   try {
-    const fence=claimBotSession(host.store,session.id,owner);
+    const fence=claimMessageForExecution(host,session,row,owner);
     if(fence===undefined){host.store.db.exec('COMMIT');return undefined;}
-    const sender=host.store.getBot(String(row.sender_bot));
-    const sourceRoom=typeof row.source_room==='string'&&row.source_room?row.source_room:undefined;
-    const fromRoom=sourceRoom?` (from room ${sourceRoom})`:'';
-    const written=host.store.appendMessage(session.id,'user',[{type:'text',text:`Message from ${sender?.name??row.sender_bot} / ${row.sender_bot}${fromRoom}: ${row.body}`}]);
-    row.message_ref=written.id;row.updated_at=nowIso();
+    const messageRef=String(row.message_ref);
     const prior={...(host.store.getSession(session.id)!.metadata??{})};
     delete prior.sourceRoomId;
-    host.store.updateSession(session.id,{metadata:{...prior,relayHop:Number(row.hop),relayHopMessageId:written.id,botWorkTaskId:taskId,botWorkTaskAttempt:taskId?Number((host.store.db.prepare('SELECT attempt FROM bot_work_tasks WHERE id=?').get(taskId) as {attempt:number}).attempt)+1:undefined,botDelegatedGoal:taskId?host.store.getDaemonControl(`bot.delegated-goal:${taskId}`):undefined,outcome:undefined,botWorkStartBarrier:undefined}});
-    host.store.db.prepare("UPDATE bot_work_messages SET status=?,message_ref=?,attempt=attempt+1,updated_at=? WHERE id=? AND status='pending'").run(row.wake?'processing':'processed',written.id,nowIso(),String(row.id));
+    host.store.updateSession(session.id,{metadata:{...prior,relayHop:Number(row.hop),relayHopMessageId:messageRef,botWorkTaskId:taskId,botWorkTaskAttempt:taskId?Number((host.store.db.prepare('SELECT attempt FROM bot_work_tasks WHERE id=?').get(taskId) as {attempt:number}).attempt)+1:undefined,botDelegatedGoal:taskId?host.store.getDaemonControl(`bot.delegated-goal:${taskId}`):undefined,outcome:undefined,botWorkStartBarrier:undefined}});
+    host.store.db.prepare("UPDATE bot_work_messages SET status=?,message_ref=?,attempt=attempt+1,updated_at=? WHERE id=? AND status='pending'").run(row.wake?'processing':'processed',messageRef,nowIso(),String(row.id));
     if(taskId)host.store.db.prepare("UPDATE bot_work_tasks SET status='running',attempt=attempt+1,updated_at=? WHERE id=? AND status='queued'").run(nowIso(),taskId);
     if(taskId) {
       const task=host.store.db.prepare('SELECT attempt FROM bot_work_tasks WHERE id=?').get(taskId) as {attempt:number};
@@ -716,6 +732,9 @@ export function recoverBotWork(store:SqliteStateStore):void {
   const liveJson = JSON.stringify(live);
   const inactiveSessions = 'session_id NOT IN (SELECT value FROM json_each(?))';
   const inactiveTasks = `id NOT IN (SELECT task_id FROM bot_work_messages WHERE session_id IN (SELECT value FROM json_each(?)) AND task_id IS NOT NULL)`;
+  store.db.prepare(`UPDATE bot_work_messages SET status='processed',wake=0,updated_at=?
+    WHERE kind='result' AND status='processing' AND ${inactiveSessions}
+    AND EXISTS (SELECT 1 FROM session_messages s WHERE s.session_id=bot_work_messages.session_id AND s.id=bot_work_messages.message_ref)`).run(nowIso(),liveJson);
   const interrupted=store.db.prepare(`SELECT * FROM bot_work_messages WHERE status='processing' AND session_id IN (SELECT id FROM sessions WHERE status != 'waiting_approval') AND ${inactiveSessions}`).all(liveJson) as Record<string,unknown>[];
   const plan=withholdRestartSessions(store, interrupted);
   const keptJson=JSON.stringify(plan.keptSessionIds);
@@ -748,7 +767,7 @@ export async function tickBotWork(host:BotWorkHost):Promise<void> {
  settleBotWorkRestart(host,{isBusy:id=>active(host.store).has(id)||host.isSessionRunning?.(id)===true,retireUnknown:(sessionId,rows)=>retireRestartUnknown(host.store,sessionId,rows)});
  // Approvals resume through the existing runtime; completion is observed after it ends.
  for(const row of host.store.db.prepare("SELECT * FROM bot_work_messages WHERE status='processing'").all() as Record<string,unknown>[]){
- const id=String(row.session_id);if(botWorkRestartDefersCompletion(host.store,id))continue;if(active(host.store).has(id)||host.isSessionRunning?.(id))continue;
+ const id=String(row.session_id);if(botWorkRestartDefersCompletion(host.store,id,String(row.updated_at)))continue;if(active(host.store).has(id)||host.isSessionRunning?.(id))continue;
  const session=host.store.getSession(id);if(session?.status==='running'||session?.status==='waiting_approval')continue;
  const lease=host.store.db.prepare('SELECT owner,fence FROM bot_work_leases WHERE session_id=?').get(id) as {owner:string;fence:number}|undefined;
  if(lease){if(resumeApprovedBotSession(host,id,String(row.updated_at),error=>completeProcessing(host,row,lease.fence,lease.owner,error)))continue;completeProcessing(host,row,lease.fence,lease.owner);}
