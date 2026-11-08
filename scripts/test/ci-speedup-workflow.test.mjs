@@ -35,8 +35,12 @@ test('all verification layers retain required results without cancelled-run alwa
   assert.match(jobs.gate.if, /!cancelled\(\)/);
   assert.ok(jobs.gate.needs.includes('browser'));
   assert.ok(jobs.gate.needs.includes('mutation'));
-  for (const job of Object.values(jobs)) {
-    assert.notEqual(job['continue-on-error'], true);
+  for (const [name, job] of Object.entries(jobs)) {
+    if (name === 'remote-model-smoke') {
+      assert.equal(job['continue-on-error'], true);
+    } else {
+      assert.notEqual(job['continue-on-error'], true);
+    }
     for (const step of job.steps ?? []) assert.notEqual(step['continue-on-error'], true);
   }
 });

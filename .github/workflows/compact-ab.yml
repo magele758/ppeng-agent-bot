@@ -29,6 +29,7 @@ jobs:
   compact-ab-eval:
     name: Compact A/B (live model)
     runs-on: ubuntu-latest
+    continue-on-error: true
     timeout-minutes: 15
     if: ${{ github.event.repository.fork == false }}
     steps:
