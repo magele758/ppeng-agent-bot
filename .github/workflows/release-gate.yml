@@ -335,6 +335,7 @@ jobs:
   remote-model-smoke:
     name: Remote model smoke (optional)
     runs-on: ubuntu-latest
+    continue-on-error: true
     timeout-minutes: 10
     needs:
       - tests

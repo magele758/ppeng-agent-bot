@@ -1796,6 +1796,13 @@
       ]
     },
     {
+      "id": "bot-receipt-queue",
+      "title": "历史回执不占用新委派的执行位置",
+      "tests": [
+        "packages/core/test/bot-work.test.js"
+      ]
+    },
+    {
       "id": "bot-relay-island",
       "title": "Bot 通信收起为灵动岛式胶囊",
       "tests": [
@@ -1918,6 +1925,13 @@
         "packages/core/test/bot-linked-watchers.test.js",
         "packages/core/test/bot-supervision-freshness.test.js",
         "packages/core/test/bot-supervision-runtime.test.js"
+      ]
+    },
+    {
+      "id": "bot-task-terminal-wait",
+      "title": "已结束的委派能唤醒接收回执的 Bot",
+      "tests": [
+        "packages/core/test/durable-wait-default.test.js"
       ]
     },
     {

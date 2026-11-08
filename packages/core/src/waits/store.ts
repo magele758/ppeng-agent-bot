@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import type {SqliteStateStore} from '../storage.js';
 import {botPrincipalKey,principalFromSession} from '../bots/bot-identity.js';
 import {stableJson} from '../cron/notification-decision.js';
+import {decodeStoredWait} from './terminal-condition.js';
 import {conditionMatches,validateCondition} from './conditions.js';
 import {waitSources} from './sources.js';
 import type {DurableWait,Observation,WaitOwner,WaitSpec} from './types.js';
@@ -9,7 +10,7 @@ export class DurableWaitStore {
  constructor(private store:SqliteStateStore,private clock:()=>number=Date.now){
   store.db.exec('CREATE TABLE IF NOT EXISTS agent_waits(id TEXT PRIMARY KEY,owner_key TEXT NOT NULL,status TEXT NOT NULL,payload TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_agent_wait_owner ON agent_waits(owner_key,status)');
  }
- get(id:string):DurableWait|undefined{const row=this.store.db.prepare('SELECT payload FROM agent_waits WHERE id=?').get(id);return row?JSON.parse(String(row.payload)):undefined;}
+ get(id:string):DurableWait|undefined{const row=this.store.db.prepare('SELECT payload FROM agent_waits WHERE id=?').get(id);return row?decodeStoredWait(String(row.payload)):undefined;}
  private save(wait:DurableWait):DurableWait{wait.updatedAt=this.clock();this.store.db.prepare('UPDATE agent_waits SET status=?,payload=? WHERE id=?').run(wait.status,JSON.stringify(wait),wait.id);return wait;}
  register(owner:WaitOwner,spec:WaitSpec):DurableWait {
   const adapter=waitSources(this.store).get(spec.source);if(!adapter)throw new Error('Unknown wait source');
@@ -19,7 +20,7 @@ export class DurableWaitStore {
   if(spec.maxChecks!==undefined&&(!Number.isSafeInteger(spec.maxChecks)||spec.maxChecks<1||spec.maxChecks>1000000))throw new Error('Invalid wait check budget');
   return this.store.transaction(()=>{
    const key=stableJson(owner);const old=this.store.db.prepare("SELECT payload FROM agent_waits WHERE owner_key=? AND status IN ('waiting','ready','blocked')").get(key);
-   if(old){const current=JSON.parse(String(old.payload)) as DurableWait;if(stableJson(current.spec)!==stableJson(spec))throw new Error('Execution already has a different active wait');return current;}
+   if(old){const current=decodeStoredWait(String(old.payload));if(stableJson(current.spec)!==stableJson(spec))throw new Error('Execution already has a different active wait');return current;}
    const scope=this.store.getSession(owner.scopeSessionId);if(!scope)throw new Error('Wait owner unavailable');
    const now=this.clock();const wait:DurableWait={id:`wait_${randomUUID()}`,owner,principal:botPrincipalKey(principalFromSession(this.store,scope)),spec,status:'waiting',checks:0,createdAt:now,updatedAt:now};
    const observation=this.observe(wait);if(observation.availability==='unauthorized')throw new Error(observation.reason);

@@ -3,19 +3,13 @@ import type { SessionRecord } from '../types.js';
 import type { GoalReport, GoalWait } from '../bots/goals/types.js';
 import type { RoutineRun, RoutineRunStore } from '../cron/routine-runtime.js';
 import { DurableWaitStore } from './store.js';
-import type { WaitCondition, WaitOwner, WaitSpec } from './types.js';
+import { terminalObservableCondition } from './terminal-condition.js';
+export { terminalObservableCondition };
+import type { WaitOwner, WaitSpec } from './types.js';
 
 /** Owned observables park here. Cron, sleep, and history polls are not substitutes. */
 export const DURABLE_WAIT_DEFAULT =
   'Durable wait (wait_for / waiting_condition) is the default way to suspend for an owned observable dependency (session, bot_task, routine_run, or a host-registered adapter). Register it and end the turn. Do not cron, sleep, or poll history for a dependency this execution already owns.';
-
-const TERMINAL = new Set(['completed', 'failed', 'cancelled', 'unknown', 'expired', 'rejected', 'timed_out']);
-
-export function terminalObservableCondition(source: string): WaitCondition {
-  const status: WaitCondition = { op: 'in', field: 'status', values: [...TERMINAL] };
-  if (source === 'session') return status;
-  return { op: 'all', conditions: [status, { op: 'changed', field: 'version' }] };
-}
 
 /** A dispatch/child reference the durable sources can observe. Approval holds are not this. */
 export function observableDispatchWait(wait: GoalWait | undefined): { source: string; ref: string } | undefined {

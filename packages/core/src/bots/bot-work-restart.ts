@@ -30,7 +30,7 @@ function rowsBySession(rows: Record<string, unknown>[]): Map<string, Record<stri
   return grouped;
 }
 
-function heldDurableWait(store: SqliteStateStore, metadata: Record<string, unknown> | undefined): boolean {
+function heldDurableWait(store: SqliteStateStore, metadata: Record<string, unknown> | undefined, deliveryAt: string): boolean {
   const waitId = metadata?.agentWaitId;
   if (typeof waitId !== 'string' || waitId.length === 0) return false;
   const table = store.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_waits'").get();
@@ -38,17 +38,18 @@ function heldDurableWait(store: SqliteStateStore, metadata: Record<string, unkno
   const row = store.db.prepare('SELECT payload FROM agent_waits WHERE id=?').get(waitId) as { payload?: string } | undefined;
   if (!row?.payload) return false;
   try {
-    const payload = JSON.parse(row.payload) as { status?: unknown };
+    const payload = JSON.parse(row.payload) as { status?: unknown; createdAt?: number; owner?: {kind?: string} };
+    if (payload.owner?.kind === 'goal' && typeof payload.createdAt === 'number' && payload.createdAt < Date.parse(deliveryAt)) return false;
     return typeof payload.status === 'string' && HELD_WAIT.has(payload.status);
   } catch {
     return false;
   }
 }
 
-function bootDisposition(store: SqliteStateStore, sessionId: string): BootDisposition {
+function bootDisposition(store: SqliteStateStore, sessionId: string, deliveryAt: string): BootDisposition {
   const session = store.getSession(sessionId);
   if (!session) return 'retire';
-  if (heldDurableWait(store, session.metadata)) return 'leave-for-wait';
+  if (heldDurableWait(store, session.metadata, deliveryAt)) return 'leave-for-wait';
   const decision = decideRecovery({
     checkpoint: latestCheckpoint(session.metadata),
     messages: store.foldMessages(sessionId),
@@ -73,7 +74,7 @@ export function withholdRestartSessions(store: SqliteStateStore, interrupted: Re
   const keptSessionIds: string[] = [];
   const waitSessionIds: string[] = [];
   for (const [sessionId, rows] of rowsBySession(interrupted)) {
-    const disposition = bootDisposition(store, sessionId);
+    const disposition = bootDisposition(store, sessionId, earliestUpdate(rows));
     if (disposition === 'retire') {
       retiring.push(...rows);
       continue;
@@ -89,11 +90,11 @@ export function withholdRestartSessions(store: SqliteStateStore, interrupted: Re
   return { retiring, keptSessionIds, waitSessionIds };
 }
 
-export function botWorkRestartDefersCompletion(store: SqliteStateStore, sessionId: string): boolean {
+export function botWorkRestartDefersCompletion(store: SqliteStateStore, sessionId: string, deliveryAt: string): boolean {
   const session = store.getSession(sessionId);
   if (!session) return false;
   if (session.metadata[EFFECT_FLAG] === true) return true;
-  return heldDurableWait(store, session.metadata);
+  return heldDurableWait(store, session.metadata, deliveryAt);
 }
 
 function earliestUpdate(rows: Record<string, unknown>[]): string {

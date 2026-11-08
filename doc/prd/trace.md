@@ -1587,6 +1587,12 @@ Bot 正文 API 与显式只读路由
 - `apps/daemon/test/bot-readonly-api-http.test.ts`
 - `packages/core/test/bot-readonly-api.test.js`
 
+### bot-receipt-queue
+
+历史回执不占用新委派的执行位置
+
+- `packages/core/test/bot-work.test.js`
+
 ### bot-relay-island
 
 Bot 通信收起为灵动岛式胶囊
@@ -1696,6 +1702,12 @@ Bot 监督状态新鲜度与回复关联
 - `packages/core/test/bot-linked-watchers.test.js`
 - `packages/core/test/bot-supervision-freshness.test.js`
 - `packages/core/test/bot-supervision-runtime.test.js`
+
+### bot-task-terminal-wait
+
+已结束的委派能唤醒接收回执的 Bot
+
+- `packages/core/test/durable-wait-default.test.js`
 
 ### bot-work-durable-wait
 

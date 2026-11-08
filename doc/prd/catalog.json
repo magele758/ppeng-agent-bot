@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 387,
+    "implemented": 389,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -638,6 +638,13 @@
       "file": "acceptance/bot-readonly-api.yaml"
     },
     {
+      "id": "bot-receipt-queue",
+      "title": "历史回执不占用新委派的执行位置",
+      "requirement": "这个为什么会互相阻塞？新的任务不是应该自动去执行吗？老的就算不回复，也不该卡住，就是个记录而已，为什么要卡住？哪个pr改出来的问题，先修复，再排查定位",
+      "verificationStage": "software",
+      "file": "acceptance/bot-receipt-queue.yaml"
+    },
+    {
       "id": "bot-relay-island",
       "title": "Bot 通信收起为灵动岛式胶囊",
       "requirement": "这个加个小UI，可以用个类似灵动岛的设计，对话内容不用展示，点开再展示",
@@ -902,6 +909,13 @@
       "requirement": "可以，就按这个规则改，先按项目要求写验收标准，同一个 Bot 创建的任务会话继承 auto 权限，跨 Bot 按目标 Bot 的权限，bypass 不自动继承。\nbypass也要继承",
       "verificationStage": "software",
       "file": "acceptance/bot-task-permission-inheritance.yaml"
+    },
+    {
+      "id": "bot-task-terminal-wait",
+      "title": "已结束的委派能唤醒接收回执的 Bot",
+      "requirement": "具体线索是，我用科研小助手发送的给RSI的，说是一直在队列里，但是没看到RSIbot执行",
+      "verificationStage": "software",
+      "file": "acceptance/bot-task-terminal-wait.yaml"
     },
     {
       "id": "bot-window-compact",
