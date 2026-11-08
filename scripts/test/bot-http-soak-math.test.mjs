@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {BoundedHistogram,httpSoakFixturePassed,httpSoakProtocolPassed,latencyWithinThreshold,RssWindows,queueGrowth} from '../bot-release/http-soak-stats.mjs';
 import {expectedWorkload} from '../bot-release/http-soak-schedule.mjs';
 import {isFreshCompletedOutput,pendingHumanInputs,hasControlledSoftwareResult,pendingControlledOperations} from '../bot-release/http-soak-oracle.mjs';
+test('input protocol counts worker bots because result receipts no longer schedule a reply [AC:bot-receipt-queue#AC-1]',()=>{ const workload=JSON.parse(readFileSync(new URL('../bot-release/workload.v1.json',import.meta.url),'utf8')); assert.equal(workload.dataset.activeBots,10); assert.equal(workload.dataset.activeBots-1,9); assert.equal(httpSoakFixturePassed({smoke:true,functionalPassed:true,schedulingPassed:true,inputProtocolPassed:true,approvalProtocolPassed:true,latencyHarnessPassed:false,durabilityPassed:false}),true); });
 test('24h immutable offered protocol retains hourly burst and exact 50 percent hotspot',()=>{
  const result=expectedWorkload({warmupSeconds:1800,measurementSeconds:86400,burstEverySeconds:3600,burstDurationSeconds:60});assert.equal(result.readWarmup,72000);assert.equal(result.readMeasurement,3456000);assert.equal(result.measurement,197640);assert.equal(result.burst,27600);assert.equal(result.hot,13800);assert.deepEqual(result.kinds,{human:79056,routine:39528,dispatch:39528,room:39528});
 });
