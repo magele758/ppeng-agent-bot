@@ -47,7 +47,7 @@ test('real authenticated HTTP load fixture observes fixed read/write mix and ref
   assert.ok(report.approvals.length>=2);assert.ok(report.approvals.every(item=>item.approvedAt-Date.parse(item.createdAt)>=5000&&item.waitedMs>=5000));
   assert.equal(report.latency.receive.count,10);assert.equal(report.latency.clientQueue.count,200);assert.equal(report.latency.readSocket.count,200);
   assert.equal(report.browserFirstScreen.status,'unverified');assert.match(report.releaseAcceptance,/NOT ACCEPTED/);
-  assert.deepEqual(report.daemon.errors,[]);assert.deepEqual(report.daemon.duplicateSoftwareKeys,[]);assert.ok(report.daemon.notificationRuns>0);assert.ok(report.daemon.modelTurns>0);assert.ok(report.daemon.toolCalls>0);
+  assert.deepEqual(report.daemon.errors,[]);assert.deepEqual(report.daemon.duplicateSoftwareKeys,[]);assert.equal(report.daemon.notificationRuns,0);assert.ok(report.daemon.modelTurns>0);assert.ok(report.daemon.toolCalls>0);
   for(const rows of Object.values(report.daemon.pending))assert.ok(rows.every(row=>!['queued','running','waiting_approval'].includes(row.status)),JSON.stringify(rows));
  }finally{rmSync(directory,{recursive:true,force:true});}
 });
