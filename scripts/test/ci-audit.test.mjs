@@ -93,13 +93,8 @@ test('release gate consumes every participating quality result [AC:ci-audit-p1-p
  for(const job of ['mutation','remote-model-smoke','harness','compact-ab']) assert.ok(workflow.jobs.gate.needs.includes(job),job);
  const { releaseFailures }=await import('../ci/release-results.mjs');
  const required={unit:{result:'success'},formal:{result:'success'},sdk:{result:'success'},tests:{result:'success'},crap:{result:'success'},browser:{result:'success'},acceptance:{result:'success'},mutation:{result:'success'},'secrets-gate':{result:'success'},'soak-performance':{result:'success'}};
- for(const name of ['remote-model-smoke']) {
-  assert.deepEqual(releaseFailures({...required,[name]:{result:'skipped'}}),[]);
-  assert.ok(releaseFailures({...required,[name]:{result:'failure'}}).includes(name));
-  assert.ok(releaseFailures({...required,[name]:{result:'cancelled'}}).includes(name));
- }
  for (const result of ['success','failure','cancelled','skipped']) {
-  for (const name of ['harness', 'compact-ab']) {
+  for (const name of ['harness', 'compact-ab', 'remote-model-smoke']) {
    assert.deepEqual(releaseFailures({...required,[name]:{result}}),[]);
   }
  }
@@ -171,11 +166,13 @@ test('release CLI reports non-blocking diagnostics in stdout and step summary [A
   const needs = Object.fromEntries(['tests','unit','formal','sdk','crap','browser','acceptance','mutation','secrets-gate','soak-performance'].map(name => [name,{result:'success'}]));
   needs.harness = {result:'failure'};
   needs['compact-ab'] = {result:'failure'};
+  needs['remote-model-smoke'] = {result:'failure'};
   const run = spawnSync(process.execPath, ['scripts/ci/release-results.mjs', JSON.stringify(needs)], {encoding:'utf8',env:{...sanitizeScriptEnv(),GITHUB_STEP_SUMMARY:summary}});
   assert.equal(run.status, 0, run.stdout + run.stderr);
   for (const output of [run.stdout, readFileSync(summary, 'utf8')]) {
    assert.match(output, /Harness \(non-blocking\): failure/);
    assert.match(output, /Compact A[/]B \(non-blocking\): failure/);
+   assert.match(output, /Remote model smoke \(non-blocking\): failure/);
    assert.match(output, /non-deterministic/);
   }
  } finally { rmSync(dir, {recursive:true,force:true}); }
