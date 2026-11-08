@@ -78,3 +78,5 @@ updated: 2026-11-04
 - [外部助手交接](../../EXTERNAL_AGENT_HANDOFF.md)
 - [单机收尾](../../SINGLE_HOST_COMPLETION.md)
 - [状态与维护](../../bot/10-status.md)
+
+Bot 委派在登记自动等待前就已结束时，调度器可以直接领取该结果。旧版遗留的同类等待也能恢复，显式等待下一次版本变化的条件仍按原条件执行。见 `bot-task-terminal-wait`。

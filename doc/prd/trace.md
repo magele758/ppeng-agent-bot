@@ -1697,6 +1697,12 @@ Bot 监督状态新鲜度与回复关联
 - `packages/core/test/bot-supervision-freshness.test.js`
 - `packages/core/test/bot-supervision-runtime.test.js`
 
+### bot-task-terminal-wait
+
+已结束的委派能唤醒接收回执的 Bot
+
+- `packages/core/test/durable-wait-default.test.js`
+
 ### bot-work-durable-wait
 
 Bot 任务停在持久等待上并只恢复一次

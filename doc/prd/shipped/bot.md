@@ -653,6 +653,11 @@ Bot 监督状态新鲜度与回复关联
 可以，就按这个规则改，先按项目要求写验收标准，同一个 Bot 创建的任务会话继承 auto 权限，跨 Bot 按目标 Bot 的权限，bypass 不自动继承。
 bypass也要继承
 
+## bot-task-terminal-wait
+已结束的委派能唤醒接收回执的 Bot
+
+具体线索是，我用科研小助手发送的给RSI的，说是一直在队列里，但是没看到RSIbot执行
+
 ## bot-window-compact
 规范 Bot 按真实模型窗口的一半和 85% 压缩
 

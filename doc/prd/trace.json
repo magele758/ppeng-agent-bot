@@ -1921,6 +1921,13 @@
       ]
     },
     {
+      "id": "bot-task-terminal-wait",
+      "title": "已结束的委派能唤醒接收回执的 Bot",
+      "tests": [
+        "packages/core/test/durable-wait-default.test.js"
+      ]
+    },
+    {
       "id": "bot-work-durable-wait",
       "title": "Bot 任务停在持久等待上并只恢复一次",
       "tests": [
