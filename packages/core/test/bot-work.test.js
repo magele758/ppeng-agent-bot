@@ -379,3 +379,39 @@ test('boot recovery preserves live Bot work while retiring a dead peer', async (
   assert.equal(store.getSession(deadSid).activeWriterRunId,undefined);
  } finally {other.db.close();store.db.close();}
 });
+
+test('delivered result is a record and does not run a reply [AC:bot-receipt-queue#AC-1]', async t => {
+ const {store,host,runs}=setup(); t.after(()=>store.db.close());
+ const principal=resolveBotPrincipal(store), boss=createBot(host,{name:'Boss'}), worker=createBot(host,{name:'Worker'});
+ const task=dispatchBotTask(host,{principal,requesterBotId:boss.id,targetBotId:worker.id,input:'review'});
+ await tickBotWork(host); await tickBotWork(host); await tickBotWork(host);
+ assert.deepEqual(runs,[worker.canonicalSessionId]);
+ const result=store.db.prepare("SELECT status,message_ref FROM bot_work_messages WHERE kind='result' AND task_id=?").get(task.id);
+ assert.equal(result.status,'processed');
+ assert.equal(store.listMessages(boss.canonicalSessionId).filter(m=>m.id===result.message_ref).length,1);
+});
+
+test('legacy delivered receipt and older goal wait release independent incoming work [AC:bot-receipt-queue#AC-2]', async t => {
+ const {store,host,runs}=setup(); t.after(()=>store.db.close());
+ const principal=resolveBotPrincipal(store), rsi=createBot(host,{name:'RSI'}), worker=createBot(host,{name:'Worker'});
+ const old=dispatchBotTask(host,{principal,requesterBotId:rsi.id,targetBotId:worker.id,input:'old'});
+ await tickBotWork(host); await tickBotWork(host);
+ const sid=rsi.canonicalSessionId;
+ const receipt=store.db.prepare("SELECT id,message_ref FROM bot_work_messages WHERE kind='result' AND task_id=?").get(old.id);
+ assert.ok(receipt.message_ref);
+ store.db.prepare("UPDATE bot_work_messages SET status='processing' WHERE id=?").run(receipt.id);
+ const payload={id:'old-wait',status:'waiting',createdAt:1,owner:{kind:'goal',sessionId:sid}};
+ store.db.exec('CREATE TABLE IF NOT EXISTS agent_waits(id TEXT PRIMARY KEY,owner_key TEXT,status TEXT,payload TEXT)');
+ store.db.prepare('INSERT INTO agent_waits VALUES(?,?,?,?)').run(payload.id,'old-goal','waiting',JSON.stringify(payload));
+ store.updateSession(sid,{metadata:{...store.getSession(sid).metadata,agentWaitId:payload.id}});
+ const fresh=dispatchBotTask(host,{principal,requesterBotId:worker.id,targetBotId:rsi.id,input:'new'});
+ runs.length=0;
+ recoverBotWork(store);
+ await tickBotWork(host); await tickBotWork(host);
+ assert.equal(listBotTasks(store,principal).find(task=>task.id===fresh.id).status,'completed');
+ assert.deepEqual(runs,[sid]);
+ assert.equal(store.getSession(sid).metadata.agentWaitId,payload.id);
+ const recovered=store.db.prepare('SELECT status,message_ref FROM bot_work_messages WHERE id=?').get(receipt.id);
+ assert.equal(recovered.status,'processed');
+ assert.equal(recovered.message_ref,receipt.message_ref);
+});

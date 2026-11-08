@@ -1,0 +1,15 @@
+id: bot-receipt-queue
+title: 历史回执不占用新委派的执行位置
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  这个为什么会互相阻塞？新的任务不是应该自动去执行吗？老的就算不回复，也不该卡住，就是个记录而已，为什么要卡住？哪个pr改出来的问题，先修复，再排查定位
+criteria:
+  - id: AC-1
+    given: 一项委派已返回结果
+    when: 回执写入接收方的对话
+    then: 只记录一次，不启动模型回复回执
+  - id: AC-2
+    given: 旧版本已写入回执，旧目标还在等待，新委派已入队
+    when: 调度恢复
+    then: 新委派自动执行并交付，旧等待可以继续存在，旧回执不会被重发

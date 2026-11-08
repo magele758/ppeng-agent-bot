@@ -1587,6 +1587,12 @@ Bot 正文 API 与显式只读路由
 - `apps/daemon/test/bot-readonly-api-http.test.ts`
 - `packages/core/test/bot-readonly-api.test.js`
 
+### bot-receipt-queue
+
+历史回执不占用新委派的执行位置
+
+- `packages/core/test/bot-work.test.js`
+
 ### bot-relay-island
 
 Bot 通信收起为灵动岛式胶囊

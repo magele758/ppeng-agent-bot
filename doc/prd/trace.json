@@ -1796,6 +1796,13 @@
       ]
     },
     {
+      "id": "bot-receipt-queue",
+      "title": "历史回执不占用新委派的执行位置",
+      "tests": [
+        "packages/core/test/bot-work.test.js"
+      ]
+    },
+    {
       "id": "bot-relay-island",
       "title": "Bot 通信收起为灵动岛式胶囊",
       "tests": [

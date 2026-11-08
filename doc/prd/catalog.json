@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 387,
+    "implemented": 388,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -636,6 +636,13 @@
       "requirement": "继续把 API 混入 reasoning 和只读消息误建目标这两个问题修好，补上针对性的回归测试，不扩大评估。测试和 review 通过后直接提交合并，再更新本地、构建重启 daemon，用当前 Bot 验证到通过。",
       "verificationStage": "software",
       "file": "acceptance/bot-readonly-api.yaml"
+    },
+    {
+      "id": "bot-receipt-queue",
+      "title": "历史回执不占用新委派的执行位置",
+      "requirement": "这个为什么会互相阻塞？新的任务不是应该自动去执行吗？老的就算不回复，也不该卡住，就是个记录而已，为什么要卡住？哪个pr改出来的问题，先修复，再排查定位",
+      "verificationStage": "software",
+      "file": "acceptance/bot-receipt-queue.yaml"
     },
     {
       "id": "bot-relay-island",
