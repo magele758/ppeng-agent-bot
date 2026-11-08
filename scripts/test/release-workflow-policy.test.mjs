@@ -47,14 +47,20 @@ test('release gate retains deterministic test layers and does not tolerate failu
   const doc = workflow('release-gate');
   assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'browser', 'compact-ab', 'crap', 'formal', 'harness', 'mutation', 'remote-model-smoke', 'sdk', 'secrets-gate', 'soak-performance', 'tests', 'unit']);
   assert.equal(doc.jobs.gate.if, '${{ !cancelled() }}');
-  const optionalLive = new Set(['remote-model-smoke', 'harness', 'compact-ab']);
+  // remote-model-smoke is a local job; harness/compact-ab are reusable callers
+  // (continue-on-error must live inside those reusable workflows, not on the caller).
   for (const [name, job] of Object.entries(doc.jobs)) {
-    if (optionalLive.has(name)) {
+    if (name === 'remote-model-smoke') {
       assert.equal(job['continue-on-error'], true, `${name} must continue-on-error`);
     } else {
       assert.notEqual(job['continue-on-error'], true, `${name} must remain blocking`);
     }
     for (const step of job.steps ?? []) assert.notEqual(step['continue-on-error'], true);
+  }
+  assert.equal(workflow('compact-ab').jobs['compact-ab-eval']['continue-on-error'], true);
+  for (const job of Object.values(workflow('harness-quality').jobs)) {
+    if (job.uses) continue;
+    assert.equal(job['continue-on-error'], true);
   }
   const runs = Object.values(doc.jobs).flatMap(job => job.steps ?? []).map((step) => step.run).filter(Boolean);
   for (const script of ['build', 'test:package', 'agent:eval:verify', 'test:regression', 'test:integration']) {
