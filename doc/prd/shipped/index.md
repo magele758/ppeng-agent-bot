@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 386 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 387 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -475,6 +475,12 @@
 
 - `hide-approval-continue` 聊天不展示审批自动合成的续跑用户消息
 - `hide-dev-overlays` 本地页面不展示开发浮层
+
+## history（1）
+
+需求正文见 [other](other.md)。
+
+- `history-startup-contention` 后台调度期间打开历史会话
 
 ## jev（1）
 

@@ -335,3 +335,33 @@ test('a child wake stamped with a stale execution revision does not resume the g
  assert.equal(saved.wait?.correlationId, child.id);
  assert.equal(runs.length, 0);
 });
+
+test('fresh queued goals share the initial session scan [AC:history-startup-contention#AC-2]', async t => {
+  const { host, create, store, runs } = fixture(t);
+  for (let i = 0; i < 4; i++) create({ sourceMessageId: 'original-' + i });
+  const list = store.listSessions.bind(store);
+  let scans = 0;
+  store.listSessions = () => { scans++; return list(); };
+  await tickBotGoals(host);
+  assert.deepEqual(runs, []);
+  assert.ok(scans <= 1, 'full session scans: ' + scans);
+});
+
+test('only a stopped child belonging to this goal and parent enables deferred dispatch', async t => {
+  const { host, create, store, parent, runs, running } = fixture(t);
+  const goal = create({ sourceMessageId: 'original' });
+  const child = (parentSessionId, botGoalId, botGoalScopeSessionId) => store.createSession({
+    title: 'child', mode: 'subagent', agentId: 'general', parentSessionId,
+    metadata: { botGoalId, botGoalScopeSessionId }
+  });
+  child('another-parent', goal.id, parent.id);
+  child(parent.id, goal.id, 'another-scope');
+  child(parent.id, 'another-goal', parent.id);
+  const valid = child(parent.id, goal.id, parent.id);
+  running.add(valid.id);
+  await tickBotGoals(host);
+  assert.deepEqual(runs, []);
+  running.delete(valid.id);
+  await tickBotGoals(host);
+  assert.equal(runs.length, 1);
+});

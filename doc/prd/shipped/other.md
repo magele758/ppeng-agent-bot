@@ -358,6 +358,11 @@ Fix: a GitHub webhook must not run a second routine just by changing X-Github-De
 
 我想要本地web页面不显示这个next的调试工具，还有右边的4Issue也不要展示，怎么搞
 
+## history-startup-contention
+后台调度期间打开历史会话
+
+现在我看刚才启动网页，拉取历史会话的时间还是特别长，帮我排查下原因，看看是否可以进一步提升，甚至可以加本地部署的其他中间件来提升这个性能，深度研究下，另外告诉我现在的日志记录是否完整
+
 ## jev-model-settings
 在模型设置中配置 Jev 评估
 

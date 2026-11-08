@@ -5,9 +5,15 @@ import { redactToolContent } from '../sandbox/result-redaction.js';
 import type { SessionMessage } from '../types.js';
 import type { DaydreamEvidence } from '../daydream/types.js';
 export function tryBotDaydreamPrincipal(store:SqliteStateStore,botId:string){
- const bot=store.getBot(botId);const session=bot&&store.getSession(bot.canonicalSessionId);
- if(!bot||!session)return undefined;
- return botDefinitionOwner(store,botId)??principalFromSession(store,session);
+ const bot = store.getBot(botId);
+ if (!bot) return undefined;
+ const owner = botDefinitionOwner(store, botId);
+ if (owner) {
+  const exists = store.db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(bot.canonicalSessionId);
+  return exists ? owner : undefined;
+ }
+ const session = store.getSession(bot.canonicalSessionId);
+ return session && principalFromSession(store, session);
 }
 export function botDaydreamPrincipal(store:SqliteStateStore,botId:string){
  if(!store.getBot(botId))throw Error('Bot not found');

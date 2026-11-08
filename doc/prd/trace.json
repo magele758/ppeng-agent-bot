@@ -2703,6 +2703,15 @@
       ]
     },
     {
+      "id": "history-startup-contention",
+      "title": "后台调度期间打开历史会话",
+      "tests": [
+        "e2e/history-startup.spec.ts",
+        "packages/core/test/bot-goals-scheduler.test.js",
+        "packages/core/test/daydream-tick-cost.test.js"
+      ]
+    },
+    {
       "id": "jev-model-settings",
       "title": "在模型设置中配置 Jev 评估",
       "tests": [
