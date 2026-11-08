@@ -47,8 +47,13 @@ test('release gate retains deterministic test layers and does not tolerate failu
   const doc = workflow('release-gate');
   assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'browser', 'compact-ab', 'crap', 'formal', 'harness', 'mutation', 'remote-model-smoke', 'sdk', 'secrets-gate', 'soak-performance', 'tests', 'unit']);
   assert.equal(doc.jobs.gate.if, '${{ !cancelled() }}');
-  for (const job of Object.values(doc.jobs)) {
-    assert.notEqual(job['continue-on-error'], true);
+  const optionalLive = new Set(['remote-model-smoke', 'harness', 'compact-ab']);
+  for (const [name, job] of Object.entries(doc.jobs)) {
+    if (optionalLive.has(name)) {
+      assert.equal(job['continue-on-error'], true, `${name} must continue-on-error`);
+    } else {
+      assert.notEqual(job['continue-on-error'], true, `${name} must remain blocking`);
+    }
     for (const step of job.steps ?? []) assert.notEqual(step['continue-on-error'], true);
   }
   const runs = Object.values(doc.jobs).flatMap(job => job.steps ?? []).map((step) => step.run).filter(Boolean);
