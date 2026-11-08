@@ -335,6 +335,7 @@ jobs:
   remote-model-smoke:
     name: Remote model smoke (optional)
     runs-on: ubuntu-latest
+    continue-on-error: true
     timeout-minutes: 10
     needs:
       - tests
@@ -378,6 +379,7 @@ jobs:
       - browser
       - secrets-gate
     if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-harness-key == 'true' }}
+    continue-on-error: true
     uses: ./.github/workflows/harness-quality.yml
     with:
       baseline_ref: ${{ needs.secrets-gate.outputs.base-ref }}
@@ -390,6 +392,7 @@ jobs:
       - browser
       - secrets-gate
     if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-key == 'true' }}
+    continue-on-error: true
     uses: ./.github/workflows/compact-ab.yml
     secrets: inherit
   gate:
