@@ -438,7 +438,7 @@
     "packages/agent-loop/src/session/fork-quote.test.ts": "5691846bf0b8d1c8c840996ad31cc28383cd24ece2178b4766d47c32f4e06f2e",
     "scripts/test/release-workflow-policy.test.mjs": "5733b26eaf60b838768bcca44e06b6ed872eeda1cfa3ee2f47ed4c267979d695",
     "scripts/ci/validation-artifacts.mjs": "d0da148d709c698ad29e21cf769a84b4a5def4e82e2d636e52d994185ae82b6f",
-    "scripts/test/ci-audit.test.mjs": "c355ce76ff525786fbaa2e7c520bf7b4507427b135bd5508deedd14d6e00d07f",
+    "scripts/test/ci-audit.test.mjs": "4939dff9c6b4255f5ffb4e48d539728f90ba8395550a2411c6cf76bb38c77dee",
     "scripts/ci/validation-lane.mjs": "4bd43ff55f1c6708f6acc7c135a27693d4eb2ab00c26f988de84845c6af653be",
     "scripts/ci/release-results.mjs": "6396174f7b0ad6fcdf164adb0320e32ee24767220c60133fe17ed4afe680835a",
     "scripts/ci/test-partition.mjs": "d6018aebae05ebc907ddd0de10c6905ee68e0c1ab2406057a7f09bb21b8ed28e",
