@@ -388,3 +388,43 @@ test('a new Bot message retires old review instructions only in the model view [
     assert.ok(store.foldMessages(session.id).some(m=>m.id===old.id));
   } finally { store.db.close(); }
 });
+
+test('settled goal commands expire even after the latest user message [AC:bot-goal-context-boundary#AC-2]',async()=>{
+ const {prepareMessagesForModel}=await import('../dist/turn/prepare-view.js');
+ const store=new SqliteStateStore(':memory:');
+ try {
+  const session=store.createSession({agentId:'general',mode:'chat',title:'test',
+    metadata:{canonicalBotChat:true,botId:'bot',botGoalId:'active',botGoalExecutionId:'new'}});
+  store.setDaemonControl('bot_goals:bot',{goals:[{id:'old',status:'completed'},{id:'active',revision:1,status:'running',activeExecutionId:'new'}],
+    executions:[{id:'new',goalId:'active',goalRevision:1,status:'running',sessionId:session.id,leaseUntil:Date.now()+60000}]});
+  const append=(role,text,key)=>store.appendMessage(session.id,role,[{type:'text',text}],{key});
+  append('user','Continue the assigned work');
+  const old=append('system','Run the old task','goal-execution:old');
+  const receipt=append('assistant','The old task delivered its report');
+  const active=append('system','Run the current task','goal-execution:new');
+  const host={store,emitTrace(){},turnShapeBySession:new Map(),promptBuilder:{lastCognitivePhaseBySession:new Map()}};
+  const prepare=()=>prepareMessagesForModel(host,session,store.foldMessages(session.id));
+  const view=await prepare();
+  assert.ok(!view.some(m=>m.id===old.id));
+  assert.ok(view.some(m=>m.id===active.id));
+  assert.ok(view.some(m=>m.id===receipt.id));
+  store.setDaemonControl('bot_goals:bot',{goals:[{id:'active',status:'completed'}],executions:[]});
+  assert.ok(!(await prepare()).some(m=>m.id===active.id));
+ } finally {store.db.close();}
+});
+
+test('old mixed summaries defer to saved goal status without importing unrelated tasks [AC:bot-goal-context-boundary#AC-2]',async()=>{
+ const {prepareMessagesForModel}=await import('../dist/turn/prepare-view.js');
+ const store=new SqliteStateStore(':memory:');
+ try {
+  const session=store.createSession({title:'legacy',mode:'chat',agentId:'general',metadata:{canonicalBotChat:true,botId:'bot'}});
+  store.setDaemonControl('bot_goals:bot',{goals:[{id:'goal_a',status:'completed'},{id:'goal_b',status:'paused'},{id:'goal_unrelated',status:'queued'}],executions:[]});
+  const text='Goal\nContinue goal_a and goal_b\nProgress\nPrevious check passed.';
+  const summary=store.appendMessage(session.id,'assistant',[{type:'text',text}],{key:'compact-summary'});
+  const view=await prepareMessagesForModel({store,emitTrace(){},turnShapeBySession:new Map(),promptBuilder:{lastCognitivePhaseBySession:new Map()}},session,[summary]);
+  const rendered=view[0].parts.map(p=>p.text).join('\n');
+  assert.match(rendered,/goal_a=completed/);assert.match(rendered,/goal_b=paused/);
+  assert.match(rendered,/Previous check passed/);assert.doesNotMatch(rendered,/goal_unrelated/);
+  assert.equal(store.foldMessages(session.id)[0].parts[0].text,text);
+ } finally {store.db.close();}
+});

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 405,
+    "implemented": 406,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -447,6 +447,13 @@
       "requirement": "修复目标结算与子会话身份的生命周期闭环（breakpoint-5，同一件活，一次做完）。\n1. 派出的子会话结束后，等待记录要指向这个子会话而不是父执行会话，目标能读到子会话的结果，不会被判为未授权而阻塞。\n2. 同一 Bot 同时有多件待办、其中一件已登记为目标并交给子会话时，子会话跑完后目标按实际结果结算，不再停在执行中，结果不只留在子会话里。\n3. 委托给另一个 Bot 后，原目标只依据对方这个委托任务的状态和结果继续；对方在自己会话里另开的子会话不是原目标的执行。\n4. 团队或群体扇出后，成员会话失败或群体没有任何任务时，对应计划或执行进入失败终态；父目标不会一直等待，也不会被缺失的执行误唤醒。\n5. 回合已经给出可核对的完成证据时，完成判官不可用或抛错不得把该回合收成阻塞。",
       "verificationStage": "software",
       "file": "acceptance/bot-goal-conclusion.yaml"
+    },
+    {
+      "id": "bot-goal-context-boundary",
+      "title": "聊天隐藏内部摘要，历史 Goal 仅供回顾",
+      "requirement": "如果是界面插入的不要插入。完成的只作为经验，没完成的才要作为bot的任务继续跟进啊",
+      "verificationStage": "software",
+      "file": "acceptance/bot-goal-context-boundary.yaml"
     },
     {
       "id": "bot-goal-lifecycle-boundaries",

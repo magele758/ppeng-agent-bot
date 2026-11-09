@@ -29,3 +29,10 @@ test('history pagination requires the loaded transcript owner [AC:bot-switch-liv
  assert.equal(pageEpochCurrent('b', 'b', 2, 2, 'a'), false);
  assert.equal(pageEpochCurrent('b', 'b', 2, 2, 'b'), true);
 });
+
+test('hide stored compaction from ordinary chat only [AC:bot-goal-context-boundary#AC-1]',()=>{
+ const reply={role:'assistant',parts:[{type:'text',text:'Goal'}]};
+ const summary={...reply,key:'compact-summary'};
+ assert.deepEqual(transcriptModelView(true,false,undefined,[reply,summary]),[reply]);
+ assert.deepEqual(transcriptModelView(true,true,[summary],[reply,summary]),[summary]);
+});

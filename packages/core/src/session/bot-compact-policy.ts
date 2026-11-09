@@ -93,7 +93,9 @@ export function botCompactInstruction(tier: BotCompactTier, priorSummary?: strin
       return unreachable;
     }
   }
-  const dated = `${head}\n${ABSOLUTE_DATE_SUMMARY_RULE}`;
+  const dated = [head, ABSOLUTE_DATE_SUMMARY_RULE,
+    'Completed goals are historical evidence. Keep relevant outcomes and lessons only. The goal scheduler owns pending work. Omit its task list, execution commands and historical next steps, including those in a previous summary.',
+  ].join('\n');
   if (!prior) return dated;
   return [
     dated,
@@ -117,4 +119,12 @@ export function pruneLargeToolOutputs(messages: readonly SessionMessage[]): Sess
     });
     return changed ? { ...message, parts } : message;
   });
+}
+
+export function isGoalCommand(message:SessionMessage):boolean {
+  return message.role === 'system' && message.key?.startsWith('goal-execution:') === true;
+}
+
+export function botSummaryHistory(messages:SessionMessage[],hasPrior:boolean):SessionMessage[] {
+  return messages.filter(message => !isGoalCommand(message) && !(hasPrior && message.key === 'compact-summary'));
 }
