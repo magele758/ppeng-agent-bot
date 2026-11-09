@@ -1811,6 +1811,13 @@
       ]
     },
     {
+      "id": "bot-network-motion",
+      "title": "协作网络从 Bot 特写展开",
+      "tests": [
+        "e2e/bot-network-motion.spec.ts"
+      ]
+    },
+    {
       "id": "bot-pin-sync",
       "title": "跨浏览器置顶同步",
       "tests": [

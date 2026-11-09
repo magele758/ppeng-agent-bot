@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 403,
+    "implemented": 404,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -608,6 +608,13 @@
       "requirement": "我要看的是多bot的视角。这个定时任务的太丑陋了，你参考grok-bot的设计，帮我改进一下",
       "verificationStage": "software",
       "file": "acceptance/bot-network-and-schedule-list.yaml"
+    },
+    {
+      "id": "bot-network-motion",
+      "title": "协作网络从 Bot 特写展开",
+      "requirement": "这个工作流的特效不太对，可以参考这个视频的效果",
+      "verificationStage": "software",
+      "file": "acceptance/bot-network-motion.yaml"
     },
     {
       "id": "bot-panel-reset",

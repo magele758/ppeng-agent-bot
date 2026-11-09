@@ -6,7 +6,7 @@
 .viewport {overflow:auto;max-height:66vh}
 .stage {position:relative;margin:auto}
 .node {position:absolute;transform:translate(-50%,-50%);display:grid;justify-items:center;align-content:start;background:transparent;border:0;color:#d4d9d7;cursor:pointer;width:max-content;max-width:98px;font:inherit}
-.node>span:last-child {position:absolute;top:100%;max-width:98px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px #000;background:#191b1cee;border-radius:4px;padding:0 3px}
+.caption {position:absolute;top:100%;max-width:98px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px #000;background:#191b1cee;border-radius:4px;padding:0 3px}
 .node[data-selected=true],.node:focus-visible {outline:2px solid #a5eab9;border-radius:9px;outline-offset:2px}
 .group {display:grid;place-items:center;width:27px;height:27px;background:#464255;color:#dad1fc;border-radius:8px;font-size:21px}
 .edge {cursor:pointer;color:#7c8984}.edge path {fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-dasharray:1 6}
@@ -22,3 +22,28 @@
 .legend span::before {content:'';display:inline-block;width:12px;border-top:3px dotted #7c8984;vertical-align:middle;margin-right:4px}
 .legend [data-tone=running]::before {border-color:#558bc8}.legend [data-tone=waiting]::before {border-color:#b68b41}.legend [data-tone=failed]::before {border-color:#c56f5a}
 .inspect details:not([open]) summary span {display:inline-block;max-width:90%;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.stage {overflow:clip}
+.scene {position:absolute;inset:0;transform-origin:var(--origin-x) var(--origin-y)}
+.node:has(.preview) {z-index:1}
+.preview {
+  position:absolute;bottom:calc(100% + 9px);width:max-content;max-width:clamp(100px,16vw,180px);
+  padding:5px 9px;border-radius:8px;background:#303233;color:#f3f3ee;
+  box-shadow:0 2px 10px #0004;font-size:11px;line-height:1.4;text-align:start;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+  overflow-wrap:anywhere;pointer-events:none;
+}
+.edge[data-active=true] path:first-of-type {stroke-width:2.6}
+@media (prefers-reduced-motion:no-preference) {
+  .scene[data-ready=true] {animation:pullBack 1.8s cubic-bezier(.22,.8,.24,1) both}
+  .scene[data-ready=true] .node:not([data-anchor=true]),
+  .scene[data-ready=true] > svg {animation:appear 950ms 180ms ease-out backwards}
+  .edge[data-active=true] path:first-of-type {animation:handoff 1s linear infinite}
+  .preview {animation:appear 300ms ease-out}
+}
+@keyframes pullBack {
+  from {transform:translate(calc(50% - var(--origin-x)),calc(50% - var(--origin-y))) scale(2.2)}
+  to {transform:none}
+}
+@keyframes appear {from {opacity:0} to {opacity:1}}
+@keyframes handoff {to {stroke-dashoffset:-14}}

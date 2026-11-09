@@ -1600,6 +1600,12 @@ Bot 回复标签显示 Bot 名称
 - `apps/web-console/components/routine-editor-dialog.test.ts`
 - `apps/web-console/lib/network-observations.test.ts`
 
+### bot-network-motion
+
+协作网络从 Bot 特写展开
+
+- `e2e/bot-network-motion.spec.ts`
+
 ### bot-pin-sync
 
 跨浏览器置顶同步

@@ -1,0 +1,15 @@
+id: bot-network-motion
+title: 协作网络从 Bot 特写展开
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  这个工作流的特效不太对，可以参考这个视频的效果
+criteria:
+  - id: AC-1
+    given: 所选 Bot 有协作记录
+    when: 打开工作流网络
+    then: 镜头从所选 Bot 拉开，相关点线显示传递方向；选择连线可在发起端看到最近的协作摘要
+  - id: AC-2
+    given: 系统启用了减少动态效果
+    when: 浏览同一协作关系
+    then: 静态显示网络和协作摘要，跳过镜头与传递动画
