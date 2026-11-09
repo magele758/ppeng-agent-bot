@@ -498,3 +498,14 @@ test('budget summarizes older context before discarding an unobserved tool resul
   assert.ok(tokens(actual) <= normalRequestCapTokens(1500));
   assert.equal(hasOrphan(actual.messages), false);
 });
+
+test('retain a recoverable preview of oversized current tool evidence [AC:session-review-runtime#AC-2]', async () => {
+  const original = 'FIRST '+ 'middle '.repeat(4000)+' LAST';
+  const messages = [latestUser(), ...wave('fresh',original)];
+  messages[2].seq = 3;
+  const sent = await applyNormalSessionRequestBudget(requestOf(messages), {maxContextTokens:4096});
+  assert.ok(tokens(sent) <= normalRequestCapTokens(4096));
+  assert.equal(hasOrphan(sent.messages), false);
+  assert.match(joined(sent.messages), /FIRST[\s\S]*history_read[\s\S]*LAST/);
+  assert.equal(messages[2].parts[0].content,original);
+});

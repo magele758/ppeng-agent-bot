@@ -93,12 +93,14 @@ test('a scope-refused call in an attended chat gets one approval card, runs once
   assert.match((await f.run({ command: other }, 'rej')).content, /source_scope_denied/);
 });
 
-test('routine and unattended sessions keep the immediate scope denial without a card [AC:local-source-unlock#AC-2]', async (t) => {
+test('routine and unattended sessions keep the immediate scope denial without a card [AC:local-source-unlock#AC-2] [AC:session-review-runtime#AC-5]', async (t) => {
   const f = fixture(t, { approvalWake: { kind: 'unattended', source: 'routine' } });
   new SourceLedger(f.store).record(f.session.id, { kind: 'routine', ref: 'routine:1', label: 'routine' });
   assert.equal(f.gate({ command: COUNT }, 'g1'), 'proceed');
   assert.equal(f.store.listApprovals().length, 0);
-  assert.match((await f.run({ command: COUNT }, 'r')).content, /source_scope_denied/);
+  const denial = JSON.parse((await f.run({ command: COUNT }, 'r')).content);
+  assert.equal(denial.error, 'source_scope_denied');
+  assert.match(denial.reason, /stop this operation/i);
   assert.deepEqual(f.ran, []);
 });
 

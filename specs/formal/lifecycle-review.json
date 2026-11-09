@@ -372,7 +372,7 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "a65250f150c2b94a0551d1c9103fe4b5f9da2393f08b8cb10a988a3efca4acb4",
+    "packages/core/src/runtime.ts": "d3bffd4d9965c1be308a8da4bc079bd3023cd61be3ad4640fe64b54126332878",
     "packages/core/src/runtime/session-control.ts": "8f42a13096811dd960ed726e7d9685350fa041e08c57960e9e2f57cf7c5d55b4",
     "packages/core/src/runtime/session-facade.ts": "e51309153c623da43076ff3125d9e119bb7ecc571a82e31c09b7b45bb548ecef",
     "packages/core/src/runtime/session-complete.ts": "dc1ac19365583096d95892d5f424293ab5ef2e0e3494665451a2ed951fc7f6e5",
@@ -380,7 +380,7 @@
     "packages/agent-loop/src/runtime/tool-loop.ts": "d470cacece1948389df3d04a692c5c4995a9df7b34f04f96844f62bb3646cfdc",
     "packages/agent-loop/src/session/interrupt.ts": "1842240883d68a0ca20da065c9d2ba238a24a782bca5f9148f0da51026236f96",
     "packages/agent-loop/src/session/run-outcome.ts": "7b4ec4892db8d935eb96ea940bd2dd78d8add08a7786227cc361491c8fe73053",
-    "packages/core/src/runtime/tool-loop.ts": "618cef7473056b9ae8425657560f4d0ac9e60261f734c90ac393232cb25128d8",
+    "packages/core/src/runtime/tool-loop.ts": "0f5fb82d270067c9f4c5f14308283c888f5232dcef47efaa3cde523de3c5857e",
     "packages/agent-loop/src/assembly/create-assembled-loop.ts": "acae47516f5b679639849351381b4d7a746ddcd07e1a1a2e3ddf52373b87eaf9",
     "packages/agent-loop/src/assembly/mini-host.ts": "73ec3d608685531455116e51c7d3c6bb0639989d564d3635b5a6df66f269aee6",
     "packages/agent-loop/src/assembly/normal-host.ts": "da1277222a77d1817b2c92bf926b2525d9fb54d015f28dd49f998bccd97942bb",
@@ -485,7 +485,7 @@
     "packages/core/test/bot-goals-scheduler.test.js": "e40eb10875b2ecf3e0ae565cc52f786960829a365afce9524e6cd2581cc9ab44",
     "packages/core/test/bot-goals-budget.test.js": "95f0470da406f57a94c9881c736b1705c0692695549d110d825af6166995ca7d",
     "packages/core/src/runtime/tool-assembly.ts": "8784cde87f20b3a8b607c160dfcd7af8ef955dc2809b9db6215226799fabccba",
-    "packages/core/src/turn/resolve-turn-tools.ts": "1a88f37b11c25252d94bf0f44187bf12ddb3c851d5e37fe0b510ce3cbf329f01",
+    "packages/core/src/turn/resolve-turn-tools.ts": "d388f0c6b3e885e502f763b1c579d12e1b4e1713db7a6c6dbf17a074cb9d8df7",
     "packages/core/src/tools/tool-search.ts": "9bde547cf078ba8b58b8044f6abb6e4eba238f9ef07e8f4eacc926e8b0126cb2",
     "packages/core/src/tools/deferred-disclosure.ts": "dfeaba53ab769bad9c8b6bbabfe5fb9cf8728b8dad23efef061d34e1c3b591ca",
     "packages/core/test/necessary-tool-injection.test.js": "a25570dc9cb0a0d63fb594f187a634eb0dfe234adb39c798ae11407e1c35341a",

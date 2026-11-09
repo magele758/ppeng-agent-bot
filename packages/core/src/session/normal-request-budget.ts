@@ -221,6 +221,39 @@ function prefixBeforeLatestUser(messages: readonly SessionMessage[]): {
   };
 }
 
+function excerptToBudget(original: string, source: string, target: number): string {
+  const preview = (n: number) => original.slice(0, n) + source + original.slice(-n);
+  let lo = 1, hi = Math.floor(original.length / 2);
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (estimateTokensFromText(preview(mid)) <= target) lo = mid;
+    else hi = mid - 1;
+  }
+  return preview(lo);
+}
+
+/** Keep fresh tool evidence paired and readable when the post-user tail alone exceeds the cap. */
+function fitStoredToolPreviews(input: NormalRequestMeasureInput, messages: SessionMessage[], cap: number): SessionMessage[] {
+  const kept = prefixBeforeLatestUser(messages).kept;
+  let excess = estimateNormalRequestTokens({ ...input, messages: kept }) - cap;
+  if (excess <= 0) return messages;
+  const tail = new Set(kept);
+  return messages.map(message => {
+    if (excess <= 0 || message.role !== 'tool' || !Number.isSafeInteger(message.seq) || !tail.has(message)) return message;
+    const parts = message.parts.map(part => {
+      if (excess <= 0 || part.type !== 'tool_result') return part;
+      const source = `\n[… history_read(${JSON.stringify({ session_id: message.sessionId, seq: message.seq })}) …]\n`;
+      const cost = estimateTokensFromText(part.content);
+      const target = Math.max(estimateTokensFromText(source) + 32, cost - excess - 8);
+      if (target >= cost) return part;
+      const content = excerptToBudget(part.content, source, target);
+      excess -= cost - estimateTokensFromText(content);
+      return { ...part, content };
+    });
+    return { ...message, parts };
+  });
+}
+
 export function fitNormalSessionRequest(input: NormalRequestMeasureInput): NormalRequestFit {
   const windowTokens = Math.max(1, Math.floor(input.maxContextTokens));
   const capTokens = normalRequestCapTokens(windowTokens);
@@ -251,9 +284,10 @@ export function fitNormalSessionRequest(input: NormalRequestMeasureInput): Norma
     };
   }
 
-  const trimmed = dropOlderClosedToolWaves(input.messages, (next) => {
+  const closedWavesDropped = dropOlderClosedToolWaves(input.messages, (next) => {
     return estimateNormalRequestTokens({ ...input, messages: next }) > capTokens;
   });
+  const trimmed = fitStoredToolPreviews(input, closedWavesDropped, capTokens);
   const trimmedTokens = estimateNormalRequestTokens({ ...input, messages: trimmed });
   if (trimmedTokens <= capTokens) {
     return {

@@ -235,3 +235,14 @@ test('broken sibling manifest does not load the skill unconstrained [AC:skill-ma
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('manifest constrains visible, deferred and dynamic tools [AC:session-review-runtime#AC-1]', async t => {
+  const {session} = sessionFixture(t);
+  const {resolveTurnTools,hiddenDeferredToolsForSession} = await import('../dist/turn/resolve-turn-tools.js');
+  noteActiveSkillManifest(session.id, {version:'1', allowTools:['read_file'], allowPaths:['/allowed']});
+  const tool = name => ({name, description:name, inputSchema:{type:'object'}});
+  const args = {env:{}, agent:{id:'general'}, session, sessionId:session.id, systemPromptChars:0,
+    tools:['bash','read_file','history_search'].map(tool), dynTools:[tool('forbidden_extra')]};
+  assert.deepEqual(resolveTurnTools(args).turnTools.map(t=>t.name), ['read_file']);
+  assert.deepEqual(hiddenDeferredToolsForSession(args), []);
+});

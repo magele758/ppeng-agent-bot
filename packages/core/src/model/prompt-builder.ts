@@ -920,7 +920,11 @@ export class PromptBuilder {
         return fromFs;
       })();
     }
-    const merged = await this.workspaceSkillsPromise;
+    const pending = this.workspaceSkillsPromise;
+    const merged = await pending.catch(error => {
+      if (this.workspaceSkillsPromise === pending) this.workspaceSkillsPromise = undefined;
+      throw error;
+    });
     const enabled = runtimeCapabilityCheck(this.deps.store);
     return [...builtinSkills, ...merged, ...(this.deps.extraSkills ?? [])].filter(skill => enabled('skills', skill.id));
   }

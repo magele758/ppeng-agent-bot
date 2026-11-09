@@ -41,7 +41,7 @@ import { createAppControlTools } from './app-control/tools.js';
 import { readAppControlSettings } from './app-control/settings.js';
 import { createLogger } from './logger.js';
 import { emitAdmitPhase } from './observability/admit-trace.js';
-import { logStartupPhase, setStartupPhaseEmitter, startupPhaseFromRecord } from './observability/startup-phase.js';
+import { logStartupPhase, setStartupPhaseEmitter, startupTraceDisposition, startupPhaseFromRecord } from './observability/startup-phase.js';
 import { NotFoundError, ValidationError } from './errors.js';
 import type { AgentSandbox } from './sandbox/agent-sandbox-types.js';
 import { SelfHealScheduler } from './self-heal/self-heal-scheduler.js';
@@ -2237,7 +2237,10 @@ export class RawAgentRuntime {
   private emitTrace(sessionId: string, rawEvent: Omit<TraceEvent, 'ts' | 'sessionId'>): void {
     if (rawEvent.kind === 'startup_phase' && rawEvent.payload) {
       const startup = startupPhaseFromRecord(rawEvent.payload);
-      if (startup) logStartupPhase(sessionId, startup);
+      if (startup) {
+        if (startupTraceDisposition(startup) === 'summary') return;
+        logStartupPhase(sessionId, startup);
+      }
     }
     if (rawEvent.kind === 'turn_end') {
       const session = this.store.getSession(sessionId);

@@ -79,10 +79,21 @@ export function startupPhaseFromRecord(raw: Record<string, unknown>): StartupPha
   return sanitizeStartupPhase(payload);
 }
 
+/** Both kernels include these fast slices in the ready summary. Keep slow slices for live diagnosis. */
+export function startupTraceDisposition(payload: StartupPhasePayload): 'summary' | 'detail' | 'warn' {
+  if (payload.scope !== 'kernel') return 'detail';
+  if (payload.phase === 'ready') return payload.durationMs >= 50_000 ? 'warn' : 'detail';
+  return payload.durationMs < 1000 ? 'summary' : 'detail';
+}
+
 /** Boot lines only. Per-turn phases stay in the session trace. */
 export function logStartupPhase(sessionId: string | undefined, payload: StartupPhasePayload): void {
   try {
     const clean = sanitizeStartupPhase(payload);
+    if (startupTraceDisposition(clean) === 'warn') {
+      log.warn('bot_startup_slow', { sessionId, ...clean });
+      return;
+    }
     if (clean.scope !== 'boot') return;
     log.info('bot_startup', sessionId ? { sessionId, ...clean } : clean);
   } catch {

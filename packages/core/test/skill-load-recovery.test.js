@@ -45,3 +45,23 @@ test('自建及搜索都不能绕过归属和允许名单 [AC:skill-load-recover
  disabled.store.setDaemonControl('bot_skill_selection:owner',{mode:'selected',ids:[]});
  assert.ok((await resolveSkillLoad(disabled.host,disabled.skill.id,'s')).error);
 });
+
+test('failed discovery names the search recovery step [AC:session-review-runtime#AC-4]', async () => {
+  const f=fixture();
+  for (const name of ['absent',f.shared.name]) {
+    assert.match((await resolveSkillLoad(f.host,name,'s')).error,/search_skills.*id/i);
+  }
+});
+
+test('catalog warmup shares the pending read and recovers after a failed read [AC:session-review-runtime#AC-6]', async () => {
+  let reads=0;
+  const pb=new PromptBuilder({repoRoot:'/nonexistent-skill-recovery',store:fixture().store,cloudSkillsLoader:async()=>{
+    if (++reads === 1) throw new Error('temporarily unavailable');
+    return [];
+  }});
+  const requests=await Promise.allSettled([pb.allSkills(),pb.allSkills()]);
+  assert.deepEqual(requests.map(r=>r.status),['rejected','rejected']);
+  assert.equal(reads,1);
+  assert.ok((await pb.allSkills()).length);
+  assert.equal(reads,2);
+});

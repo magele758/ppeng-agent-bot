@@ -3276,6 +3276,16 @@ Secure Form fill-from-Vault
 
 - `scripts/test/session-restart-recovery-verification.test.mjs`
 
+### session-review-runtime
+
+会话复盘中的工具选择、请求预算和启动观测
+
+- `packages/core/test/bot-startup-kernel.test.ts`
+- `packages/core/test/local-source-unlock.test.js`
+- `packages/core/test/normal-request-budget.test.js`
+- `packages/core/test/skill-load-recovery.test.js`
+- `packages/core/test/skill-manifest-gate.test.js`
+
 ### settings-categories
 
 设置页「行为 / 安全 / 工具 / 集成」分类易用化

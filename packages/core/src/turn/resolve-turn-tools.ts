@@ -1,3 +1,4 @@
+import { manifestVisibleTools } from '../skills/skill-manifest-gate.js';
 import type {SqliteStateStore} from '../storage.js';
 import { filterUserVaultTools } from '../secrets/user-vault-settings.js';
 import { runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
@@ -182,7 +183,9 @@ export function authorizeToolsForSession(input: {
   checkpoint(tools,'mode');
   const finalTools=filterWaitTools(input.session,filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore),input.settingsStore);
   checkpoint(finalTools,'policy');
-  return {allowExternalAiTools,tools:finalTools};
+  const visible = manifestVisibleTools(input.session, finalTools);
+  checkpoint(visible, 'skill_manifest');
+  return {allowExternalAiTools,tools:visible};
 }
 
 function goalEntryTools(session: SessionRecord, store?: WebSettingsReadStore): Set<string> {
@@ -292,7 +295,7 @@ export function resolveTurnTools(input: {
   const names = new Set(filtered.tools.map((t) => t.name));
   const extras: ToolContract<any>[] = [];
   const dynAllowed = applyAllowlists(
-    input.dynTools ?? [],
+    manifestVisibleTools(input.session, input.dynTools ?? []),
     allowlistsFor(currentToolPolicyAgent(input.agent, input.session, input.settingsStore), input.session)
   );
   for (const tool of dynAllowed) {

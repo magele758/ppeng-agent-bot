@@ -1,0 +1,31 @@
+id: session-review-runtime
+title: 会话复盘中的工具选择、请求预算和启动观测
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  我让Agent home自己分析了一下，你看看这些问题，是否仍然存在，如果存在就赶紧去修复一下
+criteria:
+  - id: AC-1
+    given: 已加载技能限制了可用工具
+    when: 下一轮选择或搜索工具
+    then: 清单禁止的工具不可见，路径权限仍在实际调用时检查
+  - id: AC-2
+    given: 普通会话的最新工具结果已落库且过长
+    when: 该结果导致请求超出预算
+    then: 模型获得可回读的结果节选并保留工具配对，原文仍完整
+  - id: AC-3
+    given: 正常启动的内核阶段耗时已经纳入 ready 汇总
+    when: 记录启动
+    then: 快速内核阶段通过汇总查看，慢阶段单独保留，总耗时达到五十秒有告警
+  - id: AC-4
+    given: 找不到技能或技能未入严格短名单
+    when: Bot 收到拒绝
+    then: 返回搜索后按命中 ID 加载的恢复方式
+  - id: AC-5
+    given: 无人值守任务没有执行某项操作的授权
+    when: 来源权限检查拒绝该操作
+    then: 明确告知应停止该操作，重试不会产生审批卡
+  - id: AC-6
+    given: daemon 刚开始监听且技能目录尚冷
+    when: 首次会话使用技能目录
+    then: 复用后台预热的加载，预热失败后可再次加载

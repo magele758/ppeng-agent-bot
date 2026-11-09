@@ -411,6 +411,9 @@ server.listen(port, host, () => {
   markListenReady(bootStartedAt);
   warnUnsetOauthPublicOrigin();
   if (desktopValidation) return;
+  void runtime.listSkills().catch(error => {
+    log.warn('Skill catalog warmup failed', errorMessage(error));
+  });
   void runtime.warmMcp().catch((error) => {
     log.warn('MCP HTTP warm connect failed', errorMessage(error));
   });
