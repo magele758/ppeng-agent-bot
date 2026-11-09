@@ -1393,6 +1393,12 @@ Bloub 动态头像风格
 - `e2e/bot-bloub-dynamic.spec.ts`
 - `packages/core/test/bots.test.js`
 
+### bot-browser-notices
+
+Bot 桌面通知
+
+- `e2e/bot-notices-auth.spec.ts`
+
 ### bot-child-task-chip-fill
 
 子任务芯片有底色
@@ -2549,6 +2555,12 @@ Lab 只读查看本机 Grok Bot 会话
 
 - `e2e/auth-bearer-proxy.spec.ts`
 - `scripts/test/route-access-contract.test.mjs`
+
+### lab-auth-loading-recovery
+
+网页登录检查可恢复
+
+- `e2e/bot-notices-auth.spec.ts`
 
 ### lab-library-pages
 

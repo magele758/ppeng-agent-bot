@@ -1575,6 +1575,13 @@
       ]
     },
     {
+      "id": "bot-browser-notices",
+      "title": "Bot 桌面通知",
+      "tests": [
+        "e2e/bot-notices-auth.spec.ts"
+      ]
+    },
+    {
       "id": "bot-child-task-chip-fill",
       "title": "子任务芯片有底色",
       "tests": [
@@ -2890,6 +2897,13 @@
       "tests": [
         "e2e/auth-bearer-proxy.spec.ts",
         "scripts/test/route-access-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "lab-auth-loading-recovery",
+      "title": "网页登录检查可恢复",
+      "tests": [
+        "e2e/bot-notices-auth.spec.ts"
       ]
     },
     {

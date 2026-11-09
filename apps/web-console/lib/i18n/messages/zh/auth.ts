@@ -1,4 +1,8 @@
 export const auth = {
+  connectionFailed: '无法确认登录状态。请检查连接后重试。',
+  retry: '重试',
+  reload: '重新加载页面',
+
   title: '登录 Agent Home',
   subtitle: '使用 Google 或 GitHub 账号进入，会话与记忆按账号隔离。',
   google: '使用 Google 登录',

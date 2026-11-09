@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 410 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 412 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（132）
+## bot（133）
 
 需求正文见 [bot](bot.md)。
 
@@ -88,6 +88,7 @@
 - `bot-async-summary` Bot 历史摘要后台更新
 - `bot-autonomous-execution-coverage` Bot 自动选择并完整承接原有执行能力
 - `bot-bloub-dynamic` Bloub 动态头像风格
+- `bot-browser-notices` Bot 桌面通知
 - `bot-chat-header` Bot 对话头部只显示名字、活脸和权限入口
 - `bot-chat-image-compatibility` Bot 历史图片兼容与群聊发送恢复
 - `bot-child-task-chat-entry` 普通会话列表里的 Bot 子任务入口
@@ -524,11 +525,12 @@
 
 - `knowledge-library-dirs` 本地资料目录进入知识库并可检索
 
-## lab（5）
+## lab（6）
 
 需求正文见 [lab](lab.md)。
 
 - `lab-auth-and-route-access` 控制台鉴权与接口访问隔离
+- `lab-auth-loading-recovery` 网页登录检查可恢复
 - `lab-library-pages` Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 - `lab-poll-crash-diagnostics` 轻量会话列表与客户端异常诊断
 - `lab-registered-machines` Lab Settings → Tools → Registered Machines panel

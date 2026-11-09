@@ -1,4 +1,16 @@
 export const settings = {
+  desktopNotices: {
+    "title": "Bot desktop notifications",
+    "keywords": "Chrome browser notifications alerts",
+    "description": "Keep Agent Home open in this browser to receive desktop notifications when a Bot completes work, asks a question, or needs approval.",
+    "enable": "Enable desktop notifications",
+    "disable": "Turn off desktop notifications",
+    "denied": "Allow notifications in this browser’s site settings.",
+    "unavailable": "Open Agent Home over HTTPS or localhost in a browser that supports desktop notifications.",
+    "failed": "Could not save notification preferences. Check your browser settings.",
+    "completed": "{name} completed work",
+    "interaction": "{name} needs your attention"
+},
   chatWidth: { title: 'Content width', keywords: 'chat width margins spacing', mode: 'Layout', center: 'Centered', full: 'Full width', gap: 'Extra side spacing', pixels: '{value} px' },
   debugDisplay: {
   "title": "Debug information",

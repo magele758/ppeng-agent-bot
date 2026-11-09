@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 410,
+    "implemented": 412,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -181,6 +181,13 @@
       "requirement": "另加一套 “Bloub 动态”",
       "verificationStage": "software",
       "file": "acceptance/bot-bloub-dynamic.yaml"
+    },
+    {
+      "id": "bot-browser-notices",
+      "title": "Bot 桌面通知",
+      "requirement": "加一个功能，如果在chrome里访问的Agent  home，在有bot完成任务，或者需要交互的时候，可以发一个通知",
+      "verificationStage": "software",
+      "file": "acceptance/bot-browser-notices.yaml"
     },
     {
       "id": "bot-chat-header",
@@ -1770,6 +1777,13 @@
       "requirement": "daemon 不能被绕过令牌直接访问；通过 Lab 控制台使用时浏览器不需要持有令牌。\n多用户场景下，普通成员碰不到管理员功能，也看不到别人的数据。",
       "verificationStage": "software",
       "file": "acceptance/lab-auth-and-route-access.yaml"
+    },
+    {
+      "id": "lab-auth-loading-recovery",
+      "title": "网页登录检查可恢复",
+      "requirement": "很奇怪，为什么现在在chatgpt里，网页一直加载不回来？",
+      "verificationStage": "software",
+      "file": "acceptance/lab-auth-loading-recovery.yaml"
     },
     {
       "id": "lab-library-pages",

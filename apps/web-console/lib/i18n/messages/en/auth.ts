@@ -1,4 +1,8 @@
 export const auth = {
+  connectionFailed: 'Could not check your sign-in status. Check the connection and retry.',
+  retry: 'Retry',
+  reload: 'Reload page',
+
   title: 'Sign in to Agent Home',
   subtitle: 'Use Google or GitHub. Sessions and memory stay private to your account.',
   google: 'Continue with Google',

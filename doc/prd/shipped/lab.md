@@ -6,6 +6,11 @@
 daemon 不能被绕过令牌直接访问；通过 Lab 控制台使用时浏览器不需要持有令牌。
 多用户场景下，普通成员碰不到管理员功能，也看不到别人的数据。
 
+## lab-auth-loading-recovery
+网页登录检查可恢复
+
+很奇怪，为什么现在在chatgpt里，网页一直加载不回来？
+
 ## lab-library-pages
 Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 

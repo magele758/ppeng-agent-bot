@@ -145,3 +145,7 @@
   gap: var(--ui-space-2);
   min-width: 0;
 }
+
+/* This control also works if a cached document cannot hydrate after a release. */
+[data-auth-reload] { animation: auth-reload-delay 8s step-end both; }
+@keyframes auth-reload-delay { from { visibility: hidden; } to { visibility: visible; } }

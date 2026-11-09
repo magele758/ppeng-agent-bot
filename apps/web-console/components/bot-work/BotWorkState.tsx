@@ -6,12 +6,15 @@ import { parseBotWorkStates, parseBotWorkOverview, type BotWorkStates, type BotW
 import type { LivingFaceMood } from '@/lib/bot-face';
 import { ConnectionNotice } from './ConnectionNotice';
 
+import { useDesktopNotices } from './DesktopNotices';
+
 const EMPTY: BotWorkStates = {};
 const BotWorkContext = createContext<BotWorkStates>(EMPTY);
 const BotOverviewContext = createContext<BotWorkOverview>({});
 
 /** Keep the last confirmed snapshot through outages and label it as stale. */
 export function BotWorkStateProvider({ children }: { children: ReactNode }) {
+  const notice = useDesktopNotices();
   const [states, setStates] = useState<BotWorkStates>(EMPTY);
   const [overview, setOverview] = useState<BotWorkOverview>({});
   const [disconnected, setDisconnected] = useState(false);
@@ -27,6 +30,7 @@ export function BotWorkStateProvider({ children }: { children: ReactNode }) {
         const snapshot = await api('/api/bot-work/status', {signal: controller.signal});
         const next = parseBotWorkStates(snapshot);
         if (!disposed) {
+          notice.current(snapshot);
           setStates(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
           const summary = parseBotWorkOverview(snapshot);
           setOverview(previous => JSON.stringify(previous) === JSON.stringify(summary) ? previous : summary);
