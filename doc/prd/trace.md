@@ -1518,6 +1518,14 @@ Bot 子任务会话放进详情菜单
 - `packages/core/test/bot-goals-scheduler.test.js`
 - `packages/core/test/bot-goals.test.js`
 
+### bot-goal-context-boundary
+
+聊天隐藏内部摘要，历史 Goal 仅供回顾
+
+- `apps/web-console/lib/session-panel-resource.test.ts`
+- `packages/core/test/context-stack.test.js`
+- `packages/core/test/conversation-clock-summary.test.js`
+
 ### bot-goal-lifecycle-boundaries
 
 Bot 目标跨用户与执行生命周期闭环

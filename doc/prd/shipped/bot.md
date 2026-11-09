@@ -263,6 +263,11 @@ Acceptance-first, user pre-authorized, tests first. Open a non-draft PR. Do not 
 4. 团队或群体扇出后，成员会话失败或群体没有任何任务时，对应计划或执行进入失败终态；父目标不会一直等待，也不会被缺失的执行误唤醒。
 5. 回合已经给出可核对的完成证据时，完成判官不可用或抛错不得把该回合收成阻塞。
 
+## bot-goal-context-boundary
+聊天隐藏内部摘要，历史 Goal 仅供回顾
+
+如果是界面插入的不要插入。完成的只作为经验，没完成的才要作为bot的任务继续跟进啊
+
 ## bot-goal-lifecycle-boundaries
 Bot 目标跨用户与执行生命周期闭环
 

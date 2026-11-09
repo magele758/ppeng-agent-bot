@@ -1,0 +1,19 @@
+id: bot-goal-context-boundary
+title: 聊天隐藏内部摘要，历史 Goal 仅供回顾
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  如果是界面插入的不要插入。完成的只作为经验，没完成的才要作为bot的任务继续跟进啊
+criteria:
+  - id: AC-1
+    given: 会话同时有正常答复和后台压缩摘要
+    when: 用户打开普通聊天或模型视图
+    then: 普通聊天仅显示正常答复，模型视图可检查内部摘要
+  - id: AC-2
+    given: 同一 Bot 有已完成任务及正在执行的任务
+    when: 组装本轮模型输入
+    then: 只传当前有效执行的任务指令，已完成任务的历史结果可回顾
+  - id: AC-3
+    given: 历史中同时存在不同任务的执行指令与结果
+    when: 后台压缩历史
+    then: 历史执行命令不作为待办传入摘要器，事实和结果可保留作经验

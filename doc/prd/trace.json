@@ -1718,6 +1718,15 @@
       ]
     },
     {
+      "id": "bot-goal-context-boundary",
+      "title": "聊天隐藏内部摘要，历史 Goal 仅供回顾",
+      "tests": [
+        "apps/web-console/lib/session-panel-resource.test.ts",
+        "packages/core/test/context-stack.test.js",
+        "packages/core/test/conversation-clock-summary.test.js"
+      ]
+    },
+    {
       "id": "bot-goal-lifecycle-boundaries",
       "title": "Bot 目标跨用户与执行生命周期闭环",
       "tests": [
