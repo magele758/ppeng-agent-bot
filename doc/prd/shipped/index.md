@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（127）
+## bot（128）
 
 需求正文见 [bot](bot.md)。
 
@@ -149,6 +149,7 @@
 - `bot-mock-interview` 内置模拟面试官按指定信息出题、评分并给改进建议
 - `bot-multi-goal-coordination` Bot 多目标持续执行与自动选择执行方式
 - `bot-network-and-schedule-list` 多 Bot 协作关系图与紧凑的定时列表
+- `bot-network-motion` 协作网络从 Bot 特写展开
 - `bot-panel-reset` 切换 Bot 时重置记忆、暂停开关和软件连接
 - `bot-pin-area` Bot 列表置顶区
 - `bot-pin-sync` 跨浏览器置顶同步

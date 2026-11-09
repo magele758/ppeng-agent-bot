@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useState,type CSSProperties} from 'react';
 import {useI18n} from '@/lib/i18n';
 import {loadBotNetwork} from '@/lib/load-bot-network';
 import {networkEdges,type Observation} from '@/lib/network-observations';
@@ -53,6 +53,20 @@ function graphData(records:Observation[],botIds:string[],roomIds:string[],days:n
   return {edges,...networkLayout(ids,edges)};
 }
 
+function cameraOrigin(graph:ReturnType<typeof networkLayout>,focus:string):CSSProperties {
+  const anchor=graph.byId.get(focus) ?? graph.points[0];
+  if(!anchor)return {};
+  return {
+    '--origin-x': (100*anchor.x/graph.width)+'%',
+    '--origin-y': (100*anchor.y/graph.height)+'%',
+  } as CSSProperties;
+}
+
+function HandoffPreview({row,node}:{row:Observation|undefined;node:string}){
+  if(!row?.title || row.from!==node)return null;
+  return <span className={styles.preview} data-testid="handoff-preview" aria-hidden="true">{row.title}</span>;
+}
+
 export function BotNetworkView({focus,onInspect}:{focus:string;onInspect:(id:string)=>void}){
   const {t}=useI18n();
   const {bots,openSession}=useLab();
@@ -74,6 +88,7 @@ export function BotNetworkView({focus,onInspect}:{focus:string;onInspect:(id:str
     <div className={styles.filters}><label><input type="checkbox" checked={showIdle} onChange={e=>setShowIdle(e.target.checked)}/>{t('tasks.flow.idle')}</label><select aria-label={t('tasks.flow.period')} value={days} onChange={e=>setDays(Number(e.target.value))}>{[1,7,0].map(n=><option key={n} value={n}>{n?t('tasks.flow.days',{n}):t('tasks.flow.all')}</option>)}</select></div></header>
     <div className={styles.board}><div className={styles.tools}><button aria-label={t('tasks.flow.smaller')} disabled={zoom<=.6} onClick={()=>setZoom(v=>v-.2)}>−</button><button aria-label={t('tasks.flow.larger')} disabled={zoom>=1.8} onClick={()=>setZoom(v=>v+.2)}>+</button></div>
     <div className={styles.viewport}><div className={styles.stage} style={{width:graph.width*zoom,height:graph.height*zoom}}>
+      <div className={styles.scene} data-testid="network-scene" data-ready={Boolean(data)} style={cameraOrigin(graph,focus)}>
       <svg viewBox={`0 0 ${graph.width} ${graph.height}`} width="100%" height="100%">
         {graph.edges.map(edge=>{
           const a=graph.byId.get(edge.from)!,b=graph.byId.get(edge.to)!;
@@ -83,10 +98,11 @@ export function BotNetworkView({focus,onInspect}:{focus:string;onInspect:(id:str
           </g>;
         })}
       </svg>
-      {graph.points.map(p=><button key={p.id} className={styles.node} data-selected={p.id===selection.from} title={label(p.id)} onClick={()=>select({from:p.id})} style={{left:p.x*zoom,top:p.y*zoom}}>
-        {roomIds.has(p.id)?<span className={styles.group}>◎</span>:<BotFace name={label(p.id)} botId={p.id} size="sm"/>}<span>{label(p.id)}</span>
+      {graph.points.map(p=><button key={p.id} className={styles.node} data-anchor={p.id===focus} data-selected={p.id===selection.from} aria-label={label(p.id)} title={label(p.id)} onClick={()=>select({from:p.id})} style={{left:p.x*zoom,top:p.y*zoom}}>
+        {roomIds.has(p.id)?<span className={styles.group}>◎</span>:<BotFace name={label(p.id)} botId={p.id} size="sm"/>}<span className={styles.caption}>{label(p.id)}</span>
+        <HandoffPreview row={rows[0]} node={p.id}/>
       </button>)}
-    </div></div></div>
+    </div></div></div></div>
     <div className={styles.legend}>{(['running','waiting','failed','done'] as const).map(status=><span key={status} data-tone={status}>{t(`tasks.flow.${status}`)}</span>)}</div>
     <section className={styles.inspect} aria-live="polite">
       {data?.partial && <p>{t('tasks.flow.partial')}</p>}
