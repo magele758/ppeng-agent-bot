@@ -361,3 +361,30 @@ test('native media previews show asset references and budget without binary payl
   assert.equal(payload.blocks.find(b => b.text === '[video clip]').tokens, 10000);
   assert.ok(!JSON.stringify(payload).includes('AQIDBA=='));
 });
+
+test('current instruction follows an explicit end of recalled context [AC:bot-turn-ownership#AC-1]', async () => {
+  const {applyMemoryAppendixToMessages} = await import('../dist/turn/prepare-turn-input.js');
+  const source = msg('new', 'user', [{type:'text',text:'切换到任务 Birch'}]);
+  const [packed] = applyMemoryAppendixToMessages([source], 'Task Atlas');
+  assert.match(packed.parts.map(p=>p.text).join('\n'), /Task Atlas[\s\S]*end of reference context[\s\S]*切换到任务 Birch/i);
+  assert.deepEqual(source.parts,[{type:'text',text:'切换到任务 Birch'}]);
+});
+
+test('a new Bot message retires old review instructions only in the model view [AC:bot-turn-ownership#AC-1]', async () => {
+  const {prepareMessagesForModel} = await import('../dist/turn/prepare-view.js');
+  const store = new SqliteStateStore(':memory:');
+  try {
+    const session = store.createSession({title:'handoff',agentId:'general',mode:'chat',metadata:{canonicalBotChat:true}});
+    const append = (role,text,key) => store.appendMessage(session.id,role,[{type:'text',text}],{key});
+    append('user','Atlas');
+    const old = append('system','Atlas goal','goal-execution:old');
+    append('system','[completion review] Finish Atlas');
+    append('user','Birch');
+    const current = append('system','Birch goal','goal-execution:new');
+    const feedback = append('system','[completion review] Finish Birch');
+    const host = {store,emitTrace(){}, turnShapeBySession:new Map(),promptBuilder:{lastCognitivePhaseBySession:new Map()}};
+    const view = await prepareMessagesForModel(host,session,store.foldMessages(session.id));
+    assert.deepEqual(view.filter(m=>m.role==='system').map(m=>m.id),[current.id,feedback.id]);
+    assert.ok(store.foldMessages(session.id).some(m=>m.id===old.id));
+  } finally { store.db.close(); }
+});

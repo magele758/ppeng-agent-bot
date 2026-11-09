@@ -295,3 +295,5 @@ await loop.run(session.id, { onModelStreamChunk: chunk => console.log(chunk) });
 - `ModelTurnRequest.cacheStablePrefix` 可标记稳定 system 前缀；Anthropic 只在该块设置缓存断点，动态上下文留在其后。宿主可提供 `buildSystemPromptParts`，无分块实现时继续使用原有完整提示。
 - 工具 `access` 声明 read/edit/bash/network/delegate/other 类别；未知外部工具的 other 类别在非 bypass 模式需要审批。`hookRewrote` 在执行日志标记 pre_tool_use 改写参数。
 - 自动压缩返回的归档路径用于后续检索，子任务上下文保持来源标记；mini 的无 Node 静态依赖约束不变。
+
+打包当前用户消息时，`applyMemoryAppendixToMessages` 在参考记忆末尾标明边界，随后保留用户原始 parts。该标记只进入模型视图。

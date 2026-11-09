@@ -1799,7 +1799,8 @@
       "id": "bot-receipt-queue",
       "title": "历史回执不占用新委派的执行位置",
       "tests": [
-        "packages/core/test/bot-work.test.js"
+        "packages/core/test/bot-work.test.js",
+        "scripts/test/bot-http-soak-math.test.mjs"
       ]
     },
     {
@@ -1932,6 +1933,15 @@
       "title": "已结束的委派能唤醒接收回执的 Bot",
       "tests": [
         "packages/core/test/durable-wait-default.test.js"
+      ]
+    },
+    {
+      "id": "bot-turn-ownership",
+      "title": "Bot 当轮任务和目标审查归属",
+      "tests": [
+        "packages/core/test/bot-goal-only-when-needed.test.js",
+        "packages/core/test/context-stack.test.js",
+        "scripts/test/bot-turn-ownership.test.mjs"
       ]
     },
     {

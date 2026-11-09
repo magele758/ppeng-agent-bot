@@ -16,6 +16,26 @@ export function buildContextSuite() {
   })));
 }
 
+/** Replay both observed task switches on a newly created Bot's canonical session. */
+export function buildBotTurnOwnershipSuite() {
+  const switchCase = buildContextSuite().find(task => task.id === 'task-switch-bot');
+  const contextSeed = { ...switchCase.contextSeed, summaryTimeoutMs: 60_000 };
+  const rounds = ['收到','收到','周宁，73万元','许宁，19万元','周宁，73万元','周宁，73万元'];
+  return [
+    { ...switchCase, bot:true, contextSeed,
+      expected:{...switchCase.expected,rounds:['收到','收到','收到','73'],currentGoalOnly:true} },
+    { id:'handoff-bot', category:'correction-switch', critical:true, bot:true, contextSeed,
+      turns:[
+        '海棠项目立项。负责人为林岚，预算为73万元。仅回复收到。',
+        '更正海棠项目：负责人改为周宁，预算保持不变。仅回复收到。',
+        '给出海棠目前的交接信息，只按“负责人，预算”回答（带单位）。',
+        '切换到白桦项目。负责人为许宁，预算为19万元。给出白桦的交接信息，只按“负责人，预算”回答（带单位）。',
+        '切回海棠。给出当前项目的交接信息，只按“负责人，预算”回答（带单位）。',
+        '继续刚才切回的项目。现在交给谁，预算多少？只按“负责人，预算”回答（带单位）。'
+      ],expected:{exact:rounds.at(-1),rounds,currentGoalOnly:true},script:rounds.map(text=>({text})) }
+  ];
+}
+
 export function summarizeContextEvidence(suite, records, { trials = 1, simulation = false, invalidReasons = [] } = {}) {
   if (!Number.isInteger(trials) || trials < 1) throw new Error('trials must be positive');
   const rows = records.filter(r => r.variant === 'candidate');

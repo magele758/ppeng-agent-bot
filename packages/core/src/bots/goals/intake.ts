@@ -258,6 +258,17 @@ function isHistoricalResultQuery(text: string): boolean {
     && !/保存|写入|删除|更新|升级|执行|运行|重启|发起|启动|创建|触发|回滚|安装|发送|重试|\b(?:publish|upgrade|update|save|write|delete|remove|run|execute|restart|start|create|trigger|rollback|roll back|install|send|retry|change)\b/i.test(request);
 }
 
+/** Acknowledging a list of project facts has no separate external deliverable. */
+function isFactAcknowledgment(text: string): boolean {
+  if (deliveryWork.test(text) || /保存|写入|删除|发送|执行|创建|登记/.test(text)) return false;
+  const clauses = text.split(/[。；;，,：:\n]/u).map(part => part.trim()).filter(Boolean);
+  if (!/^(?:只|仅)(?:需)?回复[“「"]?收到[”」"]?[！!]?$/u.test(clauses.pop() ?? '')) return false;
+  // Every clause must be declarative. Preserve action requests even when the reply is constrained.
+  return clauses.length > 0 && clauses.every(clause =>
+    /^(?:更正|修正)?[\p{L}\d_-]{1,32}项目(?:立项)?$/u.test(clause)
+    || /^(?:负责人|预算|期限|地点|代号|名称)(?:(?:为|是|改为|更正为)[\p{L}\d. _-]{1,40}|保持不变)$/u.test(clause));
+}
+
 /** Analysis, explanation, or inspection the current Bot can finish in this chat. A stated delivery still stays a goal. */
 export function isSelfContainedBotWork(text: string): boolean {
   if (hasStatedOutcome(text) || isolatedHandoff.test(text)) return false;
@@ -278,7 +289,7 @@ export function releaseOpenInquiry(intent: GoalIntentProposal): GoalIntentPropos
 /** Bot chat only. A new goal the current Bot can finish itself stays a chat turn. Room intake does not use this. */
 export function releaseSelfContainedBotWork(intent: GoalIntentProposal): GoalIntentProposal {
   if (intent.kind !== 'new_goal') return intent;
-  return isSelfContainedBotWork(intent.text) ? { kind: 'chat', text: intent.text } : intent;
+  return (isFactAcknowledgment(intent.text) || isSelfContainedBotWork(intent.text)) ? { kind: 'chat', text: intent.text } : intent;
 }
 
 /** Judge proposals are untrusted. Callers still validate scoped target ownership and goal revision. */

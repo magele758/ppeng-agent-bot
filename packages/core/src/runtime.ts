@@ -1294,7 +1294,8 @@ export class RawAgentRuntime {
   }
 
   private async compactCanonicalSession(
-    sessionId: string
+    sessionId: string,
+    summaryTimeoutMs?: number
   ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
     const session = this.store.getSession(sessionId);
     if (!session) throw new NotFoundError('Session', sessionId);
@@ -1303,7 +1304,7 @@ export class RawAgentRuntime {
     return autoCompactSession(
       compactFrom(this.l5()),
       { repoRoot: this.repoRoot, stateDir: this.stateDir, session, agent },
-      { force: true }
+      { force: true, summaryTimeoutMs }
     );
   }
 

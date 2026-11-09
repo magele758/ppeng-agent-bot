@@ -1,0 +1,40 @@
+{
+  "suite": "builtin:bot-turn-ownership",
+  "trials": 1,
+  "baseline": {
+    "repoRoot": ".",
+    "systemAppendix": "",
+    "daemonControl": {}
+  },
+  "candidate": {
+    "repoRoot": ".",
+    "systemAppendix": "",
+    "daemonControl": {}
+  },
+  "model": {
+    "provider": "openai-compatible",
+    "apiKeyEnv": "RAW_AGENT_API_KEY",
+    "baseUrlEnv": "RAW_AGENT_BASE_URL",
+    "nameEnv": "RAW_AGENT_MODEL_NAME",
+    "httpKind": "chat",
+    "temperature": 0
+  },
+  "limits": {
+    "timeoutMs": 600000,
+    "maxModelCalls": 40,
+    "maxOutputTokens": 2048,
+    "maxInputChars": 900000,
+    "maxTotalCalls": 160
+  },
+  "policy": {
+    "minCases": 30,
+    "minTrials": 3,
+    "minBaselinePassRate": 0.8,
+    "nonInferiorityMargin": 0.05,
+    "maxCategoryDrop": 0.05,
+    "maxTokenRatio": 1.2,
+    "maxLatencyRatio": 1.5,
+    "requireUsage": true
+  },
+  "concurrency": 2
+}

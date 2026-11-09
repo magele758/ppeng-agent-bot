@@ -53,6 +53,19 @@ export interface PrepareViewHost {
   };
 }
 
+/** Chat adapters hoist system messages, so old execution instructions must expire in the send view. */
+function foregroundNotices(session: SessionRecord, messages: SessionMessage[]): SessionMessage[] {
+  if (session.metadata.canonicalBotChat !== true) return messages;
+  const request = messages.findLastIndex(message => message.role === 'user' && !message.key?.startsWith('human-steer:'));
+  return messages.filter((message, index) => index >= request || !isTurnNotice(message));
+}
+
+function isTurnNotice(message: SessionMessage): boolean {
+  if (message.role !== 'system') return false;
+  if (message.key?.startsWith('goal-execution:')) return true;
+  return message.parts.some(part => part.type === 'text' && /^\[(?:output format|completion review)\]/.test(part.text));
+}
+
 export async function prepareMessagesForModel(
   host: PrepareViewHost,
   session: SessionRecord,
@@ -63,7 +76,7 @@ export async function prepareMessagesForModel(
     dynSettings.enabled || messagesMayNeedRetiredAnnotation(messages, session);
   sealSharedExposure(host.store,session.id,messages);
   const scoped=messages.filter(message=>sharedMessageVisible(host.store,session.id,message));
-  return prepareRichView(session, coordinatorViewOf(session, embedReplyQuotes(scoped, id => {
+  return prepareRichView(session, coordinatorViewOf(session, embedReplyQuotes(foregroundNotices(session, scoped), id => {
     const original = host.store.readHistoryById?.(session.id, id);
     return original && sharedMessageVisible(host.store, session.id, original) ? original : undefined;
   })), {

@@ -8,7 +8,8 @@
  * ModelAdapter.runTurn must only receive `messages` from this function.
  */
 
-import { createId } from '../id.js';
+import { applyMemoryAppendixToMessages } from '@ppeng/agent-loop';
+export { applyMemoryAppendixToMessages };
 import type { MessageReplyTo, SessionMessage, SessionRecord } from '../types.js';
 import type { InboxItem } from '../session/step-inbox.js';
 import { lastUserQueryFromMessages } from '../session/context-compiler.js';
@@ -53,39 +54,6 @@ export interface PreparedTurnInput {
   viewMessages: SessionMessage[];
   foldSeqs: number[];
   claimedInbox: InboxItem[];
-}
-
-export function applyMemoryAppendixToMessages(
-  messages: SessionMessage[],
-  appendix: string
-): SessionMessage[] {
-  if (!appendix.trim()) return messages;
-  const out = messages.map((m) => ({ ...m, parts: [...m.parts] }));
-  let idx = -1;
-  for (let i = out.length - 1; i >= 0; i--) {
-    if (out[i]!.role === 'user') {
-      idx = i;
-      break;
-    }
-  }
-  if (idx < 0) {
-    return [
-      {
-        id: createId('msg'),
-        sessionId: messages[0]?.sessionId ?? '',
-        role: 'user',
-        parts: [{ type: 'text', text: appendix }],
-        createdAt: new Date().toISOString()
-      },
-      ...out
-    ];
-  }
-  const msg = out[idx]!;
-  out[idx] = {
-    ...msg,
-    parts: [{ type: 'text', text: `${appendix}\n\n` }, ...msg.parts]
-  };
-  return out;
 }
 
 function textPart(text: string): SessionMessage['parts'][number] {

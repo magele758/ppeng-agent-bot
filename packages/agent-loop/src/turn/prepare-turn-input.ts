@@ -117,7 +117,7 @@ export function applyMemoryAppendixToMessages(
   const msg = out[idx]!;
   out[idx] = {
     ...msg,
-    parts: [{ type: 'text', text: `${appendix}\n\n` }, ...msg.parts]
+    parts: [{ type: 'text', text: `${appendix}\n\n[End of reference context. The current user message follows.]\n` }, ...msg.parts]
   };
   return out;
 }

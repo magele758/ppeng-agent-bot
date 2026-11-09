@@ -1592,6 +1592,7 @@ Bot 正文 API 与显式只读路由
 历史回执不占用新委派的执行位置
 
 - `packages/core/test/bot-work.test.js`
+- `scripts/test/bot-http-soak-math.test.mjs`
 
 ### bot-relay-island
 
@@ -1708,6 +1709,14 @@ Bot 监督状态新鲜度与回复关联
 已结束的委派能唤醒接收回执的 Bot
 
 - `packages/core/test/durable-wait-default.test.js`
+
+### bot-turn-ownership
+
+Bot 当轮任务和目标审查归属
+
+- `packages/core/test/bot-goal-only-when-needed.test.js`
+- `packages/core/test/context-stack.test.js`
+- `scripts/test/bot-turn-ownership.test.mjs`
 
 ### bot-work-durable-wait
 

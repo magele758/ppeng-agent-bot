@@ -1,0 +1,20 @@
+id: bot-turn-ownership
+title: Bot 当轮任务和目标审查归属
+status: implemented
+requirement: |
+  直接把这两个问题修掉：切到新任务时要以用户当轮指令为准，后台也别再拿旧目标审查新任务。把纠正、切换、切回和压缩后的回答都加上逐轮断言，再用当前真实模型跑一遍，看还有哪一轮会串线。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: Bot 对话带有较早任务的记忆
+    when: 用户给出新的任务指令
+    then: 模型能够区分当前指令和历史参考并遵循本轮任务
+  - id: AC-2
+    given: 上一目标尚未完成且可由后台继续
+    when: 用户在 Bot 主对话讨论另一任务
+    then: 新回答不会用于审查上一目标，上一目标仍可单独继续
+  - id: AC-3
+    given: 在同一 Bot 对话更正事实、切换任务、切回并压缩
+    when: 逐轮验证回答
+    then: 任一轮返回旧值或串用其他任务数据均单独报告为失败

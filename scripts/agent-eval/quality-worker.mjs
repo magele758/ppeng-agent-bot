@@ -191,15 +191,24 @@ try {
         }
         if (task.contextSeed.compact) {
           // Product's existing forced-compaction entry, not a synthetic summary replacement.
-          const compact = await runtime.compactCanonicalSession(session.id);
+          const compact = await runtime.compactCanonicalSession(session.id, task.contextSeed.summaryTimeoutMs);
           outcome.contextEvidence.compactRounds.push(compact);
           if (!compact.replaced) throw new Error('context fixture did not compact; semantic evaluation invalid');
         }
       }
     }
     if (i) runtime.sendUserMessage(session.id, task.turns[i]);
+    const sourceSeq = task.expected.rounds ? runtime.store.listSurfaceNodes(session.id).at(-1)?.seq : undefined;
+    const auxiliaryStart = outcome.auxiliaryRequests.length;
     if(task.bot)await runtime.runHumanSession(session.id);
     else await runtime.runSession(session.id, { onModelStreamChunk: () => {} });
+    if (sourceSeq !== undefined) {
+      const response = runtime.store.foldMessages(session.id).filter(message => message.seq > sourceSeq);
+      (outcome.rounds ??= []).push(finalAssistantOutput(response));
+      const reviews = outcome.auxiliaryRequests.slice(auxiliaryStart).filter(request => request.input.system.startsWith('Evaluate the goal'));
+      (outcome.reviewGoals ??= []).push(reviews.map(request => JSON.parse(request.input.user).goal));
+      checkpoint();
+    }
   }
   outcome.status = runtime.getSession(session.id).status;
   // The general-purpose summary getter also includes reasoning. Preserve the
