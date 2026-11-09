@@ -1,0 +1,15 @@
+id: reply-hover-ended-at
+title: 悬停 Bot 回复时显示结束时间
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  这里hover的时候，不仅显示引用，再补一个会话的时间，用yyyy-mm-dd  hh:mm:ss 格式，展示这个会话结束的时间就可以
+criteria:
+  - id: AC-1
+    given: Bot 回复已完成并保存时间
+    when: 查看该回复的悬停操作
+    then: 保留引用并显示本地年月日和时分秒，缺少可用时间时仍可引用
+  - id: AC-2
+    given: 回复操作曾被点击或聚焦
+    when: 鼠标移开回复
+    then: 时间与引用按钮一起隐藏

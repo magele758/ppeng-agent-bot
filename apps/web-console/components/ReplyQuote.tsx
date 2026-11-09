@@ -2,31 +2,37 @@
 
 import { WorkspaceIcon } from './WorkspaceIcon';
 import { useI18n } from '@/lib/i18n';
-import { quoteFromReply, type QuoteableReply, type ReplyQuote, type ReplyTo } from '@/lib/reply-quote';
+import { formatReplyEnd, quoteFromReply, type QuoteableReply, type ReplyQuote, type ReplyTo } from '@/lib/reply-quote';
 
 export function ReplyQuoteButton({
   messageId,
   label,
   ariaLabel,
+  endedAt,
   onQuote
 }: {
   messageId: string;
   label: string;
   ariaLabel: string;
+  endedAt?: string;
   onQuote: () => void;
 }) {
+  const stamp = formatReplyEnd(endedAt);
   return (
+    <>
+    {stamp && <time className="chat-reply-ended-at" dateTime={endedAt}>{stamp}</time>}
     <button
       type="button"
       className="btn btn-ghost btn-sm chat-reply-quote__start"
       data-testid="reply-quote-start"
       data-message-id={messageId}
       aria-label={ariaLabel}
-      title={ariaLabel}
+      title={stamp ? ariaLabel + ' · ' + stamp : ariaLabel}
       onClick={onQuote}
     >
       <WorkspaceIcon kind="quote" /><span className="sr-only">{label}</span>
     </button>
+    </>
   );
 }
 
@@ -42,6 +48,7 @@ export function BotReplyQuoteAction({
   if (!quote) return null;
   return (
     <ReplyQuoteButton
+      endedAt={reply.endedAt}
       messageId={quote.messageId}
       label={t('play.replyQuote.action')}
       ariaLabel={t('play.replyQuote.actionAria', { name: quote.botName })}

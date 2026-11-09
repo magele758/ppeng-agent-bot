@@ -784,6 +784,11 @@ Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk 
 
 会话或 Bot 行上的移除按钮第一次点击不删除，变成确认，再点一次才删除
 
+## reply-hover-ended-at
+悬停 Bot 回复时显示结束时间
+
+这里hover的时候，不仅显示引用，再补一个会话的时间，用yyyy-mm-dd  hh:mm:ss 格式，展示这个会话结束的时间就可以
+
 ## request-metric-follows-turn
 已发送请求指标随所选轮变化
 

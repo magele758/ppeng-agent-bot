@@ -62,6 +62,7 @@ type Room = {
 };
 
 type RoomMessage = {
+  createdAt?: string;
   workReceipt?: RoomWorkReceiptData;
   id: string;
   seq: number;
@@ -163,6 +164,7 @@ function GroupTurn({
           <BotReplyQuoteAction
             reply={{
               messageId: message.id,
+              endedAt: message.createdAt,
               botId: message.sender.id,
               botName: name,
               text: stripVisibleClockMarks(message.text),

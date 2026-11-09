@@ -12,6 +12,7 @@ export type ApiMessagePart = MessagePart;
 
 /** Subset of SessionMessage for chat rendering. */
 export type ApiChatMessage = {
+  createdAt?: string;
   role: MessageRole;
   parts: MessagePart[];
 };

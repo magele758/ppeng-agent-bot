@@ -3048,6 +3048,12 @@ microVM 命令不会悄悄改在宿主机上跑
 
 - `apps/web-console/lib/armed-delete.test.ts`
 
+### reply-hover-ended-at
+
+悬停 Bot 回复时显示结束时间
+
+- `apps/web-console/components/ReplyQuote.test.ts`
+
 ### request-metric-follows-turn
 
 已发送请求指标随所选轮变化
