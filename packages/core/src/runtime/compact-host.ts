@@ -29,6 +29,7 @@ import {
 import {
   BOT_HYGIENE_KEEP_RECENT,
   botCompactInstruction,
+  botSummaryHistory,
   botCompactTokenThresholds,
   isCanonicalBotChat,
   pruneLargeToolOutputs,
@@ -366,7 +367,7 @@ async function compactCanonicalBot(
   const sourceSnapshot = JSON.stringify(range.older.map(m => [m.id, m.parts]));
   const prior = session.summary?.trim() ?? '';
   const instruction = botCompactInstruction(tier, prior);
-  const pruned = pruneLargeToolOutputs(prior ? range.older.filter(message => message.key !== 'compact-summary') : range.older);
+  const pruned = pruneLargeToolOutputs(botSummaryHistory(range.older, Boolean(prior)));
   const adapter = actualAdapter;
   let summary: string;
   try {

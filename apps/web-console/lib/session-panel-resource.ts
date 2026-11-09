@@ -5,6 +5,11 @@ export async function loadSessionPanelResource<T>(load: () => Promise<T>, curren
   if (current()) apply(value);
 }
 
-export function transcriptModelView<T extends readonly unknown[]>(bound: boolean, enabled: boolean, modelView: T | undefined, messages: T): T {
-  return bound && enabled && modelView ? modelView : messages;
+function isCompactSummary(message: unknown): boolean {
+  return typeof message === 'object' && message !== null && 'key' in message && message.key === 'compact-summary';
+}
+
+export function transcriptModelView<T>(bound: boolean, enabled: boolean, modelView: T[] | undefined, messages: T[]): T[] {
+  if (bound && enabled && modelView) return modelView;
+  return messages.some(isCompactSummary) ? messages.filter(message => !isCompactSummary(message)) : messages;
 }

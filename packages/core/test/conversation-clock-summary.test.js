@@ -45,3 +45,11 @@ test('summaries must use absolute dates [AC:conversation-date-clock#AC-3]', asyn
   assert.match(HISTORICAL_SUMMARY_NOTICE, /when the summary was written/);
   assert.doesNotMatch(HISTORICAL_SUMMARY_NOTICE, /\d{4}-\d{2}-\d{2}/);
 });
+
+test('compaction takes goal results as experience and leaves commands with scheduler [AC:bot-goal-context-boundary#AC-3]',async()=>{
+ const {botSummaryHistory,botCompactInstruction}=await import('../src/session/bot-compact-policy.ts');
+ const receipt={role:'system',key:'goal-notice:g:completed',parts:[{type:'text',text:'Done: sent the report'}]};
+ const command={role:'system',key:'goal-execution:e',parts:[{type:'text',text:'Send the report now'}]};
+ assert.deepEqual(botSummaryHistory([command,receipt],false),[receipt]);
+ assert.match(botCompactInstruction('structured','older unfinished goal'),/completed goals are historical evidence/i);
+});

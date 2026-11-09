@@ -2,6 +2,9 @@
  * Product view ports around A's prepareRichView / fold budget.
  */
 
+import type { GoalSnapshot } from '../bots/goals/types.js';
+import { currentGoalExecution, historicalGoalStatus } from '../bots/goals/current-execution.js';
+import { isGoalCommand } from '../session/bot-compact-policy.js';
 import { envBool } from '../env.js';
 import { embedReplyQuotes } from '../reply-quote.js';
 import { resolveMicroCompactConfig } from '../session/compact-settings.js';
@@ -53,11 +56,26 @@ export interface PrepareViewHost {
   };
 }
 
+function annotateGoalHistory(host: PrepareViewHost,session: SessionRecord,message:SessionMessage):SessionMessage {
+  if(message.key!=='compact-summary' || !session.metadata.botId)return message;
+  const parts=message.parts.map(part=>{
+    if(part.type!=='text' || !part.text.includes('goal_'))return part;
+    const snapshot=host.store.getDaemonControl?.(`bot_goals:${session.metadata.botId}`) as GoalSnapshot|undefined;
+    return {...part,text:historicalGoalStatus(part.text,snapshot)+part.text};
+  });
+  return {...message,parts};
+}
+
 /** Chat adapters hoist system messages, so old execution instructions must expire in the send view. */
-function foregroundNotices(session: SessionRecord, messages: SessionMessage[]): SessionMessage[] {
+function foregroundNotices(host: PrepareViewHost, session: SessionRecord, messages: SessionMessage[]): SessionMessage[] {
   if (session.metadata.canonicalBotChat !== true) return messages;
   const request = messages.findLastIndex(message => message.role === 'user' && !message.key?.startsWith('human-steer:'));
-  return messages.filter((message, index) => index >= request || !isTurnNotice(message));
+  const recent = messages.filter((message, index) => index >= request || !isTurnNotice(message))
+    .map(message => annotateGoalHistory(host,session,message));
+  if (!session.metadata.botId || !recent.some(isGoalCommand)) return recent;
+  const current = currentGoalExecution(session,host.store);
+  const key = current && `goal-execution:${current.id}`;
+  return recent.filter(message => !isGoalCommand(message) || message.key === key);
 }
 
 function isTurnNotice(message: SessionMessage): boolean {
@@ -76,7 +94,7 @@ export async function prepareMessagesForModel(
     dynSettings.enabled || messagesMayNeedRetiredAnnotation(messages, session);
   sealSharedExposure(host.store,session.id,messages);
   const scoped=messages.filter(message=>sharedMessageVisible(host.store,session.id,message));
-  return prepareRichView(session, coordinatorViewOf(session, embedReplyQuotes(foregroundNotices(session, scoped), id => {
+  return prepareRichView(session, coordinatorViewOf(session, embedReplyQuotes(foregroundNotices(host, session, scoped), id => {
     const original = host.store.readHistoryById?.(session.id, id);
     return original && sharedMessageVisible(host.store, session.id, original) ? original : undefined;
   })), {

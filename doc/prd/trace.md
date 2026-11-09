@@ -1518,6 +1518,14 @@ Bot 子任务会话放进详情菜单
 - `packages/core/test/bot-goals-scheduler.test.js`
 - `packages/core/test/bot-goals.test.js`
 
+### bot-goal-context-boundary
+
+聊天隐藏内部摘要，历史 Goal 仅供回顾
+
+- `apps/web-console/lib/session-panel-resource.test.ts`
+- `packages/core/test/context-stack.test.js`
+- `packages/core/test/conversation-clock-summary.test.js`
+
 ### bot-goal-lifecycle-boundaries
 
 Bot 目标跨用户与执行生命周期闭环
@@ -3053,6 +3061,12 @@ microVM 命令不会悄悄改在宿主机上跑
 列表里的移除需要再确认一次
 
 - `apps/web-console/lib/armed-delete.test.ts`
+
+### reply-hover-ended-at
+
+悬停 Bot 回复时显示结束时间
+
+- `apps/web-console/components/ReplyQuote.test.ts`
 
 ### request-metric-follows-turn
 

@@ -1,7 +1,7 @@
 import type {SqliteStateStore} from '../storage.js';
 import { filterUserVaultTools } from '../secrets/user-vault-settings.js';
 import { runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
-import type { GoalSnapshot } from '../bots/goals/types.js';
+import { currentGoalExecution } from '../bots/goals/current-execution.js';
 import { filterFactoryTools } from '../factory/tool-policy.js';
 import { filterRoomTools } from '../rooms/tool-policy.js';
 import { ROOM_RETRIEVAL_TOOL_NAMES } from '../rooms/room-retrieval-tools.js';
@@ -186,14 +186,7 @@ export function authorizeToolsForSession(input: {
 }
 
 function goalEntryTools(session: SessionRecord, store?: WebSettingsReadStore): Set<string> {
-  const {botId, botGoalId, botGoalExecutionId, botWorkTaskId} = session.metadata;
-  if (botWorkTaskId || typeof botId !== 'string' || typeof botGoalId !== 'string') return new Set();
-  const snapshot = store?.getDaemonControl?.(`bot_goals:${botId}`) as GoalSnapshot | undefined;
-  const goal = snapshot?.goals.find(item => item.id === botGoalId);
-  const execution = snapshot?.executions.find(item => item.id === botGoalExecutionId);
-  if (!goal || !execution || goal.status !== 'running' || goal.activeExecutionId !== execution.id
-    || execution.goalId !== goal.id || execution.goalRevision !== goal.revision
-    || execution.sessionId !== session.id || execution.status !== 'running' || execution.leaseUntil <= Date.now()) return new Set();
+  if(!currentGoalExecution(session,store))return new Set();
   return new Set(['goal_dispatch', 'goal_checkpoint', 'wait_for']);
 }
 

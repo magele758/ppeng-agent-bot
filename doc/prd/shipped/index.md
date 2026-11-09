@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 405 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 407 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（129）
+## bot（130）
 
 需求正文见 [bot](bot.md)。
 
@@ -126,6 +126,7 @@
 - `bot-functional-groups` Bot 功能分组、共享范围优先级与头像修复
 - `bot-gateway-delivery` IM 静默回复、至少一次投递与例行预检
 - `bot-goal-conclusion` 目标结算与子会话身份的生命周期闭环
+- `bot-goal-context-boundary` 聊天隐藏内部摘要，历史 Goal 仅供回顾
 - `bot-goal-lifecycle-boundaries` Bot 目标跨用户与执行生命周期闭环
 - `bot-goal-live-chain` Bot 默认配置完整执行与证据回流
 - `bot-goal-nested-approval` 目标子任务的待批准出现在主对话
@@ -803,6 +804,12 @@
 需求正文见 [other](other.md)。
 
 - `remove-needs-confirm` 列表里的移除需要再确认一次
+
+## reply（1）
+
+需求正文见 [other](other.md)。
+
+- `reply-hover-ended-at` 悬停 Bot 回复时显示结束时间
 
 ## request（1）
 

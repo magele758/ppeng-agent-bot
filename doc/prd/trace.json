@@ -1718,6 +1718,15 @@
       ]
     },
     {
+      "id": "bot-goal-context-boundary",
+      "title": "聊天隐藏内部摘要，历史 Goal 仅供回顾",
+      "tests": [
+        "apps/web-console/lib/session-panel-resource.test.ts",
+        "packages/core/test/context-stack.test.js",
+        "packages/core/test/conversation-clock-summary.test.js"
+      ]
+    },
+    {
       "id": "bot-goal-lifecycle-boundaries",
       "title": "Bot 目标跨用户与执行生命周期闭环",
       "tests": [
@@ -3464,6 +3473,13 @@
       "title": "列表里的移除需要再确认一次",
       "tests": [
         "apps/web-console/lib/armed-delete.test.ts"
+      ]
+    },
+    {
+      "id": "reply-hover-ended-at",
+      "title": "悬停 Bot 回复时显示结束时间",
+      "tests": [
+        "apps/web-console/components/ReplyQuote.test.ts"
       ]
     },
     {
