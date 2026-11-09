@@ -12,12 +12,17 @@ import {
   visibleBotForSession,
   sessionsForPlaySurface,
   writeStoredPlaySurface,
+  type OpenBotResponse,
   type PlaySurface
 } from '@/lib/bots';
 import type { AgentInfo, BotInfo, SessionSummary } from '@/lib/types';
 import { PlayPanel } from '../../PlayPanel';
 import { usePlayChat } from '../../usePlayChat';
 import { useLab } from '../../shell/LabProvider';
+
+function openedDefault(data: OpenBotResponse) {
+  return data.sessionId || data.session?.id ? data : undefined;
+}
 
 /**
  * 对话页。常驻挂载（隐藏时仍保持流式连接与草稿），
@@ -119,19 +124,18 @@ export function ChatSection({ active }: { active: boolean }) {
           }
           if (saved) {
             try {
-              await api(`/api/bots/${encodeURIComponent(saved)}`);
+              const opened = await api(`/api/bots/${encodeURIComponent(saved)}/open`, { method: 'POST' }) as OpenBotResponse;
               if (!maySelect()) return;
-              await chat.selectBot(saved);
+              await chat.selectBot(saved, opened);
               return;
             } catch {
               if (!maySelect()) return;
             }
           }
           if (!maySelect()) return;
-          const data = (await api('/api/bot-work/default')) as { bot: BotInfo };
+          const data = (await api('/api/bot-work/default')) as OpenBotResponse & { bot: BotInfo };
           if (!maySelect()) return;
-          upsertBot(data.bot);
-          await chat.selectBot(data.bot.id);
+          await chat.selectBot(data.bot.id, openedDefault(data));
         } catch (e) {
           if (maySelect()) chat.setPlayStatus({ text: String(e), err: true });
         }
@@ -206,13 +210,11 @@ export function ChatSection({ active }: { active: boolean }) {
         const sess = sessionsRef.current.find((s) => s.id === id);
         if (sess?.agentId) chat.setAgentId(sess.agentId);
       }
-      const panel = chat.refreshPlayPanel();
-      await loadOverview();
-      await panel;
+      await chat.refreshPlayPanel();
       chat.requestScrollPlayToBottom();
       return surface;
     },
-    [chat, loadOverview, setPlaySurface, setSelectedSessionId]
+    [chat, setPlaySurface, setSelectedSessionId]
   );
 
   const applySurface = (next: PlaySurface) => {
@@ -230,7 +232,7 @@ export function ChatSection({ active }: { active: boolean }) {
         setSelectedSessionId(fallback);
         const restored = fallback ? sessionsRef.current.find((s) => s.id === fallback) : undefined;
         chat.setAgentId(restored?.agentId || pickDefaultAgentId(agentsRef.current));
-        void loadOverview().then(() => chat.refreshPlayPanel());
+        void chat.refreshPlayPanel();
       } else {
         const curSess = current ? sessionsRef.current.find((s) => s.id === current) : undefined;
         chat.setAgentId(curSess?.agentId || pickDefaultAgentId(agentsRef.current));
@@ -245,7 +247,7 @@ export function ChatSection({ active }: { active: boolean }) {
       return;
     }
     setSelectedSessionId(null);
-    void loadOverview().then(() => chat.refreshPlayPanel());
+    void chat.refreshPlayPanel();
   };
 
   const applySurfaceRef = useRef(applySurface);

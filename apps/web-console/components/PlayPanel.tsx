@@ -79,7 +79,7 @@ import { BotRowMenu } from './BotRowMenu';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { BotPinArea } from './BotPinArea';
 import { BotPermissionsLink, BotDetailPane, BotDetailToggle, botDetailIsVisible, botDetailMainClass } from './BotDetailMenu';
-import { useBotSessionQuestions } from './useBotSessionQuestions';
+import { useSelectedQuestion } from './useBotSessionQuestions';
 import { BotEntryDialog } from './BotEntryDialog';
 import { BotCreateForm } from './sections/agents/BotCreateForm';
 import { BotGroupCreateForm } from './sections/agents/BotGroupCreateForm';
@@ -351,13 +351,7 @@ export function PlayPanel({
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const [groupCount, setGroupCount] = useState(0);
   const [sidebarRooms, setSidebarRooms] = useState<SidebarRoom[]>([]);
-  const botQuestions = useBotSessionQuestions({
-    sessions,
-    bots,
-    selectedSessionId,
-    selectedMessages: chat.sessionMessages,
-    pendingQuestion: chat.optimisticUser
-  });
+  const selectedQuestion = useSelectedQuestion(selectedSessionId, chat.sessionMessages, chat.optimisticUser);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const createMenuCloseTimer = useRef<number | null>(null);
   const clearCreateMenuClose = () => {
@@ -1009,7 +1003,7 @@ export function PlayPanel({
         key={s.id}
         session={s}
         bots={bots}
-        question={botQuestions.get(s.id) ?? ''}
+        question={selectedQuestion(s.id)}
         selected={!openGroupId && selectedSessionId === s.id}
         checked={checked}
         selectMode={selectMode}

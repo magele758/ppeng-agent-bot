@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 409,
+    "implemented": 410,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -909,6 +909,13 @@
       "requirement": "这种子任务的会话又跑到bot的列表里了？修复一下",
       "verificationStage": "software",
       "file": "acceptance/bot-sidebar-child-sessions.yaml"
+    },
+    {
+      "id": "bot-sidebar-load",
+      "title": "Bot 侧栏按需加载与切换响应",
+      "requirement": "怎么现在网页加载这么慢？怎么回事，还有个问题一起排查下，为什么切换bot会话也很慢，卡很久，看看怎么优化下",
+      "verificationStage": "software",
+      "file": "acceptance/bot-sidebar-load.yaml"
     },
     {
       "id": "bot-sidebar-order",

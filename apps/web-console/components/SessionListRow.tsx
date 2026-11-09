@@ -5,6 +5,7 @@ import { botFaceIdleDelay } from '@/lib/bot-face';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { sessionRowCopy, sessionWorkBotId } from '@/lib/session-row';
+import { useVisibleQuestion } from './useBotSessionQuestions';
 import { BotFace } from './BotFace';
 import { useBotWorkMood } from './bot-work/BotWorkState';
 import { useArmedConfirm } from './use-armed-confirm';
@@ -88,10 +89,11 @@ export function SessionListRow({
 }) {
   const { t } = useI18n();
   const confirm = useArmedConfirm();
+  const preview = useVisibleQuestion(session, bots, question);
   const copy = sessionRowCopy({
     session,
     bots,
-    question,
+    question: preview.text,
     emptyHint: t('play.sidebar.noQuestion'),
     unnamed: t('play.unnamed')
   });
@@ -101,6 +103,7 @@ export function SessionListRow({
 
   return (
     <div
+      ref={preview.row}
       className={sessionListRowClass(view.bot, selected, checked)}
       role="button"
       tabIndex={0}

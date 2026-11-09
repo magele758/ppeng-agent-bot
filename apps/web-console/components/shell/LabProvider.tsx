@@ -381,7 +381,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    void tick({ includePlayPanel: true });
+    void tick({ includePlayPanel: false });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initial load
 
   useEffect(() => {

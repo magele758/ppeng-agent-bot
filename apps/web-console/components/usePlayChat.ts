@@ -291,6 +291,11 @@ function isSessionResult(event: string, payload: { session?: { id?: string } }):
   return (event === 'result' || event === 'session') && Boolean(payload.session?.id);
 }
 
+async function readOpenedBot(id: string, existing?: OpenBotResponse): Promise<OpenBotResponse> {
+  if (existing) return existing;
+  return await api(`/api/bots/${encodeURIComponent(id)}/open`, { method: 'POST' }) as OpenBotResponse;
+}
+
 export function usePlayChat(deps: PlayChatDeps) {
   const {
     selectedSessionId,
@@ -1615,13 +1620,11 @@ export function usePlayChat(deps: PlayChatDeps) {
   }, []);
 
   const openBotSession = useCallback(
-    async (id: string, adopt?: { liveGen: number }): Promise<{ bot: BotInfo; sessionId: string }> => {
+    async (id: string, adopt?: { liveGen: number }, existing?: OpenBotResponse): Promise<{ bot: BotInfo; sessionId: string }> => {
       const requestId = ++botOpenRequestRef.current;
       const selectedAtStart = selectedSessionRef.current;
       const generation = adopt?.liveGen ?? liveGenRef.current;
-      const data = (await api(`/api/bots/${encodeURIComponent(id)}/open`, {
-        method: 'POST'
-      })) as OpenBotResponse;
+      const data = await readOpenedBot(id, existing);
       const opened = parseOpenBotResponse(data);
       if (!botOpenApplies(requestId, botOpenRequestRef.current, selectedAtStart, selectedSessionRef.current, liveTurnCurrent(generation))) return opened;
       applyBotSelection(opened.bot);
@@ -1637,7 +1640,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   );
 
   const selectBot = useCallback(
-    async (id: string) => {
+    async (id: string, existing?: OpenBotResponse) => {
       // Invalidate pending opens and stream callbacks as soon as selection is requested.
       botOpenRequestRef.current += 1;
       liveGenRef.current += 1;
@@ -1653,15 +1656,15 @@ export function usePlayChat(deps: PlayChatDeps) {
       }
       try {
         onPlaySurfaceChange?.('bot');
-        await openBotSession(id);
+        await openBotSession(id, undefined, existing);
         requestScrollPlayToBottom();
         sessionListStickTopRef.current = true;
-        await Promise.all([refreshPlayPanel(), tick({ includePlayPanel: false })]);
+        await refreshPlayPanel();
       } catch (e) {
         setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
       }
     },
-    [applyBotSelection, onPlaySurfaceChange, openBotSession, requestScrollPlayToBottom, sessionListStickTopRef, refreshPlayPanel, tick]
+    [applyBotSelection, onPlaySurfaceChange, openBotSession, requestScrollPlayToBottom, sessionListStickTopRef, refreshPlayPanel]
   );
 
   /**

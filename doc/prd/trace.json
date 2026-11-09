@@ -1963,6 +1963,13 @@
       ]
     },
     {
+      "id": "bot-sidebar-load",
+      "title": "Bot 侧栏按需加载与切换响应",
+      "tests": [
+        "e2e/history-startup.spec.ts"
+      ]
+    },
+    {
       "id": "bot-sidebar-order",
       "title": "Bot 列表同一区域内拖拽排序",
       "tests": [
