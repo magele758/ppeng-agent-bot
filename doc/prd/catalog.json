@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 404,
+    "implemented": 405,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -615,6 +615,13 @@
       "requirement": "这个工作流的特效不太对，可以参考这个视频的效果",
       "verificationStage": "software",
       "file": "acceptance/bot-network-motion.yaml"
+    },
+    {
+      "id": "bot-network-pan",
+      "title": "横向拖动的 Bot 协作全景",
+      "requirement": "这个要能水平拖动，你这个效果跟我给你的视频差距太大了，质感，布局，以及动效全都没了",
+      "verificationStage": "software",
+      "file": "acceptance/bot-network-pan.yaml"
     },
     {
       "id": "bot-panel-reset",

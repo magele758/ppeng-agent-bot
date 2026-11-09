@@ -1818,6 +1818,13 @@
       ]
     },
     {
+      "id": "bot-network-pan",
+      "title": "横向拖动的 Bot 协作全景",
+      "tests": [
+        "e2e/bot-network-motion.spec.ts"
+      ]
+    },
+    {
       "id": "bot-pin-sync",
       "title": "跨浏览器置顶同步",
       "tests": [
