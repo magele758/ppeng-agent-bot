@@ -932,6 +932,7 @@ function quoteTarget(p: TurnActionsProps) {
   if (!p.onQuote || !p.quoteBot) return null;
   const reply = {
     messageId: replyMessageId(p.m),
+    endedAt: p.m.createdAt,
     botId: p.quoteBot.id,
     botName: p.quoteBot.name,
     text: replySourceText(p.parts),

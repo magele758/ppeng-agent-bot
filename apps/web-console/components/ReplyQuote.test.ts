@@ -262,3 +262,15 @@ test('滚到较早的 Bot 回复后仍可引用，效果与引用刚出现的回
   assert.match(freshBubble, /刚出现的回复/);
   assert.equal(olderBubble.includes(olderText), false);
 });
+
+test('悬停操作显示该回复的本地结束时间且旧数据仍可引用 [AC:reply-hover-ended-at#AC-1]',()=>{
+  const endedAt=new Date(2026,10,9,6,4,5).toISOString();
+  const html=actions([{...botReply,endedAt}]);
+  assert.match(html,/<time[^>]*>2026-11-09  {1}06:04:05<\/time>/);
+  assert.match(html,/title="引用 北风 的这条回复[^"]*06:04:05"/);
+  for(const stamp of [undefined,'bad-date']){
+    const fallback=actions([{...botReply,endedAt:stamp}]);
+    assert.doesNotMatch(fallback,/<time/);
+    assert.match(fallback,/title="引用 北风 的这条回复"/);
+  }
+});

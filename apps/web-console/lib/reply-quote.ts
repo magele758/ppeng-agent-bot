@@ -14,7 +14,18 @@ export type ReplyQuote = ReplyTo & {
 
 export type QuoteAuthor = 'bot' | 'user';
 
+export function formatReplyEnd(iso?: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return '';
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const day = [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join('-');
+  const time = [date.getHours(), date.getMinutes(), date.getSeconds()].map(pad).join(':');
+  return day + '  ' + time;
+}
+
 export type QuoteableReply = {
+  endedAt?: string;
   messageId: string;
   botId: string;
   botName: string;

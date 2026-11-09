@@ -3453,6 +3453,13 @@
       ]
     },
     {
+      "id": "reply-hover-ended-at",
+      "title": "悬停 Bot 回复时显示结束时间",
+      "tests": [
+        "apps/web-console/components/ReplyQuote.test.ts"
+      ]
+    },
+    {
       "id": "request-metric-follows-turn",
       "title": "已发送请求指标随所选轮变化",
       "tests": [

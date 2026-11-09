@@ -1994,3 +1994,7 @@ details.trace-row,
 .approval-explanation__section { display: flex; flex-direction: column; gap: 0.25rem; overflow-wrap: anywhere; }
 .approval-explanation__section small { display: block; margin-top: 0.25rem; }
 .approval-explanation__raw { font-size: 0.85em; overflow-wrap: anywhere; }
+
+.chat-reply-ended-at { visibility: hidden; order: -1; align-self: center; white-space: pre; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.chat-turn__label .chat-reply-ended-at { order: 0; margin-inline-start: auto; }
+.chat-turn:hover .chat-reply-ended-at, .chat-turn:focus-within .chat-reply-ended-at { visibility: visible; background: var(--bg-raised); }
