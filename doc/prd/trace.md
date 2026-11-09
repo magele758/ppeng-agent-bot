@@ -1536,6 +1536,13 @@ Bot 只在必须时才为目标再开子任务
 
 - `packages/core/test/bot-goal-only-when-needed.test.js`
 
+### bot-group-cleanup
+
+删除分组时可一并删除 Bot
+
+- `e2e/bot-functional-groups.spec.ts`
+- `scripts/test/bot-functional-group-routes.test.mjs`
+
 ### bot-linked-watchers
 
 关联原工作的临时盯梢与观察证据
@@ -3047,6 +3054,12 @@ Rotate library page share links without deleting content
 - `apps/web-console/lib/routine-weekday-daytime.test.ts`
 - `packages/core/test/routine-weekday-daytime.test.js`
 - `scripts/test/routine-weekday-daytime.test.mjs`
+
+### runtime-diagnostics-skill
+
+Agent Home 故障排查技能
+
+- `packages/core/test/runtime-diagnostics-skill.test.js`
 
 ### runtime-gap-closures
 

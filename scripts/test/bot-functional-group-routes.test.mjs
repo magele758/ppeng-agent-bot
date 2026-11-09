@@ -111,3 +111,50 @@ test('an old group reply arriving after a move cannot reenter the next model req
   assert.ok(!JSON.stringify(calls.at(-1)).includes('LATE_OLD_GROUP_CODE'),'late old-group output must stay outside the next model request');
  }finally{release();rt.destroy();}
 });
+
+async function cleanupFixture(rt) {
+ const bots=['First','Second','Outside'].map(name=>rt.createBot({name}));
+ const group=(await call(rt,'POST','/api/bot-functional-groups',{}, {name:'Clean up'})).body.group;
+ const members=bots.slice(0,2);
+ for(const bot of members){
+   await call(rt,'PUT','/api/bots/:id/functional-group',{id:bot.id},{groupId:group.id});
+   rt.store.appendMessage(bot.canonicalSessionId,'user',[{type:'text',text:'Keep history'}]);
+ }
+ const remove=(botIds=members.map(b=>b.id))=>call(rt,'DELETE','/api/bot-functional-groups/:id',{id:group.id},{botIds},ANONYMOUS_AUTH,'?deleteBots=1');
+ return {bots,members,group,remove};
+}
+test('explicit group cleanup preserves member transcripts and other bots [AC:bot-group-cleanup#AC-1]',async()=>{
+ const rt=makeRuntime();try{
+   const {bots,members,remove}=await cleanupFixture(rt);
+   await remove();
+   assert.deepEqual((await call(rt,'GET','/api/bot-functional-groups')).body.groups,[]);
+   for(const bot of members){
+     assert.equal(rt.store.getBot(bot.id),undefined);
+     assert.equal(rt.store.listMessages(bot.canonicalSessionId).at(-1).parts[0].text,'Keep history');
+   }
+   assert.ok(rt.getBot(bots[2].id));
+ }finally{rt.destroy();}
+});
+test('busy member or stale confirmation preserves the whole group [AC:bot-group-cleanup#AC-2]',async()=>{
+ const rt=makeRuntime();try{
+   const {members,remove}=await cleanupFixture(rt);
+   await assert.rejects(remove([members[0].id]));
+   rt.store.updateSession(members[1].canonicalSessionId,{status:'running'});
+   await assert.rejects(remove());
+   for(const bot of members)assert.ok(rt.getBot(bot.id));
+   assert.deepEqual((await call(rt,'GET','/api/bot-functional-groups')).body.groups[0].botIds,members.map(b=>b.id).sort());
+ }finally{rt.destroy();}
+});
+
+test('group membership does not confer deletion rights [AC:bot-group-cleanup#AC-2]',async()=>{
+ const rt=makeRuntime();try{
+   const auth={isolate:true,user:{id:'member-owner'}};
+   const bot=rt.createBot({name:'Transferred'});
+   const group=(await call(rt,'POST','/api/bot-functional-groups',{}, {name:'Personal'},auth)).body.group;
+   await call(rt,'PUT','/api/bots/:id/functional-group',{id:bot.id},{groupId:group.id},auth);
+   setBotDefinitionOwner(rt.store,bot.id,{userId:'another-owner'});
+   await assert.rejects(call(rt,'DELETE','/api/bot-functional-groups/:id',{id:group.id},{botIds:[bot.id]},auth,'?deleteBots=1'));
+   assert.ok(rt.getBot(bot.id));
+   assert.deepEqual((await call(rt,'GET','/api/bot-functional-groups',{}, {},auth)).body.groups[0].botIds,[bot.id]);
+ }finally{rt.destroy();}
+});

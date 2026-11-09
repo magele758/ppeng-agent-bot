@@ -56,16 +56,14 @@ export class BotFunctionalGroupService {
   }
   delete(principal: BotPrincipal,id: string): void {
     const group=this.get(principal,id);
-    this.store.db.exec('BEGIN IMMEDIATE');
-    try {
+    this.store.transaction(() => {
       for(const botId of group.botIds)this.revokeExposure(principal,botId,id);
       this.store.db.prepare('DELETE FROM bot_functional_members WHERE group_id=? AND principal_id=?').run(id,botPrincipalKey(principal));
       this.store.db.prepare('DELETE FROM bot_functional_room_members WHERE group_id=? AND principal_id=?').run(id,botPrincipalKey(principal));
       this.store.db.prepare("DELETE FROM bot_shared_context WHERE principal_id=? AND scope='group' AND scope_id=?").run(botPrincipalKey(principal),id);
       this.store.db.prepare('DELETE FROM bot_functional_groups WHERE id=? AND principal_id=?').run(id,botPrincipalKey(principal));
-      this.store.db.exec('COMMIT');
       this.store.setDaemonControl('bot.functionalGroups.updatedAt', nowIso());
-    } catch(error) { this.store.db.exec('ROLLBACK'); throw error; }
+    });
   }
   groupIdForBot(principal: BotPrincipal,botId: string): string | null {
     const row=this.store.db.prepare('SELECT m.group_id FROM bot_functional_members m JOIN bot_functional_groups g ON g.id=m.group_id AND g.principal_id=m.principal_id WHERE m.principal_id=? AND m.bot_id=?').get(botPrincipalKey(principal),botId);

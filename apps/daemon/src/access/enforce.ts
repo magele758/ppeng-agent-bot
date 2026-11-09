@@ -15,7 +15,7 @@ function requireAdmin(auth: RequestAuth): void {
   if (!auth.admin) throw new AuthorizationError('admin_required');
 }
 
-function checkOwnerRef(ref: OwnerRef, access: OwnerAccess, auth: RequestAuth): void {
+export function checkOwnerRef(ref: OwnerRef, access: Pick<OwnerAccess, 'resource' | 'unowned'>, auth: RequestAuth): void {
   if (!ref.found) return;
   if (ref.ownerId === undefined) {
     const unowned = ref.unowned ?? access.unowned ?? 'deny';

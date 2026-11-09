@@ -301,6 +301,11 @@ Team / Swarm 扇出后，父目标可能一直 waiting，也可能被误唤醒�
 
 这个少于2个goal的时候不要展示
 
+## bot-group-cleanup
+删除分组时可一并删除 Bot
+
+增加“同时删除组内 Bot”选项，保留历史会话
+
 ## bot-group-drag-only
 Bot 侧栏移组仅保留拖拽入口
 
