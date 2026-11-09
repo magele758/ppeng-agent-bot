@@ -35,7 +35,7 @@ function RecordRow({row}:{row:Observation}){
   const {t,locale}=useI18n();
   const {openSession}=useLab();
   return <li><small>{new Date(row.at).toLocaleString(locale)} · {t(`tasks.flow.${tone(row.state)}`,{state:row.state})}</small>
-    <details><summary>{row.title}</summary><p>{row.report}</p><small>{row.id}</small></details>
+    <details><summary><span>{row.title}</span></summary><p>{row.report}</p><small>{row.id}</small></details>
     {row.cost!=null && <small>{t('tasks.flow.cost',{value:'$'+row.cost})}</small>}
     {row.session && <button className="btn btn-ghost btn-sm" onClick={()=>void openSession(row.session!,{focusChat:true})}>{t('tasks.flow.open')}</button>}
   </li>;
@@ -55,7 +55,7 @@ function graphData(records:Observation[],botIds:string[],roomIds:string[],days:n
 
 export function BotNetworkView({focus,onInspect}:{focus:string;onInspect:(id:string)=>void}){
   const {t}=useI18n();
-  const {bots}=useLab();
+  const {bots,openSession}=useLab();
   const data=useNetwork();
   const [selection,select]=useState<Selection>({from:focus});
   const [days,setDays]=useState(7);
@@ -87,10 +87,13 @@ export function BotNetworkView({focus,onInspect}:{focus:string;onInspect:(id:str
         {roomIds.has(p.id)?<span className={styles.group}>◎</span>:<BotFace name={label(p.id)} botId={p.id} size="sm"/>}<span>{label(p.id)}</span>
       </button>)}
     </div></div></div>
+    <div className={styles.legend}>{(['running','waiting','failed','done'] as const).map(status=><span key={status} data-tone={status}>{t(`tasks.flow.${status}`)}</span>)}</div>
     <section className={styles.inspect} aria-live="polite">
       {data?.partial && <p>{t('tasks.flow.partial')}</p>}
       <header><h3>{selection.to?linkLabel(selection.from,selection.to):label(selection.from)}</h3>
-      {bot && <button className="btn btn-sm" onClick={()=>onInspect(bot.id)}>{t('tasks.flow.single')}</button>}</header>
+      {bot && <div className={styles.filters}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>void openSession(bot.canonicalSessionId,{focusChat:true})}>{t('tasks.flow.open')}</button>
+        <button className="btn btn-sm" onClick={()=>onInspect(bot.id)}>{t('tasks.flow.single')}</button></div>}</header>
       <NetworkRecords key={selection.from+selection.to} rows={rows} selected={Boolean(selection.from)} loaded={Boolean(data)}/>
     </section>
   </section>;

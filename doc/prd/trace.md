@@ -1597,6 +1597,7 @@ Bot 回复标签显示 Bot 名称
 
 多 Bot 协作关系图与紧凑的定时列表
 
+- `apps/web-console/components/routine-editor-dialog.test.ts`
 - `apps/web-console/lib/network-observations.test.ts`
 
 ### bot-pin-sync

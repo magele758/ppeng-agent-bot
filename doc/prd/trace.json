@@ -1806,6 +1806,7 @@
       "id": "bot-network-and-schedule-list",
       "title": "多 Bot 协作关系图与紧凑的定时列表",
       "tests": [
+        "apps/web-console/components/routine-editor-dialog.test.ts",
         "apps/web-console/lib/network-observations.test.ts"
       ]
     },

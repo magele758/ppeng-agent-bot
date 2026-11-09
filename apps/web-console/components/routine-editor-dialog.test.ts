@@ -112,3 +112,15 @@ test('editing saves to the selected job and refreshes the list [AC:compact-bot-s
   assert.equal(view.requests[0].path,'/api/cron/jobs/old');assert.equal(view.requests[0].body.prompt,'Existing prompt');
   assert.equal(dialog(view.render()).open,false);
 });
+
+test('routine disclosure groups management and exposes the current switch state [AC:bot-network-and-schedule-list#AC-2]',async()=>{
+  const view=setup();view.render();await view.load();
+  const row=find(view.render(),n=>n.props['data-testid']==='bot-detail-routine');
+  const details=find(row,n=>n.type==='details' && n.props.className==='routine-row-details');
+  assert.equal(details.props.open,undefined);
+  assert.ok(find(details,n=>n.type==='button' && n.props.children==='botWork.edit'));
+  const toggle=find(row,n=>n.props.role==='switch');
+  assert.equal(toggle.props['aria-checked'],true);
+  toggle.props.onClick();
+  assert.deepEqual(view.requests[0],{path:'/api/cron/jobs/old',body:{enabled:false}});
+});
