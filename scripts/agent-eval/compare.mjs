@@ -13,6 +13,7 @@ import { buildBotSuite, summarizeBaseline } from './bot-quality.mjs';
 import { buildReliabilitySuite, buildCoreSuite } from './bot-reliability.mjs';
 import { runPairedTasks } from './paired-runner.mjs';
 import { planQuality } from './sample-plan.mjs';
+import { buildBotTurnOwnershipSuite } from './context-reliability.mjs';
 import { configuredModel } from './configured-model.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -27,7 +28,7 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 if (!options.config) throw new Error('Usage: compare.mjs --config experiment.json [--simulation] [--out directory] [--baseline-root path] [--candidate-root path] [--trials N]');
 const experiment = JSON.parse(readFileSync(resolve(options.config), 'utf8'));
-const suite = validateSuite(experiment.suite==='builtin:bot-core'?buildCoreSuite():experiment.suite==='builtin:bot-reliability'?buildReliabilitySuite():experiment.suite==='builtin:bot-p0'?buildBotSuite():JSON.parse(readFileSync(resolve(root, experiment.suite), 'utf8')));
+const suite = validateSuite(experiment.suite==='builtin:bot-turn-ownership'?buildBotTurnOwnershipSuite():experiment.suite==='builtin:bot-core'?buildCoreSuite():experiment.suite==='builtin:bot-reliability'?buildReliabilitySuite():experiment.suite==='builtin:bot-p0'?buildBotSuite():JSON.parse(readFileSync(resolve(root, experiment.suite), 'utf8')));
 const trials = Number(options.trials ?? experiment.trials ?? 3);
 if (!Number.isInteger(trials) || trials < 1 || trials > 20) throw new Error('trials must be 1..20');
 const concurrency=experiment.concurrency??1;

@@ -230,18 +230,21 @@ function activeExecutionDecision(service:BotGoalService,botId:string,session:Ses
 function blockedSubagent(session:SessionRecord,goal:BotGoal|undefined):boolean {
  return session.mode==='subagent'&&!!goal&&goal.status!=='queued';
 }
-function queuedFromPending(goal:BotGoal,pending:Set<string>,forked:Set<string|undefined>):boolean {
- return goal.status==='queued'&&!!goal.sourceMessageId&&pending.has(goal.sourceMessageId)&&!forked.has(goal.sourceMessageId);
-}
+/** The idle fork planner reserves the first unforked receipt for the foreground. */
 function unforkedQueued(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string):BotGoal|undefined {
- const pending=new Set(listPendingHumanWork(host.store,session.id).map(receipt=>receipt.id));
  const forks=Array.isArray(session.metadata.concurrentBotForks)?session.metadata.concurrentBotForks:[];
  const forked=new Set(forks.map((fork:{sourceMessageId?:string})=>fork.sourceMessageId));
- return service.list(botId).find(goal=>queuedFromPending(goal,pending,forked));
+ const pending=listPendingHumanWork(host.store,session.id);
+ if(!pending.length)return undefined;
+ const queued=new Map(service.list(botId).filter(goal=>goal.status==='queued').map(goal=>[goal.sourceMessageId,goal]));
+ for(const receipt of pending){
+  const goal=queued.get(receipt.id);
+  if(goal&&!forked.has(receipt.id))return goal;
+ }
+ return undefined;
 }
 function queuedGoal(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string,currentGoal:BotGoal|undefined):BotGoal|undefined {
- if(currentGoal?.status==='queued')return goalAlreadyHandled(host,session,currentGoal)?undefined:currentGoal;
- if(session.metadata?.canonicalBotChat!==true)return undefined;
+ if(session.metadata?.canonicalBotChat!==true)return currentGoal?.status==='queued'?currentGoal:undefined;
  const queued=unforkedQueued(host,session,service,botId);
  return queued&&goalAlreadyHandled(host,session,queued)?undefined:queued;
 }
@@ -267,7 +270,14 @@ function decidedBind(host:GoalRuntimeHost,session:SessionRecord,scope:NonNullabl
  const currentGoal=currentGoalOf(scope.service,scope.botId,session);
  if(blockedSubagent(session,currentGoal))return {done:true,result:false};
  const goal=queuedGoal(host,session,scope.service,scope.botId,currentGoal);
- if(!goal)return {done:true,result:true};
+ if(!goal){
+  // A settled foreground binding is still present on older sessions. Do not let
+  // a new chat turn (or a child it spawns) inherit that execution's identity.
+  if(session.metadata.canonicalBotChat===true && currentGoal && listPendingHumanWork(host.store,session.id).length){
+   host.store.updateSession(session.id,{metadata:{...session.metadata,botGoalId:undefined,botGoalExecutionId:undefined,botGoalCheckpoint:undefined}});
+  }
+  return {done:true,result:true};
+ }
  return {done:false,goal};
 }
 function startBoundGoal(host:GoalRuntimeHost,session:SessionRecord,scope:NonNullable<ReturnType<typeof goalScope>>,goal:BotGoal):boolean {

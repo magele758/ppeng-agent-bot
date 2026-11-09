@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 390,
+    "implemented": 391,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -923,6 +923,13 @@
       "requirement": "具体线索是，我用科研小助手发送的给RSI的，说是一直在队列里，但是没看到RSIbot执行",
       "verificationStage": "software",
       "file": "acceptance/bot-task-terminal-wait.yaml"
+    },
+    {
+      "id": "bot-turn-ownership",
+      "title": "Bot 当轮任务和目标审查归属",
+      "requirement": "直接把这两个问题修掉：切到新任务时要以用户当轮指令为准，后台也别再拿旧目标审查新任务。把纠正、切换、切回和压缩后的回答都加上逐轮断言，再用当前真实模型跑一遍，看还有哪一轮会串线。",
+      "verificationStage": "software",
+      "file": "acceptance/bot-turn-ownership.yaml"
     },
     {
       "id": "bot-window-compact",

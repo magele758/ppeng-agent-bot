@@ -1717,6 +1717,14 @@ Bot 监督状态新鲜度与回复关联
 
 - `packages/core/test/durable-wait-default.test.js`
 
+### bot-turn-ownership
+
+Bot 当轮任务和目标审查归属
+
+- `packages/core/test/bot-goal-only-when-needed.test.js`
+- `packages/core/test/context-stack.test.js`
+- `scripts/test/bot-turn-ownership.test.mjs`
+
 ### bot-work-durable-wait
 
 Bot 任务停在持久等待上并只恢复一次

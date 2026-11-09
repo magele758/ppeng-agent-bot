@@ -171,7 +171,7 @@ describe('applyMemoryAppendixToMessages', () => {
     const src = [textMsg('s', 'user', 'hi', 1)];
     const out = applyMemoryAppendixToMessages(src, '[mem]');
     expect(src[0]!.parts[0]).toEqual({ type: 'text', text: 'hi' });
-    expect(out[0]!.parts[0]).toEqual({ type: 'text', text: '[mem]\n\n' });
+    expect(out[0]!.parts[0]).toEqual({ type: 'text', text: '[mem]\n\n[End of reference context. The current user message follows.]\n' });
     expect(lastUserQueryFromMessages(src)).toBe('hi');
   });
 });

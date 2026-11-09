@@ -35,8 +35,9 @@ export function validateSuite(suite) {
     if (!c.category || !Array.isArray(c.turns) || !c.turns.length || c.turns.some(x => typeof x !== 'string' || !x.trim())) throw new Error(`invalid task: ${c.id}`);
     if (!c.expected || !['exact', 'json', 'state'].some(key => Object.hasOwn(c.expected, key))) throw new Error(`case has no outcome grader: ${c.id}`);
     for (const key of Object.keys(c.expected)) {
-      if (!['exact', 'json', 'state', 'requiredTools', 'forbiddenTools', 'maxToolCalls', 'status', 'botEvidence','observedTools','toolPrefix'].includes(key)) throw new Error(`unknown grader ${key}`);
+      if (!['exact', 'json', 'state', 'requiredTools', 'forbiddenTools', 'maxToolCalls', 'status', 'botEvidence','observedTools','toolPrefix','rounds','currentGoalOnly'].includes(key)) throw new Error(`unknown grader ${key}`);
     }
+    if (c.expected.rounds !== undefined && (!Array.isArray(c.expected.rounds) || c.expected.rounds.length !== c.turns.length || c.expected.rounds.some(answer => typeof answer !== 'string' || !answer.trim()))) throw new Error(`expected one answer per turn: ${c.id}`);
     if (c.expected.exact != null && typeof c.expected.exact !== 'string') throw new Error(`exact grader must be text: ${c.id}`);
     if (Object.hasOwn(c.expected, 'toolPrefix') && !isValidToolPrefix(c.expected.toolPrefix)) throw new Error(`invalid tool prefix: ${c.id}`);
   }
@@ -79,6 +80,15 @@ export function modelAnswer(output) {
   return String(output ?? '').replace(/^\[written \d{4}-\d{2}-\d{2} \d{2}:\d{2} [^\]\n]+\]\n?/, '').trim();
 }
 
+function gradeTurnAnswers(task, trial) {
+  const failures = [];
+  for (const [i, expected] of (task.expected.rounds ?? []).entries()) {
+    if (modelAnswer(trial.rounds?.[i]) !== expected) failures.push(`turn ${i + 1} answer`);
+    if (task.expected.currentGoalOnly && !trial.reviewGoals?.[i]?.every(goal => typeof goal === 'string' && goal && task.turns[i].includes(goal))) failures.push(`turn ${i + 1} review ownership`);
+  }
+  return failures;
+}
+
 export function gradeTask(task, trial) {
   const failures = [];
   const e = task.expected;
@@ -88,6 +98,7 @@ export function gradeTask(task, trial) {
   if (trial.status !== (e.status ?? 'idle')) failures.push(`terminal status: ${trial.status}`);
   if (trial.invariantsOk !== true) failures.push('transcript invariants');
   if (Object.hasOwn(e, 'exact') && answer !== e.exact) failures.push('exact final answer');
+  failures.push(...gradeTurnAnswers(task, trial));
   if (Object.hasOwn(e, 'json')) {
     try { if (!isDeepStrictEqual(JSON.parse(answer), e.json)) failures.push('JSON final answer'); }
     catch { failures.push('invalid JSON final answer'); }

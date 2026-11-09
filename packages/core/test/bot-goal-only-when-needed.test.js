@@ -121,3 +121,28 @@ test('status and response preferences keep the existing work [AC:bot-watch-work-
  for(const text of ['好了吗？','进度怎么样？','回复简短一点，只说结论','以后用中文回答'])await chat.say(text);
  assert.deepEqual(chat.service.list('b').map(g=>g.id),[goal.id]);
 });
+
+test('a new human turn does not reclaim a previous queued goal [AC:bot-turn-ownership#AC-2]', async t => {
+  const chat = openChat(t);
+  const goal = chat.service.create({botId: 'b', sessionId: chat.session.id, title: 'Atlas', objective: '修复 Atlas 登录'});
+  const execution = chat.service.claim('b', goal.id, {strategy:'direct'});
+  chat.service.report('b', execution.id, {kind:'progress', summary:'still pending', evidence:[], advanced:true});
+  chat.store.updateSession(chat.session.id, {metadata:{...chat.session.metadata, botGoalId:goal.id, botGoalExecutionId:execution.id}});
+  await chat.say('看看 Birch 的文档');
+  bindGoalExecution(chat.host, chat.store.getSession(chat.session.id));
+  assert.equal(chat.service.get('b', goal.id).status, 'queued');
+  assert.equal(chat.service.get('b', goal.id).attempts, 1);
+  assert.equal(chat.store.getSession(chat.session.id).metadata.botGoalId, undefined);
+  await tickBotGoals(chat.host);
+  assert.equal(chat.runs.length, 1);
+  assert.notEqual(chat.runs[0], chat.session.id);
+});
+
+test('acknowledging stated project facts stays in chat while an external edit keeps its goal [AC:bot-turn-ownership#AC-2]', async t => {
+  const chat = openChat(t);
+  await chat.say('海棠项目立项。负责人为林岚，预算为73万元。仅回复收到。');
+  await chat.say('更正海棠项目：负责人改为周宁，预算保持不变。仅回复收到。');
+  assert.deepEqual(chat.service.list('b'), []);
+  await chat.say('请在项目表里把负责人改为周宁，保存后仅回复收到。');
+  assert.equal(chat.service.list('b').length, 1);
+});
