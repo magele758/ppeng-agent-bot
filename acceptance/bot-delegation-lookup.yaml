@@ -1,0 +1,19 @@
+id: bot-delegation-lookup
+title: Bot 对话直接委派并打断重复查询
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  那把这两个问题修一下，Bot 对话里默认注入 bot_delegate，像这次 bot_get 同参数、同结果一直重复的，也要能及时拦住。
+criteria:
+  - id: AC-1
+    given: 已有 Bot 在自己的对话中，使用默认的渐进工具展示
+    when: 开始第一轮工作
+    then: 若已获授权，可直接调用 bot_delegate；普通会话仍按需发现，显式权限限制仍生效
+  - id: AC-2
+    given: Bot 连续单独查询同一 Bot 的配置，三次成功返回完全相同的内容
+    when: 通用重复检测关闭或仅约束弱模型
+    then: 触发重复保护；默认给一次换策略的机会，再次原样重复即停止
+  - id: AC-3
+    given: Bot 查询目标、返回结果发生变化或中途执行了其他工作
+    when: 再次查询
+    then: 从新的连续查询开始计数

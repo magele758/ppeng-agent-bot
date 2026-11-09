@@ -142,7 +142,7 @@ export function isContentRepeatAbort(reason: string | undefined): boolean {
 
 
 export function loopGuardStopReason(reason: string | undefined): 'repeat_detection' | 'tool_loop' {
-  return isContentRepeatAbort(reason) ? 'repeat_detection' : 'tool_loop';
+  return isContentRepeatAbort(reason) || reason?.startsWith('unchanged lookup:') ? 'repeat_detection' : 'tool_loop';
 }
 
 /**
