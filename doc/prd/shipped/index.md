@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 400 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 401 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,10 +78,11 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（124）
+## bot（125）
 
 需求正文见 [bot](bot.md)。
 
+- `bot-activity-flow` 从 Bot 运行记录查看工作流
 - `bot-activity-open-session` 活动卡点击打开所属会话
 - `bot-activity-rail` Lab activity rail 展示 Bot 在途工作，并按 owner 隔离
 - `bot-async-summary` Bot 历史摘要后台更新

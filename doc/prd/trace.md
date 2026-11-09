@@ -1372,6 +1372,12 @@ Host parks durable wait for owned bg_run
 
 - `packages/core/test/bg-run-host-park.test.js`
 
+### bot-activity-flow
+
+从 Bot 运行记录查看工作流
+
+- `apps/web-console/lib/bot-activity-flow.test.ts`
+
 ### bot-async-summary
 
 Bot 历史摘要后台更新

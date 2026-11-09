@@ -1551,6 +1551,13 @@
       ]
     },
     {
+      "id": "bot-activity-flow",
+      "title": "从 Bot 运行记录查看工作流",
+      "tests": [
+        "apps/web-console/lib/bot-activity-flow.test.ts"
+      ]
+    },
+    {
       "id": "bot-async-summary",
       "title": "Bot 历史摘要后台更新",
       "tests": [
