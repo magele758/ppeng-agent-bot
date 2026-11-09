@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 399,
+    "implemented": 400,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -489,6 +489,13 @@
       "requirement": "增加“同时删除组内 Bot”选项，保留历史会话",
       "verificationStage": "software",
       "file": "acceptance/bot-group-cleanup.yaml"
+    },
+    {
+      "id": "bot-group-disclosure-memory",
+      "title": "刷新后记住各 Bot 分组的展开状态",
+      "requirement": "分组的展开和收起状态要能保存，免得每次刷新都要搞一下",
+      "verificationStage": "software",
+      "file": "acceptance/bot-group-disclosure-memory.yaml"
     },
     {
       "id": "bot-group-drag-only",

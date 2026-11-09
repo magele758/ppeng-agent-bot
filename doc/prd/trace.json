@@ -1746,6 +1746,13 @@
       ]
     },
     {
+      "id": "bot-group-disclosure-memory",
+      "title": "刷新后记住各 Bot 分组的展开状态",
+      "tests": [
+        "e2e/bot-functional-groups.spec.ts"
+      ]
+    },
+    {
       "id": "bot-linked-watchers",
       "title": "关联原工作的临时盯梢与观察证据",
       "tests": [
