@@ -1,4 +1,8 @@
 export const botSettings = {
+ everyDuration: '每{duration}',
+ dailyAt: '每天 {time}',
+ weekdaysAt: '工作日 {time}',
+ toggleRoutine: '启停「{name}」',
  memoryManagement: '记忆管理',
  skillManagement: '技能管理',
  otherRecords: '文件与任务记录',

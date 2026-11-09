@@ -15,7 +15,7 @@ test('Lab saves and reloads an original-work watcher [AC:bot-linked-watchers#AC-
   const readJobs=async()=> (await(await request.get(`/api/cron/jobs?botId=${bot.id}`)).json()).jobs;
   const job=(await readJobs()).find((j:{name:string})=>j.name==='Linked original work');expect(job.metadata.workLink).toEqual({goalId:goal.id,sopSkill:'current-delivery-sop'});
   await page.reload();await page.getByRole('tab',{name:'定时',exact:true}).click();
-  const card=page.getByTestId('bot-detail-routine').filter({hasText:'Linked original work'});await card.getByRole('button',{name:'修改',exact:true}).click();
+  const card=page.getByTestId('bot-detail-routine').filter({hasText:'Linked original work'});await card.locator('summary').first().click();await card.getByRole('button',{name:'修改',exact:true}).click();
   await expect(page.getByLabel('原工作目标',{exact:true})).toHaveValue(goal.id);await expect(page.getByLabel('当前 SOP 技能名或 ID（可选）',{exact:true})).toHaveValue('current-delivery-sop');
   await request.delete(`/api/cron/jobs/${job.id}`);
  }finally{await request.patch(`/api/bots/${bot.id}`,{data:{hidden:true}});}

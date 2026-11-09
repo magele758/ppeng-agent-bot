@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 402,
+    "implemented": 403,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -601,6 +601,13 @@
       "requirement": "那你帮我设计一下，怎么把这些已有能力围绕多goal统一起来，让bot能自动选择执行方式，我插话也不会丢任务，先给我方案。",
       "verificationStage": "software",
       "file": "acceptance/bot-multi-goal-coordination.yaml"
+    },
+    {
+      "id": "bot-network-and-schedule-list",
+      "title": "多 Bot 协作关系图与紧凑的定时列表",
+      "requirement": "我要看的是多bot的视角。这个定时任务的太丑陋了，你参考grok-bot的设计，帮我改进一下",
+      "verificationStage": "software",
+      "file": "acceptance/bot-network-and-schedule-list.yaml"
     },
     {
       "id": "bot-panel-reset",

@@ -1,5 +1,12 @@
 export const tasks = {
   flow: {
+  idle: 'Include bots without activity',
+  network: 'Bot network',
+  single: 'View bot activity',
+  networkHint: 'Select a face to see its activity, or a connection to inspect shared records.',
+  smaller: 'Zoom out',
+  larger: 'Zoom in',
+
   tokens: '{n} tokens',
   period: 'Period', days:'Last {n} days', all:'All loaded',
   elapsed: '{n}s elapsed',

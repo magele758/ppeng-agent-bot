@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {RoutineWorkLinkFields,type RoutineWorkLinkValue} from './RoutineWorkLinkFields';
 import { RoutineEditorDialog } from './RoutineEditorDialog';
+import { RoutineCadence } from './RoutineCadence';
 import { RoutineSchedule } from './RoutineSchedule';
 import { RoutineRuns } from './bot-work/RoutineRuns';
 import { zonedLocalToIso, zonedInstantToLocal } from '@/lib/routine-time';
@@ -404,12 +405,13 @@ export function BotCronPanel({
           jobs.map((job) => {
             const summary = precheckSummary(job, t);
             return (
-            <article key={job.id} data-testid="bot-detail-routine" className={`activity-card${job.enabled ? '' : ' is-off'}`}>
-              <div className="bot-cron-card__head">
-                <strong>{job.name}</strong>
-                <RoutineEnabled enabled={job.enabled} />
-
-              </div>
+            <article key={job.id} data-testid="bot-detail-routine" className="routine-list-item">
+              <details className="routine-row-details">
+                <summary className="routine-row-summary">
+                  <strong>{job.name}</strong>
+                  <span className="routine-row-when"><RoutineCadence job={job}/></span>
+                </summary>
+              <div className="routine-row-body">
               <RoutineSchedule job={job} onSaved={refreshSchedule} />
               <WorkLinkStopStatus job={job}/>
               <details className="bot-settings-disclosure"><summary>{t('botSettings.routineDetails')}</summary>
@@ -418,21 +420,12 @@ export function BotCronPanel({
               <RoutineRuns jobId={job.id}/>
               </details>
               <p className="bot-cron-card__meta">
-                {t('play.cronPanel.next', { when: formatWhen(job.nextRunAt) })}
-                {job.lastRunAt ? t('play.cronPanel.last', { when: formatWhen(job.lastRunAt) }) : ''}
+                {job.enabled && t('play.cronPanel.next', { when: formatWhen(job.nextRunAt) })}
+                {job.lastRunAt && t('play.cronPanel.last', { when: formatWhen(job.lastRunAt) })}
               </p>
-              <p>{String(routineTimezone(job.timezone, timezone))}</p>
               {job.expiresAt&&<p className="bot-cron-card__meta">{t('botWork.expiresAt')}: {formatWhen(job.expiresAt)}</p>}
-              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditorOpen(true);setErr(null);setEditingId(job.id);setWorkLink(storedWorkLink(job));setSourceDelivery(job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined);setRoomId(String(job.metadata.roomId??''));setDeliveryPolicy((job.metadata.deliveryPolicy as typeof deliveryPolicy)??{inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');setPrecheckMode(job.metadata.precheckMode==='strict'?'strict':'compat');}}>{t('botWork.edit')}</button>
               <div className="bot-cron-card__actions">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  disabled={busy}
-                  onClick={() => void patchJob(job.id, { enabled: !job.enabled })}
-                >
-                  {job.enabled ? t('play.cronPanel.pause') : t('play.cronPanel.enable')}
-                </button>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditorOpen(true);setErr(null);setEditingId(job.id);setWorkLink(storedWorkLink(job));setSourceDelivery(job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined);setRoomId(String(job.metadata.roomId??''));setDeliveryPolicy((job.metadata.deliveryPolicy as typeof deliveryPolicy)??{inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');setPrecheckMode(job.metadata.precheckMode==='strict'?'strict':'compat');}}>{t('botWork.edit')}</button>
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
@@ -442,6 +435,11 @@ export function BotCronPanel({
                   {t('play.cronPanel.remove')}
                 </button>
               </div>
+              </div>
+              </details>
+              <button type="button" className="routine-power" role="switch" aria-checked={job.enabled}
+                aria-label={t('botSettings.toggleRoutine',{name:job.name})} disabled={busy}
+                onClick={()=>void patchJob(job.id,{enabled:!job.enabled})}><span/></button>
             </article>
             );
           })
@@ -449,9 +447,4 @@ export function BotCronPanel({
       </div>
     </div>
   );
-}
-
-function RoutineEnabled({ enabled }: { enabled: boolean }) {
-  const { t } = useI18n();
-  return <span className="badge">{t(enabled ? 'play.botDetail.on' : 'play.botDetail.off')}</span>;
 }

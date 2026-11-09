@@ -4,6 +4,7 @@ import { useI18n } from '@/lib/i18n';
 import { loadBotFlows } from '@/lib/load-bot-flows';
 import type { Flow, FlowStep } from '@/lib/bot-activity-flow';
 import { useLab } from '../../shell/LabProvider';
+import {BotNetworkView} from './BotNetworkView';
 import styles from './bot-flow.module.css';
 
 const stateLabels:Record<string,'done'|'waiting'|'running'|'failed'|'reportedBlocked'>={
@@ -63,8 +64,15 @@ function useActivity(bot:string,session:string){
 }
 export function BotFlowView(){
   const {t}=useI18n();
+  const [focus,setFocus]=useState(()=>new URLSearchParams(typeof window==='undefined'?'':window.location.hash.split('?')[1]).get('bot')??'');
+  const [detail,setDetail]=useState(false);
+  if(!detail)return <BotNetworkView focus={focus} onInspect={id=>{setFocus(id);setDetail(true);}}/>;
+  return <><button className="btn btn-ghost" onClick={()=>setDetail(false)}>← {t('tasks.flow.network')}</button><BotFlowDetail initial={focus}/></>;
+}
+function BotFlowDetail({initial}:{initial:string}){
+  const {t}=useI18n();
   const {bots,selectedSessionId}=useLab();
-  const [selection,setSelection]=useState(()=>new URLSearchParams(typeof window==='undefined'?'':window.location.hash.split('?')[1]).get('bot')??'');
+  const [selection,setSelection]=useState(initial);
   const [limit,setLimit]=useState(12);
   const [period,setPeriod]=useState(7);
   const visible=bots.filter(bot=>!bot.hidden);

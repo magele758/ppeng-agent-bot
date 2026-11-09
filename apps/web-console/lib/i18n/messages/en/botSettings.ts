@@ -1,4 +1,8 @@
 export const botSettings = {
+ everyDuration: 'Every {duration}',
+ dailyAt: 'Daily at {time}',
+ weekdaysAt: 'Weekdays at {time}',
+ toggleRoutine: 'Enable or pause {name}',
  memoryManagement: 'Memory management',
  skillManagement: 'Skill management',
  otherRecords: 'Files and task records',
