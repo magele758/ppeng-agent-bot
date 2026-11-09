@@ -58,6 +58,7 @@ function loadFile(file: URL): Record<string, unknown> {
     if (id === 'react') return React;
     if (id === 'react/jsx-runtime') return JsxRuntime;
     if (id === '@/lib/i18n') return { useI18n: () => ({ t }) };
+    if (id === '@/lib/api') return { api: async () => ({}) };
     if (id === '@/lib/bot-face') return { botFaceIdleDelay: () => '0s' };
     if (id === '@/lib/session-row') return localRequire('../lib/session-row.ts');
     if (id === './BotFace' || id.endsWith('/BotFace')) return { BotFace: () => null };

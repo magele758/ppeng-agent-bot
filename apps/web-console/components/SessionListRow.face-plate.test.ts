@@ -40,6 +40,7 @@ function loadFile(file: URL): Record<string, unknown> {
     if (id === 'react') return React;
     if (id === 'react/jsx-runtime') return JsxRuntime;
     if (id === '@/lib/i18n') return { useI18n: () => ({ t: (key: string) => key }) };
+    if (id === '@/lib/api') return { api: async () => ({}) };
     if (id === '@/lib/bot-face') return localRequire('../lib/bot-face.ts');
     if (id === '@/lib/soft-bot-face') return localRequire('../lib/soft-bot-face.ts');
     if (id === '@/lib/bloub-motion') return localRequire('../lib/bloub-motion.ts');
