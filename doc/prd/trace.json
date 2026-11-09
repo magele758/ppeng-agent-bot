@@ -1804,6 +1804,13 @@
       ]
     },
     {
+      "id": "bot-recall-replies",
+      "title": "Bot 原文召回与逐字确认",
+      "tests": [
+        "packages/core/test/bot-recall-replies.test.js"
+      ]
+    },
+    {
       "id": "bot-receipt-queue",
       "title": "历史回执不占用新委派的执行位置",
       "tests": [

@@ -1,3 +1,4 @@
+import { botConversationRequest } from '../conversation-reply.js';
 import {hasWaitReceipt} from '../../waits/receipt.js';
 import {DurableWaitStore} from '../../waits/store.js';
 import {DURABLE_WAIT_DEFAULT,parkGoalDurableWait} from '../../waits/default-park.js';
@@ -168,6 +169,8 @@ async function classifyReceipt(service:BotGoalService,botId:string,messages:Map<
  const message=messages.get(receipt.id);
  const text=message?.parts.filter(part=>part.type==='text').map(part=>part.text).join('\n')??'';
  if(!text.trim())return;
+ const request=botConversationRequest(text);
+ if(request && request!=='format-receipt')return [{kind:'chat',text}];
  return (await classifyGoalIntents(text,service.list(botId))).map(releaseOpenInquiry).map(releaseSelfContainedBotWork);
 }
 async function ingestPending(host:GoalRuntimeHost,session:SessionRecord,scope:{botId:string;sessionId:string;service:BotGoalService}):Promise<void> {

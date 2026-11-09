@@ -242,6 +242,23 @@ try {
     });
     if (!outcome.contextEvidence.historySourceVerified) outcome.error = 'cross-session answer lacks a successful read of the original evidence';
   }
+  if (recallBot && task.category === 'post-compact') {
+    const original = runtime.store.listHistory(session.id,{role:'user',query:task.turns[0]}).messages
+      .find(message=>message.parts.some(part=>part.type==='text' && part.text===task.turns[0]));
+    const question = transcript.findLast(message=>message.role==='user' && message.parts.some(p=>p.type==='text' && p.text===task.turns.at(-1)));
+    const calls = transcript.filter(message=>question && message.seq>question.seq).flatMap(message=>message.parts);
+    outcome.contextEvidence.historySourceVerified = Boolean(original && calls.some(call=>{
+      if (call.type!=='tool_call' || call.name!=='history_read') return false;
+      const result = results.get(call.toolCallId);
+      if (!result?.ok) return false;
+      try {
+        const page = JSON.parse(result.content);
+        if (page.sessionId===session.id && page.messageId===original.id) return page.text.includes(task.expected.exact);
+        return page.message?.id===original.id && page.message.parts.some(p=>p.type==='text' && p.text.includes(task.expected.exact));
+      } catch { return false; }
+    }));
+    if (!outcome.contextEvidence.historySourceVerified) outcome.error='post-compaction answer lacks a read of the original evidence in the question turn';
+  }
   outcome.tokens = usageComplete ? tokens : null;
   if(task.bot){
     const goals=runtime.store.getDaemonControl('bot_goals:'+session.metadata.botId)?.goals??[];

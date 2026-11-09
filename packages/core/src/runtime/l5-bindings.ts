@@ -1,3 +1,4 @@
+import { botConversationRequest, deliverConversationTurn } from '../bots/conversation-reply.js';
 import {SourceLedger} from '../learning/sources.js';
 import { restoreTaskContract, type TaskContract } from '../session/task-contract.js';
 import { diagnosePrompt, type CacheDiagnostic } from '../session/cache-diagnostics.js';
@@ -749,6 +750,18 @@ function fitProductModelRequest(
   });
 }
 
+function conversationRequestForInput(rt: L5Bindable, input: Parameters<ModelTurnCall>[0]) {
+  const session = input.sessionId && rt.store.getSession(input.sessionId);
+  if (!session || !isCanonicalBotChat(session)) return undefined;
+  const user = input.messages.findLast(message => message.role === 'user');
+  if (!user) return undefined;
+  const original = rt.store.readHistoryById(session.id,user.id);
+  if (!original || original.role !== 'user' || !original.parts.every(part => part.type === 'text')) return undefined;
+  const text = original.parts.map(part => part.text).join('\n');
+  const request = botConversationRequest(text);
+  return session.metadata?.botGoalExecutionId && request !== 'format-receipt' ? undefined : { request, text };
+}
+
 function runTurnWithNormalRequestBudget(
   rt: L5Bindable,
   input: Parameters<ModelTurnCall>[0],
@@ -756,7 +769,8 @@ function runTurnWithNormalRequestBudget(
   deliver: ModelTurnCall
 ): Promise<ModelTurnResult> {
   return fitProductModelRequest(rt, input).then(async (fitted) => {
-    const result=await deliver(fitted,onStream);
+    const conversation = conversationRequestForInput(rt,input);
+    const result = await deliverConversationTurn(conversation?.request, fitted, onStream, deliver, conversation?.text);
     try { if(fitted.sessionId){
       const session=rt.store.getSession(fitted.sessionId);
       if(session){

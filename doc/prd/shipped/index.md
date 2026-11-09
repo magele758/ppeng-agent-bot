@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 392 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 393 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（119）
+## bot（120）
 
 需求正文见 [bot](bot.md)。
 
@@ -154,6 +154,7 @@
 - `bot-quality-reliability` 限定写入范围与辅助判断可靠性及重复对照
 - `bot-quality-sample-plan` 真实模型评估的独立任务与样本量预检
 - `bot-readonly-api` Bot 正文 API 与显式只读路由
+- `bot-recall-replies` Bot 原文召回与逐字确认
 - `bot-receipt-queue` 历史回执不占用新委派的执行位置
 - `bot-relay-island` Bot 通信收起为灵动岛式胶囊
 - `bot-relay-slug` 非 bot_ 前缀的 Bot 通信也收成小提醒
