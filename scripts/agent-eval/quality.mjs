@@ -80,6 +80,15 @@ export function modelAnswer(output) {
   return String(output ?? '').replace(/^\[written \d{4}-\d{2}-\d{2} \d{2}:\d{2} [^\]\n]+\]\n?/, '').trim();
 }
 
+function gradeTurnAnswers(task, trial) {
+  const failures = [];
+  for (const [i, expected] of (task.expected.rounds ?? []).entries()) {
+    if (modelAnswer(trial.rounds?.[i]) !== expected) failures.push(`turn ${i + 1} answer`);
+    if (task.expected.currentGoalOnly && !trial.reviewGoals?.[i]?.every(goal => typeof goal === 'string' && goal && task.turns[i].includes(goal))) failures.push(`turn ${i + 1} review ownership`);
+  }
+  return failures;
+}
+
 export function gradeTask(task, trial) {
   const failures = [];
   const e = task.expected;
@@ -89,10 +98,7 @@ export function gradeTask(task, trial) {
   if (trial.status !== (e.status ?? 'idle')) failures.push(`terminal status: ${trial.status}`);
   if (trial.invariantsOk !== true) failures.push('transcript invariants');
   if (Object.hasOwn(e, 'exact') && answer !== e.exact) failures.push('exact final answer');
-  for (const [i, expected] of (e.rounds ?? []).entries()) {
-    if (modelAnswer(trial.rounds?.[i]) !== expected) failures.push(`turn ${i + 1} answer`);
-    if (e.currentGoalOnly && !trial.reviewGoals?.[i]?.every(goal => typeof goal === 'string' && goal && task.turns[i].includes(goal))) failures.push(`turn ${i + 1} review ownership`);
-  }
+  failures.push(...gradeTurnAnswers(task, trial));
   if (Object.hasOwn(e, 'json')) {
     try { if (!isDeepStrictEqual(JSON.parse(answer), e.json)) failures.push('JSON final answer'); }
     catch { failures.push('invalid JSON final answer'); }
