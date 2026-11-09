@@ -485,7 +485,7 @@
     "packages/core/test/bot-goals-scheduler.test.js": "e40eb10875b2ecf3e0ae565cc52f786960829a365afce9524e6cd2581cc9ab44",
     "packages/core/test/bot-goals-budget.test.js": "95f0470da406f57a94c9881c736b1705c0692695549d110d825af6166995ca7d",
     "packages/core/src/runtime/tool-assembly.ts": "8784cde87f20b3a8b607c160dfcd7af8ef955dc2809b9db6215226799fabccba",
-    "packages/core/src/turn/resolve-turn-tools.ts": "60ce3e28de6e85e0a1afac73a20c150251284daef6e1bdf53d80283142a0c346",
+    "packages/core/src/turn/resolve-turn-tools.ts": "1a88f37b11c25252d94bf0f44187bf12ddb3c851d5e37fe0b510ce3cbf329f01",
     "packages/core/src/tools/tool-search.ts": "9bde547cf078ba8b58b8044f6abb6e4eba238f9ef07e8f4eacc926e8b0126cb2",
     "packages/core/src/tools/deferred-disclosure.ts": "dfeaba53ab769bad9c8b6bbabfe5fb9cf8728b8dad23efef061d34e1c3b591ca",
     "packages/core/test/necessary-tool-injection.test.js": "a25570dc9cb0a0d63fb594f187a634eb0dfe234adb39c798ae11407e1c35341a",

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 407,
+    "implemented": 408,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -839,6 +839,13 @@
       "requirement": "跟其他bot的通信的模式，组群会话的能力是否能支持\n群里遇到需要真人登录/验证/审批的步骤，转到私聊完成",
       "verificationStage": "software",
       "file": "acceptance/bot-rooms.yaml"
+    },
+    {
+      "id": "bot-routine-create-receipt",
+      "title": "Bot 对话直接创建定时任务并取得确认",
+      "requirement": "RLM bot 创建定时任务，死循环了，刚才，去排查解决一下这个问题",
+      "verificationStage": "software",
+      "file": "acceptance/bot-routine-create-receipt.yaml"
     },
     {
       "id": "bot-routine-lifecycle",

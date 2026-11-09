@@ -212,7 +212,11 @@ function partitionDeferred(
   const settings=readToolExposure(settingsStore);
   if(settings.mode==='full') return {visible:tools.filter(t=>!['tool_search','load_capability_tool'].includes(t.name)),hidden:[]};
   const entries=executionEntryTools(session,settingsStore);
-  if (isCanonicalBotChatSession(session)) entries.add('bot_delegate');
+  if (isCanonicalBotChatSession(session)) {
+    entries.add('bot_delegate');
+    entries.add('cron_create');
+    entries.add('cron_list');
+  }
   const pinned=new Set(Object.hasOwn(settings.pinnedGroups,agent.id) ? settings.pinnedGroups[agent.id] : []);
   return splitDeferredTools({
     tools: tools.map(tool => toolGroup(tool.name).tier > 1 && !entries.has(tool.name) && !pinned.has(toolGroup(tool.name).id) ? {...tool,disclosure:'on_demand'} : {...tool,disclosure:undefined}),

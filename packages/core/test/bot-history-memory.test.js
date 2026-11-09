@@ -139,16 +139,20 @@ test('12 actual compactions preserve fixture constraints plus searchable origina
  for(let n=0;n<100;n++){const p=s.listHistory(c.id,{query:`FACT${n} original requirement`});assert.equal(p.messages.length,1);}
  assert.ok(s.agentMemory().search({sessionId:c.id,scope:'session.long'}).every(memory=>memory.sourceRefs?.length));
 });
-test('routine dialogue tools override optional group choice and respect Bot allowlists',async()=>{
+test('routine dialogue tools override optional group choice and respect Bot allowlists [AC:bot-routine-create-receipt#AC-1]',async()=>{
  const {RawAgentRuntime}=await import('../dist/runtime.js');const {bindTurnKernelHost}=await import('../dist/runtime/l5-bindings.js');
  const old=process.env.RAW_AGENT_OPTIONAL_TOOL_GROUPS;process.env.RAW_AGENT_OPTIONAL_TOOL_GROUPS='1';
  const rt=new RawAgentRuntime({repoRoot:tempDir('tools-repo-'),stateDir:tempDir('tools-state-'),modelAdapter:{name:'fixture',runTurn:async()=>({assistantParts:[],stopReason:'end'}),summarizeMessages:async()=>''}});track(rt.store);
  try {
  const bot=rt.createBot({name:'Routine owner'}),s=rt.getSession(rt.openBot(bot.id).sessionId);rt.mergeSessionMetadata(s.id,{enabledOptionalToolGroups:[]});
- rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
+ rt.store.setDaemonControl('tool_exposure_settings',{mode:'progressive',pinnedGroups:{}});
  rt.store.setDaemonControl('routine.settings',{dialogToolsEnabled:true});const host=bindTurnKernelHost(rt.l5());
  const input=()=>({session:rt.getSession(s.id),agent:rt.store.getAgent(bot.agentId),messages:[],systemPromptChars:0});
- const enabled=await host.resolveTurnTools(input());assert.ok(enabled.tools.some(t=>t.name==='cron_create'));
+ for (const mode of ['progressive', 'full']) {
+   rt.store.setDaemonControl('tool_exposure_settings', {mode, pinnedGroups: {}});
+   const enabled = await host.resolveTurnTools(input());
+   for (const name of ['cron_create', 'cron_list']) assert.ok(enabled.tools.some(t => t.name === name), name);
+ }
  rt.mergeSessionMetadata(s.id,{allowedTools:['memory_get']});const limited=await host.resolveTurnTools(input());assert.ok(!limited.tools.some(t=>t.name==='cron_create'));
  } finally {await rt.destroy();stores.delete(rt.store);if(old===undefined)delete process.env.RAW_AGENT_OPTIONAL_TOOL_GROUPS;else process.env.RAW_AGENT_OPTIONAL_TOOL_GROUPS=old;}
 });

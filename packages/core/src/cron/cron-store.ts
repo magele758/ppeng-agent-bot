@@ -3,6 +3,7 @@ import { createCronRunTools, type CronToolOptions } from './cron-run-tools.js';
 import { normalizeCiConclusions, parseEventScheduleValue } from './event-routine.js';
 import { normalizeExpiresAt, routineExpired } from './routine-deadline.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
 import { join } from 'node:path';
 import { createId, nowIso } from '../id.js';
 import { envBool } from '../env.js';
@@ -229,6 +230,18 @@ function resolveDialogSchedule(args: DialogScheduleArgs, timezone: string): Dial
   return explicitDialogSchedule(args, timezone);
 }
 
+type DialogJob = Omit<CronJobRecord, 'id' | 'enabled' | 'createdAt' | 'updatedAt'>;
+
+function confirmDialogJob(store: CronJobStore, input: DialogJob) {
+  const fields = ['agentId', 'name', 'prompt', 'scheduleKind', 'scheduleValue', 'timezone', 'missedPolicy', 'expiresAt'] as const;
+  const existing = store.list({ sessionId: input.sessionId, enabled: true }).find(job => {
+    const { catchUpPlan, queueBlockedReason, ...configuration } = job.metadata;
+    return fields.every(key => job[key] === input[key]) && isDeepStrictEqual(configuration, input.metadata);
+  });
+  if (existing) return { ...existing, creationStatus: 'already_scheduled' };
+  return { ...store.create(input), creationStatus: 'created' };
+}
+
 export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOptions): ToolContract<any>[] {
   const createTool: ToolContract<{
     name: string;
@@ -247,7 +260,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
   }> = {
     name: 'cron_create',
     description:
-      'Schedule a recurring or one-shot agent prompt. Omit every_ms, once_at, cron, and event to run weekdays at 09:00 in the routine timezone. Pass exactly one of those fields to choose a different schedule.',
+      'Create or confirm an identical active schedule. Call directly. A successful receipt confirms persistence: report it without listing jobs, inspecting files, or running the task. Omit every_ms, once_at, cron, and event to run weekdays at 09:00 in the routine timezone. Pass exactly one of those fields to choose a different schedule.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -284,7 +297,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
       if(args.workLink!==undefined&&!opts?.store)throw new ValidationError('Work link requires runtime storage');
       const linked=args.workLink!==undefined?resolveRoutineWorkLink(opts!.store!,context.session.id,args.workLink):undefined;
       const workLink=linked?.link;
-      const job = getStore().create({
+      const job = confirmDialogJob(getStore(), {
         sessionId: linked?.session.id??context.session.id,
         agentId: context.agent.id,
         name: args.name,

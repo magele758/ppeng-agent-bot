@@ -1,0 +1,15 @@
+id: bot-routine-create-receipt
+title: Bot 对话直接创建定时任务并取得确认
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  RLM bot 创建定时任务，死循环了，刚才，去排查解决一下这个问题
+criteria:
+  - id: AC-1
+    given: Bot 私聊允许定时任务且按需加载工具
+    when: 用户请求添加定时任务
+    then: Bot 首轮即可创建或查询，权限限制仍然生效
+  - id: AC-2
+    given: 同一会话已创建并启用相同配置的任务
+    when: Bot 重试创建
+    then: 直接取得同一任务的确认和下次运行时间，配置不同的任务可另建

@@ -588,6 +588,11 @@ approval = private-default：默认仍转到该 Bot 私聊，结果不自动回�
 跟其他bot的通信的模式，组群会话的能力是否能支持
 群里遇到需要真人登录/验证/审批的步骤，转到私聊完成
 
+## bot-routine-create-receipt
+Bot 对话直接创建定时任务并取得确认
+
+RLM bot 创建定时任务，死循环了，刚才，去排查解决一下这个问题
+
 ## bot-routine-lifecycle
 Bot 可靠例行任务
 
