@@ -1938,8 +1938,7 @@ details.trace-row,
 .chat-turn .chat-turn__actions .correction-capture__trigger.btn { position: static; }
 .chat-turn__actions > button { background: var(--bg-raised); }
 .chat-turn__actions .chat-reply-quote__start { margin-left: 0; }
-.chat-turn:hover .chat-reply-quote__start, .chat-turn:focus-within .chat-reply-quote__start { opacity: 1; }
-@media (hover: none) { .chat-turn__label .chat-reply-quote__start, .chat-turn__actions .chat-reply-quote__start { opacity: 1; } }
+.chat-turn:hover .chat-reply-quote__start { opacity: 1; }
 .composer-preview-row:empty { display: none; }
 .composer-preview-row { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow: auto; }
 .chat-composer-outer .composer-reply-quote { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; margin: 0 0 8px; padding: 10px 12px; background: var(--bg-raised); border-left: 3px solid var(--accent); }
@@ -1997,4 +1996,4 @@ details.trace-row,
 
 .chat-reply-ended-at { visibility: hidden; order: -1; align-self: center; white-space: pre; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .chat-turn__label .chat-reply-ended-at { order: 0; margin-inline-start: auto; }
-.chat-turn:hover .chat-reply-ended-at, .chat-turn:focus-within .chat-reply-ended-at { visibility: visible; background: var(--bg-raised); }
+.chat-turn:hover .chat-reply-ended-at { visibility: visible; background: var(--bg-raised); }
