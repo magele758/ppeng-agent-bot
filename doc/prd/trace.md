@@ -1614,6 +1614,12 @@ Bot 回复标签显示 Bot 名称
 
 - `e2e/bot-network-motion.spec.ts`
 
+### bot-network-pan
+
+横向拖动的 Bot 协作全景
+
+- `e2e/bot-network-motion.spec.ts`
+
 ### bot-pin-sync
 
 跨浏览器置顶同步

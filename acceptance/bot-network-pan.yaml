@@ -1,0 +1,15 @@
+id: bot-network-pan
+title: 横向拖动的 Bot 协作全景
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  这个要能水平拖动，你这个效果跟我给你的视频差距太大了，质感，布局，以及动效全都没了
+criteria:
+  - id: AC-1
+    given: 打开横向协作画布
+    when: 鼠标按住画布或头像左右拖动
+    then: 能连续来回平移，松开不误选头像，仍能单击头像查看记录
+  - id: AC-2
+    given: 无指定 Bot 打开工作流，有多个 Bot 和协作记录
+    when: 浏览全景
+    then: 可见包含空闲 Bot 的错落头像阵列，真实交接依次亮起连线与消息预览
