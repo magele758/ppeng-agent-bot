@@ -7,7 +7,7 @@ import { readWireUsage, sourceChecksPass, wireRequestPurpose } from './bot-quali
 import { observeTextCompletion, serializeEvidence } from './completion-audit.mjs';
 
 const [inputFile, outputFile] = process.argv.slice(2);
-const { task, variant, model, limits, workspace, simulation, trial } = JSON.parse(readFileSync(inputFile, 'utf8'));
+const { task, variant, model, limits, workspace, simulation, trial } = JSON.parse(readFileSync(inputFile === '-' ? 0 : inputFile, 'utf8'));
 const outcome = { output: '', status: 'error', state: {}, toolCalls: [], promptShapes: [], modelCalls: 0,
   tokens: null, invariantsOk: false, infrastructureError: false, modelErrors: [], auxiliaryRequests: [] };
 const started = Date.now();
