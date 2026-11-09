@@ -1733,6 +1733,12 @@ Bot 侧栏不列出子任务会话
 
 - `apps/web-console/lib/bot-child-tasks.test.ts`
 
+### bot-sidebar-load
+
+Bot 侧栏按需加载与切换响应
+
+- `e2e/history-startup.spec.ts`
+
 ### bot-sidebar-order
 
 Bot 列表同一区域内拖拽排序

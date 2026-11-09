@@ -1,0 +1,15 @@
+id: bot-sidebar-load
+title: Bot 侧栏按需加载与切换响应
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  怎么现在网页加载这么慢？怎么回事，还有个问题一起排查下，为什么切换bot会话也很慢，卡很久，看看怎么优化下
+criteria:
+  - id: AC-1
+    given: Bot 列表超过一屏
+    when: 用户打开页面并滚动列表
+    then: 屏幕外的 Bot 不预先请求问题摘要，滚动可见后显示其最近问题
+  - id: AC-2
+    given: 已加载会话列表
+    when: 用户点选另一 Bot 会话
+    then: 新会话正文可见，点选不触发全局任务列表刷新
