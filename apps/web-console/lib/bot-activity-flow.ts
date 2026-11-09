@@ -4,7 +4,7 @@ export interface FlowStep {
 }
 export interface Flow {
   id:string; kind:'task'|'room'|'routine'|'chat'; title:string; at:string; steps:FlowStep[];
-  cost?:number; calls?:number; seconds?:number;
+  cost?:number; calls?:number; seconds?:number; sourceRunId?:string;
 }
 export interface Task {
   id:string; input:string; status:string; requesterBotId:string; targetBotId:string; parentTaskId?:string;
@@ -57,7 +57,7 @@ export function chatFlows(messages:ChatRecord[],bot:string,session:string):Flow[
   for(const m of [...messages].sort((a,b)=>a.seq-b.seq)){
     if(m.role==='user'){
       const title=m.parts.find(p=>p.type==='text')?.text?.trim();
-      active=title?{id:m.id,title:title.slice(0,140),kind:'chat',at:m.createdAt,steps:[]}:undefined;
+      active=title?{id:m.id,title:title.slice(0,140),kind:'chat',sourceRunId:routineFromKey(m.key),at:m.createdAt,steps:[]}:undefined;
       if(active)flows.push(active);
       calls=new Map();
       continue;
@@ -91,4 +91,23 @@ export function sessionFlow(root:SessionNode,descendants:SessionNode[],bot:strin
   const steps=rows.map(s=>({id:s.id,session:s.id,parent:s.id===root.id?undefined:s.parentSessionId,bot:s.id===root.id?bot:s.agentId,
     label:s.title,raw:s.status,state:s.status,cost:s.metadata?.usageCostUsd,tokens:s.metadata?.usageTotals?.totalTokens}));
   return [{id:'team/'+root.id,title:root.title,kind:'chat',at:rows.map(s=>s.updatedAt).sort().at(-1)!,steps}];
+}
+
+function routineFromKey(key?:string):string|undefined {
+  return /^routine:(routine_run_[a-zA-Z0-9_-]+)(?::resume:[0-9]+)?$/.exec(key ?? '')?.[1];
+}
+
+/** The scheduler stamps the user message with the run ID on delivery. */
+export function joinRoutineHistory(flows:Flow[]):Flow[] {
+  const runs=new Map(flows.filter(flow=>flow.kind==='routine').map(run=>[run.id,{...run,steps:[...run.steps]}]));
+  const result:Flow[]=[];
+  for(const flow of flows){
+    const run=runs.get(flow.sourceRunId ?? '');
+    if(run){
+      run.steps.push(...flow.steps.map(step=>({...step,parent:run.id})));
+    } else {
+      result.push(runs.get(flow.id) ?? flow);
+    }
+  }
+  return result;
 }

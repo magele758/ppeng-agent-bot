@@ -1496,6 +1496,13 @@ Bot 以高并发同时推进多件工作
 - `apps/web-console/lib/soft-bot-face.test.ts`
 - `packages/core/test/bots.test.js`
 
+### bot-flow-read-projection
+
+工作流只接收展示所需的会话数据
+
+- `apps/daemon/test/bot-flow-projection.test.ts`
+- `apps/web-console/lib/bot-activity-flow.test.ts`
+
 ### bot-fork-sessions-in-detail
 
 Bot 子任务会话放进详情菜单

@@ -215,6 +215,11 @@ Soft faces render as static SVG. Do not animate every list row.
 
 这个不要每个bot新建都展示，只有新用户才展示
 
+## bot-flow-read-projection
+工作流只接收展示所需的会话数据
+
+要能根据我的bot对话的实际情况来动态生成，不要搞一个配置来搞这个，要零侵入的实现这个流的能力
+
 ## bot-forever-chat
 Bot 永久主会话命令
 
