@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 395 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 396 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -460,6 +460,12 @@
 - `goal-intake-hot-path` 开轮不再等待目标判定和数据库锁
 - `goal-restart-resume` 重启后从安全检查点继续 Goal
 - `goal-update-hidden` 目标更新通知不在聊天里展示
+
+## grok（1）
+
+需求正文见 [other](other.md)。
+
+- `grok-local-history` Lab 只读查看本机 Grok Bot 会话
 
 ## group（10）
 

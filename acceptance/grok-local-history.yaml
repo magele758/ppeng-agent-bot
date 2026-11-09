@@ -1,0 +1,19 @@
+id: grok-local-history
+title: Lab 只读查看本机 Grok Bot 会话
+status: implemented
+requirement: |
+  可以，直接实现吧。在 Lab 的会话列表里加一个「Grok Bot（本机）」来源，点开就能按原顺序只读查看聊天记录。
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 本机 Grok Bot 缓存中含有会话和其他应用文件
+    when: 在会话列表打开 Grok Bot 来源并选择缓存目录
+    then: 列出可读取的会话并忽略其他应用文件
+  - id: AC-2
+    given: 一个会话包含用户文字和 Bot 回复
+    when: 打开会话
+    then: 按原始顺序只读展示消息
+  - id: AC-3
+    given: 缓存目录为空或有损坏文件
+    when: 查看这个来源
+    then: 提示空列表或读取失败，其他正常会话仍可查看

@@ -347,6 +347,11 @@ Fix: a GitHub webhook must not run a second routine just by changing X-Github-De
 
 这个左右都没对齐
 
+## grok-local-history
+Lab 只读查看本机 Grok Bot 会话
+
+可以，直接实现吧。在 Lab 的会话列表里加一个「Grok Bot（本机）」来源，点开就能按原顺序只读查看聊天记录。
+
 ## hide-approval-continue
 聊天不展示审批自动合成的续跑用户消息
 

@@ -65,6 +65,7 @@ import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
 import { PlayBotGroupList, type SidebarRoom } from './play-group/PlayBotGroupList';
+import { GrokHistorySource } from './GrokHistorySource';
 import { SessionListRow } from './SessionListRow';
 import { BotGoals } from './bot-work/BotGoals';
 import { BotWorkSummary } from './bot-work/BotWorkSummary';
@@ -1157,6 +1158,7 @@ export function PlayPanel({
 
           </div>
           <div className="list-scroll play-sidebar__list" id="sessionListMini">
+            <GrokHistorySource />
               <BotPinArea
                 active={botSurface}
                 bots={botRoster}
