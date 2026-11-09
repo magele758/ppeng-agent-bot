@@ -1,0 +1,18 @@
+.grok-history {
+  width: min(46rem, 94vw);
+  max-height: 82vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  color: inherit;
+  background: var(--surface, Canvas);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.grok-history::backdrop { background: rgb(0 0 0 / 40%); }
+.grok-history header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.grok-history .list-item { display: block; width: 100%; text-align: start; }
+.grok-transcript { list-style: none; padding: 0; }
+.grok-transcript li { padding: .75rem 0; border-top: 1px solid var(--border); }
+.grok-transcript time { margin-inline-start: 1rem; font-size: .8rem; }
+.grok-user-text { white-space: pre-wrap; }

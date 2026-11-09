@@ -93,7 +93,7 @@ function renderTable(this: Renderer, token: Tokens.Table): string {
 }
 
 // A blank line separates paragraphs. A single newline stays inside the paragraph.
-const chatMarked = new Marked({
+const chatMarkdownOptions = {
   gfm: true,
   breaks: false,
   renderer: {
@@ -103,7 +103,20 @@ const chatMarked = new Marked({
     html: renderRawHtml,
     table: renderTable,
   },
+};
+const chatMarked = new Marked(chatMarkdownOptions);
+const archiveMarked = new Marked({
+  ...chatMarkdownOptions,
+  renderer: {
+    ...chatMarkdownOptions.renderer,
+    image: (token: Tokens.Image) => escapeHtml(token.text)
+  }
 });
+
+/** Archived messages never embed remote media or activate embedded HTML. */
+export function archivedMarkdownHtml(src: string): string {
+  return archiveMarked.parse(src, { async: false });
+}
 
 /**
  * When the model returns a full HTML5 document (common if the user asks for
