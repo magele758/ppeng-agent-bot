@@ -1594,6 +1594,12 @@ Bot 正文 API 与显式只读路由
 - `apps/daemon/test/bot-readonly-api-http.test.ts`
 - `packages/core/test/bot-readonly-api.test.js`
 
+### bot-recall-replies
+
+Bot 原文召回与逐字确认
+
+- `packages/core/test/bot-recall-replies.test.js`
+
 ### bot-receipt-queue
 
 历史回执不占用新委派的执行位置

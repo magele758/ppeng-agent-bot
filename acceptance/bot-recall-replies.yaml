@@ -1,0 +1,15 @@
+id: bot-recall-replies
+title: Bot 原文召回与逐字确认
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  直接把剩下两处也修掉：压缩后问编号时，Bot 应该能从历史原文找回答案，别卡在工具审批；要求只回“收到”时就别加句号或复述指令。保留现有断言和默认权限，再用当前真实模型重跑，看五道题能不能 5/5、逐轮能不能 10/10。
+criteria:
+  - id: AC-1
+    given: 用户提供或切换上下文并明确指定只回收到
+    when: Bot 回复
+    then: 对话与流式显示均逐字返回收到，实际执行工作仍须遵守原有权限
+  - id: AC-2
+    given: 先前检查结论已记录在对话且历史已压缩
+    when: 用户询问检查发现的编号
+    then: Bot 通过现有权限可见的历史原文作答，无需操作外部文件
