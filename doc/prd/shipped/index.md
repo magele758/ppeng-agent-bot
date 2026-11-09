@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 390 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 391 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（117）
+## bot（118）
 
 需求正文见 [bot](bot.md)。
 
@@ -103,6 +103,7 @@
 - `bot-daydream-local` Bot 每日独立复盘
 - `bot-daydream-missing-session` 缺少固定对话时每日复盘继续
 - `bot-daydream-ui` Bot 每日复盘配置与治理界面
+- `bot-delegation-lookup` Bot 对话直接委派并打断重复查询
 - `bot-delete` 删除 Bot 并保留对话历史
 - `bot-detail-child-tasks-tab` 子任务改到详情页签
 - `bot-detail-menu` Bot 对话右侧详情菜单

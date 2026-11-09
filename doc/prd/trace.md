@@ -1438,6 +1438,13 @@ Bot 每日复盘配置与治理界面
 
 - `e2e/bot-daydream.spec.ts`
 
+### bot-delegation-lookup
+
+Bot 对话直接委派并打断重复查询
+
+- `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
+- `packages/core/test/tool-exposure-tiers.test.js`
+
 ### bot-delete
 
 删除 Bot 并保留对话历史

@@ -27,6 +27,8 @@ SDK 提供 4 个组装档位（高档位包含所有低档位模块）：
 > 完整 26 个模块矩阵与 `AssembledLoopIo` 注入端口定义见 [modules-and-ports.md](references/modules-and-ports.md)。
 
 ### 开发者红线（Hard Constraints）
+
+- `LoopConfig.unchangedLookupTools` 可指定只读查询工具，默认空列表。启用恢复保护时，连续三轮单独执行同一查询、参数和成功结果相同，会触发恢复流程，默认宽限一次。该保护独立于通用 `repeatGuard` 档位。
 - **插话与工具取消分离**：`tool_launch` 只提早消费/落地 inbox，不再合成 skipped 工具结果，也不跳过整波工具。普通插话不触发产品 HITL steer latch。宿主可通过 `ToolLoopHost.toolExecutionScope(call, context)` 为每次调用提供独立 context/abortSignal 与 release 回调；release 必须在完成/失败时执行。信号 reason 的 `code: TOOL_CANCELLED_BY_STEER` 表示选择性取消，结果带 `metadata.cancelledBySteer` 且不触发同波成功工具的补偿。全会话 abort 语义不变，取消不保证撤销外部副作用。
 - **即时落地与模型送达**：产品可在 next-step 入队时按 receipt key 立即 append 消息，并保留 inbox 到下一模型边界消费。`applyClaimedInbox` 在相同 key/role/parts/replyTo 已可见时不重复 append/hide，保持消息 ID、序号和 UI 位置；未提供 foldMessages 的宿主保留原行为。显式 next-run 队列与并行子任务保留原语义。
 - **结束前接收转向**：模型返回无工具的正常结束轮，在等待 steering 子任务结束后再次消费 `next-step` inbox；若有新输入，按原 writerRunId 写入并进入下一轮，而不提前调用完成回调。`next-run` 保留到下一次运行，既有轮数/取消/预算上限仍生效。

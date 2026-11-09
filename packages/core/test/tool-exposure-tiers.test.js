@@ -90,3 +90,13 @@ test('failed loader reports no false success [AC:tool-exposure-tiers#AC-4]', asy
 });
 test('allowlist is authorization, not a pinned group [AC:tool-exposure-tiers#AC-1] [AC:tool-exposure-tiers#AC-6]', t => { const h = fixture(t); h.agent.allowedTools = ['read_file', 'tool_search', 'load_capability_tool', 'bot_create']; assert.ok(!h.visible().includes('bot_create')); h.store.setDaemonControl(settingsKey, { mode: 'progressive', pinnedGroups: { general: ['bot-config'] } }); assert.ok(h.visible().includes('bot_create')); });
 test('disabled external discovery and browser stay unavailable in every mode [AC:tool-exposure-tiers#AC-8] [AC:tool-exposure-tiers#AC-9]', async (t) => { const h = fixture(t); h.catalog.push(tool('tailscale_list_devices'), tool('browser_navigate')); h.store.setDaemonControl('discovery_settings', { enabled: false, tailscaleEnabled: true }); h.store.setDaemonControl('browser_settings', { enabled: false }); const r = await h.search('tailscale'); assert.deepEqual(JSON.parse(r.content).loaded, []); h.store.setDaemonControl(settingsKey, { mode: 'full', pinnedGroups: {} }); assert.ok(!h.visible().includes('tailscale_list_devices')); assert.ok(!h.visible().includes('browser_navigate')); });
+
+test('Bot chats receive authorized delegation on the first turn [AC:bot-delegation-lookup#AC-1]', t => {
+    const h = fixture(t);
+    h.catalog.push(tool('bot_delegate'));
+    assert.ok(!h.visible().includes('bot_delegate'));
+    h.store.updateSession(h.session.id, { metadata: { canonicalBotChat: true } });
+    assert.ok(h.visible().includes('bot_delegate'));
+    h.store.updateSession(h.session.id, { metadata: { canonicalBotChat: true, allowedTools: ['read_file'] } });
+    assert.ok(!h.visible().includes('bot_delegate'));
+});

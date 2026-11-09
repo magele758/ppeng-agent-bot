@@ -103,7 +103,9 @@ export class SessionLoopGuard {
   private readonly repeatWindow: number;
   private readonly repeatRatio: number;
 
-  constructor(env: Record<string, string | undefined>) {
+  private lastLookup?: { args: string; content: string; count: number };
+
+  constructor(env: Record<string, string | undefined>, private readonly unchangedLookupTools: readonly string[] = []) {
     this.failStreakMax = envInt(env, 'RAW_AGENT_RECOVERY_TOOL_FAIL_STREAK', 3);
     this.sameToolStreakMax = envInt(env, 'RAW_AGENT_RECOVERY_SAME_TOOL_STREAK', 5);
     this.repeatWindow = envInt(env, 'RAW_AGENT_RECOVERY_REPEAT_WINDOW', 8);
@@ -138,11 +140,29 @@ export class SessionLoopGuard {
     return { abort: false };
   }
 
+  private repeatedLookup(calls: LoopGuardToolCall[], results: { name: string; ok: boolean; content?: string; toolCallId?: string }[]): string | undefined {
+    const [call] = calls;
+    const [result] = results;
+    if (calls.length !== 1 || results.length !== 1 || !call || !result?.ok ||
+        !this.unchangedLookupTools.includes(call.name) || result.name !== call.name ||
+        result.toolCallId !== call.toolCallId || typeof result.content !== 'string') {
+      this.lastLookup = undefined;
+      return;
+    }
+    const args = stableJsonForFingerprint([call.name, call.input]);
+    const previous = this.lastLookup;
+    const count = previous?.args === args && previous.content === result.content ? previous.count + 1 : 1;
+    this.lastLookup = { args, content: result.content, count };
+    if (count >= 3) return `unchanged lookup: ${call.name} returned the same result ${count} consecutive times; use the previous result and proceed to the next action`;
+  }
+
   /** After tool results are known; updates failure and same-call-content streaks. */
   afterToolRound(
     toolCalls: LoopGuardToolCall[],
     results: { name: string; ok: boolean; content?: string; toolCallId?: string }[]
   ): { abort: true; reason: string } | { abort: false } {
+    const repeated = this.repeatedLookup(toolCalls, results);
+    if (repeated) return { abort: true, reason: repeated };
     // Match by call ID when available; concurrent execution can reorder results.
     const remaining = [...results];
     const paired = toolCalls.map(call => {

@@ -34,6 +34,8 @@ export interface LoopConfig {
   refusalPreservation?: boolean;
   /** Successful tool names that end the run (`stop_at:<name>`). */
   stopAtToolNames?: string[];
+  /** Read-only lookups for which three consecutive identical observations require a change of strategy. */
+  unchangedLookupTools?: string[];
   /**
    * Last finite turn: empty tools so the model must answer.
    * Default true (chrome distill / last-call reservation).
@@ -67,6 +69,7 @@ export interface ResolvedLoopConfig {
   modelName?: string;
   refusalPreservation: boolean;
   stopAtToolNames: string[];
+  unchangedLookupTools: string[];
   forceAnswerOnLastTurn: boolean;
   overflowSkipAppendix: boolean;
   promptCacheBustKey?: string;
@@ -92,6 +95,7 @@ export const DEFAULT_LOOP_CONFIG: ResolvedLoopConfig = {
   overflowReprepare: true,
   refusalPreservation: true,
   stopAtToolNames: [],
+  unchangedLookupTools: [],
   forceAnswerOnLastTurn: true,
   overflowSkipAppendix: true,
   lastTurnNudge: LAST_TURN_NUDGE,
@@ -132,6 +136,7 @@ export function resolveLoopConfig(
     overflowReprepare: merged.overflowReprepare ?? DEFAULT_LOOP_CONFIG.overflowReprepare,
     modelName: merged.modelName,
     refusalPreservation: merged.refusalPreservation ?? DEFAULT_LOOP_CONFIG.refusalPreservation,
+    unchangedLookupTools: [...(merged.unchangedLookupTools ?? [])],
     stopAtToolNames: merged.stopAtToolNames ? [...merged.stopAtToolNames] : [],
     forceAnswerOnLastTurn: merged.forceAnswerOnLastTurn ?? DEFAULT_LOOP_CONFIG.forceAnswerOnLastTurn,
     overflowSkipAppendix: merged.overflowSkipAppendix ?? DEFAULT_LOOP_CONFIG.overflowSkipAppendix,

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 390,
+    "implemented": 391,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -286,6 +286,13 @@
       "requirement": "按照这个开发计划，帮我分多个agent去完成开发",
       "verificationStage": "software",
       "file": "acceptance/bot-daydream-ui.yaml"
+    },
+    {
+      "id": "bot-delegation-lookup",
+      "title": "Bot 对话直接委派并打断重复查询",
+      "requirement": "那把这两个问题修一下，Bot 对话里默认注入 bot_delegate，像这次 bot_get 同参数、同结果一直重复的，也要能及时拦住。",
+      "verificationStage": "software",
+      "file": "acceptance/bot-delegation-lookup.yaml"
     },
     {
       "id": "bot-delete",

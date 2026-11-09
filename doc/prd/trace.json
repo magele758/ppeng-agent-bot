@@ -1627,6 +1627,14 @@
       ]
     },
     {
+      "id": "bot-delegation-lookup",
+      "title": "Bot 对话直接委派并打断重复查询",
+      "tests": [
+        "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
+        "packages/core/test/tool-exposure-tiers.test.js"
+      ]
+    },
+    {
       "id": "bot-delete",
       "title": "删除 Bot 并保留对话历史",
       "tests": [

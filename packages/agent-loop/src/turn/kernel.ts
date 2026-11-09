@@ -556,7 +556,7 @@ async function runSessionKernel(
   // RAW_AGENT_RISK_*); an empty bag yields the documented defaults.
   const env = host.env ?? {};
   const loopGuard =
-    loopConfig.recoveryEnabled && recoveryPolicyEnabled(env) ? new SessionLoopGuard(env) : null;
+    loopConfig.recoveryEnabled && recoveryPolicyEnabled(env) ? new SessionLoopGuard(env, loopConfig.unchangedLookupTools) : null;
   // Budget 0 makes grace a pass-through (abort stays abort), i.e. "disabled".
   const advisoryGrace = new AdvisoryGrace(
     loopGuard && advisoryGraceEnabled(env) ? advisoryGraceBudget(env) : 0

@@ -119,6 +119,11 @@ Bot 每日复盘配置与治理界面
 
 按照这个开发计划，帮我分多个agent去完成开发
 
+## bot-delegation-lookup
+Bot 对话直接委派并打断重复查询
+
+那把这两个问题修一下，Bot 对话里默认注入 bot_delegate，像这次 bot_get 同参数、同结果一直重复的，也要能及时拦住。
+
 ## bot-delete
 删除 Bot 并保留对话历史
 
