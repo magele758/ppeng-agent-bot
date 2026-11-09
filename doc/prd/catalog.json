@@ -498,6 +498,13 @@
       "file": "acceptance/bot-group-cleanup.yaml"
     },
     {
+      "id": "bot-group-disclosure-memory",
+      "title": "刷新后记住各 Bot 分组的展开状态",
+      "requirement": "分组的展开和收起状态要能保存，免得每次刷新都要搞一下",
+      "verificationStage": "software",
+      "file": "acceptance/bot-group-disclosure-memory.yaml"
+    },
+    {
       "id": "bot-group-drag-only",
       "title": "Bot 侧栏移组仅保留拖拽入口",
       "requirement": "这个显示纯多余，去掉，已经有拖拽进入分组的能力了",

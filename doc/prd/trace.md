@@ -1549,6 +1549,12 @@ Bot 只在必须时才为目标再开子任务
 - `e2e/bot-functional-groups.spec.ts`
 - `scripts/test/bot-functional-group-routes.test.mjs`
 
+### bot-group-disclosure-memory
+
+刷新后记住各 Bot 分组的展开状态
+
+- `e2e/bot-functional-groups.spec.ts`
+
 ### bot-linked-watchers
 
 关联原工作的临时盯梢与观察证据

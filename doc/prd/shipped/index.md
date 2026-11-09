@@ -133,6 +133,7 @@
 - `bot-goals-panel-rules` 目标与进展只展示同时在做的多件事
 - `bot-goals-panel-threshold` 目标与进展少于两个目标时不展示
 - `bot-group-cleanup` 删除分组时可一并删除 Bot
+- `bot-group-disclosure-memory` 刷新后记住各 Bot 分组的展开状态
 - `bot-group-drag-only` Bot 侧栏移组仅保留拖拽入口
 - `bot-history-memory` Bot 持续对话历史与记忆
 - `bot-human-continuation` Bot忙时接收与连续对话

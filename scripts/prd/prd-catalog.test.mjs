@@ -63,6 +63,18 @@ function buildCatalog() {
     0,
     result.stderr || result.stdout || result.error?.message || 'build-catalog failed',
   );
+  // Regenerate must be a no-op against committed docs. A dirty tree here used to
+  // pass unit assertions on the rewritten files, then fail validation-lane identity.
+  const dirty = spawnSync('git', ['status', '--porcelain', '--', 'doc/prd/'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  });
+  assert.equal(dirty.status, 0, dirty.stderr || dirty.error?.message || 'git status failed');
+  assert.equal(
+    dirty.stdout.trim(),
+    '',
+    `doc/prd generated files are stale; run: node scripts/prd/build-catalog.mjs\n${dirty.stdout}`,
+  );
 }
 
 function readCatalog() {
