@@ -83,6 +83,7 @@ test('schedule details distinguish schedule kinds and persist edits without exec
   await page.getByTestId('bot-detail-toggle').click();
   await page.getByTestId('bot-detail-panel').getByRole('tab', { name: '自动化', exact: true }).click();
   await expect(page.getByTestId('bot-detail-section-routines')).toContainText('一次性');
+  await page.getByTestId('bot-detail-routine').first().locator('summary').first().click();
   await page.getByTestId('bot-detail-routine').first().getByRole('button', { name: '编辑计划' }).click();
   await page.getByLabel('Cron 表达式', { exact: true }).fill('invalid');
   await page.getByRole('button', { name: '保存计划' }).click();

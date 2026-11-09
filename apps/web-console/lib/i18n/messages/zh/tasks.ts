@@ -1,5 +1,12 @@
 export const tasks = {
   flow: {
+  idle: '含无协作记录的 Bot',
+  network: 'Bot 协作图',
+  single: '查看单 Bot 工作流',
+  networkHint: '点击头像查看这个 Bot 的协作记录，或点击连线查看双方的往来。',
+  smaller: '缩小',
+  larger: '放大',
+
   tokens: '{n} 个 token',
   period: '时间范围', days:'最近 {n} 天', all:'全部已加载',
   elapsed: '耗时 {n} 秒',

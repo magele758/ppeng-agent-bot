@@ -1,0 +1,15 @@
+id: bot-network-and-schedule-list
+title: 多 Bot 协作关系图与紧凑的定时列表
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  我要看的是多bot的视角。这个定时任务的太丑陋了，你参考grok-bot的设计，帮我改进一下
+criteria:
+  - id: AC-1
+    given: 多个 Bot 有委派或参加了实际群轮次
+    when: 查看工作流总览
+    then: 能看到有记录的跨 Bot 关系及其回执，重复记录只计一次
+  - id: AC-2
+    given: Bot 有间隔任务与已停用的任务
+    when: 查看定时任务列表
+    then: 能直接辨认启停与易读的间隔，展开条目才能看到管理操作与完整内容

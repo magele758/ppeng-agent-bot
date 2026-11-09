@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 402 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 403 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（126）
+## bot（127）
 
 需求正文见 [bot](bot.md)。
 
@@ -148,6 +148,7 @@
 - `bot-message-name` Bot 回复标签显示 Bot 名称
 - `bot-mock-interview` 内置模拟面试官按指定信息出题、评分并给改进建议
 - `bot-multi-goal-coordination` Bot 多目标持续执行与自动选择执行方式
+- `bot-network-and-schedule-list` 多 Bot 协作关系图与紧凑的定时列表
 - `bot-panel-reset` 切换 Bot 时重置记忆、暂停开关和软件连接
 - `bot-pin-area` Bot 列表置顶区
 - `bot-pin-sync` 跨浏览器置顶同步

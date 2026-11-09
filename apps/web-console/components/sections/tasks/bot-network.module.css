@@ -1,0 +1,19 @@
+.network {max-width:80rem;margin:auto}
+.network header {display:flex;justify-content:space-between;align-items:center;gap:12px}
+.network h2,.network h3 {margin:.5rem 0}
+.network select {background:var(--panel);color:inherit;border:1px solid var(--border);border-radius:8px;padding:.4rem}
+.board {position:relative;background:#191b1c;border:1px solid #34383a;border-radius:16px;overflow:hidden;color:#eaedeb}
+.viewport {overflow:auto;max-height:66vh}
+.stage {position:relative;margin:auto}
+.node {position:absolute;transform:translate(-50%,-50%);display:grid;justify-items:center;align-content:start;background:transparent;border:0;color:#d4d9d7;cursor:pointer;width:max-content;max-width:98px;font:inherit}
+.node>span:last-child {position:absolute;top:100%;max-width:98px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px #000;background:#191b1cee;border-radius:4px;padding:0 3px}
+.node[data-selected=true],.node:focus-visible {outline:2px solid #a5eab9;border-radius:9px;outline-offset:2px}
+.group {display:grid;place-items:center;width:27px;height:27px;background:#464255;color:#dad1fc;border-radius:8px;font-size:21px}
+.edge {cursor:pointer;color:#7c8984}.edge path {fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-dasharray:1 6}
+.edge[data-tone=running]{color:#82baff}.edge[data-tone=failed]{color:#e39580}.edge[data-tone=waiting]{color:#e3bc75}.edge[data-active=true],.edge:hover,.edge:focus{color:#b2f4c7}
+.edge path.hit {stroke:transparent;stroke-width:12;stroke-dasharray:none}
+.tools {position:absolute;z-index:2;right:10px;top:10px;display:flex;background:#303538;border-radius:8px}
+.tools button {background:none;border:0;color:#fff;cursor:pointer;font-size:19px;width:32px;height:32px}.tools button:disabled {opacity:.4}
+.inspect {padding:.6rem .3rem;overflow-wrap:anywhere}.inspect ul {padding:0;list-style:none}.inspect li {padding:.6rem 0;border-top:1px solid var(--border)}.inspect small {color:var(--muted)}.inspect summary{cursor:pointer}.inspect p {white-space:pre-wrap}
+
+.filters{display:flex;align-items:center;gap:12px}.filters label{font-size:12px}.filters input{vertical-align:middle;margin-right:4px}.network>header{flex-wrap:wrap}
