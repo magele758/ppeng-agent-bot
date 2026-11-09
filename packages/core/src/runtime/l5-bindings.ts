@@ -136,6 +136,7 @@ import {
 } from '../turn/prepare-view.js';
 import type { TurnKernelHost } from '../turn/host.js';
 import { autoCompactSession } from './compact-host.js';
+import { BOT_COMPRESSION_TIMEOUT_MS } from '../session/compact-summary-deadline.js';
 import { autoCompactForTurn, waitForBotSummary } from './bot-summary-background.js';
 import { applyNormalSessionRequestBudget } from './normal-request-guard.js';
 import { resolveMaxContextTokens } from '../session/session-budget.js';
@@ -487,7 +488,7 @@ export function createRuntimeToolServices(rt: L5Bindable) {
     startBackgroundJob: (sessionId, command, options) =>
       startBackgroundJob(spawnFrom(rt), sessionId, command, options),
     compactContext: async (context, opts) => {
-      const compacted = await autoCompactSession(compactFrom(rt), context, opts);
+      const compacted = await autoCompactSession(compactFrom(rt), context, { ...opts, summaryTimeoutMs: BOT_COMPRESSION_TIMEOUT_MS });
       if (compacted.replaced) {
         return `Compacted seq ${compacted.replaced.startSeq}–${compacted.replaced.endSeq}.`;
       }

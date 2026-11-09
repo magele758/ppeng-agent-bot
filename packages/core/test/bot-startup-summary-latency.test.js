@@ -125,4 +125,14 @@ test('explicit Bot compaction accepts a six-second summary by default [AC:bot-se
   finish('current decision');
   assert.ok((await pending).replaced);
   assert.equal(readdirSync(join(dir,'transcripts',sessionId)).length,1);
+
+  for(let i=0;i<60;i++) runtime.store.appendMessage(sessionId,i%2?'assistant':'user',[{type:'text',text:'next step '+i}]);
+  const session = runtime.getSession(sessionId);
+  const tool = runtime.tools.find(tool=>tool.name==='compact_context');
+  const toolResult = tool.execute({session,agent:runtime.store.getAgent(session.agentId),stateDir:dir,repoRoot:dir},{});
+  await flush();
+  t.mock.timers.tick(6000);
+  assert.equal(request.signal.aborted,false,'model-requested compression gets the same deadline');
+  finish('updated decision');
+  assert.match((await toolResult).content,/^Compacted seq/);
 });
