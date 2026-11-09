@@ -1909,6 +1909,15 @@
       ]
     },
     {
+      "id": "bot-sidebar-routing",
+      "title": "Bot 名册入口与主对话一致",
+      "tests": [
+        "apps/web-console/lib/bots.test.ts",
+        "e2e/bot-functional-groups.spec.ts",
+        "e2e/grok-local-history.spec.ts"
+      ]
+    },
+    {
       "id": "bot-soft-create-runtime",
       "title": "软萌头像可正常创建和保存",
       "tests": [

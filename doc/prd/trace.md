@@ -1686,6 +1686,14 @@ Bot 列表同一区域内拖拽排序
 
 - `apps/web-console/lib/sidebar-order.test.ts`
 
+### bot-sidebar-routing
+
+Bot 名册入口与主对话一致
+
+- `apps/web-console/lib/bots.test.ts`
+- `e2e/bot-functional-groups.spec.ts`
+- `e2e/grok-local-history.spec.ts`
+
 ### bot-soft-create-runtime
 
 软萌头像可正常创建和保存

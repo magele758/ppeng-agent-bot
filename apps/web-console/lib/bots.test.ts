@@ -65,8 +65,18 @@ test('filterSessionsByPlaySurface keeps bot fork sessions on the chat list and o
     { id: 'fork', metadata: { botGoalWorker: true } },
     { id: 'room', metadata: { roomId: 'room-1', canonicalBotChat: true } }
   ];
-  assert.deepEqual(filterSessionsByPlaySurface(sessions, [], 'chat').map((s) => s.id), ['chat', 'worker', 'fork']);
-  assert.deepEqual(filterSessionsByPlaySurface(sessions, [], 'bot').map((s) => s.id), ['canon']);
+  assert.deepEqual(filterSessionsByPlaySurface(sessions, [], 'chat').map((s) => s.id), ['chat', 'canon', 'worker', 'fork']);
+  assert.deepEqual(filterSessionsByPlaySurface(sessions, [], 'bot').map((s) => s.id), []);
+});
+
+test('a newly hidden Bot and its per-user chat immediately move to history [AC:bot-sidebar-routing#AC-1]', () => {
+  const roster = [{ ...bot, hidden: true }];
+  const sessions = [
+    { id: bot.canonicalSessionId },
+    { id: 'personal', metadata: { botId: bot.id, canonicalBotChat: true } }
+  ];
+  assert.deepEqual(filterSessionsByPlaySurface(sessions, roster, 'bot'), []);
+  assert.deepEqual(filterSessionsByPlaySurface(sessions, roster, 'chat'), sessions);
 });
 
 test('filterSessionsByPlaySurface splits chat vs bot canonical', () => {

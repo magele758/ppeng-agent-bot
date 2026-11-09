@@ -60,3 +60,12 @@ test('reopens a previously authorized folder after reload', async ({page}) => {
   await row.click();
   await expect(page.getByRole('listitem').filter({hasText:'remembered conversation'})).toBeVisible();
 });
+
+test('history source belongs to the conversation list [AC:bot-sidebar-routing#AC-2]', async ({ page }) => {
+  await page.goto('/#/bot');
+  await expect(page.getByTestId('functional-group-ungrouped')).toBeVisible();
+  const source = page.locator('#sessionListMini').getByRole('button', { name: 'Grok Bot（本机）' });
+  await expect(source).toHaveCount(0);
+  await page.goto('/#/chat');
+  await expect(source).toBeVisible();
+});

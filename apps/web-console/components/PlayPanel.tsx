@@ -1158,7 +1158,7 @@ export function PlayPanel({
 
           </div>
           <div className="list-scroll play-sidebar__list" id="sessionListMini">
-            <GrokHistorySource />
+            <GrokHistorySource surface={playSurface} />
               <BotPinArea
                 active={botSurface}
                 bots={botRoster}

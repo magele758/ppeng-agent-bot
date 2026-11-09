@@ -9,7 +9,7 @@ import { useI18n } from '@/lib/i18n';
 import { leaveCancelsRun } from '@/lib/run-leave';
 import { createDefaultBotLoadGuard, defaultBotLoadMaySelect, startDefaultBotLoadEffect } from '@/lib/bot-console-selection';
 import {
-  botForCanonicalSession,
+  visibleBotForSession,
   sessionsForPlaySurface,
   writeStoredPlaySurface,
   type PlaySurface
@@ -193,7 +193,7 @@ export function ChatSection({ active }: { active: boolean }) {
   const selectSession = useCallback(
     async (id: string): Promise<PlaySurface> => {
       setSelectedSessionId(id);
-      const match = botForCanonicalSession(botsRef.current, id, sessionsRef.current);
+      const match = visibleBotForSession(botsRef.current, id, sessionsRef.current);
       const surface: PlaySurface = match ? 'bot' : 'chat';
       if (match) {
         lastBotSessionRef.current = id;
@@ -221,7 +221,7 @@ export function ChatSection({ active }: { active: boolean }) {
     if (next === 'chat') {
       chat.applyBotSelection(null);
       const current = selectedSessionRef.current;
-      if (current && botForCanonicalSession(botsRef.current, current, sessionsRef.current)) {
+      if (current && visibleBotForSession(botsRef.current, current, sessionsRef.current)) {
         let fallback = lastChatSessionRef.current;
         if (fallback && !sessionsRef.current.some((s) => s.id === fallback)) {
           fallback = null;
@@ -238,9 +238,9 @@ export function ChatSection({ active }: { active: boolean }) {
       return;
     }
     const current = selectedSessionRef.current;
-    if (current && botForCanonicalSession(botsRef.current, current, sessionsRef.current)) return;
+    if (current && visibleBotForSession(botsRef.current, current, sessionsRef.current)) return;
     const fallback = lastBotSessionRef.current;
-    if (fallback && botForCanonicalSession(botsRef.current, fallback, sessionsRef.current)) {
+    if (fallback && visibleBotForSession(botsRef.current, fallback, sessionsRef.current)) {
       void selectSession(fallback);
       return;
     }
