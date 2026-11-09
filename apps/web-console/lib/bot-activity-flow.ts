@@ -1,6 +1,6 @@
 export interface FlowStep {
   id:string; bot:string; raw:string; state:string; parent?:string; session?:string;
-  report?:string; cost?:number; label?:string;
+  report?:string; cost?:number; tokens?:number; label?:string;
 }
 export interface Flow {
   id:string; kind:'task'|'room'|'routine'|'chat'; title:string; at:string; steps:FlowStep[];
@@ -78,4 +78,17 @@ export function chatFlows(messages:ChatRecord[],bot:string,session:string):Flow[
     active.at=m.createdAt;
   }
   return flows.filter(f=>f.steps.length>0);
+}
+
+export interface SessionNode {
+  id:string;agentId:string;title:string;parentSessionId?:string;status:string;updatedAt:string;
+  metadata?:{usageCostUsd?:number;usageTotals?:{totalTokens?:number}};
+}
+/** Native session parent pointers also cover historical tool reports without a child ID. */
+export function sessionFlow(root:SessionNode,descendants:SessionNode[],bot:string):Flow[] {
+  if(!descendants.length)return [];
+  const rows=[root,...descendants];
+  const steps=rows.map(s=>({id:s.id,session:s.id,parent:s.id===root.id?undefined:s.parentSessionId,bot:s.id===root.id?bot:s.agentId,
+    label:s.title,raw:s.status,state:s.status,cost:s.metadata?.usageCostUsd,tokens:s.metadata?.usageTotals?.totalTokens}));
+  return [{id:'team/'+root.id,title:root.title,kind:'chat',at:rows.map(s=>s.updatedAt).sort().at(-1)!,steps}];
 }

@@ -1,5 +1,6 @@
 export const tasks = {
   flow: {
+  tokens: '{n} tokens',
   period: 'Period', days:'Last {n} days', all:'All loaded',
   elapsed: '{n}s elapsed',
   "select": "Select bot",

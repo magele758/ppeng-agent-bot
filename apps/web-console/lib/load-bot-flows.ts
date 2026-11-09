@@ -1,5 +1,5 @@
 import { api } from './api';
-import { chatFlows, type ChatRecord, taskSteps, roomSteps, routineStep, type FlowStep, type Flow, type Task, type Routine, type RoomTurn, type RoomMessage } from './bot-activity-flow';
+import { sessionFlow, type SessionNode, chatFlows, type ChatRecord, taskSteps, roomSteps, routineStep, type FlowStep, type Flow, type Task, type Routine, type RoomTurn, type RoomMessage } from './bot-activity-flow';
 interface Collaboration { id:string;goal:string;members:Task[] }
 interface Room { id:string;title:string;botIds:string[] }
 interface Job { id:string;name:string;metadata?:{botId?:string};agentId:string }
@@ -42,7 +42,8 @@ export async function loadBotFlows(bot:string,session:string,signal:AbortSignal)
   const jobs=get<{jobs:Job[]}>('cron/jobs?botId='+encodeURIComponent(bot),signal).then(d=>Promise.all(d.jobs.map(j=>fromJob(j,bot,signal))).then(a=>a.flat()));
   const rooms=get<{rooms:Room[]}>('bot-rooms',signal).then(d=>Promise.all(d.rooms.filter(r=>r.botIds.includes(bot)).map(r=>fromRoom(r,bot,signal))).then(a=>a.flat()));
   const chats=get<{messages:ChatRecord[]}>('sessions/'+encodeURIComponent(session)+'/history?limit=100',signal).then(d=>chatFlows(d.messages,bot,session));
-  const reads=await Promise.allSettled([tasks,jobs,rooms,chats]);
+  const family=get<{root:SessionNode;descendants:SessionNode[]}>('sessions/'+encodeURIComponent(session)+'/team',signal).then(d=>sessionFlow(d.root,d.descendants,bot));
+  const reads=await Promise.allSettled([tasks,jobs,rooms,chats,family]);
   const flows=reads.flatMap(r=>r.status==='fulfilled'?r.value:[]).sort((a,b)=>b.at.localeCompare(a.at));
   return {flows,partial:reads.some(r=>r.status==='rejected')};
 }

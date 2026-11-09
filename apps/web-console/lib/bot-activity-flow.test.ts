@@ -21,3 +21,11 @@ test('实际对话工具调用只配对同轮回执，子会话可打开 [AC:bot
  const calls=chatFlows([rec(1,'user',[{type:'text',text:'inspect'}]),rec(2,'assistant',[{type:'tool_call',toolCallId:'x',name:'spawn_subagent'}]),rec(3,'tool',[{type:'tool_result',toolCallId:'x',name:'spawn_subagent',ok:true,content:'{"childSessionId":"session_worker"}'}]),rec(4,'user',[{type:'text',text:'new'}]),rec(5,'tool',[{type:'tool_result',toolCallId:'x',ok:false}])],'b','session_main');
  assert.equal(calls.length,1);assert.equal(calls[0].steps[0].session,'session_worker');assert.equal(calls[0].steps[0].state,'done');
 });
+
+test('按真实会话父子关系显示子任务与用量，缺失用量保留未知 [AC:bot-activity-flow#AC-2]',async()=>{
+ const {sessionFlow}=await import('./bot-activity-flow.ts');
+ const root={id:'s1',title:'root',agentId:'b',status:'idle',updatedAt:'2026-11-09'};
+ const child={...root,id:'s2',parentSessionId:'s1',metadata:{usageCostUsd:0.1,usageTotals:{totalTokens:50}}};
+ const flow=sessionFlow(root,[child],'b')[0];
+ assert.equal(flow.steps[1].parent,'s1');assert.equal(flow.steps[1].session,'s2');assert.equal(flow.steps[1].cost,0.1);assert.equal(flow.steps[0].cost,undefined);
+});

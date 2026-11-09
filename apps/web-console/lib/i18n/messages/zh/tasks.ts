@@ -1,5 +1,6 @@
 export const tasks = {
   flow: {
+  tokens: '{n} 个 token',
   period: '时间范围', days:'最近 {n} 天', all:'全部已加载',
   elapsed: '耗时 {n} 秒',
   "select": "选择 Bot",

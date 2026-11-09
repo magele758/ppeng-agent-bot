@@ -26,6 +26,7 @@ function Step({step,index,flow}:{step:FlowStep;index:number;flow:Flow}){
     {parent && <small>{t('tasks.flow.upstream')} · {parentName??parent.bot} · {flow.steps.indexOf(parent)+1}</small>}
     {step.label && <p>{step.label.slice(0,240)}</p>}
     {state==='reportedBlocked' && <small>{t('tasks.flow.raw',{state:step.raw})}</small>}
+    {step.tokens!=null && <small>{t('tasks.flow.tokens',{n:step.tokens.toLocaleString()})} </small>}
     {step.cost!=null && <small>{t('tasks.flow.cost',{value:'$'+step.cost.toLocaleString(undefined,{maximumFractionDigits:6})})}</small>}
     {step.report && <details><summary>{t('tasks.flow.result')}</summary><div className={styles.report}>{step.report}</div></details>}
   </li>;
