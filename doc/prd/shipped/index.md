@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 396 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 397 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -431,6 +431,12 @@
 需求正文见 [other](other.md)。
 
 - `fold-visible-history` 折叠历史保留用户问题
+
+## functional（1）
+
+需求正文见 [other](other.md)。
+
+- `functional-group-disclosure` Bot 侧栏功能分组折叠与展开
 
 ## gateway（1）
 

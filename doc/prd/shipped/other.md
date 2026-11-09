@@ -319,6 +319,11 @@ If a prefix must be dropped because the token budget is exceeded, use the existi
 autoCompact summary path; if summary fails, fall back to pin-user + closed-wave,
 never the old blind slice.
 
+## functional-group-disclosure
+Bot 侧栏功能分组折叠与展开
+
+加一个群组折叠、展开的功能
+
 ## gateway-im-security
 IM 网关入站安全（验签、去重、白名单、Bot 路由）
 

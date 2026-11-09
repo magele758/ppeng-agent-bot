@@ -119,6 +119,8 @@ export const play = {
   },
   faceMotion: { working: "Working" },
   functionalGroups: {
+    collapse: "Collapse {name}",
+    expand: "Expand {name}",
     title: "Functional groups",
     create: "New functional group",
     name: "Functional group name",
