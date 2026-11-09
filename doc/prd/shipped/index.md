@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（121）
+## bot（122）
 
 需求正文见 [bot](bot.md)。
 
@@ -190,6 +190,7 @@
 - `bot-soft-motion` 软萌头像跟随实际工作状态动起来
 - `bot-software-execution` Bot 软件连接与可靠执行
 - `bot-source-authorization-continuity` Bot 已授权工作的来源连续性
+- `bot-source-trace-pairing` 跨会话原文召回与乱序工具回执
 - `bot-startup-summary-latency` 摘要服务变慢时 Bot 启动有界等待
 - `bot-startup-trace` Bot 启动耗时分段可观测
 - `bot-steer-visible` Bot 对话里的实时插话马上出现在对话流

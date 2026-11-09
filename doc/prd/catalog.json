@@ -897,6 +897,13 @@
       "file": "acceptance/bot-source-authorization-continuity.yaml"
     },
     {
+      "id": "bot-source-trace-pairing",
+      "title": "跨会话原文召回与乱序工具回执",
+      "requirement": "跨会话查原文别再被无关技能拦住或反复重试，trace 按会话和调用 ID 配对，别把乱序返回误报成未结束。",
+      "verificationStage": "software",
+      "file": "acceptance/bot-source-trace-pairing.yaml"
+    },
+    {
       "id": "bot-startup-summary-latency",
       "title": "摘要服务变慢时 Bot 启动有界等待",
       "requirement": "帮我分析下现在启动bot会话的耗时，怎么感觉启动会话这么慢？排查定位根因，修复问题",

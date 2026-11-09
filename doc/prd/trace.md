@@ -1705,6 +1705,13 @@ Bot 已授权工作的来源连续性
 
 - `packages/core/test/bot-source-authorization-continuity.test.js`
 
+### bot-source-trace-pairing
+
+跨会话原文召回与乱序工具回执
+
+- `packages/core/test/bot-recall-replies.test.js`
+- `packages/core/test/execution-findings.test.ts`
+
 ### bot-startup-summary-latency
 
 摘要服务变慢时 Bot 启动有界等待

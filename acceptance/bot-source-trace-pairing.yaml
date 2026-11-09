@@ -1,0 +1,14 @@
+id: bot-source-trace-pairing
+title: 跨会话原文召回与乱序工具回执
+status: implemented
+requirement: 跨会话查原文别再被无关技能拦住或反复重试，trace 按会话和调用 ID 配对，别把乱序返回误报成未结束。
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 用户准备查找或明确查询旧会话中的原文
+    when: Bot 接到请求或读取来源被拒
+    then: 只使用当前权限允许的历史工具，优先读取同身份同 Bot 的旧会话，遇到拒绝停止尝试
+  - id: AC-2
+    given: 多个会话中工具结束事件可能先于开始事件到达
+    when: 诊断历史记录
+    then: 同会话同调用的回执可配对，不同会话的回执不能掩盖真正缺失，失败和审批仍然报告

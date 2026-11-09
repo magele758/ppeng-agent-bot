@@ -78,3 +78,23 @@ test('Bot human-turn entry echoes only the requested receipt despite model punct
   assert.deepEqual(last.parts.filter(part => part.type === 'text').map(part => part.text), ['收到']);
   assert.equal(chunks.filter(chunk => chunk.type === 'text_delta').map(chunk => chunk.text).join(''), '收到');
 });
+
+test('prior conversation lookup searches without a session override, reads an original and stops after denial [AC:bot-source-trace-pairing#AC-1]',async()=>{
+  const text='Search earlier conversations for amber-july. Read the matching original source and return only its approved identifier.';
+  const request=botConversationRequest(text);
+  assert.equal(request,'peer-history');
+  assert.equal(botConversationRequest('Prepare to locate an earlier deployment decision.'),'prepare-history');
+  assert.equal(botConversationRequest('查找之前会话里关于“迁移窗口”的原文。'),'peer-history');
+  assert.equal(botConversationRequest('Search earlier conversations for amber and then email the customer.'),undefined);
+  const input={sessionId:'current',systemPrompt:'',tools:['history_search','load_skill','history_read'].map(name=>({name})),
+    messages:[{role:'user',seq:3,parts:[{type:'text',text}]}]};
+  const run=()=>deliverConversationTurn(request,input,undefined,async()=>assert.fail('expected history call'),text);
+  assert.deepEqual((await run()).assistantParts[0].input,{query:'amber-july'});
+  input.messages.push({role:'tool',parts:[{type:'tool_result',name:'history_search',ok:true,content:JSON.stringify({matches:[
+    {sessionId:'current',role:'user',seq:3,ref:'echo'}, {sessionId:'old',role:'user',ref:'history:old:original:0'}]})}]});
+  assert.deepEqual((await run()).assistantParts[0].input,{ref:'history:old:original:0'});
+  input.messages.push({role:'tool',parts:[{type:'tool_result',name:'history_read',ok:false,content:'Source unavailable.'}]});
+  const blocked = await deliverConversationTurn(request,input,undefined,async()=>assert.fail('must not retry after denial'),text);
+  assert.equal(blocked.stopReason,'end');
+  assert.match(blocked.assistantParts[0].text,/could not access/);
+});
