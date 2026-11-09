@@ -355,3 +355,22 @@ test('routine working sessions default to unlimited execution steps [AC:unlimite
   assert.equal(store.getSession(runs.get(run.id).sessionId).metadata.maxTurns,0);
  } finally {store.db.close();}
 });
+
+test('dialog create confirms matching active schedule on retry [AC:bot-routine-create-receipt#AC-2]', async () => {
+  const {CronJobStore, createCronTools} = await import('../dist/cron/cron-store.js');
+  const jobs = new CronJobStore(mkdtempSync(join(tmpdir(), 'routine-receipt-')));
+  const create = createCronTools(() => jobs).find(tool => tool.name === 'cron_create');
+  const context = {session: {id: 'chat', metadata: {}}, agent: {id: 'bot'}};
+  const args = {name: 'review', prompt: 'review today', every_ms: 60000};
+  const call = async (input) => JSON.parse((await create.execute(context, input)).content);
+  const first = await call(args);
+  const retry = await call(args);
+  assert.equal(retry.id, first.id);
+  assert.equal(first.creationStatus, 'created');
+  assert.equal(retry.creationStatus, 'already_scheduled');
+  assert.equal(retry.nextRunAt, first.nextRunAt);
+  assert.equal(jobs.list().length, 1);
+  assert.notEqual((await call({...args, every_ms: 120000})).id, first.id);
+  jobs.update(first.id, {enabled: false});
+  assert.notEqual((await call(args)).id, first.id);
+});

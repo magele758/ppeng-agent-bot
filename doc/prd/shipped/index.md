@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 407 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 408 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（130）
+## bot（131）
 
 需求正文见 [bot](bot.md)。
 
@@ -182,6 +182,7 @@
 - `bot-room-wave-dispatch` 群发言并行与停止拦截
 - `bot-room-work-continuity` 群派工到原 Bot 持久工作的可靠承接
 - `bot-rooms` 多 Bot 群会话与可靠发言
+- `bot-routine-create-receipt` Bot 对话直接创建定时任务并取得确认
 - `bot-routine-lifecycle` Bot 可靠例行任务
 - `bot-routine-main-session` Bot 定时任务跟自己的会话走
 - `bot-row-menu` Bot 列表操作菜单

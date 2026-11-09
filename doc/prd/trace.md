@@ -1689,6 +1689,13 @@ Bot 间通信在聊天流里显示为紧凑通信条，点击弹窗看全文
 - `packages/core/test/bot-room-work-runtime.test.js`
 - `scripts/test/bot-room-work-continuity-http.test.mjs`
 
+### bot-routine-create-receipt
+
+Bot 对话直接创建定时任务并取得确认
+
+- `packages/core/test/bot-history-memory.test.js`
+- `packages/core/test/routine-lifecycle.test.js`
+
 ### bot-row-menu
 
 Bot 列表操作菜单

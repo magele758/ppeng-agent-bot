@@ -1913,6 +1913,14 @@
       ]
     },
     {
+      "id": "bot-routine-create-receipt",
+      "title": "Bot 对话直接创建定时任务并取得确认",
+      "tests": [
+        "packages/core/test/bot-history-memory.test.js",
+        "packages/core/test/routine-lifecycle.test.js"
+      ]
+    },
+    {
       "id": "bot-row-menu",
       "title": "Bot 列表操作菜单",
       "tests": [
