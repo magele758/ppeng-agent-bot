@@ -323,3 +323,46 @@ describe('result-aware risk and recovery wiring', () => {
     expect(JSON.stringify(out.risks)).toContain('tool_repeat');
   });
 });
+
+describe('consecutive lookup results', () => {
+  async function runLookups(rounds: [string, string, string][], mode: 'off' | 'weak') {
+    const { host, session, store, calls } = createHarness();
+    host.env = {};
+    host.maxTurnsPerRun = rounds.length + 1;
+    host.loopConfig = { unchangedLookupTools: ['bot_get'], forceAnswerOnLastTurn: false };
+    host.tools.push(viewTool('bot_get'));
+    store.getDaemonControl = key => key === 'loop_settings' ? { repeatGuard: mode } : undefined;
+    host.modelAdapter = {
+      ...host.modelAdapter, name: 'strong-model',
+      async runTurn() {
+        const row = rounds[calls.execute];
+        if (!row) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'done' }] };
+        return { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: String(calls.execute), name: row[0], input: { bot: row[1] } }] };
+      },
+    };
+    host.executeToolCalls = async ([call]) => [{
+      name: call!.name, toolCallId: call!.toolCallId, ok: true, content: rounds[calls.execute++]![2],
+    }];
+    await runSessionKernel(host, session.id);
+    return { calls: calls.execute, reason: outcomeOf(store, session.id).reason, system: systemText(store, session.id) };
+  }
+
+  it('interrupts the unchanged Bot lookup after one recovery chance [AC:bot-delegation-lookup#AC-2]', async () => {
+    for (const mode of ['off', 'weak'] as const) {
+      const out = await runLookups(Array(8).fill(['bot_get', 'RSI', 'profile']), mode);
+      expect(out.calls).toBe(4);
+      expect(out.reason).toBe('repeat_detection');
+      expect(out.system).toContain('bot_get');
+    }
+  });
+
+  it('counts only consecutive identical observations of the same target [AC:bot-delegation-lookup#AC-3]', async () => {
+    const out = await runLookups([
+      ['bot_get','A','x'], ['bot_get','A','x'], ['bot_get','B','x'], ['bot_get','B','x'],
+      ['bot_get','B','y'], ['bot_get','B','y'], ['read_file','B','y'], ['bot_get','B','y'], ['bot_get','B','y'],
+    ], 'off');
+    expect(out.calls).toBe(9);
+    expect(out.system).not.toContain('recovery-advisory');
+    expect(out.reason).toBe('end');
+  });
+});

@@ -681,7 +681,7 @@ async function runSessionKernel(
       /* best-effort */
     }
   };
-  const loopGuard = recoveryPolicyEnabled(process.env) ? new SessionLoopGuard(process.env) : null;
+  const loopGuard = recoveryPolicyEnabled(process.env) ? new SessionLoopGuard(process.env, host.loopConfig?.unchangedLookupTools) : null;
   const progressGuard = loopGuard ?? new SessionLoopGuard(process.env);
   const advisoryGrace =
     loopGuard && advisoryGraceEnabled(process.env)
