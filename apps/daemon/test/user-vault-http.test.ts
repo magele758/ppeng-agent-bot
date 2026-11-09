@@ -15,6 +15,14 @@ const PASSWORD = 'http-vault-PASSWORD-sentinel';
 const CARD = '4111111111111111';
 const CVV = '918';
 
+/** CVV is 3 digits. A bare includes() collides with hex ids and ISO millis (`.918Z`).
+ *  Match the JSON string value, and a standalone token (JSON number or prose)
+ *  that is not embedded in an id or a longer number. */
+function cvvLeaked(raw: string): boolean {
+  if (raw.includes(JSON.stringify(CVV))) return true;
+  return new RegExp(`(?<![0-9A-Za-z])${CVV}(?![0-9A-Za-z])`).test(raw);
+}
+
 async function boot() {
   const dir = mkdtempSync(join(tmpdir(), 'user-vault-http-'));
   const runtime = new RawAgentRuntime({
@@ -78,6 +86,15 @@ const send = (root: string, method: string, path: string, body?: unknown) =>
     headers: { 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
+
+test('cvv leak matcher ignores hex ids and ISO millis [AC:secure-form-multi#AC-8]', () => {
+  assert.equal(cvvLeaked(`sform_${'a'.repeat(8)}918${'b'.repeat(8)}`), false);
+  assert.equal(cvvLeaked('2026-11-10T01:22:44.918Z'), false);
+  assert.equal(cvvLeaked('1739180000000'), false);
+  assert.equal(cvvLeaked(JSON.stringify({ cvv: CVV })), true);
+  assert.equal(cvvLeaked('{"cvv":918}'), true);
+  assert.equal(cvvLeaked('value is 918.'), true);
+});
 
 test('Lab Vault API: write-only secrets, uvref listing, toggle, delete, SecretVault separate [AC:user-vault-tools#AC-4]', async () => {
   const env = await boot();
@@ -293,9 +310,11 @@ test('multi-field secure form submit (card number + cvv) with no plaintext in re
     assert.equal(res.status, 200);
     const body = await res.text();
 
-    // Receipt must have no plaintext secrets
+    // Receipt must have no plaintext secrets.
+    // Same CVV match as the Lab Vault listing test (JSON string), plus a standalone
+    // token so a JSON number or prose leak still fails. Not a bare includes('918').
     assert.equal(body.includes(CARD), false, 'card number should not appear in receipt');
-    assert.equal(body.includes(CVV), false, 'cvv should not appear in receipt');
+    assert.equal(cvvLeaked(body), false, 'cvv should not appear in receipt');
     assert.match(body, /filled/);
 
     // Receipt must have fields array with fillRefs
@@ -305,10 +324,10 @@ test('multi-field secure form submit (card number + cvv) with no plaintext in re
     const fillRefs = receipt.receipt.fields.map((f) => f.fillRef).filter((f) => f);
     assert.equal(fillRefs.length, 2, 'both fields should have fillRefs');
 
-    // Transcript must have no plaintext secrets
+    // Transcript must have no plaintext secrets.
     const transcript = JSON.stringify(env.runtime.store.foldMessages(session.id));
     assert.equal(transcript.includes(CARD), false, 'card number should not appear in transcript');
-    assert.equal(transcript.includes(CVV), false, 'cvv should not appear in transcript');
+    assert.equal(cvvLeaked(transcript), false, 'cvv should not appear in transcript');
 
     // resolveFillReference should work
     for (const field of receipt.receipt.fields) {
