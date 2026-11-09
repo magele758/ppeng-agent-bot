@@ -1,0 +1,19 @@
+id: bot-browser-notices
+title: Bot 桌面通知
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  加一个功能，如果在chrome里访问的Agent  home，在有bot完成任务，或者需要交互的时候，可以发一个通知
+criteria:
+  - id: AC-1
+    given: Chrome 已打开 Agent Home
+    when: 用户在设置中开启桌面通知并允许浏览器权限
+    then: 新完成的工作和需要回应的 Bot 会显示桌面通知，点击可回到处理位置
+  - id: AC-2
+    given: 用户尚未开启、拒绝权限，或关闭了桌面通知
+    when: Bot 状态改变
+    then: 不打扰用户，页面继续使用
+  - id: AC-3
+    given: 页面首次读取状态或重复读取相同状态
+    when: 没有新的互动或完成事件
+    then: 不补发旧通知或反复提醒

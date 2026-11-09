@@ -34,6 +34,11 @@ Bloub 动态头像风格
 
 另加一套 “Bloub 动态”
 
+## bot-browser-notices
+Bot 桌面通知
+
+加一个功能，如果在chrome里访问的Agent  home，在有bot完成任务，或者需要交互的时候，可以发一个通知
+
 ## bot-chat-header
 Bot 对话头部只显示名字、活脸和权限入口
 

@@ -1,0 +1,15 @@
+id: lab-auth-loading-recovery
+title: 网页登录检查可恢复
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  很奇怪，为什么现在在chatgpt里，网页一直加载不回来？
+criteria:
+  - id: AC-1
+    given: 登录检查迟迟没有响应
+    when: 用户等待超时并重试
+    then: 页面提示连接问题，服务恢复后可以继续打开
+  - id: AC-2
+    given: 用户有旧版首页或页面脚本没有启动
+    when: 再次打开或重新加载
+    then: 首页要求重新验证版本，加载画面提供无需脚本的重新打开入口

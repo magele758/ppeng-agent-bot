@@ -1,3 +1,4 @@
+import { DesktopNoticesCard } from '../../../bot-work/DesktopNotices';
 import { ChatWidthSettingsCard } from '../../../ChatWidthSettingsCard';
 import { DebugDisplaySettingsCard } from '../../../DebugDisplay';
 import { FontSizeSettingsCard } from '../../../FontSizeSettingsCard';
@@ -8,6 +9,7 @@ import { ThemeSettingsCard } from '../../../ThemeSettingsCard';
 import type { SettingsEntry } from '../registry';
 
 export const generalEntries: SettingsEntry[] = [
+  { id: 'desktop-notices', category: 'general', titleKey: 'settings.desktopNotices.title', keywordsKey: 'settings.desktopNotices.keywords', render: () => <DesktopNoticesCard /> },
   { id: 'chat-width', category: 'general', titleKey: 'settings.chatWidth.title', keywordsKey: 'settings.chatWidth.keywords', render: () => <ChatWidthSettingsCard /> },
   { id: 'debug-display', category: 'general', titleKey: 'settings.debugDisplay.title', keywordsKey: 'settings.debugDisplay.keywords', render: () => <DebugDisplaySettingsCard /> },
   { id: 'font-size', category: 'general', titleKey: 'settings.fontSize.title', keywordsKey: 'settings.fontSize.keywords', render: () => <FontSizeSettingsCard /> },

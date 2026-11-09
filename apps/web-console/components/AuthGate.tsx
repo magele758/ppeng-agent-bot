@@ -7,6 +7,14 @@ import { authErrorFromSearch, parseAuthMe, type AuthMeResponse, type AuthUser } 
 import { LoginScreen } from './LoginScreen';
 import './auth.css';
 
+async function loadLoginState(signal: AbortSignal) {
+  const res = await fetch('/api/auth/me', { signal, cache: 'no-store' });
+  if (!res.ok) throw new Error('Login check failed');
+  const data = await res.json();
+  if (typeof data?.loginRequired !== 'boolean') throw new Error('Invalid login response');
+  return parseAuthMe(data);
+}
+
 export function AuthGate({
   children,
   onUser
@@ -14,9 +22,11 @@ export function AuthGate({
   children: ReactNode;
   onUser?: (user: AuthUser | null) => void;
 }) {
-  const { t } = useI18n();
   const [me, setMe] = useState<AuthMeResponse | null>(null);
   const [error, setError] = useState<'denied' | 'failed' | undefined>();
+
+  const [attempt, setAttempt] = useState(0);
+  const [unreachable, setUnreachable] = useState(false);
 
   useEffect(() => {
     setError(authErrorFromSearch(window.location.search));
@@ -24,8 +34,9 @@ export function AuthGate({
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/auth/me')
-      .then(async (res) => parseAuthMe(await res.json()))
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    void loadLoginState(controller.signal)
       .then((data) => {
         if (cancelled) return;
         setMe(data);
@@ -33,13 +44,14 @@ export function AuthGate({
       })
       .catch(() => {
         if (cancelled) return;
-        setMe({ loginRequired: false, providers: [], user: null });
-        onUser?.(null);
-      });
+        setUnreachable(true);
+      }).finally(() => clearTimeout(timeout));
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
+      controller.abort();
     };
-  }, [onUser]);
+  }, [attempt, onUser]);
 
   useEffect(() => {
     const onRequired = (event: Event) => {
@@ -54,16 +66,31 @@ export function AuthGate({
     return () => window.removeEventListener('ppeng-login-required', onRequired);
   }, [onUser]);
 
-  if (!me) {
-    return (
-      <p className="auth-gate__loading" role="status" aria-live="polite">
-        <span className="auth-spinner" aria-hidden="true" />
-        {t('auth.loading')}
-      </p>
-    );
-  }
+  if (!me) return <LoginCheck unreachable={unreachable} retry={() => {
+    setUnreachable(false);
+    setAttempt(value => value + 1);
+  }} />;
   if (me.loginRequired && !me.user) {
     return <LoginScreen me={me} error={error} />;
   }
   return <>{children}</>;
+}
+
+function LoginCheck({ unreachable, retry }: { unreachable: boolean; retry: () => void }) {
+  const { t } = useI18n();
+  if (unreachable) {
+    return <div className="auth-gate__loading" role="alert">{t('auth.connectionFailed')}
+      <button data-testid="auth-retry" onClick={retry}>{t('auth.retry')}</button>
+    </div>;
+  }
+  return (
+      <div className="auth-gate__loading" role="status" aria-live="polite">
+        <span className="auth-spinner" aria-hidden="true" />
+        {t('auth.loading')}
+        <form method="get" data-auth-reload="">
+          <input type="hidden" name="labBuild" value={process.env.NEXT_PUBLIC_BUILD_ID} />
+          <button type="submit">{t('auth.reload')}</button>
+        </form>
+      </div>
+  );
 }

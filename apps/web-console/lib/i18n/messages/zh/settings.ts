@@ -1,4 +1,16 @@
 export const settings = {
+  desktopNotices: {
+    "title": "Bot 桌面通知",
+    "keywords": "Chrome 浏览器 通知 提醒",
+    "description": "在此浏览器保持 Agent Home 打开，Bot 完成工作、提问或等待审批时收到桌面提醒。",
+    "enable": "开启桌面通知",
+    "disable": "关闭桌面通知",
+    "denied": "请在浏览器的此网站设置中允许通知。",
+    "unavailable": "请用支持桌面通知的浏览器，通过 HTTPS 或 localhost 打开。",
+    "failed": "未能保存通知设置，请检查浏览器设置。",
+    "completed": "{name} 完成了工作",
+    "interaction": "{name} 需要你处理"
+},
   chatWidth: { title: '内容展示宽度', keywords: '聊天 对话 宽度 边距 留白', mode: '展示方式', center: '居中', full: '铺满', gap: '两侧额外留白', pixels: '{value} px' },
   debugDisplay: {
   "title": "调试信息",
