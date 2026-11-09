@@ -2290,6 +2290,12 @@ Bot 级外部 Agent 通信
 
 - `packages/agent-loop/src/session/fold-budget.test.ts`
 
+### functional-group-disclosure
+
+Bot 侧栏功能分组折叠与展开
+
+- `e2e/bot-functional-groups.spec.ts`
+
 ### gateway-im-security
 
 IM 网关入站安全（验签、去重、白名单、Bot 路由）

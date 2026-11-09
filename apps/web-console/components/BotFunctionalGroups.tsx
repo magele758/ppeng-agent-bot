@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode } from 'react';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { botForCanonicalSession } from '@/lib/bots';
 import { api } from '@/lib/api';
@@ -249,17 +249,15 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
         if (roomId) { void moveRoom(roomId, groupId); return; }
         void move(event.dataTransfer.getData(BOT_DRAG_MIME), groupId);
       }}>
-      <div className={styles.heading}>
-        <h3>{presentation.name}</h3>
-        <span className={styles.count}>{ordered.length}</span>
-        {group ? <RowActionMenu label={t('play.rowMenu.label',{name:group.name})}>
+      <GroupDisclosure name={presentation.name} count={ordered.length} actions={
+        group ? <RowActionMenu label={t('play.rowMenu.label',{name:group.name})}>
           <button className="btn btn-ghost btn-sm" disabled={pending} aria-label={t('play.functionalGroups.rename')} title={t('play.functionalGroups.rename')}
             onClick={() => setEditing({ id: group.id, name: group.name })}>{t('play.functionalGroups.renameShort')}</button>
           <button className="btn btn-ghost btn-sm" disabled={pending} aria-label={t('play.functionalGroups.delete')} title={t('play.functionalGroups.delete')}
             onClick={() => { void remove(group, false); }}>{t('play.functionalGroups.deleteShort')}</button>
           <button className="btn btn-ghost btn-sm" disabled={pending} onClick={() => { void remove(group, true); }}>{t('play.functionalGroups.deleteWithBots')}</button>
-        </RowActionMenu> : null}
-      </div>
+        </RowActionMenu> : null
+      }>
       {ordered.map((entry) => {
         const placeKey = `${orderRegionKey(region)}:${entry.kind}:${entry.id}:`;
         const place = insert?.startsWith(placeKey) ? insert.slice(placeKey.length) : '';
@@ -315,6 +313,7 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
         );
       })}
       {!ordered.length ? <div className={styles.empty}>{t('play.functionalGroups.dropHint')}</div> : null}
+      </GroupDisclosure>
     </section>;
   };
 
@@ -332,6 +331,26 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
     </form></BotEntryDialog> : null}
     {loaded ? <>{groups.map((g) => section(g))}{section(null)}<SharedFacts groups={groups} /></> : null}
   </div>;
+}
+
+function GroupDisclosure({ name, count, actions, children }: {
+  name: string; count: number; actions: ReactNode; children: ReactNode;
+}) {
+  const { t } = useI18n();
+  const [expanded, setExpanded] = useState(true);
+  const contentId = useId();
+  return <>
+    <div className={styles.heading}>
+      <h3><button type="button" className={styles.toggle} aria-expanded={expanded} aria-controls={contentId}
+        title={t(expanded ? 'play.functionalGroups.collapse' : 'play.functionalGroups.expand', { name })}
+        onClick={() => setExpanded(value => !value)}>
+        <span className={styles.chevron} aria-hidden="true" />{name}
+      </button></h3>
+      <span className={styles.count}>{count}</span>
+      {actions}
+    </div>
+    <div id={contentId} hidden={!expanded}>{children}</div>
+  </>;
 }
 
 function SharedFacts({ groups }: { groups: FunctionalGroup[] }) {

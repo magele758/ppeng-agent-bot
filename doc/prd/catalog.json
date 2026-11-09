@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 396,
+    "implemented": 397,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1506,6 +1506,13 @@
       "file": "acceptance/fold-visible-history.yaml"
     },
     {
+      "id": "functional-group-disclosure",
+      "title": "Bot 侧栏功能分组折叠与展开",
+      "requirement": "加一个群组折叠、展开的功能",
+      "verificationStage": "software",
+      "file": "acceptance/functional-group-disclosure.yaml"
+    },
+    {
       "id": "gateway-im-security",
       "title": "IM 网关入站安全（验签、去重、白名单、Bot 路由）",
       "requirement": "实现 P0 网关修复：(1) 飞书消息事件必须校验 token/签名（不止 URL 验证），伪造事件（如 header.token=WRONG）返回 401/403；\n(2) 飞书事件按 event_id 去重并立即 ack，agent 异步执行，飞书重试不能导致重复执行；\n(3) 网关 sender 白名单；企微 bridge 必须配置 secret。配置走 Lab UI / 持久化设置（daemon_control KV / PATCH settings），不新增环境变量。\n若成本低，网关路由支持 botId，让 IM 对话落到 Bot 的 canonical 会话（P1）。",
@@ -2968,6 +2975,11 @@
       "name": "agent-loop",
       "description": "Embeddable agent loop core SDK (@ppeng/agent-loop / @mage-ai-lab/agent-loop) providing turn kernel, model adapters, streaming watchdogs, loop guards, session state, and assembly presets (mini, normal, full, max). Use when: (1) Integrating or embedding the agent loop into an application or service, (2) Developing, modifying, or testing packages/agent-loop, (3) Assembling an agent loop using createAssembledLoop or createMiniAssembledLoop, (4) Managing mid-run steering, step-level control, or event folding via AgentLoopHandle, (5) Adding or configuring loop modules, watchdogs, or model adapters.",
       "path": "skills/agent-loop/SKILL.md"
+    },
+    {
+      "name": "Agent Tech Digest",
+      "description": "Rolling digest of agent-related feeds (maintained by capability-gateway).",
+      "path": "skills/agent-tech-digest/SKILL.md"
     },
     {
       "name": "login",

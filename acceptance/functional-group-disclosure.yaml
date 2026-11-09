@@ -1,0 +1,11 @@
+id: functional-group-disclosure
+title: Bot 侧栏功能分组折叠与展开
+status: implemented
+requirement: |
+  加一个群组折叠、展开的功能
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: Bot 侧栏有功能分组和未分组的 Bot，初始均展开
+    when: 点击一个分组标题，随后用键盘再次展开
+    then: 仅该组的条目或空组提示隐藏并恢复，组名与数量始终可见

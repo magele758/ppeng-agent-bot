@@ -146,3 +146,36 @@ test('explicit group cleanup can be cancelled and preserves conversation history
   const history = await (await request.get('/api/sessions/' + bot.canonicalSessionId)).json();
   expect(JSON.stringify(history)).toContain('Keep this conversation');
 });
+
+test('sidebar groups independently collapse and reopen [AC:functional-group-disclosure#AC-1]', async ({ page }) => {
+  const f = await fixture(page);
+  try {
+    await create(page, 'Research');
+    const group = page.getByTestId('functional-group-group-0');
+    const ungrouped = page.getByTestId('functional-group-ungrouped');
+    const toggle = group.getByRole('heading').getByRole('button');
+    const looseToggle = ungrouped.getByRole('heading').getByRole('button');
+    const bot = ungrouped.locator('[data-bot-id]').filter({ hasText: f.name });
+    const hint = group.getByText('拖拽 Bot 或群聊到这里');
+    await expect(hint).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 3000 });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toContainText('Research');
+    await expect(group.getByText('0', { exact: true })).toBeVisible();
+    await expect(hint).toBeHidden();
+    await expect(bot).toBeVisible();
+    await looseToggle.click();
+    await expect(bot).toBeHidden();
+    await toggle.focus();
+    await toggle.press('Enter');
+    await expect(hint).toBeVisible();
+    await expect(bot).toBeHidden();
+    await looseToggle.focus();
+    await looseToggle.press('Space');
+    await expect(bot).toBeVisible();
+  } finally {
+    await page.request.patch(`/api/bots/${f.bot.id}`, { data: { hidden: true } });
+    await page.request.delete(`/api/sessions/${f.bot.canonicalSessionId}`);
+  }
+});

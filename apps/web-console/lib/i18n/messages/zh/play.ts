@@ -119,6 +119,8 @@ export const play = {
   },
   faceMotion: { working: "工作中" },
   functionalGroups: {
+    collapse: "折叠{name}",
+    expand: "展开{name}",
     title: "功能分组",
     create: "新建功能分组",
     name: "功能分组名称",
