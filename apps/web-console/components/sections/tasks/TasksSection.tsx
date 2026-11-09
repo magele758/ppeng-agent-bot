@@ -5,6 +5,7 @@ import { BotTeamWork } from '../../bot-work/BotTeamWork';
 import { useLab } from '../../shell/LabProvider';
 import { SectionFrame } from '../SectionFrame';
 import { InboxView } from './InboxView';
+import { BotFlowView } from './BotFlowView';
 import { RunsView } from './RunsView';
 import { TaskQueueView } from './TaskQueueView';
 
@@ -24,6 +25,8 @@ export function TasksSection({ active }: { active: boolean }) {
               const data = await api(`/api/bots/${encodeURIComponent(bot.id)}/open`, { method: 'POST' }) as { session: { id: string } };
               await lab.openSession(data.session.id, { focusChat: true });
             }} />;
+          case 'flows':
+            return <BotFlowView />;
           case 'runs':
             return <RunsView />;
           case 'inbox':

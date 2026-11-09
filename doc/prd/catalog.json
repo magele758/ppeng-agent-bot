@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 399,
+    "implemented": 400,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -139,6 +139,13 @@
       "requirement": "Under an active Goal or Routine, bg_run should host-park a durable wait (hostParked)\nso the model does not need a second wait_for round. Fewer watch loops; quieter complete.",
       "verificationStage": "software",
       "file": "acceptance/bg-run-host-park.yaml"
+    },
+    {
+      "id": "bot-activity-flow",
+      "title": "从 Bot 运行记录查看工作流",
+      "requirement": "然后这个bot的逻辑工作流，如果有逻辑关系，我希望能有一个可视化的界面来看到这个逻辑流的日常流的情况，比如流转到哪里了，卡在哪里了，是否成功以及结果和消耗，点击能跳转到bot或者他的子任务会话里，其实就是把逻辑流程可视化一下，算个没用，但是有意思的功能吧，你看看帮我设计和实现一下，要能根据我的bot对话的实际情况来动态生成，不要搞一个配置来搞这个，要零侵入的实现这个流的能力",
+      "verificationStage": "software",
+      "file": "acceptance/bot-activity-flow.yaml"
     },
     {
       "id": "bot-activity-open-session",

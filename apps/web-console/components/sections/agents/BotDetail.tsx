@@ -428,6 +428,7 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
       {sessionId && <BotGoals key={`${bot.id}:${sessionId}`} botId={bot.id} sessionId={sessionId}/>}
       </div>
       <div role="tabpanel" id={`${panelId}-page-history`} aria-labelledby={`${panelId}-tab-history`} hidden={detailTab !== 'history'}>
+      <a className="btn btn-ghost btn-sm" href={`#/tasks/flows?bot=${encodeURIComponent(bot.id)}`}>{t('tasks.flow.page')}</a>
       <BotHistory sessionId={sessionId} />
       <details className="bot-settings-disclosure" data-testid="bot-memory-settings"><summary>{t('botSettings.memoryManagement')}</summary>
       <BotMemory botId={bot.id} sessionId={sessionId}/>
