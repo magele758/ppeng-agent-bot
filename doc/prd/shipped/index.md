@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 391 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 392 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（118）
+## bot（119）
 
 需求正文见 [bot](bot.md)。
 
@@ -178,6 +178,7 @@
 - `bot-row-menu` Bot 列表操作菜单
 - `bot-runtime-log-regressions` Bot 实际运行日志回归
 - `bot-scoped-skill-sharing` Bot 私有技能沉淀与指定 Bot 共享
+- `bot-session-decisions` Bot 在同一身份的会话间找回决定
 - `bot-session-row` 单 Bot 会话行显示名字、问题和活体脸
 - `bot-settings-flow` 简化 Bot 操作与设置生效反馈
 - `bot-sidebar-child-sessions` Bot 侧栏不列出子任务会话

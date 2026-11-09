@@ -106,12 +106,15 @@ writeFileSync(join(out,'suite.json'),JSON.stringify(suite,null,2),{mode:0o600});
 async function run(task, trial, label) {
   const name = `${task.id}-${trial}-${label}`, trialWorkspace = join(workspace, name);
   mkdirSync(trialWorkspace);
-  const input = join(trialWorkspace, 'input.json'), resultFile = join(out, `${name}.json`);
-  writeFileSync(input, JSON.stringify({ task, trial, variant: variants[label], model, limits, workspace: trialWorkspace, simulation: Boolean(options.simulation) }), { mode: 0o600 });
+  const resultFile = join(out, `${name}.json`);
+  const input = JSON.stringify({ task, trial, variant: variants[label], model, limits, workspace: trialWorkspace, simulation: Boolean(options.simulation) });
   const execution = await new Promise(resolveResult => {
-    const child = spawn(process.execPath, [join(root, 'scripts/agent-eval/quality-worker.mjs'), input, resultFile], {
-      cwd: trialWorkspace, env: sanitizeScriptEnv(env), stdio: ['ignore', 'pipe', 'pipe']
+    // Trial tools may inspect their working directory. Keep the grading oracle in the parent process.
+    const child = spawn(process.execPath, [join(root, 'scripts/agent-eval/quality-worker.mjs'), '-', resultFile], {
+      cwd: trialWorkspace, env: sanitizeScriptEnv(env), stdio: ['pipe', 'pipe', 'pipe']
     });
+    child.stdin.on('error', error => resolveResult({ error: error.message }));
+    child.stdin.end(input);
     let log = '', timedOut = false;
     child.stdout.on('data', data => { log = (log + data).slice(-8000); });
     child.stderr.on('data', data => { log = (log + data).slice(-8000); });

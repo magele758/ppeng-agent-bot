@@ -1,3 +1,4 @@
+import { BOT_COMPRESSION_TIMEOUT_MS } from '../session/compact-summary-deadline.js';
 import { claimSummaryLease, summaryLeaseCurrent, releaseSummaryLease } from './bot-summary-lease.js';
 import { createHash } from 'node:crypto';
 import { resolveBotWindowBudget } from '../session/history/window.js';
@@ -45,7 +46,7 @@ export function scheduleBotSummary(host: CompactHost, context: RunContext, force
         host.emitTrace(sessionId, event);
       }};
       try {
-        await autoCompactSession(observed, context, { force, summaryTimeoutMs: 60_000, thresholdOnly: true, summarySignal: job.controller!.signal, summaryIsCurrent: () => summaryLeaseCurrent(host.store, id, lease) });
+        await autoCompactSession(observed, context, { force, summaryTimeoutMs: BOT_COMPRESSION_TIMEOUT_MS, thresholdOnly: true, summarySignal: job.controller!.signal, summaryIsCurrent: () => summaryLeaseCurrent(host.store, id, lease) });
       } catch (error) {
         failed = true;
         host.emitTrace(id, { kind: 'compact_skipped', payload: { reason: 'background_failed', message: String(error) } });

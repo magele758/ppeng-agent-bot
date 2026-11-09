@@ -100,3 +100,30 @@ test('runtime exposes exactly one history_search and one history_read after upst
  const directory=mkdtempSync(join(tmpdir(),'history-catalog-'));const runtime=new RawAgentRuntime({repoRoot:directory,stateDir:join(directory,'state'),modelAdapter:{name:'catalog',async runTurn(){return {stopReason:'end',assistantParts:[{type:'text',text:'ok'}]};},async summarizeMessages(){return '';}}});
  try{for(const name of ['history_search','history_read'])assert.equal(runtime.tools.filter(tool=>tool.name===name).length,1,name);}finally{await runtime.destroy();rmSync(directory,{recursive:true,force:true});}
 });
+
+test('signed-in Bot finds only decisions from its own direct chats [AC:bot-session-decisions#AC-1]', async () => {
+ const f = fixture();
+ try {
+  const metadata = { userId:'owner', tenantId:'tenant', botId:'alpha' };
+  const session = f.store.updateSession(f.current.id,{metadata});
+  const create = (title, overrides, mode='chat') => {
+   const s = f.store.createSession({title,mode,agentId:'general',metadata:{...metadata,...overrides}});
+   const m = f.store.appendMessage(s.id,'user',[{type:'text',text:'release-decision '+title}]);
+   return {id:s.id, ref:`history:${s.id}:${m.id}:0`};
+  };
+  const mine = create('approved',{});
+  const others = [create('user',{userId:'other'}),create('tenant',{tenantId:'other'}),create('bot',{botId:'beta'}),
+   create('room',{roomId:'room'}),create('anonymous',{userId:''}),create('child',{},'subagent')];
+  const ctx = {session};
+  const hits = JSON.parse((await f.search.execute(ctx,{query:'release-decision'})).content);
+  assert.deepEqual(hits.matches.map(m=>m.ref),[mine.ref]);
+  assert.equal(JSON.parse((await f.read.execute(ctx,{ref:mine.ref})).content).text,'release-decision approved');
+  f.store.updateSession(mine.id,{metadata:{...metadata,userId:'new-owner'}});
+  assert.equal((await f.read.execute(ctx,{ref:mine.ref,offset:1})).ok,false);
+  for(const other of others){
+   assert.equal((await f.search.execute(ctx,{query:'release-decision',session_id:other.id})).ok,false);
+   assert.equal((await f.read.execute(ctx,{ref:other.ref})).ok,false);
+   assert.equal((await f.read.execute(ctx,{session_id:other.id,seq:1})).ok,false);
+  }
+ } finally { f.store.db.close(); }
+});

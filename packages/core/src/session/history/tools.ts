@@ -8,7 +8,7 @@ import type { HistoryOptions, HistoryStore } from './types.js';
 
 type ScopedHistoryStore = HistoryStore & Partial<VisibleHistoryStore>;
 type ReadArgs = { ref?: string; session_id?: string; seq?: number; part?: number; offset?: number; limit?: number; before?: number; after?: number };
-interface ForkSession { id: string; mode?: string; parentSessionId?: string; metadata?: Record<string, unknown> | null }
+interface ForkSession { id: string; agentId?: string; mode?: string; parentSessionId?: string; metadata?: Record<string, unknown> | null }
 interface ForkStore extends ScopedHistoryStore {
  getBot?(id: string): { id: string; name: string; title: string; description: string; agentId: string } | undefined;
  getAgent?(id: string): { instructions?: string } | undefined;
@@ -115,7 +115,7 @@ function searchOwnSource(store: HistoryStore, sessionId: string, args: HistoryOp
   if (at < 0) continue;
   matches.push({ ref: historyReference(sessionId, message.id, part), sessionId, messageId: message.id, seq: message.seq, part, role: message.role, createdAt: message.createdAt, excerpt: text.slice(Math.max(0, at - 80), Math.max(0, at - 80) + 320) });
  }
- return { ok: true, content: JSON.stringify({ ...page, matches }) };
+ return { ...page, matches };
 }
 
 function historyTarget(args: ReadArgs): string | undefined {
@@ -126,20 +126,54 @@ function historyTarget(args: ReadArgs): string | undefined {
  try { return decodeURIComponent(match[1]!); } catch { return undefined; }
 }
 
+/** Only direct conversations with a recorded principal and Bot can share originals. */
+function directBotId(store: ForkStore, session: ForkSession): string {
+ if (session.mode !== 'chat' || session.metadata?.roomId || parentIdOf(session)) return '';
+ if (!metaText(session.metadata, 'userId')) return '';
+ const recorded = metaText(session.metadata, 'botId');
+ if (recorded || !session.agentId) return recorded;
+ return store.getBot?.(session.agentId)?.id ?? '';
+}
+
+function sameBotChat(store: ForkStore, session: ForkSession, other: ForkSession | undefined): boolean {
+ const bot = directBotId(store, session);
+ return Boolean(bot && other && directBotId(store, other) === bot && sameOwner(session, other));
+}
+
+function canReadScopedSession(store: ForkStore, session: ForkSession, id: string): boolean {
+ return id === session.id || id === forkParentId(store, session) || sameBotChat(store, session, store.getSession?.(id));
+}
+
+function searchBotPeers(store: ForkStore, session: ForkSession, args: HistoryOptions) {
+ const page = searchOwnSource(store, session.id, args);
+ const limit = Math.max(1, Math.min(200, args.limit ?? 50));
+ const priorMatches: typeof page.matches = [];
+ for (const peer of store.listSessions?.() ?? []) {
+  if (peer.id === session.id || !sameBotChat(store, session, peer)) continue;
+  const remaining = limit - priorMatches.length;
+  const prior = searchOwnSource(store, peer.id, {...args, limit:remaining});
+  priorMatches.push(...prior.matches.slice(0, remaining));
+  if (priorMatches.length >= limit) break;
+ }
+ // A seq cursor belongs to one session. Keep its messages and paging intact;
+ // other conversations contribute only excerpts with independently readable refs.
+ return {ok:true, content:JSON.stringify({...page, matches:[...priorMatches,...page.matches].slice(0,limit)})};
+}
+
 function searchForkSource(store: ForkStore, session: ForkSession, args: HistoryOptions & { session_id?: string }) {
  const parentId = forkParentId(store, session);
- const allowed = new Set([session.id, ...(parentId ? [parentId] : [])]);
- if (args.session_id !== undefined && !allowed.has(args.session_id)) return unavailable();
+ if (args.session_id !== undefined && !canReadScopedSession(store, session, args.session_id)) return unavailable();
  const query = typeof args.query === 'string' ? args.query.trim() : '';
+ if (!args.session_id && query && args.beforeSeq === undefined && directBotId(store, session)) return searchBotPeers(store, session, args);
  const ids = args.session_id ? [args.session_id] : parentId && query ? [session.id, parentId] : [session.id];
- if (ids.length === 1) return searchOwnSource(store, ids[0]!, args);
+ if (ids.length === 1) return {ok:true, content:JSON.stringify(searchOwnSource(store, ids[0]!, args))};
  const matches: Array<Record<string, unknown>> = [];
  const messages: HistoryPageMessage[] = [];
  let hasMore = false;
  for (const id of ids) {
-  const parsed = JSON.parse(searchOwnSource(store, id, args).content) as { messages?: HistoryPageMessage[]; matches?: Array<Record<string, unknown>>; hasMore?: boolean };
-  messages.push(...(parsed.messages ?? []));
-  matches.push(...(parsed.matches ?? []));
+  const parsed = searchOwnSource(store, id, args);
+  messages.push(...parsed.messages);
+  matches.push(...parsed.matches);
   if (parsed.hasMore) hasMore = true;
  }
  return { ok: true, content: JSON.stringify({ messages, matches, hasMore, nextCursor: null }) };
@@ -148,9 +182,8 @@ function searchForkSource(store: ForkStore, session: ForkSession, args: HistoryO
 type HistoryPageMessage = { id?: string };
 
 function readForkSource(store: ForkStore, session: ForkSession, args: ReadArgs) {
- const parentId = forkParentId(store, session);
  const target = historyTarget(args) ?? session.id;
- if (target !== session.id && target !== parentId) return unavailable();
+ if (!canReadScopedSession(store, session, target)) return unavailable();
  return readOwnSource(store, target, args);
 }
 
@@ -166,7 +199,7 @@ export function createHistoryTools(store: ForkStore): ToolContract[] {
  );
  return [{
   name: 'history_search',
-  description: 'Search retained original history. Signed-in ordinary chats search sessions visible to the current identity and namespace; anonymous, Bot and Room sessions search only THIS session. A bot sub-agent also searches its parent bot conversation by keyword, plus that bot\'s notes and durable memory, and does not search sibling conversations or other bots. No keyword match is an explicit empty result. Returns stable seq/id/ref sources for history_read.',
+  description: 'Search retained original history. Signed-in ordinary chats search sessions visible to the current identity and namespace; signed-in direct Bot chats can search previous direct chats of the same user, tenant and Bot by keyword. Anonymous and Room chats search only this session. A bot sub-agent also searches its parent bot conversation by keyword, plus that bot\'s notes and durable memory, and does not search sibling conversations or other bots. No keyword match is an explicit empty result. Returns stable seq/id/ref sources for history_read.',
   inputSchema: { type: 'object', properties: { query: { type: 'string' }, session_id: { type: 'string' }, from: { type: 'string' }, to: { type: 'string' }, beforeSeq: { type: 'integer' }, limit: { type: 'integer' } } },
   approvalMode: 'never', sideEffectLevel: 'none', ptc: { kind: 'read' },
   async execute(ctx, args) {
@@ -188,7 +221,7 @@ export function createHistoryTools(store: ForkStore): ToolContract[] {
   }
  }, {
   name: 'history_read',
-  description: 'Read retained original evidence by ref or session_id/seq from a compression source note. part defaults to 0; offset/limit are character counts and pages are at most 12000 characters. Current-session reads by seq alone or explicit before/after return the original message and indexed neighbours. Anonymous, Bot and Room sessions can read only THIS session. A bot sub-agent can also read its parent bot conversation. ref bot:self returns that bot\'s name and duties; another bot id is refused.',
+  description: 'Read retained original evidence by ref or session_id/seq from a compression source note. part defaults to 0; offset/limit are character counts and pages are at most 12000 characters. Current-session reads by seq alone or explicit before/after return the original message and indexed neighbours. Signed-in direct Bot chats can read originals from the same user, tenant and Bot. Anonymous and Room chats read only this session. A bot sub-agent can also read its parent bot conversation. ref bot:self returns that bot\'s name and duties; another bot id is refused.',
   inputSchema: { type: 'object', properties: { ref: { type: 'string' }, session_id: { type: 'string' }, seq: { type: 'integer' }, part: { type: 'integer' }, offset: { type: 'integer' }, limit: { type: 'integer' }, before: { type: 'integer' }, after: { type: 'integer' } } },
   approvalMode: 'never', sideEffectLevel: 'none', ptc: { kind: 'read' },
   async execute(ctx, args) {

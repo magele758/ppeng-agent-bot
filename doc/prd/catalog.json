@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 391,
+    "implemented": 392,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -811,6 +811,13 @@
       "requirement": "我希望沉淀的技能默认按 Bot 隔离，也可以选择共享给其他 Bot。帮我设计一下，先写验收标准给我确认。",
       "verificationStage": "software",
       "file": "acceptance/bot-scoped-skill-sharing.yaml"
+    },
+    {
+      "id": "bot-session-decisions",
+      "title": "Bot 在同一身份的会话间找回决定",
+      "requirement": "把剩下两个问题也修掉：同一个用户和 Bot 换会话后也能找回之前的决定，别串到其他用户或 Bot；长对话压缩别再卡在 5 秒超时。修完直接用产品默认配置和当前真实模型重跑，看五道题和逐轮断言能不能都过。",
+      "verificationStage": "software",
+      "file": "acceptance/bot-session-decisions.yaml"
     },
     {
       "id": "bot-session-row",
