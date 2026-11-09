@@ -71,11 +71,13 @@ export function BotFlowView(){
 }
 function FlowListView({records,limit,onLoadMore,partial,loading}:{records?:Flow[];limit:number;onLoadMore:()=>void;partial:boolean;loading:boolean}){
   const {t}=useI18n();
-  if(partial)return <p role="status">{t('tasks.flow.partial')}</p>;
-  if(loading)return <p role="status">{t('tasks.flow.loading')}</p>;
-  if(records?.length===0)return <p>{t('tasks.flow.empty')}</p>;
-  return <>{records?.slice(0,limit).map(flow=><Activity key={flow.id} flow={flow}/>)}
-    {records && records.length>limit && <button className="btn" onClick={onLoadMore}>{t('tasks.flow.more')}</button>}</>;
+  return <>
+    {partial && <p role="status">{t('tasks.flow.partial')}</p>}
+    {loading && <p role="status">{t('tasks.flow.loading')}</p>}
+    {records?.length===0 && <p>{t('tasks.flow.empty')}</p>}
+    {records?.slice(0,limit).map(flow=><Activity key={flow.id} flow={flow}/>)}
+    {records && records.length>limit && <button className="btn" onClick={onLoadMore}>{t('tasks.flow.more')}</button>}
+  </>;
 }
 function BotFlowDetail({initial}:{initial:string}){
   const {t}=useI18n();
