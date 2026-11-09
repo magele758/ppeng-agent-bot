@@ -210,3 +210,25 @@ test('only current roster conversations appear as Bot entries [AC:bot-sidebar-ro
     }
   }
 });
+
+test('each group remembers its last disclosure state on reload [AC:bot-group-disclosure-memory#AC-1]', async ({ page }) => {
+  const f = await fixture(page);
+  try {
+    await create(page, 'Remember');
+    const group = page.getByTestId('functional-group-group-0').getByRole('heading').getByRole('button');
+    const loose = page.getByTestId('functional-group-ungrouped').getByRole('heading').getByRole('button');
+    await expect(group).toHaveAttribute('aria-expanded', 'true');
+    await group.click();
+    await page.reload();
+    await expect(group).toHaveAttribute('aria-expanded', 'false', { timeout: 3000 });
+    await expect(loose).toHaveAttribute('aria-expanded', 'true');
+    await loose.click();
+    await group.click();
+    await page.reload();
+    await expect(group).toHaveAttribute('aria-expanded', 'true');
+    await expect(loose).toHaveAttribute('aria-expanded', 'false');
+  } finally {
+    await page.request.patch(`/api/bots/${f.bot.id}`, { data: { hidden: true } });
+    await page.request.delete(`/api/sessions/${f.bot.canonicalSessionId}`);
+  }
+});

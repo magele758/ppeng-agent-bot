@@ -1,0 +1,11 @@
+id: bot-group-disclosure-memory
+title: 刷新后记住各 Bot 分组的展开状态
+status: implemented
+requirement: |
+  分组的展开和收起状态要能保存，免得每次刷新都要搞一下
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 在同一浏览器中使用功能分组和未分组
+    when: 分别收起、重新展开某个分组并刷新页面
+    then: 每个分组恢复各自最后的状态，首次显示的分组默认展开

@@ -249,7 +249,7 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
         if (roomId) { void moveRoom(roomId, groupId); return; }
         void move(event.dataTransfer.getData(BOT_DRAG_MIME), groupId);
       }}>
-      <GroupDisclosure name={presentation.name} count={ordered.length} actions={
+      <GroupDisclosure groupKey={presentation.key} name={presentation.name} count={ordered.length} actions={
         group ? <RowActionMenu label={t('play.rowMenu.label',{name:group.name})}>
           <button className="btn btn-ghost btn-sm" disabled={pending} aria-label={t('play.functionalGroups.rename')} title={t('play.functionalGroups.rename')}
             onClick={() => setEditing({ id: group.id, name: group.name })}>{t('play.functionalGroups.renameShort')}</button>
@@ -333,17 +333,35 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
   </div>;
 }
 
-function GroupDisclosure({ name, count, actions, children }: {
-  name: string; count: number; actions: ReactNode; children: ReactNode;
+function readGroupExpanded(storageKey: string): boolean {
+  try {
+    return window.localStorage.getItem(storageKey) !== 'collapsed';
+  } catch {
+    return true;
+  }
+}
+
+function GroupDisclosure({ groupKey, name, count, actions, children }: {
+  groupKey: string; name: string; count: number; actions: ReactNode; children: ReactNode;
 }) {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState(true);
+  const storageKey = `lab.botGroupDisclosure.${groupKey}`;
+  const [expanded, setExpanded] = useState(() => readGroupExpanded(storageKey));
+  function toggle() {
+    setExpanded(!expanded);
+    try {
+      if (expanded) window.localStorage.setItem(storageKey, 'collapsed');
+      else window.localStorage.removeItem(storageKey);
+    } catch {
+      // Still allow toggling when browser storage is unavailable.
+    }
+  }
   const contentId = useId();
   return <>
     <div className={styles.heading}>
       <h3><button type="button" className={styles.toggle} aria-expanded={expanded} aria-controls={contentId}
         title={t(expanded ? 'play.functionalGroups.collapse' : 'play.functionalGroups.expand', { name })}
-        onClick={() => setExpanded(value => !value)}>
+        onClick={toggle}>
         <span className={styles.chevron} aria-hidden="true" />{name}
       </button></h3>
       <span className={styles.count}>{count}</span>

@@ -306,6 +306,11 @@ Team / Swarm 扇出后，父目标可能一直 waiting，也可能被误唤醒�
 
 增加“同时删除组内 Bot”选项，保留历史会话
 
+## bot-group-disclosure-memory
+刷新后记住各 Bot 分组的展开状态
+
+分组的展开和收起状态要能保存，免得每次刷新都要搞一下
+
 ## bot-group-drag-only
 Bot 侧栏移组仅保留拖拽入口
 
