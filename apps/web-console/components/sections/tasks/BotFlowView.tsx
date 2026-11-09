@@ -69,6 +69,21 @@ export function BotFlowView(){
   if(!detail)return <BotNetworkView focus={focus} onInspect={id=>{setFocus(id);setDetail(true);}}/>;
   return <><button className="btn btn-ghost" onClick={()=>setDetail(false)}>← {t('tasks.flow.network')}</button><BotFlowDetail initial={focus}/></>;
 }
+function StatusBanner({show,label}:{show:boolean;label:string}){
+  return show ? <p role="status">{label}</p> : null;
+}
+function FlowListView({records,limit,onLoadMore,partial,loading}:{records?:Flow[];limit:number;onLoadMore:()=>void;partial:boolean;loading:boolean}){
+  const {t}=useI18n();
+  const list=records??[];
+  const more=list.length>limit;
+  return <>
+    <StatusBanner show={partial} label={t('tasks.flow.partial')}/>
+    <StatusBanner show={loading} label={t('tasks.flow.loading')}/>
+    {list.length===0 && <p>{t('tasks.flow.empty')}</p>}
+    {list.slice(0,limit).map(flow=><Activity key={flow.id} flow={flow}/>)}
+    {more && <button className="btn" onClick={onLoadMore}>{t('tasks.flow.more')}</button>}
+  </>;
+}
 function BotFlowDetail({initial}:{initial:string}){
   const {t}=useI18n();
   const {bots,selectedSessionId}=useLab();
@@ -82,10 +97,6 @@ function BotFlowDetail({initial}:{initial:string}){
   const records=data?.flows.filter(flow=>Date.parse(flow.at)>=threshold);
   return <div className={styles.panel}><div className={styles.toolbar}>
     <h2>{t('tasks.flow.recent')}</h2><label>{t('tasks.flow.select')} <select value={bot} onChange={e=>{setSelection(e.target.value);setLimit(12);}}>{visible.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label><label>{t('tasks.flow.period')} <select value={period} onChange={e=>{setPeriod(Number(e.target.value));setLimit(12);}}>{[1,7,0].map(days=><option key={days} value={days}>{days?t('tasks.flow.days',{n:days}):t('tasks.flow.all')}</option>)}</select></label></div>
-    {data?.partial && <p role="status">{t('tasks.flow.partial')}</p>}
-    {!data && <p role="status">{t('tasks.flow.loading')}</p>}
-    {records?.length===0 && <p>{t('tasks.flow.empty')}</p>}
-    {records?.slice(0,limit).map(flow=><Activity key={flow.id} flow={flow}/>)}
-    {records && records.length>limit && <button className="btn" onClick={()=>setLimit(n=>n+12)}>{t('tasks.flow.more')}</button>}
+    <FlowListView records={records} limit={limit} onLoadMore={()=>setLimit(n=>n+12)} partial={!!data?.partial} loading={!data}/>
   </div>;
 }
