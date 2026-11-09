@@ -56,6 +56,13 @@ function attendedRoot(session: SessionRecord): boolean {
   return readApprovalWake(session.metadata)?.kind !== 'unattended';
 }
 
+export function scopeDenialReason(session: SessionRecord, verdict: 'pending' | 'rejected' | 'missing'): string {
+  if (verdict === 'rejected') return 'The owner rejected this operation. Stop this operation.';
+  if (verdict === 'pending') return 'Approval is pending. Wait for the owner before continuing this operation.';
+  if (!attendedRoot(session)) return 'Stop this operation and report the missing scope. This unattended execution cannot open an approval card.';
+  return 'This effect needs owner approval. Submit this exact call through the normal approval flow.';
+}
+
 /**
  * Attended root chats get a card for each call the source scope refuses, and wait.
  * Routines, subagents and unattended wakes keep the immediate denial.

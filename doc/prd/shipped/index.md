@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 408 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 409 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -886,7 +886,7 @@
 - `secure-form-multi` 对话里的多字段安全表单
 - `secure-form-vault` Secure Form fill-from-Vault
 
-## session（10）
+## session（11）
 
 需求正文见 [session](session.md)。
 
@@ -900,6 +900,7 @@
 - `session-recap` 会话末尾回顾
 - `session-restart-recovery-state-consistency` 重启恢复发现的运行状态、审批衔接与未确认工具结果修复
 - `session-restart-recovery-verification` 进程重启恢复验证：运行中、重试等待与等待审批
+- `session-review-runtime` 会话复盘中的工具选择、请求预算和启动观测
 
 ## settings（2）
 

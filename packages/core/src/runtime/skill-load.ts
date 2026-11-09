@@ -55,7 +55,7 @@ export async function resolveSkillSearch(
         })),
         hint:
           hits.length === 0
-            ? 'No matching skills. Try a shorter query, or load_skill with an exact name if you know it.'
+            ? 'No matching skills. Try a shorter search_skills query or continue without loading a skill.'
             : 'Call load_skill with an exact id from hits when names overlap.'
       },
       null,
@@ -103,7 +103,7 @@ export async function resolveSkillLoad(
       kind: 'skill_load',
       payload: { name, rejected: true, reason: 'not_found' }
     });
-    return { error: `Skill "${name}" not found.` };
+    return { error: `Skill "${name}" not found. Use search_skills for this task, then load an exact id from its hits.` };
   }
   if (!isSkillAllowed(found, host.promptBuilder.getAllowedSkills(sessionId))) {
     void host.emitTrace(sessionId, {
@@ -164,7 +164,7 @@ export async function resolveSkillLoad(
         }
       });
       return {
-        error: `Skill "${found.name}" is not in the latest search_skills results. Strict mode is ON. Try one of these: ${suggestions || 'none suggested'}`
+        error: `Skill "${found.name}" is not in the latest search_skills results. Strict mode is ON. Use search_skills for this task, then load an exact id from its hits. Suggested: ${suggestions || 'none'}`
       };
     }
   } else if (isStrict && !inShortlist) {
@@ -173,7 +173,7 @@ export async function resolveSkillLoad(
       kind: 'skill_load',
       payload: { name, skillId: found.id, skillName: found.name, inShortlist: false, rejected: true, reason: 'strict_off_shortlist', confidence: routing?.confidence.level }
     });
-    return { error: `Skill "${found.name}" is not in the current turn's shortlist. Strict mode is ON. Try one of these: ${suggestions || 'none suggested'}` };
+    return { error: `Skill "${found.name}" is not in the current turn's shortlist. Strict mode is ON. Use search_skills for this task, then load an exact id from its hits. Suggested: ${suggestions || 'none'}` };
   }
 
   const listed =

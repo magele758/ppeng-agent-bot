@@ -201,3 +201,12 @@ test('throwing startup trace does not fail the turn [AC:bot-startup-trace#AC-6]'
   const beforeModelMs = beforeModel?.payload?.durationMs as number;
   assert.ok(beforeModelMs <= 1, `before_model durationMs=${beforeModelMs}`);
 });
+
+test('fast kernel timings use the summary and long startup gets a warning [AC:session-review-runtime#AC-3]', async () => {
+  const { startupTraceDisposition } = await import('../src/observability/startup-phase.ts');
+  const phase = {scope:'kernel' as const,phase:'pack_turn',durationMs:3};
+  assert.equal(startupTraceDisposition(phase),'summary');
+  assert.equal(startupTraceDisposition({...phase,durationMs:1200}),'detail');
+  assert.equal(startupTraceDisposition({...phase,phase:'ready',durationMs:50000}),'warn');
+  assert.equal(startupTraceDisposition({...phase,scope:'wake',phase:'queue_wait'}),'detail');
+});

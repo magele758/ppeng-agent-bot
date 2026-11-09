@@ -55,6 +55,15 @@ export function manifestsForSession(sessionId: string, metadata?: Record<string,
   return dedupeManifests([...storedManifests(metadata), ...(noted.get(sessionId) ?? [])]);
 }
 
+/** Selection can check names. Paths and network hosts are checked with real arguments at execution. */
+export function manifestVisibleTools<T extends { name: string }>(
+  session: { id: string; metadata?: Record<string, unknown> }, tools: T[]
+): T[] {
+  const manifests = manifestsForSession(session.id, session.metadata);
+  if (!manifests.length) return tools;
+  return tools.filter(tool => manifests.every(manifest => enforceSkillManifest(manifest, {tool: tool.name}).ok));
+}
+
 interface ManifestSessionStore {
   getSession(id: string): { metadata?: Record<string, unknown> } | undefined;
   updateSession(id: string, patch: { metadata: Record<string, unknown> }): unknown;

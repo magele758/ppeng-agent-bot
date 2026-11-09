@@ -392,7 +392,7 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "a65250f150c2b94a0551d1c9103fe4b5f9da2393f08b8cb10a988a3efca4acb4",
+    "packages/core/src/runtime.ts": "d3bffd4d9965c1be308a8da4bc079bd3023cd61be3ad4640fe64b54126332878",
     "packages/core/src/storage.ts": "fcf7f62aa8a6318d5053e515cf7379acc38be89b9b2f83ca9d3417fc710e4ebf",
     "packages/core/src/stores/session-store.ts": "b5e3444614a0fef3bcd6ac9aecb374c4d470486a4c64fd8678251efee723a470",
     "packages/core/src/stores/approval-store.ts": "16b5ab8290b6f09a4ab373877f559b55e917af24a196bd2df942776a078ddf3a",
@@ -438,7 +438,7 @@
     "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
     "packages/core/src/turn/host.ts": "7d2bcfcbb5b3f38f284fcdf8f97057810ef29dfb4b16b3893faf00e82656b803",
     "packages/core/src/turn/kernel.ts": "a9bf0502cd5d1a9ebe9f9420e3e10d42b11a59668d80cbba2710e3a9b1c30645",
-    "packages/core/src/runtime/tool-loop.ts": "618cef7473056b9ae8425657560f4d0ac9e60261f734c90ac393232cb25128d8",
+    "packages/core/src/runtime/tool-loop.ts": "0f5fb82d270067c9f4c5f14308283c888f5232dcef47efaa3cde523de3c5857e",
     "packages/core/src/stores/trace.ts": "c4865444a2696fe170d1c20756256a9e1c2a6deeb62ca589ad8f8789bb24f20a",
     "skills/agent-loop/SKILL.md": "ccd1d75debb35b31706dfa20218e0523cc4394adc7aa91e08ba4f36df4bb4221",
     "packages/agent-loop/SKILL.md": "ccd1d75debb35b31706dfa20218e0523cc4394adc7aa91e08ba4f36df4bb4221",
@@ -519,7 +519,7 @@
     "packages/core/test/bot-goals-scheduler.test.js": "e40eb10875b2ecf3e0ae565cc52f786960829a365afce9524e6cd2581cc9ab44",
     "packages/core/test/bot-goals-budget.test.js": "95f0470da406f57a94c9881c736b1705c0692695549d110d825af6166995ca7d",
     "packages/core/src/runtime/tool-assembly.ts": "8784cde87f20b3a8b607c160dfcd7af8ef955dc2809b9db6215226799fabccba",
-    "packages/core/src/turn/resolve-turn-tools.ts": "1a88f37b11c25252d94bf0f44187bf12ddb3c851d5e37fe0b510ce3cbf329f01",
+    "packages/core/src/turn/resolve-turn-tools.ts": "d388f0c6b3e885e502f763b1c579d12e1b4e1713db7a6c6dbf17a074cb9d8df7",
     "packages/core/src/tools/tool-search.ts": "9bde547cf078ba8b58b8044f6abb6e4eba238f9ef07e8f4eacc926e8b0126cb2",
     "packages/core/src/tools/deferred-disclosure.ts": "dfeaba53ab769bad9c8b6bbabfe5fb9cf8728b8dad23efef061d34e1c3b591ca",
     "packages/core/test/necessary-tool-injection.test.js": "a25570dc9cb0a0d63fb594f187a634eb0dfe234adb39c798ae11407e1c35341a",
