@@ -1642,6 +1642,13 @@ Bot 实际运行日志回归
 
 - `packages/core/test/bot-runtime-log-regressions.test.js`
 
+### bot-session-decisions
+
+Bot 在同一身份的会话间找回决定
+
+- `packages/core/test/bot-startup-summary-latency.test.js`
+- `packages/core/test/history-tool-unification.test.js`
+
 ### bot-settings-flow
 
 简化 Bot 操作与设置生效反馈

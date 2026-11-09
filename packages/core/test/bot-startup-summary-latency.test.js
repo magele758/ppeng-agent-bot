@@ -105,3 +105,24 @@ test('forced compact bypasses cooldown and successful summary archives history [
   assert.equal(f.requests.length, 2);
   assert.ok(f.requests.every(request => request.input.signal.aborted));
  });
+
+test('explicit Bot compaction accepts a six-second summary by default [AC:bot-session-decisions#AC-2]', async t => {
+  const { RawAgentRuntime } = await import('../dist/runtime.js');
+  const dir = mkdtempSync(join(tmpdir(), 'bot-long-summary-'));
+  let request, finish;
+  const runtime = new RawAgentRuntime({repoRoot:dir, stateDir:dir, modelAdapter:{
+    name:'slow-summary', completeText(input){request=input; return new Promise(resolve=>{finish=resolve;});}
+  }});
+  t.after(async () => { await runtime.destroy(); rmSync(dir,{recursive:true,force:true}); });
+  const bot = runtime.createBot({name:'summary-test'});
+  const {sessionId} = runtime.openBot(bot.id);
+  for(let i=0;i<60;i++) runtime.store.appendMessage(sessionId,i%2?'assistant':'user',[{type:'text',text:'step '+i}]);
+  t.mock.timers.enable({apis:['setTimeout']});
+  const pending = runtime.compactCanonicalSession(sessionId);
+  await flush();
+  t.mock.timers.tick(6000);
+  assert.equal(request.signal.aborted,false);
+  finish('current decision');
+  assert.ok((await pending).replaced);
+  assert.equal(readdirSync(join(dir,'transcripts',sessionId)).length,1);
+});

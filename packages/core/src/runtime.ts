@@ -1,3 +1,4 @@
+import { BOT_COMPRESSION_TIMEOUT_MS } from './session/compact-summary-deadline.js';
 import { DaydreamHost } from './runtime/daydream-host.js';
 import { reconcileBypassApprovals } from './runtime/bypass-approvals.js';
 import {createWaitForTool} from './waits/tool.js';
@@ -1294,8 +1295,7 @@ export class RawAgentRuntime {
   }
 
   private async compactCanonicalSession(
-    sessionId: string,
-    summaryTimeoutMs?: number
+    sessionId: string
   ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
     const session = this.store.getSession(sessionId);
     if (!session) throw new NotFoundError('Session', sessionId);
@@ -1304,7 +1304,7 @@ export class RawAgentRuntime {
     return autoCompactSession(
       compactFrom(this.l5()),
       { repoRoot: this.repoRoot, stateDir: this.stateDir, session, agent },
-      { force: true, summaryTimeoutMs }
+      { force: true, summaryTimeoutMs: BOT_COMPRESSION_TIMEOUT_MS }
     );
   }
 

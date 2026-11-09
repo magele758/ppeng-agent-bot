@@ -1,5 +1,7 @@
 /** Auxiliary summaries must not hold the interactive startup path indefinitely. */
 export const COMPACT_SUMMARY_TIMEOUT_MS = 5_000;
+/** Manual and background compression run outside interactive startup. */
+export const BOT_COMPRESSION_TIMEOUT_MS = 60_000;
 const RETRY_DELAY_MS = 30_000;
 const cooldowns = new WeakMap<object, Map<string, number>>();
 

@@ -149,27 +149,32 @@ try {
   };
   if (adapter.completeText) measured.completeText = observeTextCompletion(async input => { usageComplete = false; return adapter.completeText(input); }, outcome.auxiliaryRequests, checkpoint);
   const general = core.builtinAgents.find(a => a.id === 'general');
+  const recallBot = task.contextSeed?.mode === 'bot';
   const runtime = new core.RawAgentRuntime({ repoRoot, stateDir, modelAdapter: measured,
-    agents: [{ ...general, allowedTools: task.contextSeed ? ['history_search', 'history_read', 'retrieve_tool_result'] : tools.map(t => t.name) }],
+    ...(recallBot ? {} : {agents: [{ ...general, allowedTools: task.contextSeed ? ['history_search', 'history_read', 'retrieve_tool_result'] : tools.map(t => t.name) }]}),
     ...(task.contextSeed ? {} : task.bot ? {extraTools:tools} : { tools }) });
   outcome.savedSettings = {};
   for (const [key, value] of Object.entries(variant.daemonControl ?? {})) {
     runtime.store.setDaemonControl(key, value);
     outcome.savedSettings[key] = runtime.store.getDaemonControl(key);
   }
-  const identity = task.contextSeed ? { userId: 'context-eval-user', tenantId: 'context-eval-tenant',
-    ...(task.contextSeed.mode === 'bot' ? { canonicalBotChat: true, botId: 'context-eval-bot' } : {}) } : {};
+  const identity = {userId:'context-eval-user',tenantId:'context-eval-tenant'};
+  let session;
+  if (recallBot || task.bot) {
+    const bot = runtime.createBot({name:'quality-'+task.id});
+    session = runtime.getSession(runtime.openBot(bot.id, recallBot ? identity : undefined).sessionId);
+  }
   if (task.contextSeed?.previous) {
     const previous = runtime.createChatSession({ title: 'Previous deployment decision', message: task.contextSeed.previous,
-      agentId: 'general', metadata: identity });
+      agentId: session?.agentId ?? 'general', metadata: recallBot ? {...identity,botId:session.metadata.botId} : identity });
     previousSessionId = previous.id;
     runtime.store.appendMessage(previous.id, 'assistant', [{ type: 'text', text: 'Decision recorded.' }]);
   }
-  let session;
-  if(task.bot){
-    const bot=runtime.createBot({name:'quality-'+task.id});session=runtime.getSession(runtime.openBot(bot.id).sessionId);
-    runtime.mergeSessionMetadata(session.id,{allowedSkillNames:[],allowedTools:[...tools.map(t=>t.name),'history_read','history_search','retrieve_tool_result'],permissionMode:'auto',maxTurns:limits.maxModelCalls});
-    runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
+  if(session){
+    if (!recallBot) {
+      runtime.mergeSessionMetadata(session.id,{allowedSkillNames:[],allowedTools:[...tools.map(t=>t.name),'history_read','history_search','retrieve_tool_result'],permissionMode:'auto',maxTurns:limits.maxModelCalls});
+      runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
+    }
     if(task.compactLog){
       runtime.store.appendMessage(session.id,'user',[{type:'text',text:'Record the diagnostic command result for later inspection.'}]);
       runtime.store.appendMessage(session.id,'assistant',[{type:'tool_call',toolCallId:'seed-log',name:'check_project',input:{}}]);
@@ -180,7 +185,7 @@ try {
     }
     runtime.sendUserMessage(session.id,task.turns[0]);
   }else session = runtime.createChatSession({ title: `quality-${task.id}`, message: task.turns[0], agentId: 'general',
-    metadata: { allowedSkillNames: [], ...identity } });
+    metadata: { allowedSkillNames: [], ...(task.contextSeed ? identity : {}) } });
   for (let i = 0; i < task.turns.length; i++) {
     if (task.contextSeed && i === task.turns.length - 1) {
       outcome.contextEvidence = { seededMessages: 0, compactRounds: [] };
@@ -191,7 +196,7 @@ try {
         }
         if (task.contextSeed.compact) {
           // Product's existing forced-compaction entry, not a synthetic summary replacement.
-          const compact = await runtime.compactCanonicalSession(session.id, task.contextSeed.summaryTimeoutMs);
+          const compact = await runtime.compactCanonicalSession(session.id);
           outcome.contextEvidence.compactRounds.push(compact);
           if (!compact.replaced) throw new Error('context fixture did not compact; semantic evaluation invalid');
         }
@@ -200,7 +205,7 @@ try {
     if (i) runtime.sendUserMessage(session.id, task.turns[i]);
     const sourceSeq = task.expected.rounds ? runtime.store.listSurfaceNodes(session.id).at(-1)?.seq : undefined;
     const auxiliaryStart = outcome.auxiliaryRequests.length;
-    if(task.bot)await runtime.runHumanSession(session.id);
+    if(recallBot || task.bot)await runtime.runHumanSession(session.id);
     else await runtime.runSession(session.id, { onModelStreamChunk: () => {} });
     if (sourceSeq !== undefined) {
       const response = runtime.store.foldMessages(session.id).filter(message => message.seq > sourceSeq);

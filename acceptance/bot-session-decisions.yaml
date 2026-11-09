@@ -1,0 +1,15 @@
+id: bot-session-decisions
+title: Bot 在同一身份的会话间找回决定
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  把剩下两个问题也修掉：同一个用户和 Bot 换会话后也能找回之前的决定，别串到其他用户或 Bot；长对话压缩别再卡在 5 秒超时。修完直接用产品默认配置和当前真实模型重跑，看五道题和逐轮断言能不能都过。
+criteria:
+  - id: AC-1
+    given: 同一用户在同一 Bot 的旧会话中作过决定
+    when: 在新会话搜索关键词并展开来源
+    then: 能读到原决定，其他用户、租户、Bot、房间和子任务的会话不可见
+  - id: AC-2
+    given: 长对话需要压缩且模型需要超过五秒返回摘要
+    when: 用户按默认设置压缩 Bot 对话
+    then: 摘要在一分钟内完成时生效，原始历史可追溯

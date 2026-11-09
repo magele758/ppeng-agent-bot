@@ -19,7 +19,7 @@ export function buildContextSuite() {
 /** Replay both observed task switches on a newly created Bot's canonical session. */
 export function buildBotTurnOwnershipSuite() {
   const switchCase = buildContextSuite().find(task => task.id === 'task-switch-bot');
-  const contextSeed = { ...switchCase.contextSeed, summaryTimeoutMs: 60_000 };
+  const contextSeed = switchCase.contextSeed;
   const rounds = ['收到','收到','周宁，73万元','许宁，19万元','周宁，73万元','周宁，73万元'];
   return [
     { ...switchCase, bot:true, contextSeed,
