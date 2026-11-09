@@ -1931,6 +1931,14 @@
       ]
     },
     {
+      "id": "bot-source-trace-pairing",
+      "title": "跨会话原文召回与乱序工具回执",
+      "tests": [
+        "packages/core/test/bot-recall-replies.test.js",
+        "packages/core/test/execution-findings.test.ts"
+      ]
+    },
+    {
       "id": "bot-startup-summary-latency",
       "title": "摘要服务变慢时 Bot 启动有界等待",
       "tests": [

@@ -57,15 +57,17 @@ interface OpenStart {
 interface ScanState {
   findings: ExecutionFinding[];
   open: OpenStart[];
+  ends: Map<string, number>;
   turn?: number;
   turnHasTruncated: boolean;
   turnHasRecovery: boolean;
   turnHasWaitingHold: boolean;
 }
 
-function createState(): ScanState {
+function createState(findings: ExecutionFinding[]): ScanState {
   return {
-    findings: [],
+    findings,
+    ends: new Map(),
     open: [],
     turnHasTruncated: false,
     turnHasRecovery: false,
@@ -123,12 +125,6 @@ function flushOpen(state: ScanState, asWaiting: boolean): void {
   state.open = [];
 }
 
-function findOpen(open: OpenStart[], toolCallId: string | undefined, name: string | undefined): number {
-  if (toolCallId) return open.findIndex((start) => start.toolCallId === toolCallId);
-  if (!name) return -1;
-  return open.findIndex((start) => start.name === name);
-}
-
 function onTurnStart(state: ScanState, event: ExecutionLogEvent): void {
   flushOpen(state, false);
   const turn = fieldsOf(event).turn;
@@ -137,6 +133,12 @@ function onTurnStart(state: ScanState, event: ExecutionLogEvent): void {
 
 function onToolStart(state: ScanState, event: ExecutionLogEvent): void {
   const fields = fieldsOf(event);
+  const id = textField(fields, 'toolCallId');
+  const count = id ? state.ends.get(id) : undefined;
+  if (id && count) {
+    state.ends.set(id, count - 1);
+    return;
+  }
   state.open.push({
     ts: event.ts ?? '',
     sessionId: event.sessionId,
@@ -146,9 +148,11 @@ function onToolStart(state: ScanState, event: ExecutionLogEvent): void {
   });
 }
 
-function closeOpen(state: ScanState, toolCallId: string | undefined, name: string | undefined): void {
-  const index = findOpen(state.open, toolCallId, name);
-  if (index >= 0) state.open.splice(index, 1);
+// Older logs may have only a name. Match it only when there is a single pending candidate.
+function closeLegacyStart(state: ScanState, name: string | undefined): void {
+  if (!name) return;
+  const named = state.open.filter(start => start.name === name);
+  if (named.length === 1) state.open.splice(state.open.indexOf(named[0]!), 1);
 }
 
 function noteWaitingHold(
@@ -185,7 +189,7 @@ function onToolEnd(state: ScanState, event: ExecutionLogEvent): void {
   const fields = fieldsOf(event);
   const toolCallId = textField(fields, 'toolCallId');
   const name = textField(fields, 'name') ?? textField(fields, 'tool');
-  closeOpen(state, toolCallId, name);
+  if (!toolCallId) closeLegacyStart(state, name);
   if (fields.hold === 'approval') {
     noteWaitingHold(state, event, name, toolCallId);
     return;
@@ -345,10 +349,22 @@ function dispatch(state: ScanState, event: ExecutionLogEvent): void {
 }
 
 export function analyzeExecutionLog(events: readonly ExecutionLogEvent[]): ExecutionFinding[] {
-  const state = createState();
-  for (const event of events) dispatch(state, event);
-  flushOpen(state, false);
-  return state.findings;
+  const findings: ExecutionFinding[] = [];
+  const sessions = new Map<string | undefined, ScanState>();
+  // A tool end may be appended before its start or across a turn boundary.
+  for (const event of events) {
+    let state = sessions.get(event.sessionId);
+    if (!state) {
+      state = createState(findings);
+      sessions.set(event.sessionId, state);
+    }
+    if (event.kind !== 'tool_end') continue;
+    const id = textField(fieldsOf(event), 'toolCallId');
+    if (id) state.ends.set(id, (state.ends.get(id) ?? 0) + 1);
+  }
+  for (const event of events) dispatch(sessions.get(event.sessionId)!, event);
+  for (const state of sessions.values()) flushOpen(state, false);
+  return findings;
 }
 
 export function attachExecutionFindings<T extends { events: readonly ExecutionLogEvent[] }>(

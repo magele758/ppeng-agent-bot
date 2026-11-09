@@ -102,3 +102,10 @@ describe('skill load execution log', () => {
     assert.equal(events[0]?.payload?.name, 'dup');
   });
 });
+
+it('pairs reordered outcomes by session and call id across turn boundaries [AC:bot-source-trace-pairing#AC-2]',()=>{
+  const tool=(sessionId:string,kind:string,ok=true)=>({sessionId,kind,payload:{name:'history_read',toolCallId:'same',ok}});
+  const findings=analyzeExecutionLog([tool('A','tool_end',false),tool('B','tool_start'),
+    {sessionId:'A',kind:'turn_start'},tool('A','tool_start')]);
+  assert.deepEqual(findings.map(f=>[f.sessionId,f.code]),[['A','tool_failed'],['B','tool_unpaired']]);
+});
