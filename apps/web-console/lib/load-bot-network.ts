@@ -6,11 +6,13 @@ interface Room {id:string; title:string}
 async function read<T>(path:string,signal:AbortSignal):Promise<T>{
   return await api('/api/'+path,{signal}) as T;
 }
+function pickAt(task:Task){return task.updatedAt??task.createdAt??'';}
+function pickReport(task:Task){return task.failureReason??task.delivery?.report??task.result;}
 function taskToObservation(task:Task){
   return {
     id:task.id,from:task.requesterBotId,to:task.targetBotId,title:task.input,state:task.status,
-    at:task.updatedAt??task.createdAt??'',session:task.delivery?.sessionId,
-    report:task.failureReason??task.delivery?.report??task.result,cost:task.delivery?.costUsd??undefined
+    at:pickAt(task),session:task.delivery?.sessionId,
+    report:pickReport(task),cost:task.delivery?.costUsd??undefined
   };
 }
 async function delegates(signal:AbortSignal){
