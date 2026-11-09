@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 393 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 395 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（120）
+## bot（121）
 
 需求正文见 [bot](bot.md)。
 
@@ -131,6 +131,7 @@
 - `bot-goal-result-return` 子执行结果回到原目标并收口
 - `bot-goals-panel-rules` 目标与进展只展示同时在做的多件事
 - `bot-goals-panel-threshold` 目标与进展少于两个目标时不展示
+- `bot-group-cleanup` 删除分组时可一并删除 Bot
 - `bot-group-drag-only` Bot 侧栏移组仅保留拖拽入口
 - `bot-history-memory` Bot 持续对话历史与记忆
 - `bot-human-continuation` Bot忙时接收与连续对话
@@ -818,10 +819,11 @@
 - `routine-strict-precheck` 严格例行预检与持久游标
 - `routine-weekday-daytime-default` 新建例行任务默认工作日白天
 
-## runtime（1）
+## runtime（2）
 
 需求正文见 [other](other.md)。
 
+- `runtime-diagnostics-skill` Agent Home 故障排查技能
 - `runtime-gap-closures` 事件密钥、内置工具名、发布脚本环境、只读 MCP、HTTP 来源与幂等并发
 
 ## sanctum（1）

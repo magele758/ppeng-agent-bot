@@ -1,6 +1,32 @@
-import { BotFunctionalGroupService, ValidationError, resolveBotPrincipal, type BotSharedScope, type RawAgentRuntime } from '@ppeng/agent-core';
+import { BotFunctionalGroupService, ValidationError, resolveBotPrincipal, type BotPrincipal, type BotSharedScope, type RawAgentRuntime } from '@ppeng/agent-core';
 import type { RouteContext, RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
+
+import { prepareBotDeletion } from '../bot-delete.js';
+import { checkOwnerRef } from '../access/enforce.js';
+import { botDefinitionRef } from '../access/owners.js';
+
+function deleteGroupMembers(
+  runtime: RawAgentRuntime,
+  service: BotFunctionalGroupService,
+  principal: BotPrincipal,
+  ctx: RouteContext,
+  confirmed: unknown
+): void {
+  const id = ctx.requireParam('id');
+  runtime.store.transaction(() => {
+    const { botIds } = service.get(principal, id);
+    if (!Array.isArray(confirmed) || confirmed.length !== botIds.length || botIds.some(id => !confirmed.includes(id))) {
+      throw new ValidationError('Group membership changed. Refresh and confirm again.');
+    }
+    const deletions = botIds.map(botId => {
+      if (ctx.auth.isolate) checkOwnerRef(botDefinitionRef(runtime, botId), { resource: 'bot', unowned: 'admin' }, ctx.auth);
+      return prepareBotDeletion(runtime, botId);
+    });
+    service.delete(principal, id);
+    for (const remove of deletions) remove();
+  });
+}
 
 /** All group memberships and shared facts belong to the request's principal. */
 export function botFunctionalGroupRoutes(runtime: RawAgentRuntime): RouteSpec[] {
@@ -16,7 +42,11 @@ export function botFunctionalGroupRoutes(runtime: RawAgentRuntime): RouteSpec[] 
   {method:'GET',pattern:'/api/bot-functional-groups',handler:ctx=>json(ctx.response,200,{groups:service.list(principal(ctx))})},
   {method:'POST',pattern:'/api/bot-functional-groups',handler:async ctx=>{const input=await body(ctx);json(ctx.response,201,{group:service.create(principal(ctx),input.name as string)});}},
   {method:'PATCH',pattern:'/api/bot-functional-groups/:id',handler:async ctx=>{const input=await body(ctx);json(ctx.response,200,{group:service.rename(principal(ctx),ctx.requireParam('id'),input.name as string)});}},
-  {method:'DELETE',pattern:'/api/bot-functional-groups/:id',handler:ctx=>{service.delete(principal(ctx),ctx.requireParam('id'));json(ctx.response,200,{ok:true});}},
+  {method:'DELETE',pattern:'/api/bot-functional-groups/:id',handler:async ctx=>{
+    if(ctx.url.searchParams.get('deleteBots')==='1')deleteGroupMembers(runtime,service,principal(ctx),ctx,(await body(ctx)).botIds);
+    else service.delete(principal(ctx),ctx.requireParam('id'));
+    json(ctx.response,200,{ok:true});
+  }},
   {method:'PUT',pattern:'/api/bots/:id/functional-group',handler:async ctx=>{
     const input=await body(ctx);
     if(input.groupId!==null&&typeof input.groupId!=='string')throw new ValidationError('groupId must be a group id or null');

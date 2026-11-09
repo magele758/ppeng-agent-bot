@@ -126,6 +126,8 @@ export const play = {
     renameShort: "Rename",
     delete: "Delete functional group",
     deleteShort: "Delete",
+    deleteWithBots: "Also delete member Bots",
+    deleteBotsConfirm: "Delete “{name}”, its {count} member Bots and their scheduled tasks? Conversation and group chat history will be kept. This cannot be undone.",
     deleteConfirm: "Delete “{name}”? Bots return to Ungrouped. Group chats return to the list. Bots, group chats, and conversations are kept.",
     ungrouped: "Ungrouped",
     dropHint: "Drag Bots or group chats here",

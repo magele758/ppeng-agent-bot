@@ -38,31 +38,33 @@ function affectedRooms(runtime:RawAgentRuntime,id:string):Room[] {
 }
 
 function removeDefinition(runtime:RawAgentRuntime,id:string,sessions:Session[],pending:Run[],runs:RoutineRunStore,rooms:Room[]):void {
-  runtime.store.db.exec('BEGIN IMMEDIATE');
-  try {
+  runtime.store.transaction(() => {
     for(const run of pending) runs.update(run.id,{status:'cancelled',notificationSent:true,finishedAt:new Date().toISOString()});
     preserveSessions(runtime,sessions);
     detachRooms(runtime,id,rooms);
     runtime.store.db.prepare('DELETE FROM bot_functional_members WHERE bot_id=?').run(id);
     runtime.store.updateBot(id,{hidden:true});
     runtime.store.db.prepare('DELETE FROM bots WHERE id=?').run(id);
-    runtime.store.db.exec('COMMIT');
-  } catch(error) {
-    runtime.store.db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 }
 
-export function deleteBotPreservingHistory(runtime:RawAgentRuntime,id:string):void {
+export function prepareBotDeletion(runtime:RawAgentRuntime,id:string) {
   const bot=runtime.getBot(id);
   const sessions=runtime.store.listSessions().filter(s=>s.metadata.botId===id || s.id===bot.canonicalSessionId);
   const ids=new Set(sessions.map(s=>s.id));
   const runs=new RoutineRunStore(runtime.store);
   const pending=runs.pending().filter(r=>r.job.metadata.botId===id || ids.has(r.mainSessionId));
   assertStopped(runtime,sessions,pending);
-  const rooms=affectedRooms(runtime,id);
+  affectedRooms(runtime,id);
   new BotFunctionalGroupService(runtime.store);
   const jobs=runtime.listCronJobs().filter(j=>j.metadata.botId===id || ids.has(j.sessionId));
-  for(const job of jobs) runtime.deleteCronJob(job.id);
-  removeDefinition(runtime,id,sessions,pending,runs,rooms);
+  return () => {
+    for(const job of jobs) runtime.deleteCronJob(job.id);
+    // Another member of the same room may already have been removed in this batch.
+    removeDefinition(runtime,id,sessions,pending,runs,affectedRooms(runtime,id));
+  };
+}
+
+export function deleteBotPreservingHistory(runtime:RawAgentRuntime,id:string):void {
+  runtime.store.transaction(() => prepareBotDeletion(runtime,id)());
 }

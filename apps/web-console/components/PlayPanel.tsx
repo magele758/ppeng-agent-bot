@@ -1188,6 +1188,7 @@ export function PlayPanel({
             ) : null}
             {botSurface ? (
               <BotFunctionalGroups
+                onBotsDeleted={ids => setBots(previous => previous.filter(bot => !ids.includes(bot.id)))}
                 bots={botRoster}
                 sessions={sessions}
                 rooms={sidebarRooms}

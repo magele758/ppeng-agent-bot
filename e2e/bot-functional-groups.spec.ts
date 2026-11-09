@@ -123,3 +123,26 @@ test('shared facts editor saves only explicit facts in the selected global or gr
     await expect(page.getByLabel('第 1 条信息的内容')).toHaveValue('Shanghai');
   } finally { await page.request.patch(`/api/bots/${f.bot.id}`, { data: { hidden: true } }); await page.request.delete(`/api/sessions/${f.bot.canonicalSessionId}`); }
 });
+
+test('explicit group cleanup can be cancelled and preserves conversation history [AC:bot-group-cleanup#AC-1]', async ({ page, request }) => {
+  const name = 'Cleanup ' + Date.now();
+  const { bot } = await (await request.post('/api/bots', { data: { name } })).json();
+  const { group } = await (await request.post('/api/bot-functional-groups', { data: { name } })).json();
+  await request.put(`/api/bots/${bot.id}/functional-group`, { data: { groupId: group.id } });
+  await request.post(`/api/sessions/${bot.canonicalSessionId}/messages`, { data: { message: 'Keep this conversation', autoRun: false } });
+  await page.goto('/#/bot');
+  const section = page.getByTestId('functional-group-' + group.id);
+  const menu = section.getByRole('button', { name: name + ' 的更多操作', exact: true }).first();
+  const remove = section.getByRole('button', { name: '同时删除组内 Bot', exact: true });
+  await menu.click();
+  page.once('dialog', dialog => dialog.dismiss());
+  await remove.click();
+  await expect(section).toBeVisible();
+  await menu.click();
+  page.once('dialog', dialog => dialog.accept());
+  await remove.click();
+  await expect(section).toHaveCount(0);
+  expect((await request.get('/api/bots/' + bot.id)).status()).toBe(404);
+  const history = await (await request.get('/api/sessions/' + bot.canonicalSessionId)).json();
+  expect(JSON.stringify(history)).toContain('Keep this conversation');
+});

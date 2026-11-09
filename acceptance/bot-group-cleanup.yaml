@@ -1,0 +1,14 @@
+id: bot-group-cleanup
+title: 删除分组时可一并删除 Bot
+status: implemented
+requirement: 增加“同时删除组内 Bot”选项，保留历史会话
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 功能分组内有多个 Bot 和历史会话
+    when: 用户明确选择同时删除组内 Bot
+    then: 分组与组内 Bot 一起移除，历史会话和组外 Bot 保留；普通删除仍只移除分组
+  - id: AC-2
+    given: 有成员正在运行、无权删除或成员列表已经变化
+    when: 提交之前确认过的批量删除
+    then: 操作拒绝，所有分组成员与历史保留

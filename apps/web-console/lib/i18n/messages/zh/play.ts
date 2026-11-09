@@ -126,6 +126,8 @@ export const play = {
     renameShort: "改名",
     delete: "删除功能分组",
     deleteShort: "删除",
+    deleteWithBots: "同时删除组内 Bot",
+    deleteBotsConfirm: "删除分组“{name}”及组内 {count} 个 Bot 和它们的定时任务？历史会话和群聊记录将保留。此操作不可撤销。",
     deleteConfirm: "删除功能分组“{name}”？Bot 将回到未分组，群聊也会回到原来的列表，Bot、群聊和对话会保留。",
     ungrouped: "未分组",
     dropHint: "拖拽 Bot 或群聊到这里",

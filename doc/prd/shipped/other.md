@@ -797,6 +797,11 @@ Rotate library page share links without deleting content
 Implement the smallest correct cut for r5-6 rotate_page_share (store rotate share_id + DurablePagePort.rotateShare + admin POST /api/library/pages/:id/rotate-share + tool rotate_page_share; old share 404; page+body kept; pick and test revision policy).
 Run focused unit + acceptance tests for rotate_page_share (rotate keeps page+body; old share 404; new share works; missing id fails cleanly; revision policy asserted; admin POST rotate-share; public share read-only) with nice and low concurrency.
 
+## runtime-diagnostics-skill
+Agent Home 故障排查技能
+
+针对当前项目使用的数据以及记录的trace，生成一个skill，用来指导各种Agent来怎么排查和分析问题，定位原因、修复问题使用
+
 ## runtime-gap-closures
 事件密钥、内置工具名、发布脚本环境、只读 MCP、HTTP 来源与幂等并发
 

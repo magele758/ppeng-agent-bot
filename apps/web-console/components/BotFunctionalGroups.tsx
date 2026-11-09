@@ -15,6 +15,15 @@ import { arrangeSidebarRows, beginSidebarDrag, BOT_DRAG_MIME, commitBotPinState,
 import { canMoveBot, canMoveRoom, factEditorState, functionalGroupRows, functionalGroupPresentation, FUNCTIONAL_GROUPS_CHANGED_EVENT, groupForBot, groupSaveDisabled, functionalGroupSaveRequest, moveBotInGroups, moveRoomInGroups, roomsInGroup, upsertFunctionalGroup, type FunctionalGroup } from '@/lib/functional-group-view';
 import { PlayGroupRow, deletePlayRoom, type SidebarRoom } from './play-group/PlayBotGroupList';
 
+function groupDeletion(group: FunctionalGroup, withBots: boolean) {
+  const path = `/api/bot-functional-groups/${encodeURIComponent(group.id)}`;
+  if (withBots) return {
+    path: path + '?deleteBots=1', confirm: 'play.functionalGroups.deleteBotsConfirm' as const,
+    options: { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ botIds: group.botIds }) }, deleted: group.botIds
+  };
+  return { path, confirm: 'play.functionalGroups.deleteConfirm' as const, options: { method: 'DELETE' }, deleted: [] };
+}
+
 function publishFunctionalGroups(groups: FunctionalGroup[]) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent(FUNCTIONAL_GROUPS_CHANGED_EVENT, { detail: groups }));
@@ -24,7 +33,7 @@ function withRoomIds(groups: FunctionalGroup[]): FunctionalGroup[] {
   return groups.map((group) => ({ ...group, roomIds: group.roomIds ?? [] }));
 }
 
-export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession, createRequest = 0, selectedRoomId = null, onOpenRoom, onRoomDeleted }: {
+export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession, createRequest = 0, selectedRoomId = null, onOpenRoom, onRoomDeleted, onBotsDeleted }: {
   createRequest?: number;
   bots: readonly BotInfo[];
   sessions: readonly SessionSummary[];
@@ -32,6 +41,7 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
   renderSession: (session: SessionSummary) => ReactNode;
   selectedRoomId?: string | null;
   onOpenRoom?: (roomId: string) => void;
+  onBotsDeleted: (ids: readonly string[]) => void;
   onRoomDeleted?: (roomId: string) => void;
 }) {
   const { t } = useI18n();
@@ -89,12 +99,14 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
     finally { setPending(false); }
   };
 
-  const remove = async (group: FunctionalGroup) => {
-    if (pending || !window.confirm(t('play.functionalGroups.deleteConfirm', { name: group.name }))) return;
+  const remove = async (group: FunctionalGroup, withBots: boolean) => {
+    const deletion = groupDeletion(group, withBots);
+    if (pending || !window.confirm(t(deletion.confirm, { name: group.name, count: group.botIds.length }))) return;
     setPending(true);
     setError('');
     try {
-      await api(`/api/bot-functional-groups/${encodeURIComponent(group.id)}`, { method: 'DELETE' });
+      await api(deletion.path, deletion.options);
+      onBotsDeleted(deletion.deleted);
       setGroups((previous) => {
         const next = previous.filter((g) => g.id !== group.id);
         publishFunctionalGroups(next);
@@ -244,7 +256,8 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
           <button className="btn btn-ghost btn-sm" disabled={pending} aria-label={t('play.functionalGroups.rename')} title={t('play.functionalGroups.rename')}
             onClick={() => setEditing({ id: group.id, name: group.name })}>{t('play.functionalGroups.renameShort')}</button>
           <button className="btn btn-ghost btn-sm" disabled={pending} aria-label={t('play.functionalGroups.delete')} title={t('play.functionalGroups.delete')}
-            onClick={() => { void remove(group); }}>{t('play.functionalGroups.deleteShort')}</button>
+            onClick={() => { void remove(group, false); }}>{t('play.functionalGroups.deleteShort')}</button>
+          <button className="btn btn-ghost btn-sm" disabled={pending} onClick={() => { void remove(group, true); }}>{t('play.functionalGroups.deleteWithBots')}</button>
         </RowActionMenu> : null}
       </div>
       {ordered.map((entry) => {
