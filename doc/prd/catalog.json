@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 397,
+    "implemented": 399,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -860,6 +860,13 @@
       "requirement": "你在仓库 /Users/penglei/developer/self-test-grounding/ppeng-agent-core。用户看着左侧 Bot 列表（附图：主导航旁边的会话/Bot 侧栏，有置顶、Jarvis 群聊、功能分组「开发 / 日常 / 研究 / 生活」和一列 Bot 头像）。他说这里面 Bot 的顺序会变化，要加拖拽排序，不要乱变顺序。\n\n他点中的节点是 aside.lab-rail（主导航：Agent Home、Bot、对话、Bots 与 Agents、任务、知识与记忆、设置）。Bot 头像不在这个导航里，而在旁边的 play-sidebar / sessionListMini。先确认顺序变化发生在 Bot 列表，不要去给主导航那几项做排序，除非你发现主导航里真的有会跳动的 Bot。\n\n先查清现在按什么排（最近消息、更新时间、不稳定的对象键顺序等），用一句话写进回报。\n\n要做成：\n- 同一区域内可以拖拽改顺序：置顶区内部、每个功能分组内部、未进分组也未置顶的列表内部。群聊若出现在这些区域里，也参与同一套顺序。\n- 顺序持久化，刷新后还在。沿用现有的置顶 / 功能分组存储（例如 lab.botPins 或服务端分组），不要另起一套只活在内存里的排序，也不要新增 RAW_AGENT_*。\n- 一旦有了用户顺序，新消息、执行中、刷新都不得把 Bot 重新排到前面。新出现的 Bot 或群聊追加到该区域末尾。\n- 已有的「拖进置顶 / 拖出取消置顶 / 拖进功能分组」保留。拖拽排序不要把换区拖拽弄坏。\n- 文案如需新增，走 i18n，zh/en 同一套 key。",
       "verificationStage": "software",
       "file": "acceptance/bot-sidebar-order.yaml"
+    },
+    {
+      "id": "bot-sidebar-routing",
+      "title": "Bot 名册入口与主对话一致",
+      "requirement": "怎么现在有的bot，点击是进入一个会话列表了？这个是怎么回事？排查和修复一下",
+      "verificationStage": "software",
+      "file": "acceptance/bot-sidebar-routing.yaml"
     },
     {
       "id": "bot-skill-panel-layout",
@@ -2982,11 +2989,6 @@
       "name": "agent-loop",
       "description": "Embeddable agent loop core SDK (@ppeng/agent-loop / @mage-ai-lab/agent-loop) providing turn kernel, model adapters, streaming watchdogs, loop guards, session state, and assembly presets (mini, normal, full, max). Use when: (1) Integrating or embedding the agent loop into an application or service, (2) Developing, modifying, or testing packages/agent-loop, (3) Assembling an agent loop using createAssembledLoop or createMiniAssembledLoop, (4) Managing mid-run steering, step-level control, or event folding via AgentLoopHandle, (5) Adding or configuring loop modules, watchdogs, or model adapters.",
       "path": "skills/agent-loop/SKILL.md"
-    },
-    {
-      "name": "Agent Tech Digest",
-      "description": "Rolling digest of agent-related feeds (maintained by capability-gateway).",
-      "path": "skills/agent-tech-digest/SKILL.md"
     },
     {
       "name": "login",

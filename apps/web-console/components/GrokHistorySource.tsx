@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { listGrokSessions, readGrokHistory, type GrokMessage, type GrokSession } from '@/lib/grok-history';
+import type { PlaySurface } from '@/lib/bots';
 import { directoryPicker, rememberedDirectory, replicaFiles, type GrokDirectory } from '@/lib/grok-directory';
 import { archivedMarkdownHtml } from '@/lib/markdown';
 import { ChatMarkdownHost } from './ChatMarkdownHost';
@@ -38,7 +39,11 @@ function SessionChoices({catalog, select}: {catalog: Catalog | null; select: (se
   </div>;
 }
 
-export function GrokHistorySource() {
+export function GrokHistorySource({ surface }: { surface: PlaySurface }) {
+  return surface === 'chat' ? <GrokHistoryBrowser /> : null;
+}
+
+function GrokHistoryBrowser() {
   const { t } = useI18n();
   const dialog = useRef<HTMLDialogElement>(null);
   const picker = useRef<HTMLInputElement>(null);

@@ -61,6 +61,14 @@ type SidebarSession = {
   metadata?: Record<string, unknown>;
 };
 
+/** Navigation and the Bot sidebar both require a current, visible roster entry. */
+export function visibleBotForSession(
+  bots: readonly BotInfo[], sessionId: string | null, sessions: readonly SidebarSession[]
+): BotInfo | undefined {
+  const bot = botForCanonicalSession(bots, sessionId, sessions);
+  return bot?.hidden ? undefined : bot;
+}
+
 /** A bot-spawned child task (goal worker or concurrent fork), not the bot's own chat. */
 export function isBotForkChildSession(metadata: Record<string, unknown> | undefined): boolean {
   const source = metadata?.spawnSource;
@@ -114,16 +122,10 @@ export function filterSessionsByPlaySurface<
   bots: readonly BotInfo[],
   surface: PlaySurface
 ): T[] {
-  const canonical = new Set(
-    bots.map((b) => b.canonicalSessionId).filter((id): id is string => Boolean(id))
-  );
-  const isBotSession = (s: T) => canonical.has(s.id) || s.metadata?.canonicalBotChat === true;
-  return sessions.filter((s) => {
-    if (s.metadata?.roomId) return false;
-    const child = isSidebarForkChild(s, bots);
-    if (surface === 'bot') return !child && isBotSession(s);
-    if (child) return true;
-    return !isBotSession(s);
+  return sessions.filter(session => {
+    if (session.metadata?.roomId) return false;
+    const bot = visibleBotForSession(bots, session.id, [session]);
+    return surface === 'bot' ? Boolean(bot) : !bot;
   });
 }
 

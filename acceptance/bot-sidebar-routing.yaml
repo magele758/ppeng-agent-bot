@@ -1,0 +1,15 @@
+id: bot-sidebar-routing
+title: Bot 名册入口与主对话一致
+status: implemented
+requirement: |
+  怎么现在有的bot，点击是进入一个会话列表了？这个是怎么回事？排查和修复一下
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 当前名册有可见 Bot，也保留了已移出名册的 Bot 的历史会话
+    when: 打开 Bot 侧栏并选择可见 Bot
+    then: 直接进入它的主对话，旧 Bot 历史仅在普通会话页列出
+  - id: AC-2
+    given: 本机 Grok 历史来源打开的是会话列表
+    when: 切换 Bot 和普通会话页
+    then: 仅普通会话页显示这个历史来源入口

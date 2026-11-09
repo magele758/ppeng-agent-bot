@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 397 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 399 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（122）
+## bot（123）
 
 需求正文见 [bot](bot.md)。
 
@@ -185,6 +185,7 @@
 - `bot-settings-flow` 简化 Bot 操作与设置生效反馈
 - `bot-sidebar-child-sessions` Bot 侧栏不列出子任务会话
 - `bot-sidebar-order` Bot 列表同一区域内拖拽排序
+- `bot-sidebar-routing` Bot 名册入口与主对话一致
 - `bot-skill-panel-layout` Bot 技能面板布局清晰且适应窄屏
 - `bot-soft-create-runtime` 软萌头像可正常创建和保存
 - `bot-soft-motion` 软萌头像跟随实际工作状态动起来

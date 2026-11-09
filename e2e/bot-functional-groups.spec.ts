@@ -179,3 +179,34 @@ test('sidebar groups independently collapse and reopen [AC:functional-group-disc
     await page.request.delete(`/api/sessions/${f.bot.canonicalSessionId}`);
   }
 });
+
+test('only current roster conversations appear as Bot entries [AC:bot-sidebar-routing#AC-1]', async ({ page, request }) => {
+  const createBot = async (name: string) => {
+    const res = await request.post('/api/bots', { data: { name } });
+    expect(res.ok()).toBeTruthy();
+    return (await res.json()).bot;
+  };
+  const active = await createBot('Visible ' + Date.now());
+  const removed = await createBot('Historical ' + Date.now());
+  try {
+    expect((await request.patch('/api/bots/' + removed.id, { data: { hidden: true } })).ok()).toBeTruthy();
+    await page.goto('/#/bot');
+    const sidebar = page.locator('#sessionListMini');
+    const activeRow = sidebar.locator(`[data-session-id="${active.canonicalSessionId}"]`);
+    const history = sidebar.locator(`[data-session-id="${removed.canonicalSessionId}"]`);
+    await expect(activeRow).toBeVisible();
+    await expect(history).toHaveCount(0);
+    await activeRow.click();
+    await expect(activeRow).toHaveAttribute('aria-current', 'true');
+    await expect(page.locator('.chat-panel-header__title-row').first()).toContainText(active.name);
+    await page.goto('/#/chat');
+    await expect(history).toBeVisible();
+    await history.click();
+    await expect(history).toHaveAttribute('aria-current', 'true');
+  } finally {
+    for (const bot of [active, removed]) {
+      await request.delete('/api/bots/' + bot.id);
+      await request.delete('/api/sessions/' + bot.canonicalSessionId);
+    }
+  }
+});
