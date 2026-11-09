@@ -1,0 +1,15 @@
+id: runtime-diagnostics-skill
+title: Agent Home 故障排查技能
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  针对当前项目使用的数据以及记录的trace，生成一个skill，用来指导各种Agent来怎么排查和分析问题，定位原因、修复问题使用
+criteria:
+  - id: AC-1
+    given: Agent 在项目技能目录中寻找会话故障排查方法
+    when: 加载该技能
+    then: 能获取从会话、主存储和 trace 证据到修复验证的操作指引
+  - id: AC-2
+    given: 一个会话有跨轮事件、敏感正文和损坏的日志行
+    when: 根据技能提取诊断时间线
+    then: 时间线可关联原始行、显示缺失证据并省略用户和工具正文
