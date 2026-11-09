@@ -1,0 +1,15 @@
+id: bot-flow-read-projection
+title: 工作流只接收展示所需的会话数据
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  要能根据我的bot对话的实际情况来动态生成，不要搞一个配置来搞这个，要零侵入的实现这个流的能力
+criteria:
+  - id: AC-1
+    given: Bot 及其子任务积累了大量工作资料
+    when: 打开工作流视图
+    then: 子会话只返回展示所需的身份、状态、关系及用量，且保留原有会话详情行为
+  - id: AC-2
+    given: 定时执行与普通对话在同一会话交错
+    when: 定时消息带有准确运行标识
+    then: 该轮工具显示在对应运行下，普通对话独立展示

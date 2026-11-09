@@ -29,3 +29,18 @@ test('按真实会话父子关系显示子任务与用量，缺失用量保留�
  const flow=sessionFlow(root,[child],'b')[0];
  assert.equal(flow.steps[1].parent,'s1');assert.equal(flow.steps[1].session,'s2');assert.equal(flow.steps[1].cost,0.1);assert.equal(flow.steps[0].cost,undefined);
 });
+
+test('仅按运行标识关联例行和工具 [AC:bot-flow-read-projection#AC-2]',async()=>{
+ const {chatFlows,joinRoutineHistory}=await import('./bot-activity-flow.ts');
+ const messages=[
+   {seq:1,id:'chat1',createdAt:'now',role:'user',key:'routine:routine_run_a',parts:[{type:'text',text:'inspect'}]},
+   {seq:2,id:'call',createdAt:'now',role:'assistant',parts:[{type:'tool_call',name:'bash',toolCallId:'tool1'}]},
+ ];
+ const chats=chatFlows(messages,'b','s');
+ const ordinary=chatFlows(messages.map(m=>({...m,key:undefined})),'b','s');
+ const run={id:'routine_run_a',kind:'routine' as const,title:'inspect',at:'now',steps:[routineStep({id:'routine_run_a',status:'completed'},'b')]};
+ const flows=joinRoutineHistory([run,...chats,...ordinary]);
+ assert.equal(flows.length,2);
+ assert.equal(flows[0].steps[1].parent,run.id);
+ assert.equal(flows[1].steps[0].parent,undefined);
+});

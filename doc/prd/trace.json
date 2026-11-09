@@ -1693,6 +1693,14 @@
       ]
     },
     {
+      "id": "bot-flow-read-projection",
+      "title": "工作流只接收展示所需的会话数据",
+      "tests": [
+        "apps/daemon/test/bot-flow-projection.test.ts",
+        "apps/web-console/lib/bot-activity-flow.test.ts"
+      ]
+    },
+    {
       "id": "bot-fork-sessions-in-detail",
       "title": "Bot 子任务会话放进详情菜单",
       "tests": [

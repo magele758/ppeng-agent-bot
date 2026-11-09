@@ -1,3 +1,4 @@
+import { flowSessionView } from './flow-session-view.js';
 import { sendSessionList } from '../session-list-summary.js';
 import { goalScope } from '@ppeng/agent-core';
 import { readFileSync } from 'node:fs';
@@ -523,13 +524,17 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'GET',
       pattern: '/api/sessions/:id/team',
-      handler: ({ requireParam, response, auth }) => {
+      handler: ({ requireParam, response, auth, url }) => {
         const id = requireParam('id');
         const root = runtime.getSession(id);
         if (!root) throw new NotFoundError('Session');
         const all = listedSessions(runtime, auth);
         const direct = all.filter((s) => s.parentSessionId === id);
         const descendants = collectDescendants(all, id);
+        if (url.searchParams.get('view') === 'flow') {
+          json(response, 200, { root: flowSessionView(root), descendants: descendants.map(flowSessionView) });
+          return;
+        }
         json(response, 200, {
           root,
           directChildren: direct,
