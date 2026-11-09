@@ -293,9 +293,10 @@ test('multi-field secure form submit (card number + cvv) with no plaintext in re
     assert.equal(res.status, 200);
     const body = await res.text();
 
-    // Receipt must have no plaintext secrets
+    // Receipt must have no plaintext secrets.
+    // CVV is 3 digits and can collide with hex ids/timestamps; match the JSON string value only.
     assert.equal(body.includes(CARD), false, 'card number should not appear in receipt');
-    assert.equal(body.includes(CVV), false, 'cvv should not appear in receipt');
+    assert.equal(body.includes(JSON.stringify(CVV)), false, 'cvv should not appear in receipt');
     assert.match(body, /filled/);
 
     // Receipt must have fields array with fillRefs
@@ -305,10 +306,11 @@ test('multi-field secure form submit (card number + cvv) with no plaintext in re
     const fillRefs = receipt.receipt.fields.map((f) => f.fillRef).filter((f) => f);
     assert.equal(fillRefs.length, 2, 'both fields should have fillRefs');
 
-    // Transcript must have no plaintext secrets
+    // Transcript must have no plaintext secrets.
+    // Same JSON-string match as the receipt: bare "918" collides with hex ids.
     const transcript = JSON.stringify(env.runtime.store.foldMessages(session.id));
     assert.equal(transcript.includes(CARD), false, 'card number should not appear in transcript');
-    assert.equal(transcript.includes(CVV), false, 'cvv should not appear in transcript');
+    assert.equal(transcript.includes(JSON.stringify(CVV)), false, 'cvv should not appear in transcript');
 
     // resolveFillReference should work
     for (const field of receipt.receipt.fields) {
