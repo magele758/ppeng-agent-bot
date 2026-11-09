@@ -2668,6 +2668,14 @@
       ]
     },
     {
+      "id": "grok-local-history",
+      "title": "Lab 只读查看本机 Grok Bot 会话",
+      "tests": [
+        "apps/web-console/lib/grok-history.test.ts",
+        "e2e/grok-local-history.spec.ts"
+      ]
+    },
+    {
       "id": "group-active-header",
       "title": "群聊顶部仅显示工作中的成员",
       "tests": [

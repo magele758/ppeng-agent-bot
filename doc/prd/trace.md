@@ -2354,6 +2354,13 @@ GitHub 事件不能靠换投递号重放
 
 - `apps/web-console/components/goal-update-presentation.test.ts`
 
+### grok-local-history
+
+Lab 只读查看本机 Grok Bot 会话
+
+- `apps/web-console/lib/grok-history.test.ts`
+- `e2e/grok-local-history.spec.ts`
+
 ### group-active-header
 
 群聊顶部仅显示工作中的成员

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 395,
+    "implemented": 396,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1567,6 +1567,13 @@
       "requirement": "聊天里以 [goal update] 开头的系统通知完全不展示（历史与即时都隐藏），通知仍送模型。",
       "verificationStage": "software",
       "file": "acceptance/goal-update-hidden.yaml"
+    },
+    {
+      "id": "grok-local-history",
+      "title": "Lab 只读查看本机 Grok Bot 会话",
+      "requirement": "可以，直接实现吧。在 Lab 的会话列表里加一个「Grok Bot（本机）」来源，点开就能按原顺序只读查看聊天记录。",
+      "verificationStage": "software",
+      "file": "acceptance/grok-local-history.yaml"
     },
     {
       "id": "group-active-header",
