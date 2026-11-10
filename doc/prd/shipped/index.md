@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 433 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 434 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -673,6 +673,12 @@
 需求正文见 [other](other.md)。
 
 - `necessary-tool-injection` 只把当前任务需要的工具定义交给模型
+
+## night（1）
+
+需求正文见 [other](other.md)。
+
+- `night-runtime-reliability` 夜间运行可靠性修复
 
 ## no（1）
 

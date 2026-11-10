@@ -3289,6 +3289,18 @@
       ]
     },
     {
+      "id": "night-runtime-reliability",
+      "title": "夜间运行可靠性修复",
+      "tests": [
+        "apps/web-console/lib/live-stream-once.test.ts",
+        "apps/web-console/lib/stream-segments.test.ts",
+        "e2e/chat-basics.spec.ts",
+        "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
+        "packages/core/test/skill-manifest-gate.test.js",
+        "scripts/workflows/material-source-isolation.test.mjs"
+      ]
+    },
+    {
       "id": "no-windows-desktop-pack",
       "title": "不再打 Windows 桌面安装包",
       "tests": [

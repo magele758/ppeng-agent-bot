@@ -366,3 +366,18 @@ describe('consecutive lookup results', () => {
     expect(out.reason).toBe('end');
   });
 });
+
+it('streams the durable assistant identity after its step commits [AC:night-runtime-reliability#AC-2]',async()=>{
+ const {host,store,session}=createHarness();
+ const order:string[]=[];
+ host.stepTx={commitStep:async()=>{order.push('commit');}};
+ host.modelAdapter={name:'test',runTurn:async()=>({stopReason:'end',assistantParts:[{type:'text',text:'same'}]}),summarizeMessages:async()=>''};
+ await runSessionKernel(host,session.id,{onModelStreamChunk:chunk=>{
+  if(chunk.type!=='assistant_saved')return;
+  const message=store.foldMessages(session.id).find(m=>m.id===chunk.messageId);
+  expect(message?.role).toBe('assistant');
+  expect(order.at(-1)).toBe('commit');
+  order.push('saved');
+ }});
+ expect(order).toContain('saved');
+});

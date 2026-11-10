@@ -30,7 +30,7 @@ test.describe('Chat basics', () => {
     await expect(box.locator('.chat-turn--streaming')).toHaveCount(0, { timeout: 60_000 });
   });
 
-  test('the reply comes back over the event stream and stays in the conversation once done [AC:chat-basics#AC-2]', async ({ page }) => {
+  test('the reply comes back over the event stream and stays in the conversation once done [AC:chat-basics#AC-2] [AC:night-runtime-reliability#AC-2]', async ({ page }) => {
     await page.goto('/#/chat');
     const content = `e2e stream ${Date.now()}`;
     const streamed = page.waitForResponse((res) => res.url().includes('/api/chat/stream'));
@@ -39,7 +39,9 @@ test.describe('Chat basics', () => {
 
     const res = await streamed;
     expect(res.headers()['content-type']).toContain('text/event-stream');
-    expect(await res.text()).toContain('event: result');
+    const wire = await res.text();
+    expect(wire).toContain('event: result');
+    expect(wire).toMatch(/"type":"assistant_saved","messageId":"[^"]+"/);
 
     const box = page.locator('#playMessages');
     await expect(box.locator('.chat-turn--streaming')).toHaveCount(0, { timeout: 60_000 });

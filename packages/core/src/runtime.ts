@@ -146,6 +146,7 @@ import { AgentLoopHandle, type AgentLoopLatch } from './runtime/agent-loop.js';
 import type { EnqueueSteerOptions } from './session/step-inbox.js';
 import { decideSteerAdmission, type SteerAck } from './session/steer-ack.js';
 import { resolveSteerInterruptPolicy } from './session/steer-interrupt.js';
+import { beginSkillTask } from './skills/skill-task-scope.js';
 import { requestHumanRun, requestSteerContinuation, dropHumanSteerContinuation, withHumanContinuationAdmission, createHumanContinuationObserver, drainHumanContinuations, blockHumanContinuations, releaseHumanModelInput, runAnsweredHumanSession } from './session/human-continuation.js';
 import { type SteerDrainPolicy } from './session/steer-drain.js';
 import { runSessionKernel as runSessionKernelPpeng } from './turn/kernel.js';
@@ -2047,6 +2048,7 @@ export class RawAgentRuntime {
       if (existing && options?.latch) {
         await existing.catch(() => undefined);
       }
+      beginSkillTask(this.store, sessionId);
       const goalSession = this.store.getSession(sessionId);
       if (goalSession) {
         const bindStarted = Date.now();

@@ -302,3 +302,7 @@ await loop.run(session.id, { onModelStreamChunk: chunk => console.log(chunk) });
 - 自动压缩返回的归档路径用于后续检索，子任务上下文保持来源标记；mini 的无 Node 静态依赖约束不变。
 
 打包当前用户消息时，`applyMemoryAppendixToMessages` 在参考记忆末尾标明边界，随后保留用户原始 parts。该标记只进入模型视图。
+
+### Durable streaming identity
+
+After committing a model step the kernel emits `ModelStreamChunk { type: "assistant_saved", messageId }`. Consumers associate the preceding shot with this persisted message ID and start a fresh segment for subsequent deltas, even when text is identical. `done` is an adapter attempt boundary; it is not a persistence acknowledgement.

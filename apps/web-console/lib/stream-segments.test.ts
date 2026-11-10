@@ -31,3 +31,16 @@ test('rollback to an empty checkpoint clears the stream; a2ui envelopes are not 
   rollbackToCheckpoint(segments, empty);
   assert.deepEqual(segments, []);
 });
+
+test('saved message identity closes a shot without swallowing the next identical answer [AC:night-runtime-reliability#AC-2]', async () => {
+  const {markStreamSaved,streamTailCanMerge}=await import('./stream-segments.ts');
+  const segments:StreamSegment[]=[{kind:'text',id:'s1',raw:'same',html:'same'},{kind:'reasoning',id:'s2',text:'thinking'}];
+  markStreamSaved(segments,'a1');
+  assert.equal(streamTailCanMerge(segments.at(-1),'reasoning'),false);
+  segments.push({kind:'text',id:'s3',raw:'same',html:'same'});
+  assert.equal(streamTailCanMerge(segments.at(-1),'text'),true);
+  const checkpoint=streamCheckpoint(segments);
+  segments.push({kind:'text',id:'failed',raw:'discard',html:'discard'});
+  rollbackToCheckpoint(segments,checkpoint);
+  assert.deepEqual(segments.map(s=>s.id),['s1','s2','s3']);
+});

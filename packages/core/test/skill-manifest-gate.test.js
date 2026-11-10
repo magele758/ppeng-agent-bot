@@ -246,3 +246,45 @@ test('manifest constrains visible, deferred and dynamic tools [AC:session-review
   assert.deepEqual(resolveTurnTools(args).turnTools.map(t=>t.name), ['read_file']);
   assert.deepEqual(hiddenDeferredToolsForSession(args), []);
 });
+
+test('new requests release old skill ceilings, resumes and steering keep them [AC:night-runtime-reliability#AC-1]', async t => {
+  const {store,session} = sessionFixture(t);
+  const {beginSkillTask} = await import('../dist/skills/skill-task-scope.js');
+  const {manifestVisibleTools,persistActiveSkillManifest} = await import('../dist/skills/skill-manifest-gate.js');
+  const first=store.appendMessage(session.id,'user',[{type:'text',text:'plan'}]);
+  beginSkillTask(store,session.id);
+  persistActiveSkillManifest(store,session.id,PLANNING_SKILL_MANIFEST);
+  const visible=()=>manifestVisibleTools(store.getSession(session.id),[{name:'bash'}]);
+  assert.equal(visible().length,0);
+  beginSkillTask(store,session.id);
+  assert.equal(visible().length,0);
+  store.appendMessage(session.id,'user',[{type:'text',text:'continue planning'}],{key:'human-steer:1'});
+  beginSkillTask(store,session.id);
+  assert.equal(visible().length,0);
+  store.appendMessage(session.id,'user',[{type:'text',text:'inspect logs'}]);
+  beginSkillTask(store,session.id);
+  assert.equal(visible().length,1);
+  assert.notEqual(store.getSession(session.id).metadata.activeSkillManifestTaskId,first.id);
+});
+
+test('legacy manifests migrate conservatively within their request and expire on a later request [AC:night-runtime-reliability#AC-1]', async t => {
+  const {store,session} = sessionFixture(t);
+  const {beginSkillTask} = await import('../dist/skills/skill-task-scope.js');
+  store.appendMessage(session.id,'user',[{type:'text',text:'plan'}]);
+  store.appendMessage(session.id,'assistant',[{type:'tool_call',name:'load_skill',toolCallId:'load',input:{name:'planning'}}]);
+  store.updateSession(session.id,{metadata:{activeSkillManifests:[PLANNING_SKILL_MANIFEST]}});
+  beginSkillTask(store,session.id);
+  assert.equal(store.getSession(session.id).metadata.activeSkillManifests.length,1);
+  store.appendMessage(session.id,'user',[{type:'text',text:'new task'}]);
+  beginSkillTask(store,session.id);
+  assert.deepEqual(store.getSession(session.id).metadata.activeSkillManifests,[]);
+});
+
+test('an inherited ceiling without load history is never silently discarded [AC:night-runtime-reliability#AC-1]', async t=>{
+ const {store,session}=sessionFixture(t);
+ const {beginSkillTask}=await import('../dist/skills/skill-task-scope.js');
+ store.appendMessage(session.id,'user',[{type:'text',text:'child task'}]);
+ store.updateSession(session.id,{metadata:{activeSkillManifests:[PLANNING_SKILL_MANIFEST]}});
+ beginSkillTask(store,session.id);
+ assert.equal(store.getSession(session.id).metadata.activeSkillManifests.length,1);
+});

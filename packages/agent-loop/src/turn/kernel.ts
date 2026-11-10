@@ -1816,6 +1816,7 @@ await emitStep({
         assistant: { parts: turnResult.assistantParts },
       });
 await host.stepTx?.commitStep?.(modelStep);
+options?.onModelStreamChunk?.({ type: 'assistant_saved', messageId: assistantMessage.id });
 if (recovery.action !== 'continue') {
 const __gateSignal = await __gate97();
 if (__gateSignal) return __gateSignal;

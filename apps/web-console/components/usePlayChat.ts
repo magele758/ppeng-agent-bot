@@ -32,7 +32,7 @@ import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/spee
 import { collapseRepeatedLines } from '@/lib/collapse-repeated-lines';
 import { renderMarkdown } from '@/lib/markdown';
 import { stripVisibleClockMarks } from '@/lib/visible-clock';
-import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
+import { pendingStreamIdentity, applySavedStreamEvent, streamTailCanMerge, rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
 import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { shouldRefreshOpenSession, shouldResumeRunningTurn } from '@/lib/run-leave';
@@ -547,7 +547,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   };
   const snapshotStreamText = () =>
     streamSegmentsRef.current.flatMap((segment) =>
-      segment.kind === 'text' ? [{ kind: 'text', raw: segment.raw }] : []
+      segment.kind === 'text' ? [{ kind: 'text', raw: segment.raw, messageId: segment.messageId }] : []
     );
   const clearHeldAssistant = () => {
     heldSegmentsRef.current = null;
@@ -1738,6 +1738,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const segments: StreamSegment[] = [];
     let retry: RetryProgress | undefined;
     let lastRetry: RetryProgress | undefined;
+    let streamIdentityEnabled = false;
     let turnCheckpoint = streamCheckpoint(segments);
     let idCounter = 0;
     const nextId = () => `s-${++idCounter}`;
@@ -1760,6 +1761,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     let buf = '';
         type SseEventPayload = {
           type?: string;
+          messageId?: string;
           text?: string;
           message?: string;
           toolCallId?: string;
@@ -1798,6 +1800,12 @@ export function usePlayChat(deps: PlayChatDeps) {
           throw new PlayStreamError(message);
         }
     };
+    const applySseSaved = (event: string, p: SseEventPayload) => {
+      if (!applySavedStreamEvent(event, p, segments)) return;
+      streamIdentityEnabled = true;
+      turnCheckpoint = streamCheckpoint(segments);
+      sync();
+    };
     const applySseModelText = (event: string, p: SseEventPayload) => {
         if (event === 'model' && p.type === 'model_retry') {
           const progress = readRetryProgress(p);
@@ -1826,22 +1834,23 @@ export function usePlayChat(deps: PlayChatDeps) {
         if (event === 'model' && p.type === 'text_delta') {
           const delta = p.text ?? '';
           const last = segments[segments.length - 1];
-          if (last?.kind === 'text') {
-            last.raw = collapseRepeatedLines(last.raw + delta);
-            last.html = renderMarkdown(stripVisibleClockMarks(last.raw) || '…');
+          if (streamTailCanMerge(last, 'text')) {
+            const text = last as Extract<StreamSegment, {kind: 'text'}>;
+            text.raw = collapseRepeatedLines(text.raw + delta);
+            text.html = renderMarkdown(stripVisibleClockMarks(text.raw) || '…');
           } else {
             const raw = collapseRepeatedLines(delta);
-            segments.push({ kind: 'text', id: nextId(), raw, html: renderMarkdown(stripVisibleClockMarks(raw) || '…') });
+            segments.push({ ...pendingStreamIdentity(streamIdentityEnabled), kind: 'text', id: nextId(), raw, html: renderMarkdown(stripVisibleClockMarks(raw) || '…') });
           }
           sync();
         }
         if (event === 'model' && p.type === 'reasoning_delta') {
           const delta = p.text ?? '';
           const last = segments[segments.length - 1];
-          if (last?.kind === 'reasoning') {
-            last.text += delta;
+          if (streamTailCanMerge(last, 'reasoning')) {
+            (last as Extract<StreamSegment, {kind: 'reasoning'}>).text += delta;
           } else {
-            segments.push({ kind: 'reasoning', id: nextId(), text: delta });
+            segments.push({ ...pendingStreamIdentity(streamIdentityEnabled), kind: 'reasoning', id: nextId(), text: delta });
           }
           sync();
         }
@@ -1849,7 +1858,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const applySseModelTools = (event: string, p: SseEventPayload) => {
         if (event === 'model' && p.type === 'tool_call_start') {
           const toolCallId = p.toolCallId ?? nextId();
-          segments.push({ kind: 'tool', id: nextId(), toolCallId, name: p.name ?? 'unknown', args: '' });
+          segments.push({ ...pendingStreamIdentity(streamIdentityEnabled), kind: 'tool', id: nextId(), toolCallId, name: p.name ?? 'unknown', args: '' });
           sync();
         }
         if (event === 'model' && p.type === 'tool_call_delta') {
@@ -1900,6 +1909,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         const p = payload as SseEventPayload;
         if (!liveTurnOnScreen(streamGeneration)) return;
         applySseControl(event, p);
+        applySseSaved(event, p);
         applySseModelText(event, p);
         applySseModelTools(event, p);
       });
