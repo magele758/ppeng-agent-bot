@@ -88,6 +88,10 @@ function LoginCheck({ unreachable, retry }: { unreachable: boolean; retry: () =>
   return (
       <div className="auth-gate__loading" role="status" aria-live="polite">
         <span className="auth-spinner" aria-hidden="true" />
+        <noscript>
+          <style>{'[data-boot-loading], .auth-spinner { display: none; }'}</style>
+          {t('auth.scriptsRequired')}
+        </noscript>
         <span data-boot-loading>{t('auth.loading')}</span>
         <span data-boot-error>{t('auth.bootFailed')}</span>
         <form method="get" data-auth-reload="">

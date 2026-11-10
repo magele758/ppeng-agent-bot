@@ -1,4 +1,5 @@
 export const auth = {
+  scriptsRequired: '此页面需要 JavaScript。请在浏览器中允许脚本后重新加载。',
   bootFailed: 'Agent Home 启动失败，请重新加载页面。',
   connectionFailed: '无法确认登录状态。请检查连接后重试。',
   retry: '重试',
