@@ -20,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: SKIN_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: `
           (() => {
+            if (location.pathname !== '/') return;
             function recover() {
               if (document.documentElement.dataset.labMounted) return;
               const url = new URL(location.href);

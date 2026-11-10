@@ -22,6 +22,7 @@ test('document can recover before hydration [AC:lab-auth-loading-recovery#AC-2]'
   try {
     const response = await page.goto(baseURL!);
     expect(response?.headers()['cache-control']).toMatch(/no-store|no-cache/);
+    await expect(page.getByText('此页面需要 JavaScript。请在浏览器中允许脚本后重新加载。')).toBeVisible();
     await expect(page.locator('form[data-auth-reload] button')).toBeVisible({ timeout: 14000 });
   } finally { await page.close(); }
 });
