@@ -396,6 +396,212 @@ async function followSessionStream(
   }
 }
 
+function goalPatchFromBody(body: Record<string, unknown>): Record<string, unknown> {
+  const goalPatch: Record<string, unknown> = {};
+  assignGoalCondition(body, goalPatch);
+  assignGoalEnabled(body, goalPatch);
+  assignGoalMaxTurns(body, goalPatch);
+  return goalPatch;
+}
+
+function assignGoalCondition(body: Record<string, unknown>, goalPatch: Record<string, unknown>): void {
+  if (typeof body.goalCondition !== 'string') return;
+  const cond = body.goalCondition.trim();
+  goalPatch.goalCondition = cond;
+  goalPatch.goalEnabled = cond.length > 0;
+}
+
+function assignGoalEnabled(body: Record<string, unknown>, goalPatch: Record<string, unknown>): void {
+  if (typeof body.goalEnabled !== 'boolean') return;
+  goalPatch.goalEnabled = body.goalEnabled;
+  if (!body.goalEnabled) goalPatch.goalCondition = '';
+}
+
+function assignGoalMaxTurns(body: Record<string, unknown>, goalPatch: Record<string, unknown>): void {
+  const turns = body.goalMaxTurns;
+  if (typeof turns !== 'number' || !Number.isFinite(turns)) return;
+  goalPatch.goalMaxTurns = Math.max(1, Math.min(100, Math.floor(turns)));
+}
+
+function rejectBotGoalShadow(runtime: RawAgentRuntime, id: string, goalPatch: Record<string, unknown>): void {
+  if (Object.keys(goalPatch).length === 0 || !goalScope(runtime.store, runtime.getSession(id)!)) return;
+  throw new ConflictError('Bot goals are managed through Bot messages and goal actions');
+}
+
+function rejectClearedPermissionMode(body: Record<string, unknown>): void {
+  if (body.permissionMode !== null) return;
+  throw new ValidationError('permissionMode cannot be cleared; set one of plan|ask|acceptEdits|auto|bypass');
+}
+
+function permissionChangeRequested(body: Record<string, unknown>): boolean {
+  return typeof body.permissionMode === 'string'
+    || body.shiftPermission === 'elevate'
+    || body.shiftPermission === 'demote';
+}
+
+function permissionModeInput(body: Record<string, unknown>): { mode?: string; shift?: 'elevate' | 'demote' } {
+  return {
+    mode: typeof body.permissionMode === 'string' ? body.permissionMode : undefined,
+    shift: permissionShift(body.shiftPermission)
+  };
+}
+
+function permissionShift(shift: unknown): 'elevate' | 'demote' | undefined {
+  if (shift === 'elevate' || shift === 'demote') return shift;
+  return undefined;
+}
+
+function applyOptionalToolGroups(runtime: RawAgentRuntime, id: string, body: Record<string, unknown>): void {
+  if (!Array.isArray(body.enabledOptionalToolGroups)) return;
+  runtime.mergeSessionMetadata(id, {
+    enabledOptionalToolGroups: body.enabledOptionalToolGroups.map(String).filter(Boolean)
+  });
+}
+
+function applyTaskModeMetadata(runtime: RawAgentRuntime, id: string, body: Record<string, unknown>): void {
+  const ptcPatch = ptcMetadataPatchFromInput(body);
+  if (Object.keys(ptcPatch).length === 0) return;
+  mergeUnboundTaskMode(runtime, id, ptcPatch);
+}
+
+function mergeUnboundTaskMode(runtime: RawAgentRuntime, id: string, ptcPatch: Record<string, unknown>): void {
+  const session = runtime.getSession(id);
+  const incomingMode = parseTaskMode(ptcPatch.taskRunMode);
+  const bind = applyUnboundTaskModePatch(session?.metadata, incomingMode);
+  if (!bind.ok) {
+    throw new ConflictError(`taskRunMode is write-once; session bound to ${bind.bound}`);
+  }
+  const { taskRunMode: _ignored, ...rest } = ptcPatch;
+  runtime.mergeSessionMetadata(id, { ...rest, ...bind.patch });
+}
+
+function applyGoalMetadata(runtime: RawAgentRuntime, id: string, goalPatch: Record<string, unknown>): void {
+  if (Object.keys(goalPatch).length === 0) return;
+  runtime.mergeSessionMetadata(id, goalPatch);
+  rememberGoalCondition(runtime, id, goalPatch);
+}
+
+function rememberGoalCondition(runtime: RawAgentRuntime, id: string, goalPatch: Record<string, unknown>): void {
+  const cond = goalConditionText(goalPatch);
+  if (!cond) return;
+  try {
+    upsertGoalFromApi(runtime.store.goal(), {
+      sessionId: id,
+      condition: cond,
+      maxTurns: goalMaxTurnsOrUndefined(goalPatch)
+    });
+  } catch {
+    /* fail-soft */
+  }
+}
+
+function goalConditionText(goalPatch: Record<string, unknown>): string {
+  if (typeof goalPatch.goalCondition !== 'string') return '';
+  return goalPatch.goalCondition.trim();
+}
+
+function goalMaxTurnsOrUndefined(goalPatch: Record<string, unknown>): number | undefined {
+  if (typeof goalPatch.goalMaxTurns !== 'number') return undefined;
+  return goalPatch.goalMaxTurns;
+}
+
+function applyWorkspaceBindingPatch(runtime: RawAgentRuntime, id: string, body: Record<string, unknown>): void {
+  const incoming = incomingWorkspaceBinding(body);
+  if (!incoming) return;
+  bindWorkspace(runtime, id, incoming);
+}
+
+function incomingWorkspaceBinding(body: Record<string, unknown>) {
+  if (body.workspaceBinding === undefined) return undefined;
+  if (body.workspaceBinding === null) return { kind: 'default' as const };
+  const parsed = parseWorkspaceBinding(body.workspaceBinding);
+  if (!parsed) throw new ValidationError('Invalid workspaceBinding');
+  return parsed;
+}
+
+function bindWorkspace(
+  runtime: RawAgentRuntime,
+  id: string,
+  incoming: NonNullable<ReturnType<typeof incomingWorkspaceBinding>>
+): void {
+  if (incoming.kind !== 'default') assertWorkspaceBindingRefs(runtime, incoming);
+  const session = runtime.getSession(id);
+  const bind = applyUnboundWorkspaceBindingPatch(session?.metadata, incoming);
+  if (!bind.ok) {
+    throw new ConflictError(`workspaceBinding is write-once; session bound to ${bind.bound.kind}`);
+  }
+  runtime.mergeSessionMetadata(id, bind.patch);
+}
+
+function applyModelRefPatch(runtime: RawAgentRuntime, id: string, body: Record<string, unknown>): void {
+  const modelRef = parseModelRef(body.modelRef) ?? parseModelRef(body);
+  if (modelRef || body.modelRef === null) {
+    runtime.mergeSessionMetadata(id, { modelRef: modelRef ?? null });
+  }
+}
+
+function applySessionRecordPatch(runtime: RawAgentRuntime, id: string, body: Record<string, unknown>): void {
+  const sessionPatch = sessionRecordPatch(body);
+  if (Object.keys(sessionPatch).length === 0) return;
+  runtime.store.updateSession(id, sessionPatch);
+}
+
+function sessionRecordPatch(body: Record<string, unknown>): Partial<Omit<SessionRecord, 'id' | 'createdAt'>> {
+  const sessionPatch: Partial<Omit<SessionRecord, 'id' | 'createdAt'>> = {};
+  assignAgentId(body, sessionPatch);
+  assignSessionMode(body, sessionPatch);
+  return sessionPatch;
+}
+
+function assignAgentId(
+  body: Record<string, unknown>,
+  patch: Partial<Omit<SessionRecord, 'id' | 'createdAt'>>
+): void {
+  if (typeof body.agentId !== 'string') return;
+  const agentId = body.agentId.trim();
+  if (!agentId) return;
+  patch.agentId = agentId;
+}
+
+function assignSessionMode(
+  body: Record<string, unknown>,
+  patch: Partial<Omit<SessionRecord, 'id' | 'createdAt'>>
+): void {
+  const mode = sessionModeFromBody(body.mode);
+  if (!mode) return;
+  patch.mode = mode;
+}
+
+function sessionModeFromBody(mode: unknown): SessionRecord['mode'] | undefined {
+  if (mode === 'chat' || mode === 'task' || mode === 'subagent' || mode === 'teammate') return mode;
+  return undefined;
+}
+
+function requireSession(runtime: RawAgentRuntime, id: string): SessionRecord {
+  const session = runtime.getSession(id);
+  if (!session) throw new NotFoundError('Session');
+  return session;
+}
+
+/** Metadata and record fields for PATCH /api/sessions/:id. Favorite stays in applySessionFavorite. */
+function applySessionPatch(runtime: RawAgentRuntime, id: string, body: Record<string, unknown>): void {
+  const goalPatch = goalPatchFromBody(body);
+  rejectBotGoalShadow(runtime, id, goalPatch);
+  rejectClearedPermissionMode(body);
+  assertBypassConfirmed(
+    runtime,
+    id,
+    { mode: body.permissionMode, shift: body.shiftPermission },
+    body.confirmBypass
+  );
+  applyOptionalToolGroups(runtime, id, body);
+  applyTaskModeMetadata(runtime, id, body);
+  applyGoalMetadata(runtime, id, goalPatch);
+  applyWorkspaceBindingPatch(runtime, id, body);
+  applyModelRefPatch(runtime, id, body);
+  applySessionRecordPatch(runtime, id, body);
+}
+
 export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   return wrapSessionIdRoutes(runtime, [
     ...messageSearchRoutes(runtime),
@@ -690,117 +896,16 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const id = requireParam('id');
         const body = (await readBody()) as Record<string, unknown>;
         applySessionFavorite(runtime, id, body);
-        const goalPatch: Record<string, unknown> = {};
-        if (typeof body.goalCondition === 'string') {
-          const cond = body.goalCondition.trim();
-          goalPatch.goalCondition = cond;
-          goalPatch.goalEnabled = cond.length > 0;
-        }
-        if (typeof body.goalEnabled === 'boolean') {
-          goalPatch.goalEnabled = body.goalEnabled;
-          if (!body.goalEnabled) goalPatch.goalCondition = '';
-        }
-        if (typeof body.goalMaxTurns === 'number' && Number.isFinite(body.goalMaxTurns)) {
-          goalPatch.goalMaxTurns = Math.max(1, Math.min(100, Math.floor(body.goalMaxTurns)));
-        }
-        if (Object.keys(goalPatch).length > 0 && goalScope(runtime.store, runtime.getSession(id)!)) {
-          throw new ConflictError('Bot goals are managed through Bot messages and goal actions');
-        }
-
-        if (body.permissionMode === null) {
-          throw new ValidationError('permissionMode cannot be cleared; set one of plan|ask|acceptEdits|auto|bypass');
-        }
-        assertBypassConfirmed(
-          runtime,
-          id,
-          { mode: body.permissionMode, shift: body.shiftPermission },
-          body.confirmBypass
-        );
-        if (Array.isArray(body.enabledOptionalToolGroups)) {
-          runtime.mergeSessionMetadata(id, {
-            enabledOptionalToolGroups: body.enabledOptionalToolGroups.map(String).filter(Boolean)
-          });
-        }
-        const ptcPatch = ptcMetadataPatchFromInput(body);
-        if (Object.keys(ptcPatch).length > 0) {
-          const session = runtime.getSession(id);
-          const incomingMode = parseTaskMode(ptcPatch.taskRunMode);
-          const bind = applyUnboundTaskModePatch(session?.metadata, incomingMode);
-          if (!bind.ok) {
-            throw new ConflictError(
-              `taskRunMode is write-once; session bound to ${bind.bound}`
-            );
-          }
-          const { taskRunMode: _ignored, ...rest } = ptcPatch;
-          runtime.mergeSessionMetadata(id, { ...rest, ...bind.patch });
-        }
-        if (Object.keys(goalPatch).length > 0) {
-          runtime.mergeSessionMetadata(id, goalPatch);
-          const cond = typeof goalPatch.goalCondition === 'string' ? goalPatch.goalCondition.trim() : '';
-          if (cond) {
-            try {
-              upsertGoalFromApi(runtime.store.goal(), {
-                sessionId: id,
-                condition: cond,
-                maxTurns:
-                  typeof goalPatch.goalMaxTurns === 'number' ? goalPatch.goalMaxTurns : undefined
-              });
-            } catch {
-              /* fail-soft */
-            }
-          }
-        }
-        if (body.workspaceBinding !== undefined) {
-          const incoming =
-            body.workspaceBinding === null
-              ? { kind: 'default' as const }
-              : parseWorkspaceBinding(body.workspaceBinding);
-          if (!incoming) {
-            throw new ValidationError('Invalid workspaceBinding');
-          }
-          if (incoming.kind !== 'default') {
-            assertWorkspaceBindingRefs(runtime, incoming);
-          }
-          const session = runtime.getSession(id);
-          const bind = applyUnboundWorkspaceBindingPatch(session?.metadata, incoming);
-          if (!bind.ok) {
-            throw new ConflictError(
-              `workspaceBinding is write-once; session bound to ${bind.bound.kind}`
-            );
-          }
-          runtime.mergeSessionMetadata(id, bind.patch);
-        }
-        const modelRef = parseModelRef(body.modelRef) ?? parseModelRef(body);
-        if (modelRef || body.modelRef === null) {
-          runtime.mergeSessionMetadata(id, { modelRef: modelRef ?? null });
-        }
-        const sessionPatch: Partial<Omit<SessionRecord, 'id' | 'createdAt'>> = {};
-        if (typeof body.agentId === 'string' && body.agentId.trim()) {
-          sessionPatch.agentId = body.agentId.trim();
-        }
-        if (body.mode === 'chat' || body.mode === 'task' || body.mode === 'subagent' || body.mode === 'teammate') {
-          sessionPatch.mode = body.mode;
-        }
-        if (Object.keys(sessionPatch).length > 0) {
-          runtime.store.updateSession(id, sessionPatch);
-        }
-        if (typeof body.permissionMode === 'string' || body.shiftPermission === 'elevate' || body.shiftPermission === 'demote') {
-          const result = runtime.setPermissionMode(id, {
-            mode: typeof body.permissionMode === 'string' ? body.permissionMode : undefined,
-            shift:
-              body.shiftPermission === 'elevate' || body.shiftPermission === 'demote'
-                ? body.shiftPermission
-                : undefined
-          });
-          json(response, 200, {
-            session: runtime.getSession(id),
-            permission: result
-          });
+        applySessionPatch(runtime, id, body);
+        if (!permissionChangeRequested(body)) {
+          json(response, 200, { session: requireSession(runtime, id) });
           return;
         }
-        const session = runtime.getSession(id);
-        if (!session) throw new NotFoundError('Session');
-        json(response, 200, { session });
+        const result = runtime.setPermissionMode(id, permissionModeInput(body));
+        json(response, 200, {
+          session: runtime.getSession(id),
+          permission: result
+        });
       }
     },
 

@@ -2,7 +2,8 @@
 
 import './chat.css';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { filterFavoriteSessions, sessionIsFavorited, sessionsForSidebar, withSessionFavorite } from '@/lib/session-favorite';
+import { filterSessionsByQuery } from '@ppeng/api-types';
+import { filterFavoriteSessions, sessionIsFavorited, withSessionFavorite } from '@/lib/session-favorite';
 import { api } from '@/lib/api';
 import { pickDefaultAgentId } from '@/lib/default-agent';
 import { useI18n } from '@/lib/i18n';
@@ -65,7 +66,7 @@ export function ChatSection({ active }: { active: boolean }) {
   botsRef.current = bots;
 
   const sidebarSessions = useMemo(
-    () => sessionsForSidebar(sessions, sessionSidebarFilter, favoritesOnly),
+    () => filterFavoriteSessions(filterSessionsByQuery(sessions, sessionSidebarFilter), favoritesOnly),
     [sessions, sessionSidebarFilter, favoritesOnly]
   );
 
