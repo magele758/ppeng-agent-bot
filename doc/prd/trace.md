@@ -2479,6 +2479,12 @@ Lab 只读查看本机 Grok Bot 会话
 
 - `e2e/group-active-header.spec.ts`
 
+### group-budget-stop-notice
+
+群聊顶部的失败提示写明是预算停下的
+
+- `apps/web-console/lib/room-turn-notice.test.ts`
+
 ### group-chat-settings-save
 
 群聊设置改完可以保存
