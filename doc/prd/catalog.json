@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 425,
+    "implemented": 426,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1872,7 +1872,7 @@
     {
       "id": "lab-startup-request-load",
       "title": "控制台启动时的请求负担",
-      "requirement": "我看现在网页启动，请求太多了，把页面都卡半天，优化一下启动速度",
+      "requirement": "我看现在网页启动，请求太多了，把页面都卡半天，优化一下启动速度\n\n发现的问题都查一下和解决",
       "verificationStage": "software",
       "file": "acceptance/lab-startup-request-load.yaml"
     },

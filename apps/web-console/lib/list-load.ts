@@ -32,14 +32,21 @@ export function idleLabListState(): LabListState {
   };
 }
 
-export type ListFetch<T> = { ok: true; items: T[] } | { ok: false };
+export type ListFetch<T> = { ok: true; items: T[] } | { ok: false; skipped?: true };
 
-/** Keep the previous rows when a list request fails; record that the request failed. */
+/** A list the current page does not show was left alone on this refresh. */
+export const SKIPPED_LIST: { ok: false; skipped: true } = { ok: false, skipped: true };
+
+/**
+ * Keep the previous rows when a list request fails; record that the request failed.
+ * A skipped list keeps both its rows and its last load result.
+ */
 export function settleList<T>(
   current: readonly T[],
   state: ListLoadState,
   fetched: ListFetch<T>
 ): { items: T[]; state: ListLoadState } {
+  if (!fetched.ok && fetched.skipped) return { items: [...current], state };
   if (!fetched.ok) return { items: [...current], state: { loaded: state.loaded, error: true } };
   return { items: fetched.items, state: { loaded: true, error: false } };
 }

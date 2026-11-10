@@ -28,3 +28,19 @@ export function parseBotWorkStates(payload: unknown): BotWorkStates {
   }
   return states;
 }
+
+/** Any Bot with work in progress. */
+export function anyBotWorking(states: BotWorkStates): boolean {
+  return Object.values(states).some((count) => count > 0);
+}
+
+/**
+ * Wait before the next work-status read: every second while a Bot is working,
+ * every two while all are idle, five while the tab is hidden (desktop notices
+ * still need it), and the existing back-off after failures.
+ */
+export function botWorkPollMs(input: { failures: number; working: boolean; hidden: boolean }): number {
+  if (input.failures > 0) return Math.min(8000, 1000 * input.failures);
+  if (input.hidden) return 5000;
+  return input.working ? 1000 : 2000;
+}

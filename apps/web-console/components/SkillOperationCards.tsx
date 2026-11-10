@@ -2,7 +2,9 @@
 import { usePreferenceRevision } from './usePreferenceRevision';
 import { preferenceStorage } from '@/lib/user-preference-storage';
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { api, pollApi } from "@/lib/api";
+import { startPollTimer } from '@/lib/poll-timer';
+import { sessionPollPace } from '@/lib/session-activity';
 import { useI18n } from "@/lib/i18n";
 import "./skill-capture.css";
 import { useSkillBots } from "./BotSkillSharing";
@@ -66,17 +68,16 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
     let alive = true;
     async function load() {
       try {
-        const data = (await api(endpoint)) as { operations: Operation[] };
+        const data = (await pollApi(endpoint)) as { operations: Operation[] };
         if (alive) setRows(current => JSON.stringify(current) === JSON.stringify(data.operations) ? current : data.operations);
       } catch {}
     }
-    void load();
-    const timer = setInterval(() => void load(), 2000);
+    const stop = startPollTimer({ run: load, ...sessionPollPace(sessionId, 2000, 6000) });
     return () => {
       alive = false;
-      clearInterval(timer);
+      stop();
     };
-  }, [endpoint]);
+  }, [endpoint, sessionId]);
   function stopConfirming(id: string) {
     setConfirming((current) => {
       if (!current.has(id)) return current;
