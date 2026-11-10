@@ -383,6 +383,24 @@
   display: none;
 }
 
+.session-favorite,
+.session-favorite-filter,
+.session-item__favorite {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+}
+
+.session-favorite.is-on,
+.session-favorite-filter.is-on,
+.session-item__favorite {
+  color: var(--accent);
+}
+
+.session-favorite-filter.is-on {
+  background: var(--accent-soft);
+}
+
 .session-item__status {
   display: inline-flex;
   align-items: center;

@@ -219,6 +219,8 @@ export const play = {
     filterAria: '筛选会话列表',
     noBots: '无 Bot',
     noSessions: '无会话',
+    favoritesOnly: '只看收藏',
+    noFavorites: '没有收藏的会话',
     select: '选择',
     selectAria: '批量选择会话',
     selectAll: '全选',
@@ -365,8 +367,15 @@ export const play = {
     actionFailed: '没能更新这个目标'
   },
 
+  favorite: {
+    save: '收藏',
+    saved: '已收藏',
+    failed: '收藏没保存：{detail}'
+  },
+
   sessionGroup: {
     today: '今天',
+    favorites: '收藏',
     yesterday: '昨天',
     week: '近 7 天',
     month: '近 30 天',

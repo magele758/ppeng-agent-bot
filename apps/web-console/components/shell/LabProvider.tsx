@@ -36,6 +36,7 @@ import { idleLabListState, settleList, type LabListKey, type LabListState, type 
 import type { OutboundIdentity } from '@/lib/outbound-draft-preview';
 import { shouldRefreshOpenSession } from '@/lib/run-leave';
 import { sameData } from '@/lib/same-data';
+import { replaceSessionSummary } from '@/lib/session-favorite';
 import type {
   AgentInfo,
   ApprovalItem,
@@ -159,6 +160,7 @@ export interface LabContextValue {
   sessionListStickTopRef: MutableRefObject<boolean>;
   /** 选中会话；Chat section 已挂载时走其完整逻辑。`focusChat` 为真时跳转到对话页 */
   openSession: (id: string, opts?: { focusChat?: boolean }) => Promise<void>;
+  patchSessionSummary: (id: string, patch: (session: SessionSummary) => SessionSummary) => void;
 
   modelSetupOpen: boolean;
   setModelSetupOpen: (open: boolean) => void;
@@ -436,6 +438,10 @@ export function LabProvider({ children }: { children: ReactNode }) {
   }, []);
   const getChatBridge = useCallback(() => chatBridgeRef.current, []);
 
+  const patchSessionSummary = useCallback((id: string, patch: (session: SessionSummary) => SessionSummary) => {
+    setSessions((prev) => prev.map((session) => replaceSessionSummary(session, id, patch)));
+  }, []);
+
   const openSession = useCallback(
     async (id: string, opts?: { focusChat?: boolean }) => {
       const bridge = chatBridgeRef.current;
@@ -476,6 +482,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       setSelectedSessionId,
       sessionListStickTopRef,
       openSession,
+      patchSessionSummary,
       modelSetupOpen,
       setModelSetupOpen,
       registerChatBridge,
@@ -505,6 +512,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       selectedSessionId,
       setSelectedSessionId,
       openSession,
+      patchSessionSummary,
       modelSetupOpen,
       registerChatBridge,
       getChatBridge

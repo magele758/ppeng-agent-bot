@@ -3819,6 +3819,15 @@
       ]
     },
     {
+      "id": "session-favorite",
+      "title": "当前会话一键收藏",
+      "tests": [
+        "apps/daemon/test/session-favorite.test.ts",
+        "apps/web-console/components/SessionFavorite.test.ts",
+        "apps/web-console/lib/session-favorite.test.ts"
+      ]
+    },
+    {
       "id": "session-lifecycle-state-consistency",
       "title": "生命周期验证发现的结束原因与部分审批状态一致性修复",
       "tests": [

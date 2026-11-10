@@ -373,7 +373,7 @@
     "packages/core/test/human-continuation.test.js": "aa7c22e3cfae700ce93f743e764b0393644450b833fadfd866c5fe0b0421ad8a",
     "packages/agent-loop/src/session/step-inbox-context.test.ts": "3c6ab63684e0cff31ea32a1eef6408afee2a208ab74355f2e9c1f001876a84b4",
     "packages/agent-loop/src/session/apply-claimed-inbox.test.ts": "15cc1445fc4c8ebf53ac8d4c056567287249908a90cce4b91afe0e49645979c2",
-    "apps/daemon/src/routes/sessions.ts": "98016c74eb88ccd50a555fbd782cee0e69ba20b77d4212054432c4d18b4cf765",
+    "apps/daemon/src/routes/sessions.ts": "dc1d6b8c7dcb3042befa98f0ab1ef5df400c82c46a0de62aac3ea347ceddb8a1",
     "packages/core/src/session/session-fork.ts": "4f35397b2641885ac71b044828793b84d461c0266c7892ef394d7b4b6ed0e1e4",
     "packages/core/src/bots/shared-context-isolation.ts": "d7adbfde162699e0b82e7b4b377bda6e027b73f78bfac7313b71a854295e3857",
     "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
