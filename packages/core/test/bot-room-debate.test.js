@@ -313,7 +313,8 @@ test('the total number of speeches is bounded, and a reply cap keeps one reply f
   assert.equal(stopped.status, 'failed');
   assert.equal(stopped.terminationReason, 'tool_budget');
   assert.equal(f.calls.length, 1);
-  assert.equal(botPosts(f, costly.id).length, 0);
+  // The room rule decides whether the speech written before the stop is shown. Nobody speaks after it.
+  assert.deepEqual(botPosts(f, costly.id).map(message => message.sender.name), ['Alpha']);
 });
 
 test('the per-minute reply cap makes the debate wait and then continue where it stopped [AC:room-debate-mode#AC-10]', async () => {
