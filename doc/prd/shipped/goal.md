@@ -1,5 +1,10 @@
 <!-- 本文件由 scripts/prd/build-catalog.mjs 生成，不要手改。改验收规格或技能说明后重新运行该脚本。 -->
 
+## goal-checkpoint-no-goal-once
+未分配目标时进度保存只报一次
+
+goal_checkpoint with no goal assigned must return the existing clear error once and must not be retried in the same turn. Do not invent a goal. Do not search logs. Do not weaken security denials.
+
 ## goal-history-toolbar-align
 目标历史与标题栏按钮垂直居中
 

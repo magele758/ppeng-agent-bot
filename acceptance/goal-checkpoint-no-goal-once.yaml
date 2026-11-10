@@ -1,0 +1,19 @@
+id: goal-checkpoint-no-goal-once
+title: 未分配目标时进度保存只报一次
+status: implemented
+requirement: |
+  goal_checkpoint with no goal assigned must return the existing clear error once and must not be retried in the same turn. Do not invent a goal. Do not search logs. Do not weaken security denials.
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 这场执行没有分配目标，模型在同一次执行里会反复保存进度
+    when: 它调用进度保存
+    then: 对话里只出现一次现有的明确错误「No goal is assigned to this execution」，同一次执行不会再次调用进度保存
+  - id: AC-2
+    given: 这场执行没有分配目标
+    when: 进度保存因为没有目标而失败
+    then: 没有新建目标
+  - id: AC-3
+    given: 同一次执行里有来源范围拒绝，模型还会继续调用工具
+    when: 这次执行结束
+    then: 来源范围拒绝仍然是拒绝，内容包含 source_scope_denied，没有变成成功，也没有被换成没有目标的那句错误

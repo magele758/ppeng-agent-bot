@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 433,
+    "implemented": 434,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1679,6 +1679,13 @@
       "requirement": "这个左右都没对齐",
       "verificationStage": "software",
       "file": "acceptance/global-default-model-row-align.yaml"
+    },
+    {
+      "id": "goal-checkpoint-no-goal-once",
+      "title": "未分配目标时进度保存只报一次",
+      "requirement": "goal_checkpoint with no goal assigned must return the existing clear error once and must not be retried in the same turn. Do not invent a goal. Do not search logs. Do not weaken security denials.",
+      "verificationStage": "software",
+      "file": "acceptance/goal-checkpoint-no-goal-once.yaml"
     },
     {
       "id": "goal-history-toolbar-align",

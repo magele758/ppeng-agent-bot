@@ -2474,6 +2474,12 @@ GitHub 事件不能靠换投递号重放
 
 - `e2e/global-default-model.spec.ts`
 
+### goal-checkpoint-no-goal-once
+
+未分配目标时进度保存只报一次
+
+- `packages/core/test/goal-checkpoint-no-goal-once.test.js`
+
 ### goal-history-toolbar-align
 
 目标历史与标题栏按钮垂直居中

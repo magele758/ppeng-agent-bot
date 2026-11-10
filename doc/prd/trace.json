@@ -2805,6 +2805,13 @@
       ]
     },
     {
+      "id": "goal-checkpoint-no-goal-once",
+      "title": "未分配目标时进度保存只报一次",
+      "tests": [
+        "packages/core/test/goal-checkpoint-no-goal-once.test.js"
+      ]
+    },
+    {
       "id": "goal-history-toolbar-align",
       "title": "目标历史与标题栏按钮垂直居中",
       "tests": [
