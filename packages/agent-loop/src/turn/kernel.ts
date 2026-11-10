@@ -1965,6 +1965,10 @@ await emitStep({
 await host.stepTx?.commitStep?.(toolsStep);
 return undefined;
 }
+async function stopUnassignedGoalCheckpoint() {
+if (!results.some((row: { name?: string; metadata?: { retry?: unknown } }) => row.name === 'goal_checkpoint' && row.metadata?.retry === false)) return undefined;
+return kernelTurnSignal('return', await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'goal_checkpoint_unassigned'));
+}
 async function __gate80() {
 if (stopAt.size > 0) {
         const hit = results.find((r: { ok: boolean; name: string }) => r.ok && stopAt.has(r.name));
@@ -1979,7 +1983,7 @@ progressDecision = progressGuard.afterToolRound(
         executable,
         results
       );
-return undefined;
+return stopUnassignedGoalCheckpoint();
 }
 function __gate81() {
 if (riskEngine) {
