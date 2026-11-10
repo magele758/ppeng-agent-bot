@@ -9,6 +9,28 @@ interface RoomSettings {
   rosterCap: number;
   maxRoomMembers: number;
   maxWaveSpeakers: number;
+  defaultMaxToolCalls: number;
+  defaultMaxCostUsd: number;
+}
+
+type Change = (patch: Partial<RoomSettings>) => void;
+
+/** Budgets a new group starts with. 0 leaves that budget off; each group can still set its own. */
+function NewRoomBudgetFields({ settings, disabled, onChange }: { settings: RoomSettings | null; disabled: boolean; onChange: Change }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <p>{t('settings.roomCapacity.newRoomBudgets')}</p>
+      <label>
+        {t('settings.roomCapacity.defaultMaxCostUsd')}
+        <input data-testid="room-default-cost" type="number" min={0} max={1000} step={0.01} value={settings?.defaultMaxCostUsd ?? ''} disabled={disabled} onChange={event => onChange({ defaultMaxCostUsd: Number(event.target.value) })} />
+      </label>
+      <label>
+        {t('settings.roomCapacity.defaultMaxToolCalls')}
+        <input data-testid="room-default-tools" type="number" min={0} max={10000} value={settings?.defaultMaxToolCalls ?? ''} disabled={disabled} onChange={event => onChange({ defaultMaxToolCalls: Number(event.target.value) })} />
+      </label>
+    </>
+  );
 }
 
 export function RoomCapacitySettingsCard() {
@@ -57,6 +79,7 @@ export function RoomCapacitySettingsCard() {
           {t('settings.roomCapacity.maxWaveSpeakers')}
           <input data-testid="room-capacity-wave" type="number" min={1} max={10} value={settings?.maxWaveSpeakers ?? ''} disabled={!settings || busy} onChange={event => setSettings(current => current ? { ...current, maxWaveSpeakers: Number(event.target.value) } : current)} />
         </label>
+        <NewRoomBudgetFields settings={settings} disabled={!settings || busy} onChange={patch => setSettings(current => current ? { ...current, ...patch } : current)} />
         <button type="button" data-testid="room-capacity-save" disabled={!settings || busy} onClick={() => void save()}>{t('settings.roomCapacity.save')}</button>
         {status ? <p>{status}</p> : null}
       </SettingsGroup>

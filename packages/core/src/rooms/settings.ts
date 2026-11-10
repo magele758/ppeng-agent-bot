@@ -6,6 +6,10 @@ export interface RoomSettings {
   maxWaveSpeakers: number;
   /** Visible member replies allowed in a room during one minute. Further speakers wait. */
   maxRepliesPerMinute: number;
+  /** Tool-call limit a new room starts with. 0 means the new room has none. */
+  defaultMaxToolCalls: number;
+  /** Cost budget in USD a new room starts with. 0 means the new room has none. */
+  defaultMaxCostUsd: number;
 }
 
 export interface RoomSettingsStore {
@@ -20,27 +24,39 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   rosterCap: 50,
   maxRoomMembers: 50,
   maxWaveSpeakers: 4,
-  maxRepliesPerMinute: 30
+  maxRepliesPerMinute: 30,
+  defaultMaxToolCalls: 0,
+  defaultMaxCostUsd: 0
 };
 
-const LIMITS: Record<keyof RoomSettings, { min: number; max: number }> = {
+const LIMITS: Record<keyof RoomSettings, { min: number; max: number; fractional?: boolean }> = {
   rosterCap: { min: 1, max: 500 },
   maxRoomMembers: { min: 2, max: 200 },
   maxWaveSpeakers: { min: 1, max: 10 },
-  maxRepliesPerMinute: { min: 1, max: 120 }
+  maxRepliesPerMinute: { min: 1, max: 120 },
+  defaultMaxToolCalls: { min: 0, max: 10000 },
+  defaultMaxCostUsd: { min: 0, max: 1000, fractional: true }
 };
 
-function storedInt(value: unknown, fallback: number, min: number, max: number): number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : fallback;
+function inRange(key: keyof RoomSettings, value: unknown): value is number {
+  const limit = LIMITS[key];
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < limit.min || value > limit.max) return false;
+  return limit.fractional === true || Number.isInteger(value);
+}
+
+function stored(raw: Partial<RoomSettings>, key: keyof RoomSettings): number {
+  return inRange(key, raw[key]) ? raw[key] : DEFAULT_ROOM_SETTINGS[key];
 }
 
 export function readRoomSettings(store: RoomSettingsStore): RoomSettings {
   const raw = store.getDaemonControl<Partial<RoomSettings>>(ROOM_SETTINGS_KEY) ?? {};
   return {
-    rosterCap: storedInt(raw.rosterCap, DEFAULT_ROOM_SETTINGS.rosterCap, LIMITS.rosterCap.min, LIMITS.rosterCap.max),
-    maxRoomMembers: storedInt(raw.maxRoomMembers, DEFAULT_ROOM_SETTINGS.maxRoomMembers, LIMITS.maxRoomMembers.min, LIMITS.maxRoomMembers.max),
-    maxWaveSpeakers: storedInt(raw.maxWaveSpeakers, DEFAULT_ROOM_SETTINGS.maxWaveSpeakers, LIMITS.maxWaveSpeakers.min, LIMITS.maxWaveSpeakers.max),
-    maxRepliesPerMinute: storedInt(raw.maxRepliesPerMinute, DEFAULT_ROOM_SETTINGS.maxRepliesPerMinute, LIMITS.maxRepliesPerMinute.min, LIMITS.maxRepliesPerMinute.max)
+    rosterCap: stored(raw, 'rosterCap'),
+    maxRoomMembers: stored(raw, 'maxRoomMembers'),
+    maxWaveSpeakers: stored(raw, 'maxWaveSpeakers'),
+    maxRepliesPerMinute: stored(raw, 'maxRepliesPerMinute'),
+    defaultMaxToolCalls: stored(raw, 'defaultMaxToolCalls'),
+    defaultMaxCostUsd: stored(raw, 'defaultMaxCostUsd')
   };
 }
 
@@ -55,8 +71,8 @@ export function writeRoomSettings(store: RoomSettingsStore, patch: unknown): Roo
     if (input[key] === undefined) continue;
     const limit = LIMITS[key];
     const value = input[key];
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < limit.min || value > limit.max) {
-      throw new ValidationError(`${key} must be an integer from ${limit.min} to ${limit.max}`);
+    if (!inRange(key, value)) {
+      throw new ValidationError(`${key} must be ${limit.fractional ? 'a number' : 'an integer'} from ${limit.min} to ${limit.max}`);
     }
     next[key] = value;
   }
