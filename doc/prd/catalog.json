@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 422,
+    "implemented": 423,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1854,6 +1854,13 @@
       "requirement": "Add a minimal Lab Settings → Tools → Registered Machines panel over new admin\n/api/registered-machines routes. Users can list live machines (connected status),\nregister new machines (id/label/kind), unregister, and refresh one machine.\nShow short attach hints for desktop-agent SSE and device-local SSE paths.\nNo Factory SSH UI. No Grok/Canvas clone.",
       "verificationStage": "software",
       "file": "acceptance/lab-registered-machines.yaml"
+    },
+    {
+      "id": "lab-startup-request-load",
+      "title": "控制台启动时的请求负担",
+      "requirement": "我看现在网页启动，请求太多了，把页面都卡半天，优化一下启动速度",
+      "verificationStage": "software",
+      "file": "acceptance/lab-startup-request-load.yaml"
     },
     {
       "id": "lab-startup-timing",

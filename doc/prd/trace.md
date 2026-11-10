@@ -2627,6 +2627,14 @@ Lab Settings → Tools → Registered Machines panel
 - `apps/web-console/components/sections/settings/machines/registered-machines-actions.test.ts`
 - `apps/web-console/components/sections/settings/machines/registered-machines-model.test.ts`
 
+### lab-startup-request-load
+
+控制台启动时的请求负担
+
+- `apps/daemon/test/session-detail-logs.test.ts`
+- `apps/web-console/lib/api.test.ts`
+- `apps/web-console/lib/lab-tick.test.ts`
+
 ### lab-startup-timing
 
 Lab 会话显示启动耗时

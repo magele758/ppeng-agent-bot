@@ -22,7 +22,7 @@ import {
   type FeedScrollIntent
 } from '@/lib/feed-window';
 import { prependHistoryPage, unpersistedAssistantText } from '@/lib/history-window';
-import { api } from '@/lib/api';
+import { api, pollApi } from '@/lib/api';
 import { loadSessionPanelResource, transcriptModelView } from '@/lib/session-panel-resource';
 import { readRetryProgress, type RetryProgress } from '@/lib/model-retry';
 import { modelErrorText } from '@/lib/model-errors';
@@ -1295,7 +1295,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     let cancelled = false;
     const pullChrome = async () => {
       try {
-        const data = (await api(`/api/sessions/${sid}?includeMessages=false`)) as {
+        const data = (await pollApi(`/api/sessions/${sid}?includeMessages=false`)) as {
           session: {
             title?: string;
             status: string;
