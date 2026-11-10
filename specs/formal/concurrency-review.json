@@ -538,7 +538,7 @@
     "packages/agent-loop/src/model/error-class.ts": "a7632c1f16a9aa1c89896d1f30078f630c2373ec0211bb9a032c2d18ea241ca7",
     "packages/core/src/tools/tool-exposure.ts": "704dd5831e6b1851020a4772b25dad6336235a4190229ac8265a7bfa9516da0e",
     "packages/core/src/jev/apply.ts": "8574ad0574a301d6c388e0fc0ae5a4f231b2ae816e722df880441db02ed5ed95",
-    "packages/core/test/tool-exposure-tiers.test.js": "3884bca2c94e27b154d812cb25469636dab3f046ef467b1abecc3b8ee68f649b",
+    "packages/core/test/tool-exposure-tiers.test.js": "f7ea69e8b91e921d5b1a21a54ff8c153c75c7640185bec0847fbf01403bc19de",
     "packages/core/src/bots/goals/specialty-services.ts": "07e77b8093de317102181338d40fe618b3326f5fd6d5d8f6ddc0a2b46138b024",
     "packages/core/test/bot-goal-live-chain.test.js": "0414065f9774c8dde8bdcf884d12d0325e6870ffe72c145a87cd28d28c279f04",
     "packages/core/src/bots/goals/execution-evidence.ts": "f95731115cb04567e85175ac74b2473ed444bca11c964f08288ed805a3cad1c1",
