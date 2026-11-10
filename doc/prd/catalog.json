@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 416,
+    "implemented": 417,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2540,6 +2540,13 @@
       "requirement": "我觉得像claude code的会话最后的recap挺好的，研究一下他的产品设计思路，以及他总计的内容是什么，以及他的产品逻辑，给当前项目也加上这个能力，来提升使用体验",
       "verificationStage": "software",
       "file": "acceptance/session-recap.yaml"
+    },
+    {
+      "id": "session-recap-model-routing",
+      "title": "会话回顾使用会话配置的模型",
+      "requirement": "回顾会话的功能坏了",
+      "verificationStage": "software",
+      "file": "acceptance/session-recap-model-routing.yaml"
     },
     {
       "id": "session-restart-recovery-state-consistency",

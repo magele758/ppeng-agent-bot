@@ -1,0 +1,10 @@
+id: session-recap-model-routing
+title: 会话回顾使用会话配置的模型
+status: implemented
+requirement: 回顾会话的功能坏了
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 会话有已完成的对话，所选模型可用，进程启动时的模型不可用
+    when: 用户请求回顾这段会话
+    then: 由会话所选模型生成回顾正文，返回最近进展，不向对话发送新消息

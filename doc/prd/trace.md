@@ -3306,6 +3306,12 @@ Secure Form fill-from-Vault
 - `packages/core/test/writer-claim.test.js`
 - `scripts/test/session-multiprocess-state-consistency.test.mjs`
 
+### session-recap-model-routing
+
+会话回顾使用会话配置的模型
+
+- `apps/daemon/test/session-recap-yield.test.ts`
+
 ### session-restart-recovery-state-consistency
 
 重启恢复发现的运行状态、审批衔接与未确认工具结果修复
