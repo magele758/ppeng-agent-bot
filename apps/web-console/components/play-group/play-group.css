@@ -462,13 +462,26 @@
 .room-settings-panel .play-group-reply-mode { margin: 0; gap: 12px; min-width: 0; }
 .room-settings-panel .play-group-reply-mode legend { font-size: 14px; }
 .play-group-reply-mode__note { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; }
-.room-settings-panel .play-group-reply-mode__options { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.room-settings-panel .play-group-reply-mode__options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .room-settings-panel .play-group-reply-mode__option { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; padding: 14px 12px; border: 1px solid var(--ui-border); border-radius: 10px; cursor: pointer; align-content: start; }
 .room-settings-panel .play-group-reply-mode__option.is-selected { border-color: var(--accent, #4e7056); background: color-mix(in srgb, var(--accent, #4e7056) 8%, transparent); }
 .room-settings-panel .play-group-reply-mode__option:focus-within { outline: 2px solid var(--accent, #4e7056); outline-offset: 2px; }
 .room-settings-panel .play-group-reply-mode__option input { width: 16px; height: 16px; accent-color: var(--accent, #4e7056); }
 .room-settings-panel .play-group-reply-mode__option span { font-weight: 600; line-height: 1.5; }
 .room-settings-panel .play-group-reply-mode__hint { line-height: 1.6; }
+/* Debate settings sit under the reply-mode choices while that mode is selected. */
+.play-group-debate { display: grid; gap: 10px; padding: 14px 12px; border: 1px solid var(--ui-border); border-radius: 10px; min-width: 0; }
+.play-group-debate h4 { margin: 0; font-size: 13px; }
+.play-group-debate__field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px; align-items: center; font-size: 13px; margin: 0; }
+.play-group-debate__legend { margin: 0; font-size: 13px; font-weight: 600; }
+.play-group-debate__rows { list-style: decimal inside; margin: 0; padding: 0; display: grid; gap: 6px; }
+.play-group-debate__row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto auto; gap: 6px; align-items: center; font-size: 13px; }
+.play-group-debate__join { display: flex; gap: 6px; align-items: center; margin: 0; min-width: 0; }
+.play-group-debate__join span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.play-group-debate__stance { min-width: 0; }
+.play-group-debate__row button { width: 28px; min-width: 28px; padding: 2px 0; }
+.play-group-debate__save { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.play-group-debate__save button { width: auto; min-width: 88px; }
 .room-settings-limits, .room-settings-activity { border-top: 1px solid var(--ui-border); padding-top: 16px; }
 .room-settings-limits summary, .room-settings-activity summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .room-settings-limits > p { font-size: 12px; color: var(--text-muted); margin: 12px 0; }

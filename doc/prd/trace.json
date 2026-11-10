@@ -742,6 +742,15 @@
           ]
         },
         {
+          "id": "room-debate-mode",
+          "title": "群聊辩论回复方式",
+          "tests": [
+            "apps/web-console/lib/group-debate.test.ts",
+            "e2e/room-debate-mode.spec.ts",
+            "packages/core/test/bot-room-debate.test.js"
+          ]
+        },
+        {
           "id": "room-task-collaboration",
           "title": "群聊临时负责人任务协作模式",
           "tests": [

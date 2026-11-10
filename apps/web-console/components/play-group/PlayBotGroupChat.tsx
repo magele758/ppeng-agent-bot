@@ -1,6 +1,7 @@
 'use client';
 
 import { RoomCollaborationHistory, type CollaborationTurn } from './RoomCollaborationHistory';
+import { debateLiveSpeakerId, debateProgress, type LiveDebate } from '@/lib/group-debate';
 
 import { useEffect, useRef, useState } from 'react';
 import type { BotInfo } from '@/lib/types';
@@ -74,7 +75,7 @@ type RoomMessage = {
   sender: { type: 'user' | 'bot'; id: string; name: string };
 };
 
-type RoomTurn = CollaborationTurn & { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number; terminationReason?: string; postedBotIds?: string[] };
+type RoomTurn = CollaborationTurn & { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number; terminationReason?: string; postedBotIds?: string[]; debate?: LiveDebate };
 
 function RoomReplyFailure({ turn, bots }: { turn?: RoomTurn; bots: readonly { id: string; name: string }[] }) {
   const { t } = useI18n();
@@ -88,6 +89,28 @@ function liveSpeakerId(turns: readonly RoomTurn[]): string {
   const cursor = live.cursor ?? 0;
   const index = cursor >= 0 && cursor < live.botIds.length ? cursor : 0;
   return live.botIds[index] ?? '';
+}
+
+/** In a debate the speaker comes from the debate's own progress, not from the wave cursor. */
+function currentSpeakerId(turns: readonly RoomTurn[]): string {
+  return debateLiveSpeakerId(turns) || liveSpeakerId(turns);
+}
+
+/** A running debate has exactly one speaker, known from its progress even between two speeches. */
+function roomSpeakingIds(turns: readonly RoomTurn[]): string[] {
+  const debater = debateLiveSpeakerId(turns);
+  return debater ? [debater] : speakingBotIds(turns);
+}
+
+function DebateProgress({ turns }: { turns: readonly RoomTurn[] }) {
+  const { t } = useI18n();
+  const progress = debateProgress(turns);
+  if (!progress) return null;
+  return (
+    <p className="play-group-hint" data-testid="play-group-debate-progress">
+      {progress.verdict ? t('play.group.debateVerdict') : t('play.group.debateRound', { round: progress.round, rounds: progress.rounds })}
+    </p>
+  );
 }
 
 function issueKey(code: GroupMemberCode): MessageKey {
@@ -346,7 +369,7 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
   const memberIds = uniqueMemberIds(room?.botIds ?? []);
   const workingIds = memberIds.filter(id => workStates[id] > 0);
   const speaking = turns.some((turn) => turn.status === 'queued' || turn.status === 'running' || turn.status === 'waiting_approval');
-  const speakingIds = speakingBotIds(turns);
+  const speakingIds = roomSpeakingIds(turns);
   const speakingNames = speakingIds.map(nameOf).join(t('play.group.nameSeparator'));
   const mentionRoster = memberIds.map((id) => {
     const bot = bots.find((item) => item.id === id);
@@ -526,7 +549,7 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
     }
   };
 
-  const liveId = liveSpeakerId(turns);
+  const liveId = currentSpeakerId(turns);
   const lastFromLive = [...messages].reverse().find((item) => item.sender.type === 'bot' && item.sender.id === liveId);
 
   return (
@@ -614,6 +637,7 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
                   />
                 );
               })}
+              <DebateProgress turns={turns} />
               {speakingNames ? <p className="play-group-speaking" data-testid="play-group-speaking">{t('play.group.speakingNow', { names: speakingNames })}</p> : null}
               {speaking && !speakingNames ? <p className="play-group-hint">{t('play.group.membersSpeaking')}</p> : null}
               {approveVisible ? (

@@ -657,6 +657,14 @@ Bot 会话列表里的多 Bot 群聊
 
 - `apps/web-console/lib/bot-group.test.ts`
 
+### room-debate-mode
+
+群聊辩论回复方式
+
+- `apps/web-console/lib/group-debate.test.ts`
+- `e2e/room-debate-mode.spec.ts`
+- `packages/core/test/bot-room-debate.test.js`
+
 ### room-task-collaboration
 
 群聊临时负责人任务协作模式
