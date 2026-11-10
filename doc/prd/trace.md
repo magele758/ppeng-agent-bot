@@ -1421,6 +1421,12 @@ Bot 行为契约与有证据的经验沉淀
 - `packages/core/test/bot-coaching.test.js`
 - `packages/core/test/product-admin-tools.test.js`
 
+### bot-coaching-playbook
+
+项目内置 Bot 调教流程
+
+- `packages/core/test/bot-coaching-playbook.test.js`
+
 ### bot-completion-reliability
 
 完成验证可追溯与任务收尾可靠性

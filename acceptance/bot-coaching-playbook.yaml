@@ -1,0 +1,16 @@
+id: bot-coaching-playbook
+title: 项目内置 Bot 调教流程
+status: implemented
+requirement: |
+  总结一下经验，生成一个完整的调教文档
+  还有这个方法，能内化到我的这个项目里吗？
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 项目已安装 Bot 调教技能且教练固定了该流程
+    when: 用户用普通请求开始诊断
+    then: 教练能够从技能目录检索并在严格加载模式下加载完整调教流程
+  - id: AC-2
+    given: 某 Bot 的技能策略禁止调教技能
+    when: 尝试检索或加载调教技能
+    then: 不能通过固定流程或指定名称绕过该策略
