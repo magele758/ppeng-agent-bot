@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 435,
+    "implemented": 436,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -230,6 +230,13 @@
       "requirement": "然后你结合4090的调教经验，看看系统要新增什么能力，然后通过操作帮我把开发组里的几个bot都给我调教好，跟他们会话的内容，把他们配置好，然后测试下，看看是否能提升质量，结合这个调教过程，帮我优化一下bot的能力和沉淀链路",
       "verificationStage": "software",
       "file": "acceptance/bot-coaching-loop.yaml"
+    },
+    {
+      "id": "bot-coaching-playbook",
+      "title": "项目内置 Bot 调教流程",
+      "requirement": "总结一下经验，生成一个完整的调教文档\n还有这个方法，能内化到我的这个项目里吗？",
+      "verificationStage": "software",
+      "file": "acceptance/bot-coaching-playbook.yaml"
     },
     {
       "id": "bot-completion-reliability",
@@ -3241,6 +3248,11 @@
       "name": "agent-loop",
       "description": "Embeddable agent loop core SDK (@ppeng/agent-loop / @mage-ai-lab/agent-loop) providing turn kernel, model adapters, streaming watchdogs, loop guards, session state, and assembly presets (mini, normal, full, max). Use when: (1) Integrating or embedding the agent loop into an application or service, (2) Developing, modifying, or testing packages/agent-loop, (3) Assembling an agent loop using createAssembledLoop or createMiniAssembledLoop, (4) Managing mid-run steering, step-level control, or event folding via AgentLoopHandle, (5) Adding or configuring loop modules, watchdogs, or model adapters.",
       "path": "skills/agent-loop/SKILL.md"
+    },
+    {
+      "name": "bot-coaching",
+      "description": "根据 Agent Home 的真实对话、配置和 trace 调教指定 Bot。用于纠正执行机器、SOP 遵守、交付收口和经验沉淀问题，执行配置前后对照、回读及行为复测；不代替目标 Bot 开发功能。",
+      "path": "skills/bot-coaching/SKILL.md"
     },
     {
       "name": "login",
