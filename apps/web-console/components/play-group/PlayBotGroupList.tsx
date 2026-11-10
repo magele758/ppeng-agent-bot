@@ -38,7 +38,7 @@ import { GroupFace, type GroupMemberFace } from './GroupFace';
 import './play-group.css';
 
 /** Group rows change on this page through events; the timer only catches changes made elsewhere. */
-const ROOM_POLL_MS = 4000;
+const ROOM_POLL_MS = 3000;
 
 export type SidebarRoom = {
   id: string;

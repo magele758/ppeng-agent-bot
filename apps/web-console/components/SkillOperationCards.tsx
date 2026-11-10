@@ -72,7 +72,7 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
         if (alive) setRows(current => JSON.stringify(current) === JSON.stringify(data.operations) ? current : data.operations);
       } catch {}
     }
-    const stop = startPollTimer({ run: load, ...sessionPollPace(sessionId, 2000, 6000) });
+    const stop = startPollTimer({ run: load, ...sessionPollPace(sessionId, 2000, 3000) });
     return () => {
       alive = false;
       stop();

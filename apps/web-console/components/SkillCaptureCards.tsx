@@ -80,7 +80,7 @@ export function SkillCaptureCards({ sessionId, onLayoutChange }: { sessionId: st
         // Existing daemon versions may not expose this optional panel yet.
       }
     }
-    const stop = startPollTimer({ run: poll, ...sessionPollPace(sessionId, 2000, 6000) });
+    const stop = startPollTimer({ run: poll, ...sessionPollPace(sessionId, 2000, 3000) });
     return () => { disposed = true; alive.current = false; stop(); };
   }, [endpoint, sessionId]);
 
