@@ -71,6 +71,8 @@ const EXTRA_RESERVED = new Set<string>([
   'complete_step',
   'fail_step',
   'bot_team_status',
+  'bot_coaching_get',
+  'bot_coaching_save',
   'bot_delegate',
   'bot_task_results',
   'external_agent_list', 'external_agent_delegate', 'external_agent_status', 'external_agent_cancel', 'external_agent_input',

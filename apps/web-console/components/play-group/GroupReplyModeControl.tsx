@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { GroupReplyMode } from '@/lib/group-reply-mode';
 import { roomReplySelection } from './reply-mode-selection';
 import { useI18n, type MessageKey } from '@/lib/i18n';
@@ -9,10 +9,12 @@ import './play-group.css';
 const OPTIONS: readonly { mode: GroupReplyMode; labelKey: MessageKey; hintKey: MessageKey; flowKey: MessageKey; useKey: MessageKey }[] = [
   { mode: 'coordinator', labelKey: 'play.groupSettings.coordinator', hintKey: 'play.groupSettings.coordinatorHint', flowKey: 'play.groupSettings.coordinatorFlow', useKey: 'play.groupSettings.coordinatorUse' },
   { mode: 'task-collaboration', labelKey: 'play.groupSettings.taskCollaboration', hintKey: 'play.groupSettings.taskCollaborationHint', flowKey: 'play.groupSettings.collaborationFlow', useKey: 'play.groupSettings.collaborationUse' },
-  { mode: 'all-members', labelKey: 'play.groupSettings.allMembers', hintKey: 'play.groupSettings.allMembersHint', flowKey: 'play.groupSettings.allMembersFlow', useKey: 'play.groupSettings.allMembersUse' }
+  { mode: 'all-members', labelKey: 'play.groupSettings.allMembers', hintKey: 'play.groupSettings.allMembersHint', flowKey: 'play.groupSettings.allMembersFlow', useKey: 'play.groupSettings.allMembersUse' },
+  { mode: 'debate', labelKey: 'play.groupSettings.debate', hintKey: 'play.groupSettings.debateHint', flowKey: 'play.groupSettings.debateFlow', useKey: 'play.groupSettings.debateUse' }
 ];
 
-export function GroupReplyModeControl({ roomId, initialMode }: { roomId: string; initialMode: GroupReplyMode }) {
+/** `debateSettings` is shown under the choices while the debate mode is selected. */
+export function GroupReplyModeControl({ roomId, initialMode, debateSettings }: { roomId: string; initialMode: GroupReplyMode; debateSettings?: ReactNode }) {
   const { t } = useI18n();
   const [selection] = useState(() => roomReplySelection(roomId, initialMode));
   const { mode, error } = useSyncExternalStore(selection.subscribe, selection.snapshot, selection.snapshot);
@@ -37,6 +39,7 @@ export function GroupReplyModeControl({ roomId, initialMode }: { roomId: string;
           </label>
         ))}
       </div>
+      {mode === 'debate' ? debateSettings : null}
       <details className="play-group-mode-guide" data-testid="group-mode-guide">
         <summary>{t('play.groupSettings.guideTitle')}</summary>
         {OPTIONS.map(option => (

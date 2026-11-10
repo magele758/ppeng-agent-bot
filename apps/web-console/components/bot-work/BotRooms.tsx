@@ -6,6 +6,7 @@ import { sameData } from "@/lib/same-data";
 import type { BotInfo } from "@/lib/types";
 import { readGroupReplyMode } from "@/lib/group-reply-mode";
 import { GroupReplyModeControl } from "../play-group/GroupReplyModeControl";
+import { GroupDebateSettings } from "../play-group/GroupDebateSettings";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
 import {RoomWorkReceipt,type RoomWorkReceiptData} from '../play-group/RoomWorkReceipt';
 type Room = {
@@ -20,8 +21,13 @@ type Room = {
   maxCostUsd: number;
   costCapEnabled?: boolean;
   status: string;
+  debate?: unknown;
 };
 type Turn={workRef?:RoomWorkReceiptData;id:string;status:string;botTurns:number;maxBotTurns:number;toolCalls?:number;costUsd?:number;costStatus?:string;terminationReason?:string;partialResult?:unknown};
+
+function botNameMap(bots: readonly BotInfo[]): Map<string, string> {
+  return new Map(bots.map(bot => [bot.id, bot.name]));
+}
 
 function enabledCapValue(enabled: boolean | undefined, value: number): number {
   return enabled === true ? value : 0;
@@ -282,7 +288,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
             <label>{t('botWork.title')}<input data-testid="room-settings-title" value={room.title} onChange={e=>editRoom({...room,title:e.target.value})}/></label>
             <label>{t('botWork.host')}<select value={room.hostBotId} onChange={e=>editRoom({...room,hostBotId:e.target.value})}>{room.botIds.map(id=><option key={id} value={id}>{bots.find(b=>b.id===id)?.name??id}</option>)}</select></label>
             </fieldset>
-            {selectedRoomId ? <GroupReplyModeControl key={room.id} roomId={room.id} initialMode={readGroupReplyMode(room)} /> : null}
+            {selectedRoomId ? <GroupReplyModeControl key={room.id} roomId={room.id} initialMode={readGroupReplyMode(room)} debateSettings={<GroupDebateSettings room={room} names={botNameMap(bots)} />} /> : null}
             <details className="room-settings-limits">
               <summary>{t('play.groupSettings.limits')}</summary>
               <p>{t('play.groupSettings.limitsHint')}</p>

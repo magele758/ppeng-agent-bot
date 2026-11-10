@@ -54,6 +54,7 @@ function applyHostRouteInner(
   ).get(roomId, sessionId) as { id: string; data: string; status: string } | undefined;
   const turn = decode(row);
   if (!turn || turn.status !== 'running') throw new ValidationError('No running room turn');
+  if (turn.replyMode === 'debate') throw new ValidationError('A debate has a fixed speaking order; speakers cannot be added.');
   const owner = turn.replyMode === 'task-collaboration' ? turn.ownerBotId : room.hostBotId;
   if (!owner || speaker !== owner) throw new ValidationError('Only the host or task owner can choose speakers');
   const collaboration = turn.replyMode === 'task-collaboration';
