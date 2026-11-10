@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 429,
+    "implemented": 430,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -419,6 +419,13 @@
       "requirement": "要能根据我的bot对话的实际情况来动态生成，不要搞一个配置来搞这个，要零侵入的实现这个流的能力",
       "verificationStage": "software",
       "file": "acceptance/bot-flow-read-projection.yaml"
+    },
+    {
+      "id": "bot-followup-cache-prefix",
+      "title": "追问时复用上一轮已缓存的对话前缀",
+      "requirement": "为什么老是响应较慢？分析排查一下\n\n发现的问题都查一下和解决",
+      "verificationStage": "software",
+      "file": "acceptance/bot-followup-cache-prefix.yaml"
     },
     {
       "id": "bot-forever-chat",

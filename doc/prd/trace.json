@@ -1719,6 +1719,14 @@
       ]
     },
     {
+      "id": "bot-followup-cache-prefix",
+      "title": "追问时复用上一轮已缓存的对话前缀",
+      "tests": [
+        "packages/agent-loop/src/model/chat-cache-prefix.test.ts",
+        "packages/core/test/bot-followup-cache-prefix.test.js"
+      ]
+    },
+    {
       "id": "bot-fork-sessions-in-detail",
       "title": "Bot 子任务会话放进详情菜单",
       "tests": [

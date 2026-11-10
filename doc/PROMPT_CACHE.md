@@ -34,6 +34,22 @@ Provider（Anthropic、OpenAI 等）的 prompt cache 机制依赖请求前缀的
 - `Long-term memory`：long scope 的 session_memory（上限 20 条）
 - Skill routing shortlist（基于当前用户消息动态计算）
 
+### Chat Completions 请求里动态上下文的位置
+
+按请求开头做缓存的服务（OpenAI 兼容的 Chat Completions）只复用完全相同的开头。动态上下文和运行时通知（会话里的 `system` 消息）如果留在开头那条 system 消息里，每来一条新用户消息，整段历史都要重新计费、重新读一遍。
+
+调用方传了 `cacheStablePrefix`，并且请求里有用户消息时，Chat Completions 的排布是：
+
+```
+system:  [稳定前缀] --- [一句固定说明：每轮上下文在最新用户消息最前面的 <runtime_context> 里，出自运行时]
+...更早的对话，逐字节不变...
+user:    <runtime_context>[动态上下文][运行时通知]</runtime_context>  [记忆附录]  [用户原文]
+```
+
+模型收到的内容不变，只是位置变了。没有 `cacheStablePrefix`、它不是系统提示的开头、或请求里没有用户消息时，仍然全部放在开头的 system 消息里。Anthropic 和 Responses 请求不受影响。
+
+可复用的开头到上一条用户消息之前为止：记忆附录、工作日志、来源清单和时钟提示仍挂在最新用户消息上，下一轮它们会移到新的用户消息。工具清单变化（例如目标执行期间多出的工具）是否影响命中取决于服务方把工具定义排在哪里。
+
 ## 2. Summary 单一注入原则
 
 **问题**：原实现中 `session.summary` 同时出现在：

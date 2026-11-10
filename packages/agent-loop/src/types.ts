@@ -355,6 +355,9 @@ export interface ModelTurnInput {
   /**
    * Byte-stable system prefix. Anthropic puts the cache breakpoint on this
    * block only. Dynamic context and the last-turn nudge stay after it.
+   * Chat Completions keeps only this prefix in the leading system message and
+   * sends the rest, with runtime notices, at the start of the latest user
+   * message, so a follow-up reuses the cached history.
    */
   cacheStablePrefix?: string;
 }

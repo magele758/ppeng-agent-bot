@@ -297,7 +297,7 @@ await loop.run(session.id, { onModelStreamChunk: chunk => console.log(chunk) });
 
 ## 本地能力整合（2026-11-05）
 
-- `ModelTurnRequest.cacheStablePrefix` 可标记稳定 system 前缀；Anthropic 只在该块设置缓存断点，动态上下文留在其后。宿主可提供 `buildSystemPromptParts`，无分块实现时继续使用原有完整提示。
+- `ModelTurnRequest.cacheStablePrefix` 可标记稳定 system 前缀；Anthropic 只在该块设置缓存断点，动态上下文留在其后。OpenAI 兼容的 Chat Completions 在请求里有用户消息时，开头的 system 消息只保留该前缀加一句固定说明；其余系统提示和会话里的 `system` 通知包在 `<runtime_context>` 里，放到最新一条用户消息的最前面，这样追问能复用已缓存的历史。不传该字段时仍把全部内容放在开头的 system 消息里。宿主可提供 `buildSystemPromptParts`，无分块实现时继续使用原有完整提示。
 - 工具 `access` 声明 read/edit/bash/network/delegate/other 类别；未知外部工具的 other 类别在非 bypass 模式需要审批。`hookRewrote` 在执行日志标记 pre_tool_use 改写参数。
 - 自动压缩返回的归档路径用于后续检索，子任务上下文保持来源标记；mini 的无 Node 静态依赖约束不变。
 
