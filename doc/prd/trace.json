@@ -3067,6 +3067,20 @@
       ]
     },
     {
+      "id": "message-body-search",
+      "title": "按消息正文搜索可见会话",
+      "tests": [
+        "apps/daemon/test/message-search.test.ts"
+      ]
+    },
+    {
+      "id": "message-search-ui",
+      "title": "对话页搜索消息正文",
+      "tests": [
+        "apps/web-console/components/MessageSearch.render.test.ts"
+      ]
+    },
+    {
       "id": "micro-compact-stub-wording",
       "title": "微压缩占位只说明工具输出被省略",
       "tests": [
