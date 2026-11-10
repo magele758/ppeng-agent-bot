@@ -11,6 +11,7 @@ function runnableBots(bots: DaydreamBot[]): DaydreamBot[] {
 }
 export class BotDaydreamService {
   private closing = false;
+  private ticking = false;
   private readonly botLeases = new Map<string, string>();
   private readonly active = new Set<Promise<DaydreamRun>>();
   async close(): Promise<void> {
@@ -117,15 +118,36 @@ export class BotDaydreamService {
       throw new Error('Daydream lease lost');
   }
   async tick(): Promise<void> {
+    if (this.ticking || this.closing) return;
+    this.ticking = true;
+    try {
+      await this.runDueBots();
+    } finally {
+      this.ticking = false;
+    }
+  }
+  private async runDueBots(): Promise<void> {
     for (const bot of runnableBots(this.deps.listBots())) {
       const settings = this.getSettings(bot.id);
-      if (!this.isDue(settings))
+      if (!this.isDue(settings) || this.isBusy(bot.id))
         continue;
       const today = daydreamLocalDate(this.now(), settings.timezone);
       const first = daydreamLocalDate(Date.parse(settings.effectiveFrom), settings.timezone);
+      // Revisit saved work even when a long outage has moved it outside
+      // the normal discovery window. Manual snapshots keep their original ID.
+      const pending = this.deps.db.prepare(`SELECT id,date,dedupe FROM bot_daydream_runs
+        WHERE bot_id=? AND json_extract(body,'$.status') IN ('partial','queued','running','failed')
+        ORDER BY date,rowid`).all(bot.id) as { id: string; date: string; dedupe: string }[];
+      const resumed = new Set<string>();
+      for (const row of pending) {
+        if (this.closing || !this.getSettings(bot.id).enabled) return;
+        const manual = row.dedupe !== bot.id + ':' + row.date;
+        await this.track(this.withBotLease(bot.id, () => this.runInner(bot.id, { date: row.date, manual }, row.id)));
+        if (!manual) resumed.add(row.date);
+      }
       for (let offset = 7; offset >= 1; offset--) {
         const date = shiftDay(today, -offset);
-        if (date >= first)
+        if (date >= first && !resumed.has(date))
           await this.run(bot.id, { date });
       }
     }
@@ -146,7 +168,7 @@ export class BotDaydreamService {
       for (const input of previous.inputs.slice(0, previous.checkpoint))
         processed.add(this.evidenceKey(input));
     }
-    return run.inputs.filter(input => !processed.has(this.evidenceKey(input)));
+    return [...run.inputs.slice(0, run.checkpoint), ...run.inputs.slice(run.checkpoint).filter(input => !processed.has(this.evidenceKey(input)))];
   }
   private nextChunk(run: DaydreamRun) {
     const items: DaydreamRun['inputs'] = [];
@@ -160,11 +182,6 @@ export class BotDaydreamService {
       ids.add(input.messageId);
     }
     return items;
-  }
-  private reserveDailyChunk(botId: string, settings: DaydreamSettings): boolean {
-    const key = `budget:${botId}:${daydreamLocalDate(this.now(), settings.timezone)}`;
-    this.deps.db.prepare('INSERT OR IGNORE INTO bot_daydream_effects(key,body) VALUES(?,?)').run(key, '0');
-    return Number(this.deps.db.prepare('UPDATE bot_daydream_effects SET body=CAST(CAST(body AS INTEGER)+1 AS TEXT) WHERE key=? AND CAST(body AS INTEGER)<?').run(key, settings.maxChunks).changes) > 0;
   }
   private enabled(botId: string): boolean {
     return !this.closing && this.getSettings(botId).enabled;
@@ -205,12 +222,11 @@ export class BotDaydreamService {
     return result;
   }
   private async prepareInputs(run: DaydreamRun, lease: string, settings: DaydreamSettings, manual?: boolean): Promise<void> {
-    if (run.inputs.length)
-      return;
-    const inputs = await this.deps.readEvidence(run.botId, run.date, settings.timezone);
-    run.inputs = inputs.filter(e => e.createdAt <= run.createdAt && (manual || e.createdAt >= settings.effectiveFrom)).flatMap(e => this.fragments(e));
-    if (manual)
-      run.inputs = this.unprocessedInputs(run);
+    if (!run.inputs.length) {
+      const inputs = await this.deps.readEvidence(run.botId, run.date, settings.timezone);
+      run.inputs = inputs.filter(e => e.createdAt <= run.createdAt && (manual || e.createdAt >= settings.effectiveFrom)).flatMap(e => this.fragments(e));
+    }
+    run.inputs = this.unprocessedInputs(run);
     this.save(run, lease);
   }
   private async analysisPrompt(botId: string): Promise<string> {
@@ -225,7 +241,7 @@ export class BotDaydreamService {
     const shared = await this.deps.getSharedArtifacts?.(run.botId) ?? [];
     for (const candidate of parseDaydreamCandidates(raw, slice, shared)) {
       if (!this.enabled(run.botId)) {
-        run.status = 'cancelled';
+        run.status = this.closing ? 'partial' : 'cancelled';
         return;
       }
       await this.persist(run, candidate, lease);
@@ -233,24 +249,14 @@ export class BotDaydreamService {
     run.checkpoint += slice.length;
     this.save(run, lease);
   }
-  private hasChunkBudget(run: DaydreamRun, settings: DaydreamSettings, chunks: number, manual?: boolean): boolean {
-    if (chunks >= settings.maxChunks)
-      return false;
-    return Boolean(manual) || this.reserveDailyChunk(run.botId, settings);
-  }
-  private async processChunks(run: DaydreamRun, lease: string, settings: DaydreamSettings, manual?: boolean): Promise<void> {
-    let chunks = 0;
+  private async processChunks(run: DaydreamRun, lease: string): Promise<void> {
     while (run.checkpoint < run.inputs.length) {
       if (!this.enabled(run.botId)) {
-        run.status = 'cancelled';
-        return;
-      }
-      if (!this.hasChunkBudget(run, settings, chunks++, manual)) {
-        run.status = 'partial';
+        run.status = this.closing ? 'partial' : 'cancelled';
         return;
       }
       await this.runChunk(run, lease);
-      if (run.status === 'cancelled')
+      if (run.status !== 'running')
         return;
     }
   }
@@ -263,7 +269,7 @@ export class BotDaydreamService {
       run.status = 'running';
       this.save(run, lease);
       await this.prepareInputs(run, lease, settings, manual);
-      await this.processChunks(run, lease, settings, manual);
+      await this.processChunks(run, lease);
       if (run.status === 'running')
         run.status = 'completed';
       delete run.error;
@@ -282,11 +288,12 @@ export class BotDaydreamService {
   private async runInner(botId: string, options: {
     date?: string;
     manual?: boolean;
-  } = {}): Promise<DaydreamRun> {
+  } = {}, resumeId?: string): Promise<DaydreamRun> {
     if (!this.enabled(botId))
       throw new Error('Daydream disabled');
     const settings = this.getSettings(botId);
-    const run = this.loadOrCreate(botId, this.resolveDate(settings, options.date), settings, options.manual);
+    const existing = resumeId ? this.getRun(botId, resumeId) : null;
+    const run = existing ?? this.loadOrCreate(botId, this.resolveDate(settings, options.date), settings, options.manual);
     if (['completed', 'cancelled'].includes(run.status)) {
       await this.shareOutputs(run);
       return run;

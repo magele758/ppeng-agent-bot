@@ -18,6 +18,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: FONT_SIZE_BOOTSTRAP }} />
         <script dangerouslySetInnerHTML={{ __html: SKIN_BOOTSTRAP }} />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (() => {
+            if (location.pathname !== '/') return;
+            function recover() {
+              if (document.documentElement.dataset.labMounted) return;
+              const url = new URL(location.href);
+              if (url.searchParams.has('labRetry')) {
+                document.documentElement.dataset.bootFailed = '1';
+                return;
+              }
+              url.searchParams.set('labRetry', '1');
+              location.replace(url.href);
+            }
+            window.addEventListener('error', event => {
+              const script = event.target;
+              if (script instanceof HTMLScriptElement && script.src.includes('/_next/static/')) recover();
+            }, true);
+            setTimeout(recover, 15000);
+          })();
+        ` }} />
         <meta name="color-scheme" content="dark light" />
         <script
           dangerouslySetInnerHTML={{

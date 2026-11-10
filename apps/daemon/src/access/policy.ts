@@ -212,6 +212,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
 
     // sessions
     ['GET /api/sessions', selfFiltered('session')],
+    ['GET /api/search/messages', selfFiltered('session')],
     ['POST /api/sessions/cancel-all', selfFiltered('session')],
     ['POST /api/sessions/bulk-delete', selfFiltered('session')],
     ['POST /api/sessions', owner('bot', sessionCreateRefs)],

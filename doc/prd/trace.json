@@ -2043,6 +2043,15 @@
       ]
     },
     {
+      "id": "bot-status-polling",
+      "title": "工作状态轮询区分慢响应和断线",
+      "tests": [
+        "e2e/bot-status-polling.spec.ts",
+        "scripts/test/bot-room-models.test.mjs",
+        "scripts/test/bot-work-routes.test.mjs"
+      ]
+    },
+    {
       "id": "bot-supervision-freshness",
       "title": "Bot 监督状态新鲜度与回复关联",
       "tests": [
@@ -2527,10 +2536,31 @@
       ]
     },
     {
+      "id": "cron-detail-markdown",
+      "title": "定时任务详情直接阅读 Markdown",
+      "tests": [
+        "e2e/cron-message-details.spec.ts"
+      ]
+    },
+    {
+      "id": "cron-message-details",
+      "title": "聊天中的定时任务详情",
+      "tests": [
+        "e2e/cron-message-details.spec.ts"
+      ]
+    },
+    {
       "id": "daydream-tick-cost",
       "title": "每日复盘调度不能拖死 daemon",
       "tests": [
         "packages/core/test/daydream-tick-cost.test.js"
+      ]
+    },
+    {
+      "id": "daydream-unlimited-resume",
+      "title": "每日复盘移除额度并续跑",
+      "tests": [
+        "packages/core/test/bot-daydream-local.test.js"
       ]
     },
     {
@@ -2798,6 +2828,13 @@
       ]
     },
     {
+      "id": "group-chat-stable-layout",
+      "title": "群聊顶部状态更新和输入区布局",
+      "tests": [
+        "e2e/group-chat-stable-layout.spec.ts"
+      ]
+    },
+    {
       "id": "group-command-same-as-dm",
       "title": "群里的命令跟该 Bot 单聊同一套放行",
       "tests": [
@@ -2809,6 +2846,13 @@
       "title": "群聊行展示成员头像",
       "tests": [
         "apps/web-console/lib/group-members.test.ts"
+      ]
+    },
+    {
+      "id": "group-member-partial-roster",
+      "title": "群里有旧成员时仍可添加当前可选的 Bot",
+      "tests": [
+        "apps/web-console/lib/bot-group.test.ts"
       ]
     },
     {
@@ -2832,6 +2876,13 @@
       "title": "群聊回复模式与运行限制说明",
       "tests": [
         "e2e/group-mode-explanations.spec.ts"
+      ]
+    },
+    {
+      "id": "group-mode-instant-selection",
+      "title": "群聊回复方式可以连续切换",
+      "tests": [
+        "e2e/group-mode-instant-selection.spec.ts"
       ]
     },
     {
@@ -2904,6 +2955,13 @@
       "title": "网页登录检查可恢复",
       "tests": [
         "e2e/bot-notices-auth.spec.ts"
+      ]
+    },
+    {
+      "id": "lab-bootstrap-retry",
+      "title": "工作台启动失败后恢复",
+      "tests": [
+        "e2e/lab-bootstrap-retry.spec.ts"
       ]
     },
     {
@@ -3036,6 +3094,20 @@
       "tests": [
         "e2e/first-batch-reliability.spec.ts",
         "packages/core/test/memory-deletion-suppression.test.js"
+      ]
+    },
+    {
+      "id": "message-body-search",
+      "title": "按消息正文搜索可见会话",
+      "tests": [
+        "apps/daemon/test/message-search.test.ts"
+      ]
+    },
+    {
+      "id": "message-search-ui",
+      "title": "对话页搜索消息正文",
+      "tests": [
+        "apps/web-console/components/MessageSearch.render.test.ts"
       ]
     },
     {
@@ -3723,6 +3795,13 @@
         "packages/core/test/superbot-factory-setup.test.js",
         "packages/core/test/writer-claim.test.js",
         "scripts/test/session-multiprocess-state-consistency.test.mjs"
+      ]
+    },
+    {
+      "id": "session-recap-model-routing",
+      "title": "会话回顾使用会话配置的模型",
+      "tests": [
+        "apps/daemon/test/session-recap-yield.test.ts"
       ]
     },
     {

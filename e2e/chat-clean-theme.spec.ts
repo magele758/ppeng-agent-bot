@@ -36,7 +36,8 @@ test('会话与群聊使用同一选择样式和输入布局 [AC:chat-clean-them
   const form = panel.locator('.play-group-composer');
   const field = await form.locator('textarea').boundingBox();
   const send = await form.locator('button[type="submit"]').boundingBox();
-  expect(field!.y + field!.height).toBeLessThanOrEqual(send!.y);
+  expect(field!.x + field!.width).toBeLessThanOrEqual(send!.x + 1);
+  expect(send!.y).toBeLessThan(field!.y + field!.height);
   const track = await panel.locator('.chat-feed__track').boundingBox();
   const composer = await form.boundingBox();
   expect(composer!.x).toBeCloseTo(track!.x, 0);

@@ -6,7 +6,6 @@ export interface DaydreamSettings {
   memoryPolicy: 'auto' | 'review';
   skillPolicy: 'propose' | 'autoPrivate';
   collaborationEnabled: boolean;
-  maxChunks: number;
   effectiveFrom: string;
 }
 export interface DaydreamBot {

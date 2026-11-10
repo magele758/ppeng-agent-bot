@@ -1,0 +1,14 @@
+id: group-mode-instant-selection
+title: 群聊回复方式可以连续切换
+status: implemented
+requirement: 这个回复方式怎么切换选择这么卡顿
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 群聊设置已打开，保存回复方式的请求尚未完成
+    when: 用户再次选择另一种回复方式
+    then: 立即选中最新选择，依次保存，刷新后显示最后一次的选择
+  - id: AC-2
+    given: 第一项选择保存成功，后一次选择保存失败
+    when: 保存结果返回
+    then: 恢复到最后一次保存成功的选项，显示错误并允许再次选择

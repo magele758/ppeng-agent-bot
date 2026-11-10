@@ -1,0 +1,17 @@
+id: group-chat-stable-layout
+title: 群聊顶部状态更新和输入区布局
+status: implemented
+requirement: |
+  经常页面顶部会顶下来，导致页面跳动，这个是什么问题
+  就这个元素，把这个做成浮层的不要占位
+  发送按钮浮动到右侧，输入文本不要加边框
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 用户在 Bot 页面且最近一次工作状态读取成功
+    when: 工作状态连接中断，随后重新连接
+    then: 断线提示作为浮层显示上次更新时间；出现和消失都不移动侧栏与正文，也不拦截操作
+  - id: AC-2
+    given: 用户正在群聊输入消息
+    when: 聚焦文本框并输入多行
+    then: 文本框无内边框，发送按钮在输入区同一行右侧，文字不会被按钮遮挡

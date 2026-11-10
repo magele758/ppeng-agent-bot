@@ -1803,6 +1803,14 @@ Bot 启动耗时分段可观测
 - `packages/core/test/bot-startup-prepare.test.ts`
 - `packages/core/test/bot-startup-wake.test.ts`
 
+### bot-status-polling
+
+工作状态轮询区分慢响应和断线
+
+- `e2e/bot-status-polling.spec.ts`
+- `scripts/test/bot-room-models.test.mjs`
+- `scripts/test/bot-work-routes.test.mjs`
+
 ### bot-supervision-freshness
 
 Bot 监督状态新鲜度与回复关联
@@ -2229,11 +2237,29 @@ Lab connector authorization states and SecretVault grant
 
 - `e2e/bot-interaction-polish.spec.ts`
 
+### cron-detail-markdown
+
+定时任务详情直接阅读 Markdown
+
+- `e2e/cron-message-details.spec.ts`
+
+### cron-message-details
+
+聊天中的定时任务详情
+
+- `e2e/cron-message-details.spec.ts`
+
 ### daydream-tick-cost
 
 每日复盘调度不能拖死 daemon
 
 - `packages/core/test/daydream-tick-cost.test.js`
+
+### daydream-unlimited-resume
+
+每日复盘移除额度并续跑
+
+- `packages/core/test/bot-daydream-local.test.js`
 
 ### delete-page
 
@@ -2467,6 +2493,12 @@ Lab 只读查看本机 Grok Bot 会话
 - `apps/web-console/lib/room-sidebar-placement.test.ts`
 - `packages/core/test/bot-functional-groups.test.js`
 
+### group-chat-stable-layout
+
+群聊顶部状态更新和输入区布局
+
+- `e2e/group-chat-stable-layout.spec.ts`
+
 ### group-command-same-as-dm
 
 群里的命令跟该 Bot 单聊同一套放行
@@ -2478,6 +2510,12 @@ Lab 只读查看本机 Grok Bot 会话
 群聊行展示成员头像
 
 - `apps/web-console/lib/group-members.test.ts`
+
+### group-member-partial-roster
+
+群里有旧成员时仍可添加当前可选的 Bot
+
+- `apps/web-console/lib/bot-group.test.ts`
 
 ### group-member-quiet
 
@@ -2498,6 +2536,12 @@ Lab 只读查看本机 Grok Bot 会话
 群聊回复模式与运行限制说明
 
 - `e2e/group-mode-explanations.spec.ts`
+
+### group-mode-instant-selection
+
+群聊回复方式可以连续切换
+
+- `e2e/group-mode-instant-selection.spec.ts`
 
 ### group-reply-mode
 
@@ -2561,6 +2605,12 @@ Lab 只读查看本机 Grok Bot 会话
 网页登录检查可恢复
 
 - `e2e/bot-notices-auth.spec.ts`
+
+### lab-bootstrap-retry
+
+工作台启动失败后恢复
+
+- `e2e/lab-bootstrap-retry.spec.ts`
 
 ### lab-library-pages
 
@@ -2676,6 +2726,18 @@ macOS 应用控制（外层宿主）
 
 - `e2e/first-batch-reliability.spec.ts`
 - `packages/core/test/memory-deletion-suppression.test.js`
+
+### message-body-search
+
+按消息正文搜索可见会话
+
+- `apps/daemon/test/message-search.test.ts`
+
+### message-search-ui
+
+对话页搜索消息正文
+
+- `apps/web-console/components/MessageSearch.render.test.ts`
 
 ### micro-compact-stub-wording
 
@@ -3281,6 +3343,12 @@ Secure Form fill-from-Vault
 - `packages/core/test/superbot-factory-setup.test.js`
 - `packages/core/test/writer-claim.test.js`
 - `scripts/test/session-multiprocess-state-consistency.test.mjs`
+
+### session-recap-model-routing
+
+会话回顾使用会话配置的模型
+
+- `apps/daemon/test/session-recap-yield.test.ts`
 
 ### session-restart-recovery-state-consistency
 

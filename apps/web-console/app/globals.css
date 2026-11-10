@@ -1997,3 +1997,22 @@ details.trace-row,
 .chat-reply-ended-at { visibility: hidden; order: -1; align-self: center; white-space: pre; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .chat-turn__label .chat-reply-ended-at { order: 0; margin-inline-start: auto; }
 .chat-turn:hover .chat-reply-ended-at { visibility: visible; background: var(--bg-raised); }
+
+.cron-message-turn { justify-content: flex-end; }
+.cron-message-trigger { display: inline-flex; align-items: center; gap: .5em; max-width: 100%; }
+.cron-message-trigger > span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+.cron-detail-title { padding: 20px 24px 12px; }
+.cron-detail-title h2 { margin: 0; color: var(--ui-text); font-size: 1.15rem; }
+.cron-detail-prose { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 24px 16px; line-height: 1.65; overflow-wrap: anywhere; }
+.cron-detail-prose :is(h1,h2,h3,h4) { margin: 1.1em 0 .4em; line-height: 1.35; }
+.cron-detail-prose h1 { font-size: 1.3em; }
+.cron-detail-prose h2 { font-size: 1.15em; }
+.cron-detail-prose p { margin: .4em 0 .8em; }
+.cron-detail-prose :is(pre,.chat-md-table) { overflow-x: auto; }
+.cron-detail-prose table { border-collapse: collapse; }
+.cron-detail-prose :is(th,td) { padding: .4em .7em; border-bottom: 1px solid var(--ui-border); text-align: start; }
+.cron-detail-prose img { max-width: 100%; height: auto; }
+.cron-source-field > strong { color: var(--ui-text-muted, inherit); font-size: .87em; }
+.cron-source-field > .cron-source-field { padding-inline-start: .8em; }
+.cron-source-item { margin-block: .55em; }

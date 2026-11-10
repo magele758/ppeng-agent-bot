@@ -261,6 +261,96 @@
   cursor: default;
 }
 
+/* —— 对话正文搜索（与会话列表筛选、Bot 名字搜索分开） —— */
+.message-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  padding: 0 10px 8px;
+}
+
+.message-search__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.play-sidebar .message-search__label {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+
+.message-search__field input {
+  width: 100%;
+}
+
+.message-search__status {
+  margin: 0;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+
+.message-search__status.is-error {
+  color: var(--ui-danger);
+}
+
+.message-search__hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.message-search__hit {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  background: transparent;
+  appearance: none;
+}
+
+.message-search__hit:hover {
+  background: color-mix(in srgb, var(--ui-text) 6%, transparent);
+}
+
+.message-search__hit:focus-visible {
+  outline: 2px solid var(--ui-text-muted);
+  outline-offset: 2px;
+}
+
+.message-search__hit .session-item__title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-search__snippet {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: var(--ui-text-xs);
+  line-height: 1.4;
+  color: var(--ui-text-muted);
+}
+
+.message-search__time {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+
 /* —— 会话列表 —— */
 .play-sidebar__tools {
   display: flex;

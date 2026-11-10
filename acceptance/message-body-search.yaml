@@ -1,0 +1,34 @@
+id: message-body-search
+title: 按消息正文搜索可见会话
+status: implemented
+requirement: |
+  已登录用户可以按消息正文搜索自己能看到的会话。GET /api/search/messages?q=&limit=
+  返回命中列表。摘录是命中处的短片段，不是整段消息。空白查询返回空列表，不扫描全表。
+  limit 默认 20，最大 50。不返回其他用户或不可见会话的消息。只出现在标题或 Bot 名字里、
+  正文没有的词不算命中。Bot 名字搜索保持不变。
+criteria:
+  - id: AC-1
+    given: 当前用户能看到一条含有关键词的消息
+    when: 请求 GET /api/search/messages 并带上该关键词
+    then: 命中包含 sessionId、messageId、role、snippet、createdAt、sessionTitle、agentId，且 snippet 短于原文并含该词
+  - id: AC-2
+    given: 查询为空或只有空白
+    when: 请求搜索
+    then: 返回空 hits，不扫描全表
+  - id: AC-3
+    given: 未传 limit，或传入大于 50
+    when: 请求搜索
+    then: 缺省最多 20 条，超过 50 时按 50 截断
+  - id: AC-4
+    given: 其他用户的消息，或当前用户不可见的会话
+    when: 搜索其中的正文
+    then: 这些消息不会出现
+  - id: AC-5
+    given: 关键词只出现在标题或 Bot 名字，正文没有
+    when: 按正文搜索
+    then: 不作为正文命中返回
+out_of_scope:
+  - 不改 Web 控制台的 Bot 名字搜索。
+  - 不返回整段消息正文。
+source: 用户要求搜索对话正文，而不只是 Bot 名字。
+updated: 2026-11-10

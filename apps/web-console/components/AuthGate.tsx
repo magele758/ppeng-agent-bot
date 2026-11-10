@@ -29,6 +29,8 @@ export function AuthGate({
   const [unreachable, setUnreachable] = useState(false);
 
   useEffect(() => {
+    document.documentElement.dataset.labMounted = '1';
+    delete document.documentElement.dataset.bootFailed;
     setError(authErrorFromSearch(window.location.search));
   }, []);
 
@@ -86,9 +88,14 @@ function LoginCheck({ unreachable, retry }: { unreachable: boolean; retry: () =>
   return (
       <div className="auth-gate__loading" role="status" aria-live="polite">
         <span className="auth-spinner" aria-hidden="true" />
-        {t('auth.loading')}
+        <noscript>
+          <style>{'[data-boot-loading], .auth-spinner { display: none; }'}</style>
+          {t('auth.scriptsRequired')}
+        </noscript>
+        <span data-boot-loading>{t('auth.loading')}</span>
+        <span data-boot-error>{t('auth.bootFailed')}</span>
         <form method="get" data-auth-reload="">
-          <input type="hidden" name="labBuild" value={process.env.NEXT_PUBLIC_BUILD_ID} />
+          <input type="hidden" name="labRetry" value="1" />
           <button type="submit">{t('auth.reload')}</button>
         </form>
       </div>

@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 412 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 423 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（133）
+## bot（134）
 
 需求正文见 [bot](bot.md)。
 
@@ -204,6 +204,7 @@
 - `bot-source-trace-pairing` 跨会话原文召回与乱序工具回执
 - `bot-startup-summary-latency` 摘要服务变慢时 Bot 启动有界等待
 - `bot-startup-trace` Bot 启动耗时分段可观测
+- `bot-status-polling` 工作状态轮询区分慢响应和断线
 - `bot-steer-visible` Bot 对话里的实时插话马上出现在对话流
 - `bot-supervision-freshness` Bot 监督状态新鲜度与回复关联
 - `bot-switch-live-turn` 切换 Bot 后主画面离开上一场进行中的对话
@@ -354,11 +355,19 @@
 
 - `create-menu-trigger-hit-area` 新增菜单展开后按钮仍可点击
 
-## daydream（1）
+## cron（2）
+
+需求正文见 [other](other.md)。
+
+- `cron-detail-markdown` 定时任务详情直接阅读 Markdown
+- `cron-message-details` 聊天中的定时任务详情
+
+## daydream（2）
 
 需求正文见 [other](other.md)。
 
 - `daydream-tick-cost` 每日复盘调度不能拖死 daemon
+- `daydream-unlimited-resume` 每日复盘移除额度并续跑
 
 ## default（1）
 
@@ -485,18 +494,21 @@
 
 - `grok-local-history` Lab 只读查看本机 Grok Bot 会话
 
-## group（10）
+## group（13）
 
 需求正文见 [group](group.md)。
 
 - `group-active-header` 群聊顶部仅显示工作中的成员
 - `group-chat-settings-save` 群聊设置改完可以保存
 - `group-chat-sidebar-placement` 群聊可置顶并可拖入功能分组
+- `group-chat-stable-layout` 群聊顶部状态更新和输入区布局
 - `group-command-same-as-dm` 群里的命令跟该 Bot 单聊同一套放行
 - `group-face` 群聊行展示成员头像
+- `group-member-partial-roster` 群里有旧成员时仍可添加当前可选的 Bot
 - `group-member-quiet` 群聊成员区只留成员本身的信息
 - `group-member-sections` 群成员分成已在群里和添加成员
 - `group-mode-explanations` 群聊回复模式与运行限制说明
+- `group-mode-instant-selection` 群聊回复方式可以连续切换
 - `group-reply-mode` 群聊回复模式
 - `group-settings-clarity` 群聊设置分区与成员提及清理
 
@@ -525,12 +537,13 @@
 
 - `knowledge-library-dirs` 本地资料目录进入知识库并可检索
 
-## lab（6）
+## lab（7）
 
 需求正文见 [lab](lab.md)。
 
 - `lab-auth-and-route-access` 控制台鉴权与接口访问隔离
 - `lab-auth-loading-recovery` 网页登录检查可恢复
+- `lab-bootstrap-retry` 工作台启动失败后恢复
 - `lab-library-pages` Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 - `lab-poll-crash-diagnostics` 轻量会话列表与客户端异常诊断
 - `lab-registered-machines` Lab Settings → Tools → Registered Machines panel
@@ -610,6 +623,13 @@
 需求正文见 [other](other.md)。
 
 - `memory-deletion-suppression` 删除记忆后阻止自动写回
+
+## message（2）
+
+需求正文见 [other](other.md)。
+
+- `message-body-search` 按消息正文搜索可见会话
+- `message-search-ui` 对话页搜索消息正文
 
 ## micro（1）
 
@@ -889,7 +909,7 @@
 - `secure-form-multi` 对话里的多字段安全表单
 - `secure-form-vault` Secure Form fill-from-Vault
 
-## session（11）
+## session（12）
 
 需求正文见 [session](session.md)。
 
@@ -901,6 +921,7 @@
 - `session-multiprocess-concurrency-verification` 多进程并发验证：写入占用、迟到结果与审批恢复
 - `session-multiprocess-state-consistency` 多进程会话状态一致性修复
 - `session-recap` 会话末尾回顾
+- `session-recap-model-routing` 会话回顾使用会话配置的模型
 - `session-restart-recovery-state-consistency` 重启恢复发现的运行状态、审批衔接与未确认工具结果修复
 - `session-restart-recovery-verification` 进程重启恢复验证：运行中、重试等待与等待审批
 - `session-review-runtime` 会话复盘中的工具选择、请求预算和启动观测

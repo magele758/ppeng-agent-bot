@@ -215,10 +215,25 @@ No new RAW_AGENT_* feature flags. Acceptance-first, user asked to fix now, tests
 
 按你分析的优先级，把这七个问题完整修掉，补齐跨状态、跨执行入口和跨用户的回归测试，再审查一遍整个链路，没问题就提交 PR 合并。
 
+## cron-detail-markdown
+定时任务详情直接阅读 Markdown
+
+这个有点丑，markdown要能正确渲染，这个弹窗都是展示定时任务的内容，就不用额外套框了
+
+## cron-message-details
+聊天中的定时任务详情
+
+这种定时任务不用展示全内容，只展示是哪个定时任务的，点击再用弹窗显示详情，免得占用太多视图
+
 ## daydream-tick-cost
 每日复盘调度不能拖死 daemon
 
 怎么我本地的bot都不显示了？赶紧看看可能是其他agent搞的
+
+## daydream-unlimited-resume
+每日复盘移除额度并续跑
+
+先把额度管理的能力去掉吧，以后有需要再加
 
 ## default-super-bot
 默认 Super Bot 的状态查看、派工与结果汇总
@@ -498,6 +513,21 @@ browser_navigate).
 删除记忆后阻止自动写回
 
 先按你建议的顺序推进第一批：记忆删除抑制、严格预检、定时任务故障治理。按仓库的验收优先流程，先写验收标准给我确认。
+
+## message-body-search
+按消息正文搜索可见会话
+
+已登录用户可以按消息正文搜索自己能看到的会话。GET /api/search/messages?q=&limit=
+返回命中列表。摘录是命中处的短片段，不是整段消息。空白查询返回空列表，不扫描全表。
+limit 默认 20，最大 50。不返回其他用户或不可见会话的消息。只出现在标题或 Bot 名字里、
+正文没有的词不算命中。Bot 名字搜索保持不变。
+
+## message-search-ui
+对话页搜索消息正文
+
+对话页有独立于「搜索 Bot」的正文搜索。输入非空关键词后请求
+GET /api/search/messages，展示会话标题、摘录和时间。点击结果打开对应会话。
+输入为空时不发请求。接口失败或没有命中时显示明确状态，不编造结果。
 
 ## micro-compact-stub-wording
 微压缩占位只说明工具输出被省略

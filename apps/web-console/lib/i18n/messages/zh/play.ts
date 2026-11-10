@@ -235,6 +235,19 @@ export const play = {
     reorder: '拖拽调整顺序'
   },
 
+  messageSearch: {
+    label: '搜索对话正文',
+    placeholder: '搜索消息内容',
+    aria: '搜索对话正文',
+    empty: '没有匹配的对话',
+    failed: '对话搜索失败：{detail}',
+    unavailable: '对话搜索暂不可用',
+    invalid: '对话搜索结果无法读取',
+    loading: '正在搜索…',
+    untitled: '未命名会话',
+    open: '打开会话 {title}'
+  },
+
   group: {
     replyFailed: '群成员本次回复失败，请检查成员模型或稍后重试。你可以继续发送消息。',
     create: '新建群聊',

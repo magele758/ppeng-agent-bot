@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 412,
+    "implemented": 423,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -995,6 +995,13 @@
       "file": "acceptance/bot-startup-trace.yaml"
     },
     {
+      "id": "bot-status-polling",
+      "title": "工作状态轮询区分慢响应和断线",
+      "requirement": "再排查一下，为什么 Bot 工作状态会这么频繁地提示连接中断？看看是接口响应太慢还是真的断了，把原因也修一下。",
+      "verificationStage": "software",
+      "file": "acceptance/bot-status-polling.yaml"
+    },
+    {
       "id": "bot-steer-visible",
       "title": "Bot 对话里的实时插话马上出现在对话流",
       "requirement": "我在bot对话流中，实时插话，没有立即显示在对话流的UI中，经常延迟很久，插话时机的逻辑不用改，这个ui调整一下",
@@ -1450,11 +1457,32 @@
       "file": "acceptance/create-menu-trigger-hit-area.yaml"
     },
     {
+      "id": "cron-detail-markdown",
+      "title": "定时任务详情直接阅读 Markdown",
+      "requirement": "这个有点丑，markdown要能正确渲染，这个弹窗都是展示定时任务的内容，就不用额外套框了",
+      "verificationStage": "software",
+      "file": "acceptance/cron-detail-markdown.yaml"
+    },
+    {
+      "id": "cron-message-details",
+      "title": "聊天中的定时任务详情",
+      "requirement": "这种定时任务不用展示全内容，只展示是哪个定时任务的，点击再用弹窗显示详情，免得占用太多视图",
+      "verificationStage": "software",
+      "file": "acceptance/cron-message-details.yaml"
+    },
+    {
       "id": "daydream-tick-cost",
       "title": "每日复盘调度不能拖死 daemon",
       "requirement": "怎么我本地的bot都不显示了？赶紧看看可能是其他agent搞的",
       "verificationStage": "software",
       "file": "acceptance/daydream-tick-cost.yaml"
+    },
+    {
+      "id": "daydream-unlimited-resume",
+      "title": "每日复盘移除额度并续跑",
+      "requirement": "先把额度管理的能力去掉吧，以后有需要再加",
+      "verificationStage": "software",
+      "file": "acceptance/daydream-unlimited-resume.yaml"
     },
     {
       "id": "default-super-bot",
@@ -1688,6 +1716,13 @@
       "file": "acceptance/group-chat-sidebar-placement.yaml"
     },
     {
+      "id": "group-chat-stable-layout",
+      "title": "群聊顶部状态更新和输入区布局",
+      "requirement": "经常页面顶部会顶下来，导致页面跳动，这个是什么问题\n就这个元素，把这个做成浮层的不要占位\n发送按钮浮动到右侧，输入文本不要加边框",
+      "verificationStage": "software",
+      "file": "acceptance/group-chat-stable-layout.yaml"
+    },
+    {
       "id": "group-command-same-as-dm",
       "title": "群里的命令跟该 Bot 单聊同一套放行",
       "requirement": "单独问 Super Bot 时 gh 可以执行，群里却 source_scope_denied。要改成一致。\n某个 Bot 在群里说话时，命令 / scope / gh 的放行跟它自己的单聊一样。不要因为「这是群会话」就额外 source_scope_denied。\n每个 Bot 仍用自己的权限。不要把群里其他 Bot 提升成 Super Bot。\n单聊要审批的，群里走同一条审批，不要直接拒绝且不给批。单聊拒绝的，群里也拒绝。\n沙箱、敏感路径、密钥目录不要放开。",
@@ -1700,6 +1735,13 @@
       "requirement": "群聊列表项把群里 Bot 的头像拼成一个群头像，最多四个，让人在点进去之前知道群里有谁",
       "verificationStage": "software",
       "file": "acceptance/group-face.yaml"
+    },
+    {
+      "id": "group-member-partial-roster",
+      "title": "群里有旧成员时仍可添加当前可选的 Bot",
+      "requirement": "这个怎么又不能把bot加入群聊了？",
+      "verificationStage": "software",
+      "file": "acceptance/group-member-partial-roster.yaml"
     },
     {
       "id": "group-member-quiet",
@@ -1721,6 +1763,13 @@
       "requirement": "这个是干嘛的？有必要留吗？\n这里的回复模式，介绍的详细点，现在太简单了，没说清楚\n群聊需要加定时任务的能力吗？还是由默认协调者来控制即可？群聊只做组织形式？",
       "verificationStage": "software",
       "file": "acceptance/group-mode-explanations.yaml"
+    },
+    {
+      "id": "group-mode-instant-selection",
+      "title": "群聊回复方式可以连续切换",
+      "requirement": "这个回复方式怎么切换选择这么卡顿",
+      "verificationStage": "software",
+      "file": "acceptance/group-mode-instant-selection.yaml"
     },
     {
       "id": "group-reply-mode",
@@ -1784,6 +1833,13 @@
       "requirement": "很奇怪，为什么现在在chatgpt里，网页一直加载不回来？",
       "verificationStage": "software",
       "file": "acceptance/lab-auth-loading-recovery.yaml"
+    },
+    {
+      "id": "lab-bootstrap-retry",
+      "title": "工作台启动失败后恢复",
+      "requirement": "这个无法进入页面的问题又浮现了，赶紧修复一下，彻底修复",
+      "verificationStage": "software",
+      "file": "acceptance/lab-bootstrap-retry.yaml"
     },
     {
       "id": "lab-library-pages",
@@ -1917,6 +1973,20 @@
       "requirement": "先按你建议的顺序推进第一批：记忆删除抑制、严格预检、定时任务故障治理。按仓库的验收优先流程，先写验收标准给我确认。",
       "verificationStage": "software",
       "file": "acceptance/memory-deletion-suppression.yaml"
+    },
+    {
+      "id": "message-body-search",
+      "title": "按消息正文搜索可见会话",
+      "requirement": "已登录用户可以按消息正文搜索自己能看到的会话。GET /api/search/messages?q=&limit=\n返回命中列表。摘录是命中处的短片段，不是整段消息。空白查询返回空列表，不扫描全表。\nlimit 默认 20，最大 50。不返回其他用户或不可见会话的消息。只出现在标题或 Bot 名字里、\n正文没有的词不算命中。Bot 名字搜索保持不变。",
+      "verificationStage": "software",
+      "file": "acceptance/message-body-search.yaml"
+    },
+    {
+      "id": "message-search-ui",
+      "title": "对话页搜索消息正文",
+      "requirement": "对话页有独立于「搜索 Bot」的正文搜索。输入非空关键词后请求\nGET /api/search/messages，展示会话标题、摘录和时间。点击结果打开对应会话。\n输入为空时不发请求。接口失败或没有命中时显示明确状态，不编造结果。",
+      "verificationStage": "software",
+      "file": "acceptance/message-search-ui.yaml"
     },
     {
       "id": "micro-compact-stub-wording",
@@ -2512,6 +2582,13 @@
       "requirement": "我觉得像claude code的会话最后的recap挺好的，研究一下他的产品设计思路，以及他总计的内容是什么，以及他的产品逻辑，给当前项目也加上这个能力，来提升使用体验",
       "verificationStage": "software",
       "file": "acceptance/session-recap.yaml"
+    },
+    {
+      "id": "session-recap-model-routing",
+      "title": "会话回顾使用会话配置的模型",
+      "requirement": "回顾会话的功能坏了",
+      "verificationStage": "software",
+      "file": "acceptance/session-recap-model-routing.yaml"
     },
     {
       "id": "session-restart-recovery-state-consistency",

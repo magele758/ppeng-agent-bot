@@ -3,6 +3,25 @@
   flex-direction: row;
 }
 
+.bot-work-connection-notice {
+  position: fixed;
+  z-index: calc(var(--ui-z-overlay) - 1);
+  top: max(8px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-sm);
+  font-size: var(--ui-text-sm);
+  pointer-events: none;
+}
+
 .lab-rail {
   width: var(--ui-rail-width);
   flex: 0 0 var(--ui-rail-width);

@@ -4,6 +4,7 @@ import { useI18n, type MessageKey } from "@/lib/i18n";
 import { applyHistoryPage, historyBeforeQuery, historyPollStale, historyWindowAnchor, loadEarlierCursorAfterReset, mergeHistoryWindow, olderHistoryPageStale } from "@/lib/history-window";
 import { sameData } from "@/lib/same-data";
 import type { BotInfo } from "@/lib/types";
+import { readGroupReplyMode } from "@/lib/group-reply-mode";
 import { GroupReplyModeControl } from "../play-group/GroupReplyModeControl";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
 import {RoomWorkReceipt,type RoomWorkReceiptData} from '../play-group/RoomWorkReceipt';
@@ -281,7 +282,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
             <label>{t('botWork.title')}<input data-testid="room-settings-title" value={room.title} onChange={e=>editRoom({...room,title:e.target.value})}/></label>
             <label>{t('botWork.host')}<select value={room.hostBotId} onChange={e=>editRoom({...room,hostBotId:e.target.value})}>{room.botIds.map(id=><option key={id} value={id}>{bots.find(b=>b.id===id)?.name??id}</option>)}</select></label>
             </fieldset>
-            {selectedRoomId ? <GroupReplyModeControl roomId={selectedRoomId} /> : null}
+            {selectedRoomId ? <GroupReplyModeControl key={room.id} roomId={room.id} initialMode={readGroupReplyMode(room)} /> : null}
             <details className="room-settings-limits">
               <summary>{t('play.groupSettings.limits')}</summary>
               <p>{t('play.groupSettings.limitsHint')}</p>

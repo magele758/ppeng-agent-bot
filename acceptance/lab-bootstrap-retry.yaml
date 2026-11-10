@@ -1,0 +1,14 @@
+id: lab-bootstrap-retry
+title: 工作台启动失败后恢复
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: 这个无法进入页面的问题又浮现了，赶紧修复一下，彻底修复
+criteria:
+  - id: AC-1
+    given: 浏览器未能加载启动脚本
+    when: 打开原来的 Bot 地址
+    then: 自动重新获取启动资源，保留目标页面并完成登录检查
+  - id: AC-2
+    given: 恢复后启动资源仍然不可用
+    when: 再次加载失败
+    then: 明确提示启动失败并允许手动重试，避免循环刷新

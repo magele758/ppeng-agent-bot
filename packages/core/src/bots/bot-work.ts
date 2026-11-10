@@ -158,10 +158,12 @@ export function releaseBotSession(store: SqliteStateStore, sessionId: string, ow
 }
 function leaseValid(store:SqliteStateStore,id:string,owner:string,fence:number):boolean { return !!store.db.prepare('SELECT 1 FROM bot_work_leases WHERE session_id=? AND owner=? AND fence=?').get(id,owner,fence); }
 function taskRow(row: Record<string,unknown>):BotTask { return { id:String(row.id),principal:JSON.parse(String(row.principal)).reduce((o:BotPrincipal,v:string,i:number)=>i===0?({...o,...(v?{tenantId:v}:{})}):({...o,userId:v}),{} as BotPrincipal),requesterBotId:String(row.requester_bot),targetBotId:String(row.target_bot),input:String(row.input),status:String(row.status),attempt:Number(row.attempt),...(row.deadline?{deadline:String(row.deadline)}:{}),...(row.result!==null?{result:String(row.result)}:{}),...(row.failure_reason?{failureReason:String(row.failure_reason)}:{}),createdAt:String(row.created_at),updatedAt:String(row.updated_at) }; }
-const UNRESOLVED_BOT_TASKS = ['queued','running','waiting_approval','unknown'];
+function unresolvedTaskRows(store:SqliteStateStore,key:string) {
+ return store.db.prepare("SELECT * FROM bot_work_tasks WHERE principal=? AND status IN ('queued','running','waiting_approval','unknown') ORDER BY rowid DESC").all(key) as Record<string,unknown>[];
+}
 export function listBotTasks(store:SqliteStateStore,principal:BotPrincipal):BotTask[] {
  ensureBotWorkSchema(store);const key=botPrincipalKey(principal);
- const unresolved=store.db.prepare("SELECT * FROM bot_work_tasks WHERE principal=? AND status IN ('queued','running','waiting_approval','unknown') ORDER BY rowid DESC").all(key) as Record<string,unknown>[];
+ const unresolved=unresolvedTaskRows(store,key);
  const history=store.db.prepare("SELECT * FROM bot_work_tasks WHERE principal=? AND status NOT IN ('queued','running','waiting_approval','unknown') ORDER BY rowid DESC LIMIT 500").all(key) as Record<string,unknown>[];
  return [...unresolved,...history].map(taskRow);
 }
@@ -799,21 +801,21 @@ export function retryBotTask(host:BotWorkHost,principal:BotPrincipal,id:string,c
  try{host.store.db.prepare("UPDATE bot_work_tasks SET status='queued',failure_reason=NULL,result=NULL,deadline=NULL,updated_at=? WHERE id=?").run(nowIso(),id);host.store.db.prepare("UPDATE bot_work_messages SET status='pending',message_ref=NULL,updated_at=? WHERE task_id=? AND kind='task'").run(nowIso(),id);host.store.db.prepare('UPDATE bot_work_leases SET expires=0,fence=fence+1 WHERE session_id=?').run(message.session_id);host.store.db.exec('COMMIT');}catch(err){host.store.db.exec('ROLLBACK');throw err;}
  return getBotTask(host.store,principal,id)!;
 }
-/** Project canonical ids before hydrating; isolated Routine/Room contexts never enter this view. */
-function canonicalChatsForPrincipal(store:SqliteStateStore,principal:BotPrincipal,installation:BotPrincipal):Map<string,NonNullable<ReturnType<SqliteStateStore['getSession']>>> {
- const rows=store.db.prepare(`SELECT id FROM sessions
+/** Status polling needs only the latest canonical chat id and state for each bot. */
+function canonicalChatsForPrincipal(store:SqliteStateStore,principal:BotPrincipal,installation:BotPrincipal) {
+ const rows=store.db.prepare(`SELECT id, agent_id, status FROM sessions
   WHERE json_extract(metadata_json,'$.canonicalBotChat')=1 AND (
    (json_type(metadata_json,'$.userId')='text' AND trim(json_extract(metadata_json,'$.userId'))=?
     AND coalesce(trim(json_extract(metadata_json,'$.tenantId')),'')=?)
    OR (?=1 AND (json_type(metadata_json,'$.userId') IS NULL
     OR json_type(metadata_json,'$.userId')!='text' OR trim(json_extract(metadata_json,'$.userId'))=''))
-  ) ORDER BY updated_at DESC`).all(principal.userId,principal.tenantId??'',sameBotPrincipal(principal,installation)?1:0) as {id:string}[];
- const chats=new Map<string,NonNullable<ReturnType<SqliteStateStore['getSession']>>>();
- for(const row of rows){const session=store.getSession(row.id);if(session&&!chats.has(session.agentId))chats.set(session.agentId,session);}
+  ) ORDER BY updated_at DESC`).all(principal.userId,principal.tenantId??'',sameBotPrincipal(principal,installation)?1:0) as {id:string; agent_id:string; status:string}[];
+ const chats=new Map<string, {id:string; status:string}>();
+ for(const row of rows) if(!chats.has(row.agent_id)) chats.set(row.agent_id,row);
  return chats;
 }
 export function botWorkStatus(host:BotWorkHost,principal:BotPrincipal):unknown[] {
- ensureBotWorkSchema(host.store);const tasks=listBotTasks(host.store,principal).filter(task=>UNRESOLVED_BOT_TASKS.includes(task.status));const countsByBot=new Map<string,Record<string,number>>();for(const row of host.store.db.prepare('SELECT target_bot,status,count(*) AS n FROM bot_work_tasks WHERE principal=? GROUP BY target_bot,status').all(botPrincipalKey(principal)) as {target_bot:string;status:string;n:number}[]){const counts=countsByBot.get(row.target_bot)??{};counts[row.status]=row.n;countsByBot.set(row.target_bot,counts);}const installation=resolveBotPrincipal(host.store);const chats=canonicalChatsForPrincipal(host.store,principal,installation);
+ ensureBotWorkSchema(host.store);const tasks=unresolvedTaskRows(host.store,botPrincipalKey(principal)).map(taskRow);const countsByBot=new Map<string,Record<string,number>>();for(const row of host.store.db.prepare('SELECT target_bot,status,count(*) AS n FROM bot_work_tasks WHERE principal=? GROUP BY target_bot,status').all(botPrincipalKey(principal)) as {target_bot:string;status:string;n:number}[]){const counts=countsByBot.get(row.target_bot)??{};counts[row.status]=row.n;countsByBot.set(row.target_bot,counts);}const installation=resolveBotPrincipal(host.store);const chats=canonicalChatsForPrincipal(host.store,principal,installation);
  return host.store.listBots({includeHidden:true}).flatMap(bot=>{
   const canonical=host.store.getSession(bot.canonicalSessionId);
   const owner=canonical?principalFromSession(host.store,canonical):botDefinitionOwner(host.store,bot.id);if(!owner)return [];if(!sameBotPrincipal(owner,principal)&&!sameBotPrincipal(owner,installation))return [];
