@@ -5,7 +5,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { NotFoundError, ValidationError, type RawAgentRuntime } from '@ppeng/agent-core';
+import { NotFoundError, ValidationError, resolveSessionModelAdapter, type RawAgentRuntime } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
 import {
@@ -152,8 +152,9 @@ async function composeAndStore(
   messages: ReturnType<RawAgentRuntime['store']['foldMessages']>,
   signal: AbortSignal
 ): Promise<{ text: string | null; anchorId: string | null; hint: string }> {
-  const complete = runtime.modelAdapter.completeText;
   const session = runtime.getSession(sessionId);
+  const adapter = resolveSessionModelAdapter(runtime.store, session, process.env, runtime.modelAdapter);
+  const complete = adapter.completeText;
   const cached = readSessionRecapCache(session?.metadata);
   if (!complete) return { text: null, anchorId: recapAnchorId(messages), hint: '' };
   const result = await composeSessionRecap({
@@ -162,7 +163,7 @@ async function composeAndStore(
     cached,
     clock: { nowMs: Date.now(), timezone: resolveConversationTimezone(session?.metadata) },
     signal,
-    completeText: (request) => complete.call(runtime.modelAdapter, request)
+    completeText: (request) => complete.call(adapter, request)
   });
   if (result.cache) {
     runtime.store.transaction(() => {
