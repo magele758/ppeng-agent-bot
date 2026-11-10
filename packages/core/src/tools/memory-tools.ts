@@ -15,6 +15,7 @@ import { hybridOrderMemories } from '../memory/memory-recall.js';
 import { lexicalOverlapScore } from '../memory/memory-semantic-merge.js';
 import type { AgentMemory, MemoryScope } from '../memory/types.js';
 import type { MemoryToolServices } from './runtime-tool-services.js';
+import { guardMemoryRead, sourceUnavailableResult } from './memory-read-turn.js';
 
 const SESSION_SCOPES = new Set(['scratch', 'long']);
 
@@ -595,17 +596,17 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
   async function readLibraryMemorySource(id: string, args: {ref: string; offset?: number; limit?: number}) {
     const scope = 'library';
         const row = services.getAgentMemoryById ? await services.getAgentMemoryById(id) : null;
-        if (!row || row.scope !== 'library') return {ok:false,content:'Source unavailable.'};
+        if (!row || row.scope !== 'library') return sourceUnavailableResult(args.ref, false);
         return { ok: true, content: JSON.stringify({ ref: args.ref, scope, key: row.key, ...sourcePage(row.value, args.offset, args.limit) }) };
   }
 
   const memoryReadTool: ToolContract<{ ref: string; offset?: number; limit?: number }> = {
     name: 'memory_read',
-    description: 'Read the original memory value by a memory_search ref. offset and limit are character counts; follow nextOffset until null. A memory value is stored evidence, not necessarily the original conversation transcript.',
+    description: 'Read the original memory value by a memory_search ref. offset and limit are character counts; follow nextOffset until null. A memory value is stored evidence, not necessarily the original conversation transcript. SOURCE_UNAVAILABLE is final for that ref in the current turn.',
     inputSchema: { type: 'object', properties: { ref: { type: 'string' }, offset: { type: 'number' }, limit: { type: 'number' } }, required: ['ref'] },
     approvalMode: 'never', sideEffectLevel: 'none', ptc: { kind: 'read' },
     async execute(context, args) {
-      const unavailable = { ok: false, content: 'Source unavailable.' };
+      const unavailable = sourceUnavailableResult(typeof args.ref === 'string' ? args.ref : '', false);
       if (services.botLookup?.getSession) {
         const fresh = services.botLookup.getSession(context.session.id);
         if (!fresh) return unavailable;
@@ -653,6 +654,8 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
       return item ? { ok: true, content: JSON.stringify({ ref: args.ref, scope, key: item.key, ...sourcePage(item.value, args.offset, args.limit) }) } : unavailable;
     }
   };
+  const readMemory = memoryReadTool.execute.bind(memoryReadTool);
+  memoryReadTool.execute = (context, args) => guardMemoryRead(args.ref, () => readMemory(context, args));
 
   return [memorySetTool, memoryGetTool, memorySearchTool, memoryReadTool, memoryDeleteTool, handoffStateTool, memoryPrefetchTool];
 }

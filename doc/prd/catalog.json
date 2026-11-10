@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 427,
+    "implemented": 429,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1879,7 +1879,7 @@
     {
       "id": "lab-startup-request-load",
       "title": "控制台启动时的请求负担",
-      "requirement": "我看现在网页启动，请求太多了，把页面都卡半天，优化一下启动速度",
+      "requirement": "我看现在网页启动，请求太多了，把页面都卡半天，优化一下启动速度\n\n发现的问题都查一下和解决",
       "verificationStage": "software",
       "file": "acceptance/lab-startup-request-load.yaml"
     },
@@ -1994,6 +1994,13 @@
       "requirement": "先按你建议的顺序推进第一批：记忆删除抑制、严格预检、定时任务故障治理。按仓库的验收优先流程，先写验收标准给我确认。",
       "verificationStage": "software",
       "file": "acceptance/memory-deletion-suppression.yaml"
+    },
+    {
+      "id": "memory-read-source-unavailable",
+      "title": "读不到的记忆来源一轮只说明一次",
+      "requirement": "memory_read SOURCE_UNAVAILABLE must be surfaced once and not retried for the same source in that turn. Do not search logs. Do not weaken security denials.",
+      "verificationStage": "software",
+      "file": "acceptance/memory-read-source-unavailable.yaml"
     },
     {
       "id": "message-body-search",
@@ -2428,6 +2435,13 @@
       "requirement": "这种是什么？为什么会有这个提醒？算警告？给他先加个ui，然后分析下他警告的是否合理，我看这个最近挺频繁的",
       "verificationStage": "software",
       "file": "acceptance/risk-advisory-ui.yaml"
+    },
+    {
+      "id": "room-budgets-default-off",
+      "title": "群预算默认关闭，预算停下时写完的回复照常出现",
+      "requirement": "发现的问题都查一下和解决，群预算也都默认关闭",
+      "verificationStage": "software",
+      "file": "acceptance/room-budgets-default-off.yaml"
     },
     {
       "id": "room-task-collaboration",

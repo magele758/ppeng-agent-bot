@@ -2657,7 +2657,11 @@ Lab Settings → Tools → Registered Machines panel
 
 - `apps/daemon/test/session-detail-logs.test.ts`
 - `apps/web-console/lib/api.test.ts`
+- `apps/web-console/lib/bot-work-state.test.ts`
 - `apps/web-console/lib/lab-tick.test.ts`
+- `apps/web-console/lib/overview-plan.test.ts`
+- `apps/web-console/lib/poll-timer.test.ts`
+- `apps/web-console/lib/session-activity.test.ts`
 
 ### lab-startup-timing
 
@@ -2750,6 +2754,12 @@ macOS 应用控制（外层宿主）
 
 - `e2e/first-batch-reliability.spec.ts`
 - `packages/core/test/memory-deletion-suppression.test.js`
+
+### memory-read-source-unavailable
+
+读不到的记忆来源一轮只说明一次
+
+- `packages/core/test/memory-read-source-unavailable.test.js`
 
 ### message-body-search
 
@@ -3192,6 +3202,14 @@ microVM 命令不会悄悄改在宿主机上跑
 
 - `apps/web-console/lib/risk-advisory.test.ts`
 - `e2e/risk-advisory.spec.ts`
+
+### room-budgets-default-off
+
+群预算默认关闭，预算停下时写完的回复照常出现
+
+- `apps/web-console/components/play-group/room-console.test.ts`
+- `apps/web-console/lib/room-turn-notice.test.ts`
+- `packages/core/test/bot-room-budget-default-off.test.js`
 
 ### rotate-page-share
 

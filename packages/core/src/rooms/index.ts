@@ -140,10 +140,31 @@ function roomSpendExceeded(room: { toolCapEnabled?: boolean; maxToolCalls: numbe
   if (costUsd >= enforcedCeiling(room.costCapEnabled, room.maxCostUsd)) return 'cost_budget';
   return undefined;
 }
-function roomCreateCaps(input: { maxBotTurns?: number; maxToolCalls?: number; maxCostUsd?: number }): Pick<BotRoom, 'maxBotTurns' | 'turnCapEnabled' | 'maxToolCalls' | 'toolCapEnabled' | 'maxCostUsd' | 'costCapEnabled'> {
+/** Until budgets became off by default, every room was created with these two. */
+const LEGACY_DEFAULT_MAX_TOOL_CALLS = 100;
+const LEGACY_DEFAULT_MAX_COST_USD = 1;
+export const ROOM_BUDGET_DEFAULT_OFF_KEY = 'bot.roomBudgetDefaultOff';
+/** A budget the room was created with, not one a person typed: still enforced and equal to the old default. Returns whether the room changed. */
+function dropLegacyDefaultBudgets(room: BotRoom): boolean {
+  let changed = false;
+  if (room.toolCapEnabled !== false && room.maxToolCalls === LEGACY_DEFAULT_MAX_TOOL_CALLS) { room.maxToolCalls = 0; room.toolCapEnabled = false; changed = true; }
+  if (room.costCapEnabled !== false && room.maxCostUsd === LEGACY_DEFAULT_MAX_COST_USD) { room.maxCostUsd = 0; room.costCapEnabled = false; changed = true; }
+  return changed;
+}
+function isBudgetStop(reason: string | undefined): boolean {
+  return reason === 'tool_budget' || reason === 'cost_budget';
+}
+/** The member's run ended on its own answer. A cancelled or failed run is not a finished reply. */
+function memberRunFinished(session: SessionRecord): boolean {
+  if (session.status === 'failed' || session.status === 'unknown' || session.status === 'running' || session.status === 'waiting_approval') return false;
+  const outcome = session.metadata?.outcome as { kind?: string; reason?: string } | undefined;
+  if (!outcome) return true;
+  return outcome.kind === 'idle' ? outcome.reason === 'end' : outcome.kind !== 'aborted' && outcome.kind !== 'failed' && outcome.kind !== 'waiting_approval';
+}
+function roomCreateCaps(input: { maxBotTurns?: number; maxToolCalls?: number; maxCostUsd?: number }, defaults: Pick<RoomSettings, 'defaultMaxToolCalls' | 'defaultMaxCostUsd'>): Pick<BotRoom, 'maxBotTurns' | 'turnCapEnabled' | 'maxToolCalls' | 'toolCapEnabled' | 'maxCostUsd' | 'costCapEnabled'> {
   const turns = input.maxBotTurns ?? 0;
-  const tools = input.maxToolCalls === undefined ? 100 : positiveLimit(input.maxToolCalls, 10000, 'tool', true);
-  const cost = input.maxCostUsd === undefined ? 1 : positiveLimit(input.maxCostUsd, 1000, 'cost');
+  const tools = input.maxToolCalls === undefined ? defaults.defaultMaxToolCalls : positiveLimit(input.maxToolCalls, 10000, 'tool', true);
+  const cost = input.maxCostUsd === undefined ? defaults.defaultMaxCostUsd : positiveLimit(input.maxCostUsd, 1000, 'cost');
   return { maxBotTurns: budget(turns), turnCapEnabled: turns > 0, maxToolCalls: tools, toolCapEnabled: tools > 0, maxCostUsd: cost, costCapEnabled: cost > 0 };
 }
 function conversationCapHit(room: { turnCapEnabled?: boolean; maxBotTurns: number }, turn: { maxBotTurns: number; botTurns: number }): boolean {
@@ -198,7 +219,26 @@ export class BotRoomService {
   constructor(private readonly host: BotRoomHost, opts: { recover?: boolean } = {}) {
     ensureBotRoomSchema(host.store);
     bindRoomHostRoute(host.store);
+    this.turnOffLegacyDefaultBudgets();
     if (opts.recover !== false) this.recoverInterrupted();
+  }
+  /**
+   * Runs once per state directory. Rooms used to be created with a 100 tool-call limit and a 1 USD cost budget.
+   * Nothing stored says whether a person later confirmed those numbers, so a budget still equal to the old default is switched off
+   * and any other value is kept.
+   */
+  private turnOffLegacyDefaultBudgets(): void {
+    if (this.store.getDaemonControl(ROOM_BUDGET_DEFAULT_OFF_KEY)) return;
+    this.tx(() => {
+      const roomIds: string[] = [];
+      for (const row of this.store.db.prepare('SELECT data FROM bot_rooms ORDER BY rowid').all()) {
+        const room = decode<BotRoom>(row)!;
+        if (!dropLegacyDefaultBudgets(room)) continue;
+        this.store.db.prepare('UPDATE bot_rooms SET data=? WHERE id=?').run(JSON.stringify(room), room.id);
+        roomIds.push(room.id);
+      }
+      this.store.setDaemonControl(ROOM_BUDGET_DEFAULT_OFF_KEY, { appliedAt: nowIso(), roomIds });
+    });
   }
   readSettings(): RoomSettings { return readRoomSettings(this.store); }
   writeSettings(patch: unknown): RoomSettings { return writeRoomSettings(this.store, patch); }
@@ -284,7 +324,7 @@ export class BotRoomService {
     const hostBotId = input.hostBotId ?? botIds[0]!;
     if (!botIds.includes(hostBotId)) throw new ValidationError('Host must be a Room member');
     const now = nowIso();
-    const room: BotRoom = { id: createId('room'), title, principalId: botPrincipalKey(principal), principal, botIds, hostBotId, ...roomCreateCaps(input), status: 'active', createdAt: now, updatedAt: now };
+    const room: BotRoom = { id: createId('room'), title, principalId: botPrincipalKey(principal), principal, botIds, hostBotId, ...roomCreateCaps(input, readRoomSettings(this.store)), status: 'active', createdAt: now, updatedAt: now };
     this.store.db.prepare('INSERT INTO bot_rooms(id,principal_id,data) VALUES(?,?,?)').run(room.id, room.principalId, JSON.stringify(room));
     return withReplyMode(room);
   }
@@ -657,7 +697,12 @@ export class BotRoomService {
       const spent=typeof currentCost==='number'?Math.max(0,currentCost-(slot?.startCostUsd??turn.startCostUsd??0)):0;
       if(typeof currentCost==='number')turn.costStatus='estimated';
       const reason=roomSpendWouldExceed(room,turn.toolCalls,requested,turn.costUsd,spent);
-      if(reason){turn.terminationReason=reason;this.saveTurn(turn);this.host.cancelSession(sessionId);return;}
+      if(reason){
+        turn.terminationReason=reason;this.saveTurn(turn);
+        // A final answer is already paid for and complete: let the run end so the reply can be posted. A step that asks for more tools is cut here.
+        if(requested>0)this.host.cancelSession(sessionId);
+        return;
+      }
       turn.toolCalls+=requested;this.saveTurn(turn);
     };
   }
@@ -681,17 +726,50 @@ export class BotRoomService {
   private contextMissing(turn: BotRoomTurn): void {
     turn.status = 'unknown'; turn.terminationReason = 'execution_context_missing'; this.saveTurn(turn);
   }
+  /** Ends the turn on a budget stop. Members still running are cancelled so they stop spending. */
   private completeBudget(turn: BotRoomTurn): boolean {
-    if (turn.terminationReason !== 'tool_budget' && turn.terminationReason !== 'cost_budget') return false;
+    if (!isBudgetStop(turn.terminationReason)) return false;
     turn.status = 'failed';
+    const running: string[] = [];
     for (const member of turn.members ?? []) {
       if (member.status !== 'running' && member.status !== 'waiting_approval') continue;
+      if (member.status === 'running' && member.sessionId) running.push(member.sessionId);
       member.status = 'failed';
       this.noteSettled(turn, member.botId);
     }
     delete turn.currentSessionId;
     this.syncCursor(turn);
-    this.saveTurn(turn); return true;
+    this.saveTurn(turn);
+    // The stop is stored first. A cancel that throws must not leave the turn running.
+    for (const sessionId of running) {
+      try { this.host.cancelSession(sessionId); }
+      catch (error) { this.host.log?.warn?.('Room budget stop could not cancel a member', { turnId: turn.id, sessionId, error: String(error) }); }
+    }
+    return true;
+  }
+  /**
+   * A member settling after a budget stopped the turn. A reply it already finished is still posted;
+   * a member cut off mid-run posts nothing. False when no budget stopped this turn.
+   */
+  private settleBudgetStop(room: BotRoom, turn: BotRoomTurn, botId: string, sessionId: string, closing = false): boolean {
+    if (!isBudgetStop(this.turnById(turn.id).terminationReason)) return false;
+    const session = this.store.getSession(sessionId);
+    if (session && memberRunFinished(session)) {
+      this.addMemberCost(turn.id, botId, session);
+      this.publish(room, turn, botId, sessionId, closing, true);
+    }
+    this.completeBudget(this.turnById(turn.id));
+    this.adopt(turn, this.turnById(turn.id));
+    return true;
+  }
+  private addMemberCost(turnId: string, botId: string, session: SessionRecord): void {
+    const total = session.metadata?.usageCostUsd;
+    if (typeof total !== 'number') return;
+    this.mergeTurn(turnId, latest => {
+      const start = latest.members?.find(member => member.botId === botId)?.startCostUsd ?? latest.startCostUsd ?? 0;
+      latest.costUsd += Math.max(0, total - start);
+      latest.costStatus = 'estimated';
+    });
   }
   private turnOwnsSession(turn: BotRoomTurn, sessionId: string): boolean {
     return turn.currentSessionId === sessionId || (turn.members ?? []).some(member => member.sessionId === sessionId && (member.status === 'running' || member.status === 'waiting_approval'));
@@ -797,7 +875,7 @@ export class BotRoomService {
     if (hasPendingSessionWake(this.store, session.id)) return false;
     const resumed = resumeApprovedBotSession({ store: this.store, runSession: id => this.host.runSession(id, { onEvent: this.budgetHookForSession(id) }), isSessionRunning: this.host.isSessionRunning }, session.id, turn.startedAt ?? turn.createdAt);
     if (resumed || (session.metadata?.outcome as { kind?: string } | undefined)?.kind === 'waiting_approval') return false;
-    if (this.applyUnconfirmedEffects(turn, session) || this.completeBudget(turn)) return false;
+    if (this.applyUnconfirmedEffects(turn, session) || this.settleBudgetStop(room, turn, speaker, session.id)) return false;
     if (this.applyOutcome(turn, session, speaker) || this.sessionFailed(turn, session, speaker)) return !this.isTerminal(this.turnById(turn.id).status);
     if (typeof session.metadata?.usageCostUsd === 'number') {
       this.mergeTurn(turn.id, latest => {
@@ -949,10 +1027,7 @@ export class BotRoomService {
       this.adopt(turn, saved);
       return false;
     }
-    if (after.terminationReason === 'tool_budget' || after.terminationReason === 'cost_budget') {
-      this.completeBudget(this.turnById(turn.id));
-      return false;
-    }
+    if (this.settleBudgetStop(room, turn, botId, sessionId, closing)) return false;
     if (this.applyOutcome(turn, current, botId)) return !this.isTerminal(this.turnById(turn.id).status);
     if (current.status === 'waiting_approval') {
       try {
@@ -975,13 +1050,7 @@ export class BotRoomService {
       return false;
     }
     if (this.sessionFailed(turn, current, botId)) return !this.isTerminal(this.turnById(turn.id).status);
-    if (typeof current.metadata?.usageCostUsd === 'number') {
-      this.mergeTurn(turn.id, latest => {
-        const start = latest.members?.find(member => member.botId === botId)?.startCostUsd ?? latest.startCostUsd ?? 0;
-        latest.costUsd += Math.max(0, (current.metadata?.usageCostUsd as number) - start);
-        latest.costStatus = 'estimated';
-      });
-    }
+    this.addMemberCost(turn.id, botId, current);
     this.publish(room, turn, botId, sessionId, closing);
     return true;
   }
@@ -1256,7 +1325,7 @@ export class BotRoomService {
     turn.visibleReplies = (turn.visibleReplies ?? 0) + 1;
     turn.botTurns += 1;
   }
-  private publish(room: BotRoom, turn: BotRoomTurn, botId: string, sessionId = turn.currentSessionId, closing = false): void {
+  private publish(room: BotRoom, turn: BotRoomTurn, botId: string, sessionId = turn.currentSessionId, closing = false, afterBudgetStop = false): void {
     const bot = this.store.getBot(botId);
     if (!bot || !sessionId) return;
     const slot = this.turnById(turn.id).members?.find(member => member.botId === botId);
@@ -1264,7 +1333,8 @@ export class BotRoomService {
     const output = this.resultText(sessionId, startSeq).trim();
     this.tx(() => {
       const latest = this.turnById(turn.id);
-      if (latest.status === 'cancelled' || latest.status === 'failed' || latest.status === 'unknown') return;
+      if (latest.status === 'cancelled' || latest.status === 'unknown') return;
+      if (latest.status === 'failed' && !(afterBudgetStop && isBudgetStop(latest.terminationReason))) return;
       const key = closing ? `reply:${latest.id}:${botId}:wrap` : `reply:${latest.id}:${botId}`;
       if (isWithheldRoomReply(output)) {
         this.publishMemberFailure(latest, botId, 'empty_reply');

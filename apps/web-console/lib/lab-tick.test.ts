@@ -39,3 +39,15 @@ test('the open conversation is refreshed only when asked [AC:lab-startup-request
   });
   assert.deepEqual(order, ['meta', 'overview']);
 });
+
+test('version and health are skipped on a tick that says they are not due [AC:lab-startup-request-load#AC-9]', async () => {
+  const order: string[] = [];
+  const steps = {
+    refreshMeta: async () => { order.push('meta'); },
+    refreshOverview: async () => { order.push('overview'); }
+  };
+  await runLabTick({ ...steps, metaDue: () => false });
+  assert.deepEqual(order, ['overview']);
+  await runLabTick({ ...steps, metaDue: () => true });
+  assert.deepEqual(order, ['overview', 'meta', 'overview']);
+});

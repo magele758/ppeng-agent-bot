@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { api } from '@/lib/api';
 import { createPreferenceSync } from '@/lib/user-preference-sync';
+import { createReadGate } from '@/lib/poll-timer';
 import { acknowledgePreferences, scopedLegacyPreferences, pendingPreferences, receivePreferences } from '@/lib/user-preference-storage';
 import { currentTheme, THEME_CHANGED_EVENT } from '@/lib/theme';
 import { paintSkinAttribute, readSkin, SKIN_CHANGED_EVENT } from '@/lib/skin';
@@ -42,11 +43,20 @@ export function UserPreferenceSync() {
    } catch { /* Retry pending writes and migration on reconnect. */ }
    finally { busy = false; }
   };
-  void poll();
-  const timer = window.setInterval(() => void poll(),3000);
+  // Local edits go out on the next check; other browsers' edits are picked up every 15 seconds.
+  const gate = createReadGate(REMOTE_READ_MS);
+  const check = () => { if (gate.due(hasPendingPreferences())) void poll(); };
+  check();
+  const timer = window.setInterval(check,3000);
   return () => { stopped=true; window.clearInterval(timer); };
  },[]);
  return null;
+}
+
+const REMOTE_READ_MS = 15_000;
+
+function hasPendingPreferences(): boolean {
+ return Object.keys(pendingPreferences()).length > 0;
 }
 
 function legacyForScope(scope: string) {

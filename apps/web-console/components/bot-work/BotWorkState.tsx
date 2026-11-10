@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
-import { parseBotWorkStates, parseBotWorkOverview, type BotWorkStates, type BotWorkOverview } from '@/lib/bot-work-state';
+import { anyBotWorking, botWorkPollMs, parseBotWorkStates, parseBotWorkOverview, type BotWorkStates, type BotWorkOverview } from '@/lib/bot-work-state';
+import { startPollTimer } from '@/lib/poll-timer';
 import type { LivingFaceMood } from '@/lib/bot-face';
 import { ConnectionNotice } from './ConnectionNotice';
 
@@ -30,7 +31,7 @@ export function BotWorkStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let failures = 0;
     let disposed = false;
-    let timer: ReturnType<typeof setTimeout>;
+    let working = false;
     let controller: AbortController | undefined;
     async function poll() {
       const request = new AbortController();
@@ -39,6 +40,7 @@ export function BotWorkStateProvider({ children }: { children: ReactNode }) {
       try {
         const snapshot = await api('/api/bot-work/status', {signal: request.signal});
         const next = parseBotWorkStates(snapshot);
+        working = anyBotWorking(next);
         if (!disposed) {
           notice.current(snapshot);
           setStates(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
@@ -53,11 +55,14 @@ export function BotWorkStateProvider({ children }: { children: ReactNode }) {
         if (!disposed) setFailure(failureMessage(failures, request.signal.aborted, error));
       } finally {
         clearTimeout(timeout);
-        if (!disposed) timer = setTimeout(poll, Math.min(8000, 1000 * Math.max(1, failures)));
       }
     }
-    void poll();
-    return () => { disposed = true; clearTimeout(timer); controller?.abort(); };
+    const stop = startPollTimer({
+      run: poll,
+      delayMs: () => botWorkPollMs({ failures, working, hidden: false }),
+      hiddenDelayMs: () => botWorkPollMs({ failures, working, hidden: true })
+    });
+    return () => { disposed = true; stop(); controller?.abort(); };
   }, []);
   return <BotOverviewContext.Provider value={overview}><BotWorkContext.Provider value={states}>
     <ConnectionNotice className="bot-work-connection-notice" disconnected={Boolean(failure)} messageKey={failure} lastUpdatedAt={lastUpdatedAt} testId="bot-work-connection" />

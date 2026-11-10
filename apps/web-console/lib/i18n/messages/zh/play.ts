@@ -254,6 +254,8 @@ export const play = {
     replyFailed: '群成员本次回复失败，请检查成员模型或稍后重试。你可以继续发送消息。',
     stoppedByCostBudget: '这一轮达到了群的费用预算，已经停下，还没回复的成员不再回复。可以在群设置里调高或关闭费用预算，然后继续发送消息。',
     stoppedByToolBudget: '这一轮达到了群的工具调用上限，已经停下，还没回复的成员不再回复。可以在群设置里调高或关闭工具调用上限，然后继续发送消息。',
+    stoppedByCostBudgetNamed: '这一轮达到了群的费用预算，已经停下。没有回复的成员：{names}，这一轮不再回复。可以在群设置里调高或关闭费用预算，然后继续发送消息。',
+    stoppedByToolBudgetNamed: '这一轮达到了群的工具调用上限，已经停下。没有回复的成员：{names}，这一轮不再回复。可以在群设置里调高或关闭工具调用上限，然后继续发送消息。',
     create: '新建群聊',
     title: '群名称',
     titlePlaceholder: '给这个群起个名字',

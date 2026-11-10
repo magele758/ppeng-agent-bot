@@ -44,6 +44,8 @@ No Factory SSH UI. No Grok/Canvas clone.
 
 我看现在网页启动，请求太多了，把页面都卡半天，优化一下启动速度
 
+发现的问题都查一下和解决
+
 ## lab-startup-timing
 Lab 会话显示启动耗时
 

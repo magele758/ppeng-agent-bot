@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, pollApi } from '@/lib/api';
 import {
   activityRecordKey,
   armAutomaticRecap,
@@ -68,7 +68,7 @@ export function useSessionRecap(input: {
     const load = async () => {
       const ticket = ++generation;
       try {
-        const data = (await api('/api/session-recap/settings')) as {
+        const data = (await pollApi('/api/session-recap/settings')) as {
           settings?: { enabled?: boolean; active?: boolean };
         };
         if (cancelled || ticket !== generation) return;
