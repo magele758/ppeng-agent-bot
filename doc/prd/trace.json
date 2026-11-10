@@ -3768,6 +3768,13 @@
       ]
     },
     {
+      "id": "session-recap-model-routing",
+      "title": "会话回顾使用会话配置的模型",
+      "tests": [
+        "apps/daemon/test/session-recap-yield.test.ts"
+      ]
+    },
+    {
       "id": "session-restart-recovery-state-consistency",
       "title": "重启恢复发现的运行状态、审批衔接与未确认工具结果修复",
       "tests": [

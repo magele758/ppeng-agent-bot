@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { RawAgentRuntime, ResourceOwnerStore } from '@ppeng/agent-core';
+import { RawAgentRuntime, ResourceOwnerStore, upsertProvider } from '@ppeng/agent-core';
 import { Router } from '../dist/routing.js';
 import { buildRoutePolicy } from '../dist/access/policy.js';
 import { sessionRecapRoutes } from '../dist/routes/session-recap.js';
@@ -216,6 +216,55 @@ test('completed HTTP request body still permits recap generation and cache reuse
     assert.equal((runtime.getSession(sessionId)?.metadata.sessionRecap as {text:string}).text, result.text);
   } finally {
     await server.close();
+    await runtime.destroy();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('recap uses the selected conversation model [AC:session-recap-model-routing#AC-1]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'recap-model-'));
+  const models: string[] = [];
+  const provider = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    models.push(JSON.parse(Buffer.concat(chunks).toString()).model);
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ choices: [{ message: { content: '已汇总日报。' } }] }));
+  });
+  await new Promise<void>(resolve => provider.listen(0, '127.0.0.1', resolve));
+  const address = provider.address();
+  assert.ok(address && typeof address === 'object');
+  const runtime = new RawAgentRuntime({
+    repoRoot: dir, stateDir: join(dir, 'state'),
+    modelAdapter: {
+      name: 'unavailable', async summarizeMessages() { return ''; },
+      async completeText() { throw new Error('insufficient balance'); },
+      async runTurn() { return { stopReason: 'end' as const, assistantParts: [] }; }
+    }
+  });
+  const server = await listen(runtime);
+  try {
+    upsertProvider(runtime.store, {
+      id: 'reports', name: 'Reports', kind: 'openai-compatible', apiKey: 'test',
+      baseUrl: `http://127.0.0.1:${address.port}/v1`,
+      models: [{ id: 'daily', enabled: true }]
+    });
+    const id = runtime.openBot(runtime.createBot({ name: 'Reports' }).id).sessionId;
+    const session = runtime.getSession(id)!;
+    runtime.store.updateSession(id, { metadata: { ...session.metadata, modelOverride: { providerId: 'reports', modelId: 'daily' } } });
+    runtime.store.appendMessage(id, 'user', [{ type: 'text', text: '汇总日报' }]);
+    runtime.store.appendMessage(id, 'assistant', [{ type: 'text', text: '日报已汇总' }]);
+    const before = runtime.store.listMessages(id).length;
+    const response = await fetch(`http://127.0.0.1:${server.port}/api/sessions/${id}/recap`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ locale: 'zh' })
+    });
+    assert.equal((await response.json()).text, '已汇总日报。');
+    assert.deepEqual(models, ['daily']);
+    assert.equal(runtime.store.listMessages(id).length, before);
+  } finally {
+    await server.close();
+    provider.closeAllConnections();
+    await new Promise<void>(resolve => provider.close(() => resolve()));
     await runtime.destroy();
     rmSync(dir, { recursive: true, force: true });
   }

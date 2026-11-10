@@ -41,6 +41,11 @@
 
 我觉得像claude code的会话最后的recap挺好的，研究一下他的产品设计思路，以及他总计的内容是什么，以及他的产品逻辑，给当前项目也加上这个能力，来提升使用体验
 
+## session-recap-model-routing
+会话回顾使用会话配置的模型
+
+回顾会话的功能坏了
+
 ## session-restart-recovery-state-consistency
 重启恢复发现的运行状态、审批衔接与未确认工具结果修复
 
