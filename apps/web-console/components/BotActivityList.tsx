@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useLab } from '@/components/shell/LabProvider';
-import { api } from '@/lib/api';
+import { api, pollApi } from '@/lib/api';
+import { startPollTimer } from '@/lib/poll-timer';
+import { sessionPollPace } from '@/lib/session-activity';
 import { activityOpenSessionId, openBotActivitySession, parseBotActivityItems, type BotActivityItem } from '@/lib/bot-activity';
 import { useI18n } from '@/lib/i18n';
 import { routineStatusPresentation } from '@/lib/routine-status';
 
 const POLL_MS = 3000;
+const IDLE_POLL_MS = 6000;
 
 function startedLocale(locale: string): string {
   if (locale === 'zh') return 'zh-CN';
@@ -157,10 +160,10 @@ export function BotActivityList({ sessionId }: { sessionId: string }) {
   const [refreshing, setRefreshing] = useState(false);
   const ticket = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (read: typeof api = api) => {
     const current = ++ticket.current;
     try {
-      const data = await api(`/api/sessions/${encodeURIComponent(sessionId)}/activity`);
+      const data = await read(`/api/sessions/${encodeURIComponent(sessionId)}/activity`);
       if (current !== ticket.current) return;
       setItems(parseBotActivityItems(data));
       setError(false);
@@ -176,13 +179,12 @@ export function BotActivityList({ sessionId }: { sessionId: string }) {
     setLoaded(false);
     setItems([]);
     setError(false);
-    void load();
-    const timer = setInterval(() => void load(), POLL_MS);
+    const stop = startPollTimer({ run: () => load(pollApi), ...sessionPollPace(sessionId, POLL_MS, IDLE_POLL_MS) });
     return () => {
       ticket.current += 1;
-      clearInterval(timer);
+      stop();
     };
-  }, [load]);
+  }, [load, sessionId]);
 
   const refresh = () => {
     setRefreshing(true);

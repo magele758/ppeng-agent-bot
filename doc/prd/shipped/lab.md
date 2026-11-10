@@ -39,6 +39,13 @@ register new machines (id/label/kind), unregister, and refresh one machine.
 Show short attach hints for desktop-agent SSE and device-local SSE paths.
 No Factory SSH UI. No Grok/Canvas clone.
 
+## lab-startup-request-load
+控制台启动时的请求负担
+
+我看现在网页启动，请求太多了，把页面都卡半天，优化一下启动速度
+
+发现的问题都查一下和解决
+
 ## lab-startup-timing
 Lab 会话显示启动耗时
 

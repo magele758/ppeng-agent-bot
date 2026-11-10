@@ -48,6 +48,7 @@ import { assertWorkspaceBindingRefs } from './workspace.js';
 import { guardSession, listedSessions, wrapSessionIdRoutes } from '../session-guard.js';
 import { resolveSessionImagePath } from '../session-image.js';
 import { messageSearchRoutes } from './message-search.js';
+import { withoutRunLogs } from '../session-detail-view.js';
 
 function imageAssetIdsFromBody(body: Record<string, unknown>): string[] {
   if (!Array.isArray(body.imageAssetIds)) return [];
@@ -670,7 +671,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           ? [...messages].reverse().find(message => message.role === 'assistant')?.parts.filter(part => part.type === 'text').map(part => part.text).join('')
           : runtime.getLatestAssistantText(id);
         json(response, 200, {
-          session,
+          session: withoutRunLogs(session),
           task,
           messages,
           latestAssistant,

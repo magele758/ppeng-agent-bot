@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { SettingsGroup } from './ui';
@@ -9,6 +9,32 @@ interface RoomSettings {
   rosterCap: number;
   maxRoomMembers: number;
   maxWaveSpeakers: number;
+  defaultMaxToolCalls: number;
+  defaultMaxCostUsd: number;
+}
+
+function merged(current: RoomSettings | null, patch: Partial<RoomSettings>): RoomSettings | null {
+  return current ? { ...current, ...patch } : current;
+}
+
+/** Budgets a new group starts with. 0 leaves that budget off; each group can still set its own. */
+function NewRoomBudgetFields({ settings, busy, setSettings }: { settings: RoomSettings | null; busy: boolean; setSettings: Dispatch<SetStateAction<RoomSettings | null>> }) {
+  const { t } = useI18n();
+  const disabled = !settings || busy;
+  const onChange = (patch: Partial<RoomSettings>) => setSettings(current => merged(current, patch));
+  return (
+    <>
+      <p>{t('settings.roomCapacity.newRoomBudgets')}</p>
+      <label>
+        {t('settings.roomCapacity.defaultMaxCostUsd')}
+        <input data-testid="room-default-cost" type="number" min={0} max={1000} step={0.01} value={settings?.defaultMaxCostUsd ?? ''} disabled={disabled} onChange={event => onChange({ defaultMaxCostUsd: Number(event.target.value) })} />
+      </label>
+      <label>
+        {t('settings.roomCapacity.defaultMaxToolCalls')}
+        <input data-testid="room-default-tools" type="number" min={0} max={10000} value={settings?.defaultMaxToolCalls ?? ''} disabled={disabled} onChange={event => onChange({ defaultMaxToolCalls: Number(event.target.value) })} />
+      </label>
+    </>
+  );
 }
 
 export function RoomCapacitySettingsCard() {
@@ -57,6 +83,7 @@ export function RoomCapacitySettingsCard() {
           {t('settings.roomCapacity.maxWaveSpeakers')}
           <input data-testid="room-capacity-wave" type="number" min={1} max={10} value={settings?.maxWaveSpeakers ?? ''} disabled={!settings || busy} onChange={event => setSettings(current => current ? { ...current, maxWaveSpeakers: Number(event.target.value) } : current)} />
         </label>
+        <NewRoomBudgetFields settings={settings} busy={busy} setSettings={setSettings} />
         <button type="button" data-testid="room-capacity-save" disabled={!settings || busy} onClick={() => void save()}>{t('settings.roomCapacity.save')}</button>
         {status ? <p>{status}</p> : null}
       </SettingsGroup>

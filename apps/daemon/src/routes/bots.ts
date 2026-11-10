@@ -17,6 +17,7 @@ import {
 import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified } from '../http-utils.js';
 import { visibleBots } from '../access/visibility.js';
+import { withoutRunLogs } from '../session-detail-view.js';
 
 export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   return [
@@ -100,9 +101,10 @@ export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           requireParam('id'),
           auth.user ? { userId: auth.user.id, tenantId: auth.user.tenantId } : undefined
         );
+        const openedSession = runtime.getSession(opened.sessionId);
         json(response, 200, {
           bot: opened.bot,
-          session: runtime.getSession(opened.sessionId),
+          session: openedSession && withoutRunLogs(openedSession),
           createdSession: opened.createdSession
         });
       }

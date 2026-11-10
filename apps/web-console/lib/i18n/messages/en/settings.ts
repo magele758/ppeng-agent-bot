@@ -216,6 +216,9 @@ export const settings = {
     rosterCap: 'Roster cap',
     maxRoomMembers: 'Room member cap',
     maxWaveSpeakers: 'Speakers per round',
+    newRoomBudgets: 'Default budgets for new groups. 0 means off, which is the default. This only affects groups created later; change an existing group in its own settings.',
+    defaultMaxCostUsd: 'Default cost budget for new groups (USD per round)',
+    defaultMaxToolCalls: 'Default tool call limit for new groups (per round)',
     save: 'Save',
     saved: 'Saved',
     saveFailed: 'Could not save room size settings'

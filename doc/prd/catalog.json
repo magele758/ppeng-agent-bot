@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 423,
+    "implemented": 428,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1702,6 +1702,13 @@
       "file": "acceptance/group-active-header.yaml"
     },
     {
+      "id": "group-budget-stop-notice",
+      "title": "群聊顶部的失败提示写明是预算停下的",
+      "requirement": "这个怎么一直在显示",
+      "verificationStage": "software",
+      "file": "acceptance/group-budget-stop-notice.yaml"
+    },
+    {
       "id": "group-chat-settings-save",
       "title": "群聊设置改完可以保存",
       "requirement": "现在群聊的配置无法修改之后保存，修复一下这个问题",
@@ -1863,6 +1870,13 @@
       "file": "acceptance/lab-registered-machines.yaml"
     },
     {
+      "id": "lab-startup-request-load",
+      "title": "控制台启动时的请求负担",
+      "requirement": "我看现在网页启动，请求太多了，把页面都卡半天，优化一下启动速度\n\n发现的问题都查一下和解决",
+      "verificationStage": "software",
+      "file": "acceptance/lab-startup-request-load.yaml"
+    },
+    {
       "id": "lab-startup-timing",
       "title": "Lab 会话显示启动耗时",
       "requirement": "在 Lab 会话里显示启动耗时",
@@ -1973,6 +1987,13 @@
       "requirement": "先按你建议的顺序推进第一批：记忆删除抑制、严格预检、定时任务故障治理。按仓库的验收优先流程，先写验收标准给我确认。",
       "verificationStage": "software",
       "file": "acceptance/memory-deletion-suppression.yaml"
+    },
+    {
+      "id": "memory-read-source-unavailable",
+      "title": "读不到的记忆来源一轮只说明一次",
+      "requirement": "memory_read SOURCE_UNAVAILABLE must be surfaced once and not retried for the same source in that turn. Do not search logs. Do not weaken security denials.",
+      "verificationStage": "software",
+      "file": "acceptance/memory-read-source-unavailable.yaml"
     },
     {
       "id": "message-body-search",
@@ -2407,6 +2428,13 @@
       "requirement": "这种是什么？为什么会有这个提醒？算警告？给他先加个ui，然后分析下他警告的是否合理，我看这个最近挺频繁的",
       "verificationStage": "software",
       "file": "acceptance/risk-advisory-ui.yaml"
+    },
+    {
+      "id": "room-budgets-default-off",
+      "title": "群预算默认关闭，预算停下时写完的回复照常出现",
+      "requirement": "发现的问题都查一下和解决，群预算也都默认关闭",
+      "verificationStage": "software",
+      "file": "acceptance/room-budgets-default-off.yaml"
     },
     {
       "id": "room-task-collaboration",
@@ -2967,6 +2995,13 @@
       "requirement": "Ship UserVault product surface: vault_* assistant tools + Lab/product card fill UX aligned with Grok Vault reference-fill (uvref). This is product Vault entries, NOT SecretVault.",
       "verificationStage": "software",
       "file": "acceptance/user-vault-tools.yaml"
+    },
+    {
+      "id": "whole-reply-hover",
+      "title": "同一条 Bot 回复共享悬停操作",
+      "requirement": "hover到模型返回的内容，现在会显示 “会话时间” “纠错转评测” 和 “引用” 这个要针对模型的一次完整的返回段落去触发，不要一行行的去触发",
+      "verificationStage": "software",
+      "file": "acceptance/whole-reply-hover.yaml"
     }
   ],
   "pending": [

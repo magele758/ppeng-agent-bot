@@ -5,6 +5,11 @@
 
 这里还是太重了，添加、移除和成员列表放到群聊设置里，顶部只显示正在working的bot的icon和小名称即可
 
+## group-budget-stop-notice
+群聊顶部的失败提示写明是预算停下的
+
+这个怎么一直在显示
+
 ## group-chat-settings-save
 群聊设置改完可以保存
 

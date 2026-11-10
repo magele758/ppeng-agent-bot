@@ -1,0 +1,16 @@
+id: memory-read-source-unavailable
+title: 读不到的记忆来源一轮只说明一次
+status: implemented
+requirement: |
+  memory_read SOURCE_UNAVAILABLE must be surfaced once and not retried for the same source in that turn. Do not search logs. Do not weaken security denials.
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 这一轮里某条记忆来源读不到
+    when: 助手再次读取同一来源
+    then: 读不到的结果只说明一次，同一次回合不再执行第二次读取；换一条来源或下一轮仍可以读；已经读到的来源仍可按页继续读
+  - id: AC-2
+    given: 一条记忆存在，但当前身份无权查看，正文含有不应泄露的内容
+    when: 助手读取该来源，并在同一轮再次读取
+    then: 两次都拒绝，正文不出现在结果里，第二次不再访问存储

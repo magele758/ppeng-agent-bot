@@ -24,6 +24,7 @@ import { BotFace } from '../BotFace';
 import { useBotWorkStates } from '../bot-work/BotWorkState';
 import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
 import { groupComposerCommand, runGroupComposerCommand, groupMessageMood, roomComposerDisabled, roomHistoryUrl } from '@/lib/group-chat-view';
+import { roomTurnNotice } from '@/lib/room-turn-notice';
 import type { RoomModelConfiguration } from '@/lib/room-models';
 import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import { RoomWorkReceipt, type RoomWorkReceiptData } from './RoomWorkReceipt';
@@ -73,12 +74,12 @@ type RoomMessage = {
   sender: { type: 'user' | 'bot'; id: string; name: string };
 };
 
-type RoomTurn = CollaborationTurn & { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number; terminationReason?: string };
+type RoomTurn = CollaborationTurn & { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number; terminationReason?: string; postedBotIds?: string[] };
 
-function RoomReplyFailure({ turn }: { turn?: RoomTurn }) {
+function RoomReplyFailure({ turn, bots }: { turn?: RoomTurn; bots: readonly { id: string; name: string }[] }) {
   const { t } = useI18n();
-  if (turn?.status !== 'failed') return null;
-  return <p role="alert" className="play-group-error">{t('play.group.replyFailed')}</p>;
+  const notice = roomTurnNotice(turn, new Map(bots.map((bot) => [bot.id, bot.name])), t('play.group.nameSeparator'));
+  return notice ? <p role="alert" className="play-group-error">{t(notice.key, notice.params)}</p> : null;
 }
 
 function liveSpeakerId(turns: readonly RoomTurn[]): string {
@@ -583,7 +584,7 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
         </div>
       ) : null}
       {!showSettings && error ? <p className="play-group-error">{error}</p> : null}
-      <RoomReplyFailure turn={turns.at(-1)} />
+      <RoomReplyFailure turn={turns.at(-1)} bots={bots} />
       <RoomCollaborationHistory turns={turns} names={new Map(bots.map(bot => [bot.id, bot.name]))} />
       </div>
       <div className="chat-panel-body">

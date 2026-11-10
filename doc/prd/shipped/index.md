@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 423 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 428 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -494,11 +494,12 @@
 
 - `grok-local-history` Lab 只读查看本机 Grok Bot 会话
 
-## group（13）
+## group（14）
 
 需求正文见 [group](group.md)。
 
 - `group-active-header` 群聊顶部仅显示工作中的成员
+- `group-budget-stop-notice` 群聊顶部的失败提示写明是预算停下的
 - `group-chat-settings-save` 群聊设置改完可以保存
 - `group-chat-sidebar-placement` 群聊可置顶并可拖入功能分组
 - `group-chat-stable-layout` 群聊顶部状态更新和输入区布局
@@ -537,7 +538,7 @@
 
 - `knowledge-library-dirs` 本地资料目录进入知识库并可检索
 
-## lab（7）
+## lab（8）
 
 需求正文见 [lab](lab.md)。
 
@@ -547,6 +548,7 @@
 - `lab-library-pages` Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 - `lab-poll-crash-diagnostics` 轻量会话列表与客户端异常诊断
 - `lab-registered-machines` Lab Settings → Tools → Registered Machines panel
+- `lab-startup-request-load` 控制台启动时的请求负担
 - `lab-startup-timing` Lab 会话显示启动耗时
 
 ## lcu（2）
@@ -618,11 +620,12 @@
 
 - `mandatory-skill-gate` 高危面必须先加载对应技能
 
-## memory（1）
+## memory（2）
 
 需求正文见 [other](other.md)。
 
 - `memory-deletion-suppression` 删除记忆后阻止自动写回
+- `memory-read-source-unavailable` 读不到的记忆来源一轮只说明一次
 
 ## message（2）
 
@@ -847,10 +850,11 @@
 
 - `risk-advisory-ui` 对话里的运行策略提醒
 
-## room（1）
+## room（2）
 
 需求正文见 [other](other.md)。
 
+- `room-budgets-default-off` 群预算默认关闭，预算停下时写完的回复照常出现
 - `room-task-collaboration` 群聊临时负责人任务协作模式
 
 ## rotate（1）
@@ -1106,3 +1110,9 @@
 - `user-preference-sync` 用户长期偏好入库与迁移
 - `user-vault-ref-fill` User Vault reference fill (distinct from secret-vault)
 - `user-vault-tools` User Vault assistant tools and Lab reference-fill
+
+## whole（1）
+
+需求正文见 [other](other.md)。
+
+- `whole-reply-hover` 同一条 Bot 回复共享悬停操作

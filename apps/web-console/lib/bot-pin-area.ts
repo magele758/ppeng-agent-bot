@@ -1,5 +1,6 @@
 import { api } from './api.ts';
 import { createPinSync } from './bot-pin-sync.ts';
+import { createReadGate, type ReadGate } from './poll-timer.ts';
 import { botForCanonicalSession } from './bots.ts';
 import {
   BOT_PIN_STORAGE_KEY,
@@ -277,9 +278,26 @@ function queuePinSave(state: BotPinState): void {
   pendingPin = state;
   if (typeof window !== 'undefined') void syncPins();
 }
+const REMOTE_PIN_READ_MS = 15_000;
+let pinSyncUsers = 0;
+let pinSyncTimer: number | undefined;
+
+/** A queued local change goes out on the next check; other browsers' changes are read every 15 seconds. */
+function checkPins(gate: ReadGate): void {
+  if (gate.due(pendingPin !== null)) void syncPins();
+}
+
+/** Every pin list on the page shares one timer. */
 function startPinSync(): () => void {
   if (typeof window === 'undefined') return () => {};
-  void syncPins();
-  const timer = window.setInterval(() => void syncPins(), 3000);
-  return () => window.clearInterval(timer);
+  pinSyncUsers += 1;
+  if (pinSyncUsers === 1) {
+    const gate = createReadGate(REMOTE_PIN_READ_MS);
+    checkPins(gate);
+    pinSyncTimer = window.setInterval(() => checkPins(gate), 3000);
+  }
+  return () => {
+    pinSyncUsers -= 1;
+    if (pinSyncUsers === 0) window.clearInterval(pinSyncTimer);
+  };
 }

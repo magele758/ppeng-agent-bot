@@ -1,4 +1,5 @@
 import { usesDurableBotGoals } from '../bots/goals/runtime-host.js';
+import { runWithMemoryReadTurn } from '../tools/memory-read-turn.js';
 /**
  * L3 turn kernel: one session run (prepare → model → recovery → tools).
  * Behavior-preserving move of RawAgentRuntime._runSessionInner.
@@ -561,7 +562,7 @@ async function runSessionKernelWithWriterScope(
         const agent = host.store.getAgent(admittedSession.agentId);
         if (!agent) throw new NotFoundError('Agent', admittedSession.agentId);
         const resumeFromInterrupt = decision.action === 'resume_tools' ? decision.interrupt : undefined;
-        return await runSessionKernel(host, sessionId, { session: admittedSession, agent, controller, writerRunId, resumeFromInterrupt }, options, startup);
+        return await runWithMemoryReadTurn(() => runSessionKernel(host, sessionId, { session: admittedSession, agent, controller, writerRunId, resumeFromInterrupt }, options, startup));
       }
       finally {
         if (host.sessionAbortControllers?.get(sid) === controller) host.sessionAbortControllers.delete(sid);

@@ -8,7 +8,9 @@ export const FEED_OVERSCAN_PX = 480;
 export const FEED_FALLBACK_ROWS = 24;
 export const FEED_NEAR_TOP_PX = 64;
 
-export type FeedSlotKind = 'message' | 'approval' | 'stats' | 'optimistic' | 'stream' | 'typing' | 'trail' | 'child-task' | 'held' | 'brief-note';
+import type { ReplyRun } from './reply-hover-run';
+
+export type FeedSlotKind = 'message' | 'approval' | 'stats' | 'optimistic' | 'stream' | 'typing' | 'trail' | 'child-task' | 'held' | 'brief-note' | 'reply-run';
 
 export interface FeedSlot {
   key: string;
@@ -21,6 +23,7 @@ export interface FeedSlot {
   /** Folded process rows when the session is showing key information only. */
   briefCount?: number;
   folded?: FeedSlot[];
+  replyRun?: ReplyRun;
 }
 
 export interface SteerStreamPlacement {

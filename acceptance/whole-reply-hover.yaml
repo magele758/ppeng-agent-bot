@@ -1,0 +1,11 @@
+id: whole-reply-hover
+title: 同一条 Bot 回复共享悬停操作
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  hover到模型返回的内容，现在会显示 “会话时间” “纠错转评测” 和 “引用” 这个要针对模型的一次完整的返回段落去触发，不要一行行的去触发
+criteria:
+  - id: AC-1
+    given: Bot 对同一个问题分多段返回正文，随后又回答了下一个问题
+    when: 鼠标在前一个回答的不同段落之间移动并点击引用
+    then: 同一位置只出现一组时间、纠错和引用操作，引用包含本次回答的正文，不包含下一个回答

@@ -514,6 +514,11 @@ browser_navigate).
 
 先按你建议的顺序推进第一批：记忆删除抑制、严格预检、定时任务故障治理。按仓库的验收优先流程，先写验收标准给我确认。
 
+## memory-read-source-unavailable
+读不到的记忆来源一轮只说明一次
+
+memory_read SOURCE_UNAVAILABLE must be surfaced once and not retried for the same source in that turn. Do not search logs. Do not weaken security denials.
+
 ## message-body-search
 按消息正文搜索可见会话
 
@@ -829,6 +834,11 @@ Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk 
 
 这种是什么？为什么会有这个提醒？算警告？给他先加个ui，然后分析下他警告的是否合理，我看这个最近挺频繁的
 
+## room-budgets-default-off
+群预算默认关闭，预算停下时写完的回复照常出现
+
+发现的问题都查一下和解决，群预算也都默认关闭
+
 ## room-task-collaboration
 群聊临时负责人任务协作模式
 
@@ -1087,3 +1097,8 @@ Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk 
 
 上游模型服务出各种状况（输出被截断、连接中断、限流、卡住不动）时，
 用户看到的是准确的结果或明确的错误，不会把半截回答当成完整回答，也不会看到重复的文字。
+
+## whole-reply-hover
+同一条 Bot 回复共享悬停操作
+
+hover到模型返回的内容，现在会显示 “会话时间” “纠错转评测” 和 “引用” 这个要针对模型的一次完整的返回段落去触发，不要一行行的去触发
