@@ -1405,6 +1405,13 @@ Bot 桌面通知
 
 - `apps/web-console/components/BotChildTaskStreamEntry.test.ts`
 
+### bot-coaching-loop
+
+Bot 行为契约与有证据的经验沉淀
+
+- `apps/daemon/test/bot-coaching.test.ts`
+- `packages/core/test/bot-coaching.test.js`
+
 ### bot-completion-reliability
 
 完成验证可追溯与任务收尾可靠性

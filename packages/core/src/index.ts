@@ -1,3 +1,4 @@
+export * from './bots/bot-coaching.js';
 export { resolveSessionBotGoal, goalScope } from './bots/goals/runtime-host.js';
 /**
  * `@ppeng/agent-core` main entry — **whitelist only**.
