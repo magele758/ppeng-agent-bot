@@ -2812,6 +2812,13 @@
       ]
     },
     {
+      "id": "group-budget-stop-notice",
+      "title": "群聊顶部的失败提示写明是预算停下的",
+      "tests": [
+        "apps/web-console/lib/room-turn-notice.test.ts"
+      ]
+    },
+    {
       "id": "group-chat-settings-save",
       "title": "群聊设置改完可以保存",
       "tests": [

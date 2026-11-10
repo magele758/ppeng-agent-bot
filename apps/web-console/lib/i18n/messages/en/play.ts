@@ -250,6 +250,8 @@ export const play = {
 
   group: {
     replyFailed: 'A group member could not reply. Check its model or try again later. You can continue sending messages.',
+    stoppedByCostBudget: 'This round reached the group\'s cost budget and was stopped. Members who had not replied yet will not reply. Raise or turn off the cost budget in group settings, then continue sending messages.',
+    stoppedByToolBudget: 'This round reached the group\'s tool call limit and was stopped. Members who had not replied yet will not reply. Raise or turn off the tool call limit in group settings, then continue sending messages.',
     create: 'New group chat',
     title: 'Group name',
     titlePlaceholder: 'Name this group',

@@ -24,6 +24,7 @@ import { BotFace } from '../BotFace';
 import { useBotWorkStates } from '../bot-work/BotWorkState';
 import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
 import { groupComposerCommand, runGroupComposerCommand, groupMessageMood, roomComposerDisabled, roomHistoryUrl } from '@/lib/group-chat-view';
+import { roomTurnNoticeKey } from '@/lib/room-turn-notice';
 import type { RoomModelConfiguration } from '@/lib/room-models';
 import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import { RoomWorkReceipt, type RoomWorkReceiptData } from './RoomWorkReceipt';
@@ -77,8 +78,8 @@ type RoomTurn = CollaborationTurn & { id: string; status: string; botIds?: strin
 
 function RoomReplyFailure({ turn }: { turn?: RoomTurn }) {
   const { t } = useI18n();
-  if (turn?.status !== 'failed') return null;
-  return <p role="alert" className="play-group-error">{t('play.group.replyFailed')}</p>;
+  const key = roomTurnNoticeKey(turn);
+  return key ? <p role="alert" className="play-group-error">{t(key)}</p> : null;
 }
 
 function liveSpeakerId(turns: readonly RoomTurn[]): string {
