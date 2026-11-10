@@ -1509,6 +1509,13 @@ Bot 以高并发同时推进多件工作
 - `apps/daemon/test/bot-flow-projection.test.ts`
 - `apps/web-console/lib/bot-activity-flow.test.ts`
 
+### bot-followup-cache-prefix
+
+追问时复用上一轮已缓存的对话前缀
+
+- `packages/agent-loop/src/model/chat-cache-prefix.test.ts`
+- `packages/core/test/bot-followup-cache-prefix.test.js`
+
 ### bot-fork-sessions-in-detail
 
 Bot 子任务会话放进详情菜单
