@@ -1,0 +1,6 @@
+.bot-coaching { display: grid; gap: 12px; }
+.bot-coaching label { display: grid; gap: 4px; }
+.bot-coaching fieldset { min-width: 0; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border, #d8ded9); border-radius: 8px; }
+.bot-coaching input, .bot-coaching textarea, .bot-coaching select { width: 100%; box-sizing: border-box; }
+.bot-coaching ul { padding-inline-start: 20px; overflow-wrap: anywhere; }
+.bot-coaching button { justify-self: start; }

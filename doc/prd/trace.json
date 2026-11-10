@@ -1589,6 +1589,15 @@
       ]
     },
     {
+      "id": "bot-coaching-loop",
+      "title": "Bot 行为契约与有证据的经验沉淀",
+      "tests": [
+        "apps/daemon/test/bot-coaching.test.ts",
+        "packages/core/test/bot-coaching.test.js",
+        "packages/core/test/product-admin-tools.test.js"
+      ]
+    },
+    {
       "id": "bot-completion-reliability",
       "title": "完成验证可追溯与任务收尾可靠性",
       "tests": [

@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（136）
+## bot（137）
 
 需求正文见 [bot](bot.md)。
 
@@ -94,6 +94,7 @@
 - `bot-child-task-chat-entry` 普通会话列表里的 Bot 子任务入口
 - `bot-child-task-chip-fill` 子任务芯片有底色
 - `bot-child-task-stream-entry` 主对话流里的子任务入口
+- `bot-coaching-loop` Bot 行为契约与有证据的经验沉淀
 - `bot-completion-reliability` 完成验证可追溯与任务收尾可靠性
 - `bot-composer-next-hint` Bot 输入框推荐下一句
 - `bot-concurrent-subagents` Bot 并发工作时派生子代理，并允许子代理复用记忆与互助

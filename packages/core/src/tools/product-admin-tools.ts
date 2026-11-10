@@ -1,3 +1,4 @@
+import { BotCoachingService } from '../bots/bot-coaching.js';
 /**
  * Chat-bot control of product features the Lab already exposes:
  * bots, group chats, groups, sessions, settings, and related records.
@@ -331,6 +332,25 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
       async run(ctx, args) {
         const bot = managedBot(store, principalOf(store, ctx.session), str(args, 'bot'));
         return { bot: botView(store, bot) };
+      }
+    },
+    {
+      name: 'bot_coaching_get',
+      description: 'Read the current coaching contract and evidence ledger for a Bot you can manage. Use its revision when saving. Evidence checks are operator-reported, not proof inferred from a summary.',
+      properties: { bot: { type: 'string' } }, required: ['bot'], approval: 'never',
+      async run(ctx,args) {
+        const bot=managedBot(store,principalOf(store,ctx.session),str(args,'bot'));
+        return {coaching:new BotCoachingService(store).read(bot.id)};
+      }
+    },
+    {
+      name: 'bot_coaching_save',
+      description: 'Save an authorized Bot coaching contract using the revision from bot_coaching_get. profile: role, host, executor, completion, requiredSkills (up to four visible names/IDs). lessons: id, rule, source, status (candidate|verified|retired), checks [{scenario,outcome (passed|failed|blocked),evidence}]. Only verified lessons with a latest passing check enter runtime context. Checks are append-only. Retire old lessons instead of deleting history. Preserve the full existing ledger; do not promote based on an acknowledgement or change permissions to pass a test.',
+      properties: {bot:{type:'string'},revision:{type:'integer'},profile:{type:'object'},lessons:{type:'array',items:{type:'object'}}},
+      required: ['bot','revision','profile','lessons'], approval: 'auto', write: true,
+      async run(ctx,args) {
+        const bot=managedBot(store,principalOf(store,ctx.session),str(args,'bot'));
+        return {coaching:new BotCoachingService(store).save(bot.id,args.revision,args.profile,args.lessons)};
       }
     },
     {

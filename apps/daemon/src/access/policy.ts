@@ -184,6 +184,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/cron/runs/:id/publication', selfFiltered('cron-run')],
     ['GET /api/cron/settings', AUTHENTICATED],
     ['PATCH /api/cron/settings', ADMIN],
+    ['GET /api/bots/:id/coaching', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],
+    ['PUT /api/bots/:id/coaching', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],
     ['GET /api/bots/:id/connections', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],
     ['PUT /api/bots/:id/connections/:connectorId', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],
     ['DELETE /api/bots/:id/connections/:connectorId', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],
