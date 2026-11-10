@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 422 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 423 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（133）
+## bot（134）
 
 需求正文见 [bot](bot.md)。
 
@@ -204,6 +204,7 @@
 - `bot-source-trace-pairing` 跨会话原文召回与乱序工具回执
 - `bot-startup-summary-latency` 摘要服务变慢时 Bot 启动有界等待
 - `bot-startup-trace` Bot 启动耗时分段可观测
+- `bot-status-polling` 工作状态轮询区分慢响应和断线
 - `bot-steer-visible` Bot 对话里的实时插话马上出现在对话流
 - `bot-supervision-freshness` Bot 监督状态新鲜度与回复关联
 - `bot-switch-live-turn` 切换 Bot 后主画面离开上一场进行中的对话

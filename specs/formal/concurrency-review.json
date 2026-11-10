@@ -459,7 +459,7 @@
     "packages/core/src/stores/migrations/index.ts": "649da1e474ca54571d5b51d7b964825df96565db0c5945f4f5414688a2fecaef",
     "packages/core/src/approval/unattended-approval.ts": "74aff0a40282eaffa6a84610d4c0e2550f94eee268c99ea72f80b1b44879ebfd",
     "packages/core/test/unattended-approval-writer-scope.test.js": "23c17f903361bc53bbb0b7733eb4bf9147b4977c4dc546f800862cf2856b9371",
-    "packages/core/src/bots/bot-work.ts": "7404a11e5550f3c85524c09bc5cec6c4fa386ce09efaf5caa3dd3127042c826f",
+    "packages/core/src/bots/bot-work.ts": "41a18c2e5b1072a5fd728f06fb02ad07d70f33f60bb1e21e49e8626fddaa5709",
     "packages/core/src/runtime/subagent-policy.ts": "9d02a1c115e51b4e0bb02069439f4a4cf80aac673268178a12a5c28d0ac9d758",
     "packages/core/src/sandbox/model-isolation.ts": "4b706b09281996636c2949b0881769fe0c516ca90a1a2bc54acf5ce9f78e7eae",
     "packages/core/src/runtime/spawn-host.ts": "121ce355d9784f89594125094689b12b230304e0c7ce120c778070bd34d6c136",
