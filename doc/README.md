@@ -54,6 +54,7 @@ Bot 创建、统一设置面板、热配置的作用范围与生效时机见 [BO
 | [`ROADMAP.md`](ROADMAP.md) | 长期路线（P0–P4）；与实现以代码为准 |
 | [`CAPABILITY_DISCOVERY_PLAN.md`](CAPABILITY_DISCOVERY_PLAN.md) | 自主探针 / Capability Discovery（含 Tailscale 设备池）开发计划（Draft） |
 | [`bot/README.md`](bot/README.md) | Bot 统一入口产品说明：完整功能审阅稿、分章规则与每份规格的状态。改 Bot 行为时同步更新 |
+| [`bot/BOT_COACHING_PLAYBOOK.md`](bot/BOT_COACHING_PLAYBOOK.md) | Bot 调教完整流程、诊断与复测、证据沉淀和教练使用模板 |
 | [`BOT_CAPABILITY_PLAN.md`](BOT_CAPABILITY_PLAN.md) | Bot 名册 + canonical 对话；`/new` 压缩、`/stop`、`/model` |
 | [`BOT_DAYDREAM_PLAN.md`](BOT_DAYDREAM_PLAN.md) | 默认开启的每日复盘、Bot 私有沉淀、Super Bot 治理、共享检索与防递归闭环 |
 | [`BOT_MULTI_GOAL_DESIGN.md`](BOT_MULTI_GOAL_DESIGN.md) | 多目标持久化、插话归属、自动执行路由、等待恢复与 Lab 目标面板 |

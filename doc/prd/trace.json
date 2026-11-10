@@ -1607,6 +1607,13 @@
       ]
     },
     {
+      "id": "bot-coaching-playbook",
+      "title": "项目内置 Bot 调教流程",
+      "tests": [
+        "packages/core/test/bot-coaching-playbook.test.js"
+      ]
+    },
+    {
       "id": "bot-completion-reliability",
       "title": "完成验证可追溯与任务收尾可靠性",
       "tests": [
