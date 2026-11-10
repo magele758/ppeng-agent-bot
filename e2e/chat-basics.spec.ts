@@ -41,6 +41,7 @@ test.describe('Chat basics', () => {
     expect(res.headers()['content-type']).toContain('text/event-stream');
     const wire = await res.text();
     expect(wire).toContain('event: result');
+    expect(wire).toContain('"durableAssistantIds":true');
     expect(wire).toMatch(/"type":"assistant_saved","messageId":"[^"]+"/);
 
     const box = page.locator('#playMessages');

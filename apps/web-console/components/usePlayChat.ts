@@ -32,7 +32,7 @@ import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/spee
 import { collapseRepeatedLines } from '@/lib/collapse-repeated-lines';
 import { renderMarkdown } from '@/lib/markdown';
 import { stripVisibleClockMarks } from '@/lib/visible-clock';
-import { pendingStreamIdentity, applySavedStreamEvent, streamTailCanMerge, rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
+import { checkpointAfterModelDone, streamSupportsSavedIdentity, pendingStreamIdentity, applySavedStreamEvent, streamTailCanMerge, rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
 import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { shouldRefreshOpenSession, shouldResumeRunningTurn } from '@/lib/run-leave';
@@ -1762,6 +1762,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         type SseEventPayload = {
           type?: string;
           messageId?: string;
+          durableAssistantIds?: boolean;
           text?: string;
           message?: string;
           toolCallId?: string;
@@ -1801,6 +1802,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
     };
     const applySseSaved = (event: string, p: SseEventPayload) => {
+      streamIdentityEnabled = streamIdentityEnabled || streamSupportsSavedIdentity(event, p);
       if (!applySavedStreamEvent(event, p, segments)) return;
       streamIdentityEnabled = true;
       turnCheckpoint = streamCheckpoint(segments);
@@ -1819,7 +1821,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           retry = undefined;
           lastRetry = undefined;
           sync();
-          turnCheckpoint = streamCheckpoint(segments);
+          turnCheckpoint = checkpointAfterModelDone(segments, turnCheckpoint, streamIdentityEnabled);
           modelShotOpenRef.current = false;
           const split = steerSplitRef.current;
           if (split?.holdOpen) publishSteerSplit({ prefix: segments.length, holdOpen: false });

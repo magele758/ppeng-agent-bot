@@ -44,3 +44,16 @@ test('saved message identity closes a shot without swallowing the next identical
   rollbackToCheckpoint(segments,checkpoint);
   assert.deepEqual(segments.map(s=>s.id),['s1','s2','s3']);
 });
+
+test('a reconnect knows durable identity before its first shot and done is not a commit [AC:night-runtime-reliability#AC-2]',async()=>{
+ const {streamSupportsSavedIdentity,checkpointAfterModelDone,pendingStreamIdentity}=await import('./stream-segments.ts');
+ assert.equal(streamSupportsSavedIdentity('ready',{durableAssistantIds:true}),true);
+ assert.equal(streamSupportsSavedIdentity('model',{durableAssistantIds:true}),false);
+ const segments:StreamSegment[]=[];
+ const committed=streamCheckpoint(segments);
+ segments.push({kind:'text',id:'attempt',raw:'same',html:'same',...pendingStreamIdentity(true)});
+ assert.equal(checkpointAfterModelDone(segments,committed,true),committed);
+ assert.equal(checkpointAfterModelDone(segments,committed,false).count,1);
+ rollbackToCheckpoint(segments,checkpointAfterModelDone(segments,committed,true));
+ assert.deepEqual(segments,[]);
+});

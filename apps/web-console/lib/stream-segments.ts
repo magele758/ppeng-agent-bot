@@ -70,3 +70,11 @@ export function applySavedStreamEvent(event: string, payload: {type?: string; me
 export function pendingStreamIdentity(enabled: boolean): {messageId?: string} {
   return enabled ? {messageId: ''} : {};
 }
+
+export function streamSupportsSavedIdentity(event: string, payload: {durableAssistantIds?: boolean}): boolean {
+  return event === 'ready' && payload.durableAssistantIds === true;
+}
+
+export function checkpointAfterModelDone(segments: readonly StreamSegment[], committed: StreamCheckpoint, durable: boolean): StreamCheckpoint {
+  return durable ? committed : streamCheckpoint(segments);
+}
