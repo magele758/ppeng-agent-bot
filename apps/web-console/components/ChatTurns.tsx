@@ -1060,15 +1060,23 @@ function botRelayOf(props: Parameters<typeof ChatTurnFromMessage>[0]) {
   if (props.modelView) return null;
   return parseBotRelayMessage(normalizedRole(props.m), msgPartsToText(props.m.parts));
 }
-function compactCronName(message: ChatMessage, modelView?: boolean) {
+function compactCronPrompt(message: ChatMessage, modelView?: boolean) {
   if (modelView || normalizedRole(message) !== 'user') return null;
-  return parseCronUserPrompt(msgPartsToText(message.parts))?.name;
+  return parseCronUserPrompt(msgPartsToText(message.parts?.filter(part => part.type === 'text')));
+}
+function CronAttachments(props: Parameters<typeof ChatTurnFromMessage>[0]) {
+  return <>
+    <StructuredBubble parts={props.m.parts?.filter(part => part.type !== 'text') ?? []}
+      role="user" sessionId={props.sessionId ?? ''} msgIndex={props.msgIndex ?? 0}
+      toolCallsById={props.toolCallsById} resolvedCallIds={props.resolvedCallIds} />
+    <ComposerMessageContext role="user" message={props.m} />
+  </>;
 }
 export function ChatTurnIfVisible(props: Parameters<typeof ChatTurnFromMessage>[0]) {
   const continued = useContext(ContinuedAssistantContext);
   if (hiddenStoredMessage(props.m)) return null;
-  const cronName = compactCronName(props.m, props.modelView);
-  if (cronName) return <CronMessageTurn name={cronName}><ChatTurnFromMessage {...props} brief={false} /></CronMessageTurn>;
+  const cron = compactCronPrompt(props.m, props.modelView);
+  if (cron) return <CronMessageTurn {...cron}><CronAttachments {...props} /></CronMessageTurn>;
   const relay = botRelayOf(props);
   if (relay) return <BotRelayTurn relay={relay} />;
   return <ChatTurnFromMessage {...props} hideRoleLabel={continued.has(props.msgIndex ?? -1)} />;

@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 415 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 416 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -354,10 +354,11 @@
 
 - `create-menu-trigger-hit-area` 新增菜单展开后按钮仍可点击
 
-## cron（1）
+## cron（2）
 
 需求正文见 [other](other.md)。
 
+- `cron-detail-markdown` 定时任务详情直接阅读 Markdown
 - `cron-message-details` 聊天中的定时任务详情
 
 ## daydream（2）

@@ -215,6 +215,11 @@ No new RAW_AGENT_* feature flags. Acceptance-first, user asked to fix now, tests
 
 按你分析的优先级，把这七个问题完整修掉，补齐跨状态、跨执行入口和跨用户的回归测试，再审查一遍整个链路，没问题就提交 PR 合并。
 
+## cron-detail-markdown
+定时任务详情直接阅读 Markdown
+
+这个有点丑，markdown要能正确渲染，这个弹窗都是展示定时任务的内容，就不用额外套框了
+
 ## cron-message-details
 聊天中的定时任务详情
 

@@ -1,0 +1,10 @@
+id: cron-detail-markdown
+title: 定时任务详情直接阅读 Markdown
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: 这个有点丑，markdown要能正确渲染，这个弹窗都是展示定时任务的内容，就不用额外套框了
+criteria:
+  - id: AC-1
+    given: 聊天里的定时任务附有采集的 Markdown 摘录
+    when: 打开任务详情
+    then: 弹窗直接展示指令与资料，摘录中的标题、列表和表格正常排版
