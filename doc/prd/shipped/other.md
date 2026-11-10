@@ -834,6 +834,11 @@ Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk 
 
 这种是什么？为什么会有这个提醒？算警告？给他先加个ui，然后分析下他警告的是否合理，我看这个最近挺频繁的
 
+## room-budgets-default-off
+群预算默认关闭，预算停下时写完的回复照常出现
+
+发现的问题都查一下和解决，群预算也都默认关闭
+
 ## room-task-collaboration
 群聊临时负责人任务协作模式
 

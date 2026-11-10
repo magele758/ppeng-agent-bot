@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 427,
+    "implemented": 428,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2428,6 +2428,13 @@
       "requirement": "这种是什么？为什么会有这个提醒？算警告？给他先加个ui，然后分析下他警告的是否合理，我看这个最近挺频繁的",
       "verificationStage": "software",
       "file": "acceptance/risk-advisory-ui.yaml"
+    },
+    {
+      "id": "room-budgets-default-off",
+      "title": "群预算默认关闭，预算停下时写完的回复照常出现",
+      "requirement": "发现的问题都查一下和解决，群预算也都默认关闭",
+      "verificationStage": "software",
+      "file": "acceptance/room-budgets-default-off.yaml"
     },
     {
       "id": "room-task-collaboration",

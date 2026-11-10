@@ -155,6 +155,15 @@ test('成员列表、目标条和人数上限的中英文文案不同 [AC:bot-ro
   assert.match(capacity, /useI18n/);
 });
 
+test('新群的默认预算和群规模在同一张设置卡里保存，中英文都有说明 [AC:room-budgets-default-off#AC-5]', () => {
+  assert.match(capacity, /data-testid="room-default-cost"/);
+  assert.match(capacity, /data-testid="room-default-tools"/);
+  assert.match(capacity, /defaultMaxCostUsd: Number\(event\.target\.value\)/);
+  assert.match(capacity, /defaultMaxToolCalls: Number\(event\.target\.value\)/);
+  assert.match(zh.settings.roomCapacity.newRoomBudgets, /默认关闭/);
+  assert.match(en.settings.roomCapacity.newRoomBudgets, /0 means off/);
+});
+
 test('人数上限仍在原设置里保存，群聊不新占一级导航 [AC:bot-room-console#AC-5]', () => {
   assert.match(capacity, /data-testid="room-capacity-roster"/);
   assert.match(capacity, /data-testid="room-capacity-members"/);

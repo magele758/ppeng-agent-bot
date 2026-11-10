@@ -3193,6 +3193,14 @@ microVM 命令不会悄悄改在宿主机上跑
 - `apps/web-console/lib/risk-advisory.test.ts`
 - `e2e/risk-advisory.spec.ts`
 
+### room-budgets-default-off
+
+群预算默认关闭，预算停下时写完的回复照常出现
+
+- `apps/web-console/components/play-group/room-console.test.ts`
+- `apps/web-console/lib/room-turn-notice.test.ts`
+- `packages/core/test/bot-room-budget-default-off.test.js`
+
 ### rotate-page-share
 
 Rotate library page share links without deleting content
