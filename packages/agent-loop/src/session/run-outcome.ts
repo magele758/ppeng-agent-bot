@@ -56,93 +56,67 @@ export function buildRunOutcome(input: {
   return outcome;
 }
 
-/** Map an L4 end reason + resulting session status onto a single outcome. */
-export function runOutcomeFromEnd(input: {
+interface RunEndInput {
   reason: string;
   sessionStatus: string;
   failureStage?: FailureStage;
   rewind?: RunOutcomeRewind;
   /** Turn-limit stop whose forced last turn still answered. */
   answered?: boolean;
-}): RunOutcome {
-  const reason = input.reason;
-  const rewind = input.rewind;
-  const answered = input.answered;
-  if (reason === 'abort' || reason === 'closed' || reason === 'user_abort') {
-    return buildRunOutcome({
-      kind: 'aborted',
-      reason,
-      failureStage: input.failureStage ?? 'host',
-      rewind
-    });
+}
+
+const ABORT_REASONS = new Set(['abort', 'closed', 'user_abort']);
+const RECOVERY_REASONS = new Set([
+  'empty_assistant',
+  'empty_tool_calls',
+  'leaked_tool_call',
+  'truncated_tool_call',
+  'content_filter',
+  'repetition',
+  'reasoning_spin',
+  'loop_guard_critical',
+]);
+const TOOL_REASONS = new Set(['tool_loop', 'repeat_detection', 'missing_assistant']);
+/** Reasons that always mean a failed run, with the stage they point at. */
+const FAILED_REASON_STAGE = new Map<string, FailureStage>([['before_turn_blocked', 'host'], ['rewound', 'rewind']]);
+
+/** Outcome decided by the end reason alone; undefined when the session status decides. */
+function outcomeFromReason(input: RunEndInput): RunOutcome | undefined {
+  const { reason, rewind } = input;
+  if (ABORT_REASONS.has(reason)) {
+    return buildRunOutcome({ kind: 'aborted', reason, failureStage: input.failureStage ?? 'host', rewind });
   }
   if (reason === 'waiting_approval') {
-    return buildRunOutcome({
-      kind: 'waiting_approval',
-      reason,
-      failureStage: input.failureStage ?? 'approval',
-      rewind
-    });
+    return buildRunOutcome({ kind: 'waiting_approval', reason, failureStage: input.failureStage ?? 'approval', rewind });
   }
-  if (
-    reason === 'empty_assistant' ||
-    reason === 'empty_tool_calls' ||
-    reason === 'leaked_tool_call' ||
-    reason === 'truncated_tool_call' ||
-    reason === 'content_filter' ||
-    reason === 'repetition' ||
-    reason === 'reasoning_spin' ||
-    reason === 'loop_guard_critical'
-  ) {
-    return buildRunOutcome({
-      kind: input.sessionStatus === 'failed' ? 'failed' : 'idle',
-      reason,
-      failureStage: input.failureStage ?? 'recovery',
-      rewind
-    });
+  const stopped = input.sessionStatus === 'failed' ? 'failed' : 'idle';
+  if (RECOVERY_REASONS.has(reason)) {
+    return buildRunOutcome({ kind: stopped, reason, failureStage: input.failureStage ?? 'recovery', rewind });
   }
-  if (reason === 'tool_loop' || reason === 'repeat_detection' || reason === 'missing_assistant') {
-    return buildRunOutcome({
-      kind: input.sessionStatus === 'failed' ? 'failed' : 'idle',
-      reason,
-      failureStage: input.failureStage ?? (reason === 'missing_assistant' ? 'model' : 'tool'),
-      rewind
-    });
+  if (TOOL_REASONS.has(reason)) {
+    const stage = reason === 'missing_assistant' ? 'model' : 'tool';
+    return buildRunOutcome({ kind: stopped, reason, failureStage: input.failureStage ?? stage, rewind });
   }
-  if (reason === 'before_turn_blocked') {
-    return buildRunOutcome({
-      kind: 'failed',
-      reason,
-      failureStage: input.failureStage ?? 'host',
-      rewind
-    });
+  const failedStage = FAILED_REASON_STAGE.get(reason);
+  if (failedStage) {
+    return buildRunOutcome({ kind: 'failed', reason, failureStage: input.failureStage ?? failedStage, rewind });
   }
-  if (reason === 'rewound') {
-    return buildRunOutcome({
-      kind: 'failed',
-      reason,
-      failureStage: input.failureStage ?? 'rewind',
-      rewind
-    });
-  }
+  return undefined;
+}
+
+/** Map an L4 end reason + resulting session status onto a single outcome. */
+export function runOutcomeFromEnd(input: RunEndInput): RunOutcome {
+  const decided = outcomeFromReason(input);
+  if (decided) return decided;
+  const { reason, rewind, answered } = input;
   if (input.sessionStatus === 'failed') {
-    return buildRunOutcome({
-      kind: 'failed',
-      reason,
-      failureStage: input.failureStage ?? 'model',
-      rewind
-    });
+    return buildRunOutcome({ kind: 'failed', reason, failureStage: input.failureStage ?? 'model', rewind });
   }
   if (input.sessionStatus === 'completed') {
     return buildRunOutcome({ kind: 'completed', reason, rewind, answered });
   }
   if (input.sessionStatus === 'waiting_approval') {
-    return buildRunOutcome({
-      kind: 'waiting_approval',
-      reason,
-      failureStage: input.failureStage ?? 'approval',
-      rewind
-    });
+    return buildRunOutcome({ kind: 'waiting_approval', reason, failureStage: input.failureStage ?? 'approval', rewind });
   }
   return buildRunOutcome({ kind: 'idle', reason, rewind, answered });
 }
