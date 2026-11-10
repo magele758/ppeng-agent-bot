@@ -235,6 +235,19 @@ export const play = {
     reorder: 'Drag to reorder'
   },
 
+  messageSearch: {
+    label: 'Search conversation text',
+    placeholder: 'Search message text',
+    aria: 'Search conversation text',
+    empty: 'No matching conversations',
+    failed: 'Conversation search failed: {detail}',
+    unavailable: 'Conversation search is unavailable',
+    invalid: 'Conversation search results could not be read',
+    loading: 'Searching…',
+    untitled: 'Untitled session',
+    open: 'Open session {title}'
+  },
+
   group: {
     replyFailed: 'A group member could not reply. Check its model or try again later. You can continue sending messages.',
     create: 'New group chat',

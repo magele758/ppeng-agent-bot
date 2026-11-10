@@ -67,6 +67,7 @@ import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
 import { PlayBotGroupList, type SidebarRoom } from './play-group/PlayBotGroupList';
 import { GrokHistorySource } from './GrokHistorySource';
 import { SessionListRow } from './SessionListRow';
+import { MessageSearch } from './MessageSearch';
 import { BotGoals } from './bot-work/BotGoals';
 import { BotWorkSummary } from './bot-work/BotWorkSummary';
 import { BotFirstTask } from './bot-work/BotFirstTask';
@@ -1042,6 +1043,12 @@ export function PlayPanel({
       </div>
   );
 
+  const openSearchedSession = (sessionId: string) => {
+    setOpenGroupId(null);
+    setMobileSessionsOpen(false);
+    onSelectSession(sessionId);
+  };
+
   const renderPlaySidebar = () => (
         <aside className="play-sidebar" id="mobile-session-list" hidden={sidebarCollapsed && !mobileSessionsOpen}>
           <div className="play-sidebar__head" data-testid="session-toolbar" role="toolbar" aria-label={t('polish.toolbar')}>
@@ -1132,6 +1139,7 @@ export function PlayPanel({
               {sidebarCollapsed ? null : <PlaySidebarToggle collapsed={false} onToggle={togglePlaySidebar} />}
             </div>
           </div>
+          <MessageSearch onOpenSession={openSearchedSession} />
           {botRemoveError ? <p role="alert" className="play-group-error">{botRemoveError}</p> : null}
           <div className="play-sidebar__tools" hidden={!filterOpen && !sessionFilter}>
           {onSessionFilterChange && (filterOpen || sessionFilter) ? (

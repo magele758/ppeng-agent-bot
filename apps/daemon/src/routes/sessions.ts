@@ -47,6 +47,7 @@ import { steerRequestOptions } from '../steer-request.js';
 import { assertWorkspaceBindingRefs } from './workspace.js';
 import { guardSession, listedSessions, wrapSessionIdRoutes } from '../session-guard.js';
 import { resolveSessionImagePath } from '../session-image.js';
+import { messageSearchRoutes } from './message-search.js';
 
 function imageAssetIdsFromBody(body: Record<string, unknown>): string[] {
   if (!Array.isArray(body.imageAssetIds)) return [];
@@ -395,6 +396,7 @@ async function followSessionStream(
 
 export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   return wrapSessionIdRoutes(runtime, [
+    ...messageSearchRoutes(runtime),
     // GET /api/sessions  (ETag-conditional for cheap polling)
     {
       method: 'GET',

@@ -2701,6 +2701,18 @@ macOS 应用控制（外层宿主）
 - `e2e/first-batch-reliability.spec.ts`
 - `packages/core/test/memory-deletion-suppression.test.js`
 
+### message-body-search
+
+按消息正文搜索可见会话
+
+- `apps/daemon/test/message-search.test.ts`
+
+### message-search-ui
+
+对话页搜索消息正文
+
+- `apps/web-console/components/MessageSearch.render.test.ts`
+
 ### micro-compact-stub-wording
 
 微压缩占位只说明工具输出被省略
