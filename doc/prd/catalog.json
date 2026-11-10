@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 421,
+    "implemented": 422,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1707,6 +1707,13 @@
       "requirement": "用户指着会话列表里的群聊块（div.play-group-block，组件 PlayBotGroupList），例如「Jarvis 开发群」，说群组也要能拖拽到各个功能分组里，或者置顶。\n\n现在 Bot 可以拖到「置顶」，拖出置顶区可取消置顶，也可以进「功能分组」（开发、日常、研究、生活这类）。群聊是单独一块，拖不进去。\n\n要做成：\n- 群聊可以拖进置顶，和 Bot 一样。拖出置顶区就取消置顶。\n- 群聊可以拖进现有的功能分组，也可以在分组之间移动。拖进某个分组后，不要再在顶部单独的群聊块里重复出现。\n- 没放进分组、也没置顶的群聊，仍出现在原来的群聊位置。\n- 沿用 Bot 已有的拖拽和持久化，不要另做一套只存在前端内存里的排序。刷新后还在。不要新增 RAW_AGENT_*。\n- 文案若要改「把 Bot 拖出此区域可取消置顶」这类只写 Bot 的句子，改成也包含群聊，走 i18n，zh/en 同一套 key。\n- 不要改群聊回复、成员、置顶 Bot 的原有行为。会话列表的收起按钮留着。",
       "verificationStage": "software",
       "file": "acceptance/group-chat-sidebar-placement.yaml"
+    },
+    {
+      "id": "group-chat-stable-layout",
+      "title": "群聊顶部状态更新和输入区布局",
+      "requirement": "经常页面顶部会顶下来，导致页面跳动，这个是什么问题\n就这个元素，把这个做成浮层的不要占位\n发送按钮浮动到右侧，输入文本不要加边框",
+      "verificationStage": "software",
+      "file": "acceptance/group-chat-stable-layout.yaml"
     },
     {
       "id": "group-command-same-as-dm",

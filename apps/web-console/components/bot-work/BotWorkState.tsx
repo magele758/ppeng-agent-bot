@@ -48,7 +48,7 @@ export function BotWorkStateProvider({ children }: { children: ReactNode }) {
     return () => { disposed = true; clearTimeout(timer); controller?.abort(); };
   }, []);
   return <BotOverviewContext.Provider value={overview}><BotWorkContext.Provider value={states}>
-    <ConnectionNotice disconnected={disconnected} lastUpdatedAt={lastUpdatedAt} testId="bot-work-connection" />
+    <ConnectionNotice className="bot-work-connection-notice" disconnected={disconnected} lastUpdatedAt={lastUpdatedAt} testId="bot-work-connection" />
     {children}
   </BotWorkContext.Provider></BotOverviewContext.Provider>;
 }

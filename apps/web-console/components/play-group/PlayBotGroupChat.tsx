@@ -671,46 +671,48 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
               )}
             </ul>
           ) : null}
-          <textarea
-            ref={textareaRef}
-            value={text}
-            placeholder={t('play.group.placeholder')}
-            aria-label={t('play.group.placeholder')}
-            aria-autocomplete="list"
-            aria-controls="play-group-mentions"
-            aria-expanded={mentionOpen}
-            aria-activedescendant={mentionOpen && activeMention ? `play-group-mention-${activeMention.id}` : undefined}
-            disabled={!room || room.status !== 'active' || busy}
-            onChange={(event) => {
-              setText(event.target.value);
-              syncCaret(event.currentTarget);
-            }}
-            onClick={(event) => syncCaret(event.currentTarget)}
-            onKeyUp={(event) => {
-              if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === 'Escape') return;
-              syncCaret(event.currentTarget);
-            }}
-            onKeyDown={(event) => {
-              const command = groupComposerCommand(event.key, event.shiftKey, event.nativeEvent.isComposing || event.keyCode === 229, mentionOpen, mentionOptions.length, !!activeMention);
-              if (command === 'none') return;
-              event.preventDefault();
-              runGroupComposerCommand(command, {
-                next: () => setMentionIndex(index => (index + 1) % mentionOptions.length),
-                previous: () => setMentionIndex(index => (index - 1 + mentionOptions.length) % mentionOptions.length),
-                dismiss: () => setMentionDismissed(mentionKey),
-                choose: () => chooseMention(activeMention!.insert),
-                send: () => event.currentTarget.form?.requestSubmit()
-              });
-            }}
-          />
-          <button
-            type="submit"
-            className="btn btn-primary btn-sm"
-            data-testid="play-group-send"
-            disabled={roomComposerDisabled(room, busy, text, pendingContext.length > 0)}
-          >
-            {busy ? t('play.group.sending') : t('play.group.send')}
-          </button>
+          <div className="play-group-composer__row">
+            <textarea
+              ref={textareaRef}
+              value={text}
+              placeholder={t('play.group.placeholder')}
+              aria-label={t('play.group.placeholder')}
+              aria-autocomplete="list"
+              aria-controls="play-group-mentions"
+              aria-expanded={mentionOpen}
+              aria-activedescendant={mentionOpen && activeMention ? `play-group-mention-${activeMention.id}` : undefined}
+              disabled={!room || room.status !== 'active' || busy}
+              onChange={(event) => {
+                setText(event.target.value);
+                syncCaret(event.currentTarget);
+              }}
+              onClick={(event) => syncCaret(event.currentTarget)}
+              onKeyUp={(event) => {
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === 'Escape') return;
+                syncCaret(event.currentTarget);
+              }}
+              onKeyDown={(event) => {
+                const command = groupComposerCommand(event.key, event.shiftKey, event.nativeEvent.isComposing || event.keyCode === 229, mentionOpen, mentionOptions.length, !!activeMention);
+                if (command === 'none') return;
+                event.preventDefault();
+                runGroupComposerCommand(command, {
+                  next: () => setMentionIndex(index => (index + 1) % mentionOptions.length),
+                  previous: () => setMentionIndex(index => (index - 1 + mentionOptions.length) % mentionOptions.length),
+                  dismiss: () => setMentionDismissed(mentionKey),
+                  choose: () => chooseMention(activeMention!.insert),
+                  send: () => event.currentTarget.form?.requestSubmit()
+                });
+              }}
+            />
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              data-testid="play-group-send"
+              disabled={roomComposerDisabled(room, busy, text, pendingContext.length > 0)}
+            >
+              {busy ? t('play.group.sending') : t('play.group.send')}
+            </button>
+          </div>
         </form>
         </div>
         <ComposerNotice text={contextNotice} />
