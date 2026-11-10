@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 422,
+    "implemented": 423,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -993,6 +993,13 @@
       "requirement": "我觉得现在bot启动特别慢，在对应位置，打上日志或者trace分析，让我能分析找到具体慢的原因，分多个Agent去快速开发完成",
       "verificationStage": "software",
       "file": "acceptance/bot-startup-trace.yaml"
+    },
+    {
+      "id": "bot-status-polling",
+      "title": "工作状态轮询区分慢响应和断线",
+      "requirement": "再排查一下，为什么 Bot 工作状态会这么频繁地提示连接中断？看看是接口响应太慢还是真的断了，把原因也修一下。",
+      "verificationStage": "software",
+      "file": "acceptance/bot-status-polling.yaml"
     },
     {
       "id": "bot-steer-visible",

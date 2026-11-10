@@ -8,12 +8,13 @@ import {botRoomsRoutes} from '../../apps/daemon/dist/routes/bot-rooms.js';
 function runtime(){return new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'room-model-repo-')),stateDir:mkdtempSync(join(tmpdir(),'room-model-state-')),modelAdapter:{name:'test',async runTurn(){return {stopReason:'end',assistantParts:[]};},async summarizeMessages(){return '';}}});}
 async function get(rt,id,auth=ANONYMOUS_AUTH){let output;const response={setHeader(){},end(value){output=JSON.parse(value);}};await botRoomsRoutes(rt).find(r=>r.method==='GET'&&r.pattern==='/api/bot-rooms/:id').handler({response,auth,requireParam:()=>id});return output;}
 
-test('Room shows each member model source and updates the global default without changing a Bot pin [AC:global-default-model-clarity#AC-4]',async()=>{
+test('Room shows each member model source and updates the global default without changing a Bot pin [AC:global-default-model-clarity#AC-4] [AC:bot-status-polling#AC-1]',async()=>{
  const rt=runtime();try{
  const p=upsertProvider(rt.store,{name:'Test provider',kind:'openai-compatible',baseUrl:'https://models.invalid/v1',apiKey:'dummy-not-a-real-key',models:[{id:'first',enabled:true},{id:'second',enabled:true}]});
  const ref=modelId=>({providerId:p.id,modelId});setCatalogDefaultRef(rt.store,ref('first'));
  const a=rt.createBot({name:'DefaultBot'}),b=rt.createBot({name:'PinnedBot'});rt.updateBot(b.id,{modelOverride:ref('first')});
  const room=rt.rooms.create(resolveBotPrincipal(rt.store),{title:'Models',botIds:[a.id,b.id]});
+ rt.store.listSessions = () => assert.fail("loaded all sessions while polling room models");
  let data=await get(rt,room.id);
  assert.equal(data.models.defaultModel.modelId,'first');
  assert.equal(data.models.members.find(m=>m.botId===a.id).source,'global');

@@ -5,28 +5,31 @@ import { json } from '../http-utils.js';
 /** Snapshot actual execution, including room sessions and background tool processes.
  * Persisted task queues and stale running rows never imply live execution. */
 function liveBotWork(runtime: RawAgentRuntime, principal: ReturnType<typeof resolveBotPrincipal>, rows: unknown[]) {
- const pending = new Set(runtime.store.listApprovals({status:'pending'}).map(item => item.sessionId));
  const counts = new Map<string, number>();
- const sessions = new Map(runtime.store.listSessions().map(session => [session.id, session]));
  const ownedBot = (id: string, seen = new Set<string>()): string | undefined => {
   if (seen.has(id)) return undefined;
   seen.add(id);
-  const session = sessions.get(id);
+  const session = runtime.store.getSession(id);
   if (!session) return undefined;
   const owner = principalFromSession(runtime.store, session);
   if (owner.userId !== principal.userId || (owner.tenantId ?? '') !== (principal.tenantId ?? '')) return undefined;
   if (typeof session.metadata?.botId === 'string') return session.metadata.botId;
   return session.parentSessionId ? ownedBot(session.parentSessionId, seen) : undefined;
  };
- for (const session of sessions.values()) {
-  const botId = ownedBot(session.id);
-  if (botId && session.status === 'running' && !pending.has(session.id) && runtime.isSessionRunning(session.id)) {
-   counts.set(botId, (counts.get(botId) ?? 0) + 1);
-  }
+ const running = runtime.store.db.prepare(`
+  SELECT id FROM sessions WHERE status='running' AND id NOT IN
+  (SELECT session_id FROM approvals WHERE status='pending')
+ `).all() as {id:string}[];
+ const countSession = (id: string) => {
+  const botId = ownedBot(id);
+  if (botId) counts.set(botId, (counts.get(botId) ?? 0) + 1);
+ };
+ for (const {id} of running) {
+  if (runtime.isSessionRunning(id)) countSession(id);
  }
- for (const job of runtime.store.listBackgroundJobs()) {
-  const botId = ownedBot(job.sessionId);
-  if (botId && job.status === 'running' && runtime.isBackgroundJobRunning(job.id)) counts.set(botId, (counts.get(botId) ?? 0) + 1);
+ const jobs = runtime.store.db.prepare("SELECT id, session_id FROM background_jobs WHERE status='running'").all() as {id:string;session_id:string}[];
+ for (const job of jobs) {
+  if (runtime.isBackgroundJobRunning(job.id)) countSession(job.session_id);
  }
  return rows.map(value => {
   const row = value as {bot:{id:string}; control:{paused?:boolean;disabled?:boolean}};

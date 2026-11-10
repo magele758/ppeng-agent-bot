@@ -1803,6 +1803,14 @@ Bot 启动耗时分段可观测
 - `packages/core/test/bot-startup-prepare.test.ts`
 - `packages/core/test/bot-startup-wake.test.ts`
 
+### bot-status-polling
+
+工作状态轮询区分慢响应和断线
+
+- `e2e/bot-status-polling.spec.ts`
+- `scripts/test/bot-room-models.test.mjs`
+- `scripts/test/bot-work-routes.test.mjs`
+
 ### bot-supervision-freshness
 
 Bot 监督状态新鲜度与回复关联

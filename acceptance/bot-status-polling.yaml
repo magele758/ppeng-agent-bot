@@ -1,0 +1,14 @@
+id: bot-status-polling
+title: 工作状态轮询区分慢响应和断线
+status: implemented
+requirement: 再排查一下，为什么 Bot 工作状态会这么频繁地提示连接中断？看看是接口响应太慢还是真的断了，把原因也修一下。
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 多 Bot 群聊和大量已结束会话
+    when: 工作状态及群成员资料自动刷新
+    then: 不反复加载整库历史会话或后台任务，仍按用户显示准确的成员模型及活动计数
+  - id: AC-2
+    given: 已有一次有效的工作状态
+    when: 偶发超时、持续慢响应、服务返回错误或网络断开
+    then: 保留最后状态，单次抖动不弹提示，持续失败时区分超时、服务错误和网络故障，恢复后移除提示
