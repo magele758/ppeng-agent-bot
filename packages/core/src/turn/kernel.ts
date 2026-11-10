@@ -2126,7 +2126,11 @@ if (riskEngine) {
 const __gateSignal = __gate3();
 if (__gateSignal) return __gateSignal;
 }
-return undefined;
+return stopUnassignedGoalCheckpoint();
+}
+async function stopUnassignedGoalCheckpoint() {
+if (!results.some((row: { name?: string; metadata?: { retry?: unknown } }) => row.name === 'goal_checkpoint' && row.metadata?.retry === false)) return undefined;
+return kernelTurnSignal('return', await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'goal_checkpoint_unassigned'));
 }
 async function __gate10() {
 if (loopGuard) {

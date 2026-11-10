@@ -657,6 +657,34 @@ describe('runSessionKernel wiring', () => {
     expect(names).toEqual(['dyn_echo']);
   });
 
+  it('ends the run when goal_checkpoint says not to retry', async () => {
+    let modelCalls = 0;
+    const { host, session } = createHarness({
+      model: () => {
+        modelCalls += 1;
+        return toolResult('goal_checkpoint', `goal-${modelCalls}`);
+      },
+      host: {
+        maxTurnsPerRun: 4,
+        executeToolCalls: async (toolCalls) => toolCalls.map((call) => ({
+          toolCallId: call.toolCallId,
+          name: call.name,
+          ok: false,
+          content: 'No goal is assigned to this execution',
+          metadata: { retry: false },
+        })),
+      },
+    });
+    const out = await runSessionKernel(host, session.id);
+    expect(modelCalls).toBe(1);
+    expect(out.status).toBe('idle');
+    expect(out.metadata?.outcome).toMatchObject({ kind: 'idle', reason: 'goal_checkpoint_unassigned' });
+    const saved = host.store.foldMessages(session.id).flatMap((message) => message.parts).filter((part) => part.type === 'tool_result');
+    expect(saved).toEqual([
+      expect.objectContaining({ ok: false, name: 'goal_checkpoint', content: 'No goal is assigned to this execution' }),
+    ]);
+  });
+
   it('stops after a successful stopAt tool', async () => {
     let modelCalls = 0;
     const { host, session } = createHarness({
