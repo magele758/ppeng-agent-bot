@@ -1,3 +1,4 @@
+import { botCoachingRoutes } from './routes/bot-coaching.js';
 import { clientErrorRoutes } from './routes/client-errors.js';
 import { botDaydreamRoutes } from './routes/bot-daydream.js';
 import { userPreferenceRoutes } from './routes/user-preferences.js';
@@ -111,6 +112,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(sessionsRoutes(runtime))
     .addAll(composerHintRoutes(runtime))
     .addAll(botsRoutes(runtime))
+    .addAll(botCoachingRoutes(runtime))
     .addAll(botDaydreamRoutes(runtime))
     .addAll(botMaterialRoutes(runtime))
     .addAll(botFunctionalGroupRoutes(runtime))

@@ -225,6 +225,13 @@
       "file": "acceptance/bot-child-task-stream-entry.yaml"
     },
     {
+      "id": "bot-coaching-loop",
+      "title": "Bot 行为契约与有证据的经验沉淀",
+      "requirement": "然后你结合4090的调教经验，看看系统要新增什么能力，然后通过操作帮我把开发组里的几个bot都给我调教好，跟他们会话的内容，把他们配置好，然后测试下，看看是否能提升质量，结合这个调教过程，帮我优化一下bot的能力和沉淀链路",
+      "verificationStage": "software",
+      "file": "acceptance/bot-coaching-loop.yaml"
+    },
+    {
       "id": "bot-completion-reliability",
       "title": "完成验证可追溯与任务收尾可靠性",
       "requirement": "继续修复目标已完成却停在 queued、CSV 未保存和严格输出格式的问题，补齐完成判官的原始证据，不降低门禁标准，用当前 Grok 重跑新旧版本对照，通过测试和 review 后再合并 PR #251。",

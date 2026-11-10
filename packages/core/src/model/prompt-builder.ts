@@ -1,3 +1,5 @@
+import { coachingBotId } from '../bots/coaching-scope.js';
+import { BotCoachingService, applyCoachingSkills } from '../bots/bot-coaching.js';
 import { defaultSkillCandidates } from '../skills/default-skill-candidates.js';
 import { RUNTIME_CAPABILITIES_KEY, runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import { HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
@@ -710,6 +712,7 @@ export class PromptBuilder {
     let routing!: SkillRoutingResult;
     try {
       routing = await buildSkillRoutingCooperative(userText, defaultSkillCandidates(skills, [...(readAllowedSkillNames(ctx.session.metadata) ?? []), ...readBotSkillSelection(this.deps.store, sessionBotId(ctx.session.metadata)).ids]), { mode, topK, useFusion: config.fusion });
+      routing = applyCoachingSkills(routing, skills, new BotCoachingService(this.deps.store).read(coachingBotId(this.deps.store, ctx.session) ?? '').profile.requiredSkills ?? []);
       const shortlistCandidates = [
         ...routing.routed.map((r) => ({
           id: r.skill.id,

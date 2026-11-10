@@ -1,4 +1,5 @@
 'use client';
+import { BotCoachingPanel } from '../../BotCoachingPanel';
 import { BotOverviewInfo, revealBotSetting } from '../../BotOverviewInfo';
 import { BotGoals } from '../../bot-work/BotGoals';
 import { BotDaydreamTab, BotDaydreamPage } from '../../daydream/BotDaydream';
@@ -338,6 +339,7 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
       <BotDaydreamPage botId={bot.id} panelId={panelId} selected={detailTab}/>
       <div role="tabpanel" id={`${panelId}-page-overview`} aria-labelledby={`${panelId}-tab-overview`} hidden={detailTab !== 'overview'}>
       <BotOverviewInfo bot={bot} onSave={patchBot} />
+      <BotCoachingPanel key={bot.id} botId={bot.id} />
       <BotCronPanel key={bot.id} botId={bot.id} botName={bot.name} />
       <details className="bot-settings-disclosure"><summary>{t('botSettings.modelAndExecution')}</summary>
       <p className="ag-panel__lead">{t('botSettings.scope')}</p>

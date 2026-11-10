@@ -1,3 +1,5 @@
+import { coachingBotId } from './bots/coaching-scope.js';
+import { coachingInstructions } from './bots/bot-coaching.js';
 import { BOT_COMPRESSION_TIMEOUT_MS } from './session/compact-summary-deadline.js';
 import { WriterClaimError } from './session/writer-claim.js';
 import { DaydreamHost } from './runtime/daydream-host.js';
@@ -527,7 +529,7 @@ export class RawAgentRuntime {
       sharedSkills: id => this.daydream.sharedSkills(id),
       sharedMemory: (id, query) => this.daydream.sharedMemory(id, query),
       runtimeInstructions: (sessionId) =>
-        [this.computerUse?.instructionsForSession(sessionId) ?? '', this.connectors.instructionsForGranted(process.env)]
+        [coachingInstructions(this.store, coachingBotId(this.store, this.store.getSession(sessionId))), this.computerUse?.instructionsForSession(sessionId) ?? '', this.connectors.instructionsForGranted(process.env)]
           .filter(Boolean)
           .join('\n\n'),
     });
