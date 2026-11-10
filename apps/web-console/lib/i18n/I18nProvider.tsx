@@ -10,7 +10,7 @@ import {
 } from 'react';
 import {
   DEFAULT_LOCALE,
-  LOCALE_STORAGE_KEY,
+  readStoredLocale,
   localeHtmlLang,
   resolveLocale,
   writeStoredLocale,
@@ -51,7 +51,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const next = resolveLocale({
-      stored: window.localStorage.getItem(LOCALE_STORAGE_KEY),
+      stored: readStoredLocale(),
       navigatorLanguage: window.navigator.language
     });
     setLocaleState(next);

@@ -11,27 +11,29 @@ export function daydreamLocalTime(now: number, timezone: string): string {
 export function readDaydreamSettings(deps: DaydreamDeps, botId: string): DaydreamSettings {
   const key = `bot_daydream:${botId}`;
   const stored = deps.settingsStore.getDaemonControl(key) as Partial<DaydreamSettings> | undefined;
-  if (stored)
+  if (stored) {
+    if ('maxChunks' in stored) {
+      delete stored.maxChunks;
+      deps.settingsStore.setDaemonControl(key, stored);
+    }
     return stored as DaydreamSettings;
+  }
   const legacy = deps.settingsStore.getDaemonControl('memory_settings') as {
     dreamerEnabled?: boolean;
   } | undefined;
-  const initial: DaydreamSettings = { enabled: legacy?.dreamerEnabled !== false, timezone: deps.defaultTimezone ?? 'UTC', dailyAt: '03:00', memoryPolicy: 'auto', skillPolicy: 'propose', collaborationEnabled: true, maxChunks: 20, effectiveFrom: new Date(deps.now?.() ?? Date.now()).toISOString() };
+  const initial: DaydreamSettings = { enabled: legacy?.dreamerEnabled !== false, timezone: deps.defaultTimezone ?? 'UTC', dailyAt: '03:00', memoryPolicy: 'auto', skillPolicy: 'propose', collaborationEnabled: true, effectiveFrom: new Date(deps.now?.() ?? Date.now()).toISOString() };
   deps.settingsStore.setDaemonControl(key, initial);
   return initial;
 }
 export function updateDaydreamSettings(deps: DaydreamDeps, botId: string, patch: Partial<DaydreamSettings>): DaydreamSettings {
   const old = readDaydreamSettings(deps, botId);
   const next = { ...old, ...patch, effectiveFrom: old.effectiveFrom };
+  if ('maxChunks' in next) delete next.maxChunks;
   validateSettings(next);
   if (!old.enabled && next.enabled)
     next.effectiveFrom = new Date(deps.now?.() ?? Date.now()).toISOString();
   deps.settingsStore.setDaemonControl(`bot_daydream:${botId}`, next);
   return next;
-}
-function validateBudget(value: number): void {
-  if (!Number.isInteger(value) || value < 1 || value > 200)
-    throw new Error('Invalid chunk budget');
 }
 function validatePolicy(next: DaydreamSettings): void {
   if (!['auto', 'review'].includes(next.memoryPolicy) || !['propose', 'autoPrivate'].includes(next.skillPolicy))
@@ -44,5 +46,4 @@ function validateSettings(next: DaydreamSettings): void {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(next.dailyAt))
     throw new Error('Invalid daily time');
   validatePolicy(next);
-  validateBudget(next.maxChunks);
 }

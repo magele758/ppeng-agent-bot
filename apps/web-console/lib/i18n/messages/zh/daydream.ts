@@ -14,8 +14,6 @@ export const daydream = {
     dismissFeedback: "忽略反馈",
     resolved: "已处理",
     dismissed: "已忽略",
-    maxChunks: "每批分析分段上限",
-    maxChunksHelp: "限制每次手动复盘的分段数，同时限制自动复盘每天的累计分段数。未完成部分保留进度；这不是 token 或费用额度。",
     outputCount: "本次产生 {count} 项候选或沉淀结果",
     revoke: "撤销共享",
     revokeConfirm: "撤销后，接收 Bot 后续不能再加载此成果。继续撤销？",

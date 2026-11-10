@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 412 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 414 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -354,11 +354,12 @@
 
 - `create-menu-trigger-hit-area` 新增菜单展开后按钮仍可点击
 
-## daydream（1）
+## daydream（2）
 
 需求正文见 [other](other.md)。
 
 - `daydream-tick-cost` 每日复盘调度不能拖死 daemon
+- `daydream-unlimited-resume` 每日复盘移除额度并续跑
 
 ## default（1）
 
@@ -525,12 +526,13 @@
 
 - `knowledge-library-dirs` 本地资料目录进入知识库并可检索
 
-## lab（6）
+## lab（7）
 
 需求正文见 [lab](lab.md)。
 
 - `lab-auth-and-route-access` 控制台鉴权与接口访问隔离
 - `lab-auth-loading-recovery` 网页登录检查可恢复
+- `lab-bootstrap-retry` 工作台启动失败后恢复
 - `lab-library-pages` Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 - `lab-poll-crash-diagnostics` 轻量会话列表与客户端异常诊断
 - `lab-registered-machines` Lab Settings → Tools → Registered Machines panel

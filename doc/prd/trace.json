@@ -2534,6 +2534,13 @@
       ]
     },
     {
+      "id": "daydream-unlimited-resume",
+      "title": "每日复盘移除额度并续跑",
+      "tests": [
+        "packages/core/test/bot-daydream-local.test.js"
+      ]
+    },
+    {
       "id": "delete-page",
       "title": "Delete library pages and revoke public shares",
       "tests": [
@@ -2904,6 +2911,13 @@
       "title": "网页登录检查可恢复",
       "tests": [
         "e2e/bot-notices-auth.spec.ts"
+      ]
+    },
+    {
+      "id": "lab-bootstrap-retry",
+      "title": "工作台启动失败后恢复",
+      "tests": [
+        "e2e/lab-bootstrap-retry.spec.ts"
       ]
     },
     {

@@ -2235,6 +2235,12 @@ Lab connector authorization states and SecretVault grant
 
 - `packages/core/test/daydream-tick-cost.test.js`
 
+### daydream-unlimited-resume
+
+每日复盘移除额度并续跑
+
+- `packages/core/test/bot-daydream-local.test.js`
+
 ### delete-page
 
 Delete library pages and revoke public shares
@@ -2561,6 +2567,12 @@ Lab 只读查看本机 Grok Bot 会话
 网页登录检查可恢复
 
 - `e2e/bot-notices-auth.spec.ts`
+
+### lab-bootstrap-retry
+
+工作台启动失败后恢复
+
+- `e2e/lab-bootstrap-retry.spec.ts`
 
 ### lab-library-pages
 

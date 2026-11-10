@@ -220,6 +220,11 @@ No new RAW_AGENT_* feature flags. Acceptance-first, user asked to fix now, tests
 
 怎么我本地的bot都不显示了？赶紧看看可能是其他agent搞的
 
+## daydream-unlimited-resume
+每日复盘移除额度并续跑
+
+先把额度管理的能力去掉吧，以后有需要再加
+
 ## default-super-bot
 默认 Super Bot 的状态查看、派工与结果汇总
 
