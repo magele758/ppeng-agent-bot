@@ -114,7 +114,7 @@ Idempotency：同工具名+参数 hash 的已批准记录可复用（见 [03](03
 ### Grace
 
 - `RAW_AGENT_RECOVERY_ADVISORY_GRACE`（默认开）+ `RAW_AGENT_RECOVERY_ADVISORY_GRACE_BUDGET`（默认 1，上限 5）。
-- abort 且预算>0 → 注入 `[recovery-advisory] …`（`formatRecoveryAdvisory`），**当轮/下步继续**。
+- abort 且预算>0 → 注入 `[recovery-advisory] …`（`formatRecoveryAdvisory`），**当轮/下步继续**。提示要求先换策略（换工具、换输入、拆小步），只有确实只有用户能解决时才问用户；Risk 的 `[risk-advisory]` 同此。
 - **接线事实**：Grace 的 advise **直接 append system**，**不**走 `AdvisoryQueue`（与 Risk 不同）。
 
 ---

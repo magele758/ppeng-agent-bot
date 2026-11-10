@@ -336,6 +336,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/bots/:id/goals', selfFiltered('bot-goals')],
     ['PATCH /api/bots/:id/goals/settings', selfFiltered('bot-goals')],
     ['POST /api/bots/:id/goals/:goalId/actions', selfFiltered('bot-goals')],
+    ['GET /api/bot-finish/settings', AUTHENTICATED],
+    ['PATCH /api/bot-finish/settings', ADMIN],
     ['POST /api/client-errors', AUTHENTICATED],
     ['GET /api/user/preferences', selfFiltered('bot-functional-group')],
     ['PATCH /api/user/preferences', selfFiltered('bot-functional-group')],

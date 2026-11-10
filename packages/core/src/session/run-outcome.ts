@@ -3,6 +3,8 @@ export {
   runOutcomeFromEnd,
   parseRunOutcome,
   mergeOutcomeMetadata,
+  endedWithAnswer,
+  TURN_LIMIT_REASON,
   RUN_OUTCOME_METADATA_KEY
 } from '@ppeng/agent-loop/session';
 export type {

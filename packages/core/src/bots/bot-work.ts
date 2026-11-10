@@ -2,7 +2,7 @@ import { emitStartupPhase } from '../observability/startup-phase.js';
 import {botStatusSnapshots,compactTaskPage} from './bot-status-snapshot.js';
 import {createBotStatusRequestTools,expireQueuedStatusRequest} from './bot-status-requests.js';
 import { stampSessionWake, withApprovalWake } from '../approval/unattended-approval.js';
-import { mergeOutcomeMetadata, parseRunOutcome, runOutcomeFromEnd } from '../session/run-outcome.js';
+import { endedWithAnswer, mergeOutcomeMetadata, parseRunOutcome, runOutcomeFromEnd } from '../session/run-outcome.js';
 import { assistantTextsFromFold } from '../session/visible-assistant.js';
 import { retireTaskContextSources } from '../session/task-context.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
@@ -504,7 +504,7 @@ function processingStatus(context:ProcessingContext,result:string):ProcessingSta
   if(context.error||context.denied||context.session.status==='failed')return 'failed';
   if(context.unmetGoal)return 'failed';
   if(context.outcome?.kind==='failed')return 'failed';
-  if(context.outcome?.kind==='idle'&&context.outcome.reason!=='end')return 'failed';
+  if(context.outcome?.kind==='idle'&&!endedWithAnswer(context.outcome))return 'failed';
   if(context.taskId&&!result.trim())return 'failed';
   return 'completed';
 }

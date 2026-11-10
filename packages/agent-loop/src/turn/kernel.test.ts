@@ -1129,6 +1129,53 @@ describe('runSessionKernel wiring', () => {
     expect(last?.parts.some((p) => p.type === 'tool_call')).toBe(false);
   });
 
+  it('records a forced last-turn answer as a turn-limit end, not a normal end [AC:bot-finish-follow-through#AC-11]', async () => {
+    const outcomes: Array<{ outcome: string; reason?: unknown; answered?: unknown }> = [];
+    const gateTurns: Array<boolean | undefined> = [];
+    let calls = 0;
+    const { host, session } = createHarness({
+      model: () => {
+        calls += 1;
+        return calls === 1
+          ? toolResult('echo', 'c-first')
+          : { stopReason: 'end', finishReason: 'stop', assistantParts: [{ type: 'text', text: 'ran out of turns' }] };
+      },
+      host: {
+        maxTurnsPerRun: 2,
+        loopConfig: { forceAnswerOnLastTurn: true },
+        evaluateGoalGate: async ({ finalTurn }) => {
+          gateTurns.push(finalTurn);
+          return { met: true };
+        },
+        onSessionOutcome: (input) => {
+          outcomes.push({ outcome: input.outcome, reason: input.signals?.reason, answered: input.signals?.answered });
+        },
+      },
+    });
+    const out = await runSessionKernel(host, session.id);
+    expect(out.metadata?.outcome).toEqual({ kind: 'idle', reason: 'max_turns', answered: true });
+    expect(gateTurns).toEqual([true]);
+    expect(outcomes).toEqual([{ outcome: 'partial', reason: 'max_turns_exhausted', answered: true }]);
+  });
+
+  it('keeps a normal end as `end` and tells the goal gate it is not the last turn [AC:bot-finish-follow-through#AC-11]', async () => {
+    const gateTurns: Array<boolean | undefined> = [];
+    const { host, session } = createHarness({
+      model: () => ({ stopReason: 'end', finishReason: 'stop', assistantParts: [{ type: 'text', text: 'done' }] }),
+      host: {
+        maxTurnsPerRun: 5,
+        loopConfig: { forceAnswerOnLastTurn: true },
+        evaluateGoalGate: async ({ finalTurn }) => {
+          gateTurns.push(finalTurn);
+          return { met: true };
+        },
+      },
+    });
+    const out = await runSessionKernel(host, session.id);
+    expect(out.metadata?.outcome).toEqual({ kind: 'idle', reason: 'end' });
+    expect(gateTurns).toEqual([false]);
+  });
+
   it('emits onSessionOutcome partial for max_turns', async () => {
     const outcomes: Array<{ outcome: string; reason?: unknown }> = [];
     const { host, session } = createHarness({

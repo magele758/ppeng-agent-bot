@@ -491,6 +491,11 @@ export interface TurnKernelHost {
     agent: AgentSpec;
     signal?: AbortSignal;
     workspaceRoot?: string;
+    /**
+     * True on the forced last turn (tools closed by the turn limit). A
+     * `continue` answer cannot run another turn; the run ends as `max_turns`.
+     */
+    finalTurn?: boolean;
   }): Promise<{
     met: boolean;
     reason?: string;

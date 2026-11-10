@@ -96,6 +96,44 @@ turn 4: not met, progress=stalled    → close（连续 2 轮无进展）
 
 ---
 
+## Bot 对话的收尾检查
+
+`goalCondition` 这道闸只管普通会话。Bot 私聊走持久目标，软停时按下面的顺序检查，实现都在 `bots/goals/`，入口是 `runtime/l5-bindings.ts` 的 `evaluateGoalGate`。
+
+| 这一轮的情况 | 谁检查 | 结果 |
+|---|---|---|
+| 绑定了目标，直接执行 | `reviewDirectGoalBeforeEnd`（`runtime-host.ts`） | 判官说没做完就打回一次；轮数上限的最后一轮只记录结论 |
+| 绑定了目标，执行结束 | `settleGoalExecution` → `verifyCompletion` | 写回目标状态；因轮数上限结束且没被判完成的，回到排队，由调度器接着做，对话里出现一张「目标还在继续」的提示（`[goal-continuing]`） |
+| 没有目标 | `reviewUnboundFinish`（`finish-check.ts`） | 见下 |
+
+没有目标的一轮先看便宜的信号：回复里有没有「接下来我会…」「要不要我继续」「稍后汇报」这类说法，这一轮自己写的 `TodoWrite` 是否还有未完成项。会话里更早留下的待办不看。信号都没有就直接结束，不调用模型。有信号才问一次判官，结论三选一：
+
+- `continue`：承诺了没做，或在能自己决定的下一步上停下来问人。注入 `[finish check]` 让它继续。
+- `wake`：说了稍后汇报，而事情确实在别处跑着。有后台任务、`wait_for`、`cron_create` 或目标等待在跟进时什么都不做；都没有时登记一次到期唤醒（`finish-wake.ts`），trace 里记 `deferredWithoutWake: true`。
+- `stop`：答完了（附带的可选提议不算没做完），或确实需要用户登录、给凭证、确认不可逆操作，或用户要求先讨论。判官拿不准也归这里。
+
+边界：
+
+- 一轮最多打回 2 次（可在 Lab 改）。打回后没有新的工具调用就直接结束。
+- 等审批、`ask_user`、用户中止、预算用尽、轮数上限的最后一轮、recovery 中止都不进这项检查。
+- 判官出错或返回无法解析时重试一次，仍失败就放行，trace 里 `failOpen: true`。唯一的例外是这一轮自己的待办还没做完、回复里又没有问人或稍后汇报的说法，这时按待办继续。
+- 唤醒默认 10 分钟后第一次，之后间隔翻倍，同一件事最多 3 次。用户在到期前发了新消息，这次唤醒作废。
+
+「继续」和进度追问：对话里有 24 小时内动过的未完成目标、其后用户没有聊别的事时，`prepareGoalIntake` 把这条消息接到该目标上（`followup.ts`），这一轮由主对话直接执行它，结束时走上表第一、二行。目标正在执行或等待时只报告状态。暂停的目标只有明确说「继续」才恢复。没有未完成目标时说「继续」，不再反问是哪个目标。
+
+可查的记录：
+
+| trace kind | 内容 |
+|---|---|
+| `goal_intake` | 每条用户消息的分类、降级原因（`question_mark` / `self_contained` / `open_inquiry` / `conversation_request`）、接续到哪个目标 |
+| `goal_eval`（`source: bot_goal_completion` / `bot_goal_before_end`） | 目标完成判官的每次结论、理由、是否出错放行 |
+| `finish_check` | 无目标收尾检查的结论、理由、来源、是否出错放行、已打回次数、是否登记了唤醒 |
+| `finish_wake` | 唤醒触发或作废 |
+
+开关和上限在 Lab「设置 → Agent 行为 → Bot 收尾跟进」，存在 `bot_finish_settings`，保存后下一轮生效，没有对应的环境变量。
+
+---
+
 ## 验证与限制
 
 测试重点应是：无 `goalCondition` 时不介入、judge 返回非法 JSON 时 fail-open、达到 goal turn 上限时按决策器收尾、ledger metadata 可恢复。完成率和误否决率需要带任务集的 eval，不能从状态机代码推导。
@@ -111,5 +149,9 @@ turn 4: not met, progress=stalled    → close（连续 2 轮无进展）
 | `goal/parse-goal-eval.ts` | JSON 宽容解析 |
 | `goal/types.ts` | `goalCondition` 等 metadata key |
 | `runtime.ts`（完成路径） | gate 拦截点 + `completeText` 注入 |
+| `bots/goals/finish-check.ts` | Bot 无目标一轮的收尾检查 |
+| `bots/goals/finish-wake.ts` | 稍后汇报的到期唤醒 |
+| `bots/goals/followup.ts` | 「继续」与进度追问接续旧目标 |
+| `bots/goals/finish-settings.ts` | 上述三项的开关与上限 |
 | `types.ts` `ModelAdapter.completeText?` | 判官边 |
 | [16-runtime-governance.md](16-runtime-governance.md) | 与 LoopGuard/Risk 的正交关系 |

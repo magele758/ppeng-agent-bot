@@ -196,6 +196,6 @@ export function formatRiskAdvisory(signals: RiskSnapshot[]): string {
   return (
     `[risk-advisory]\n` +
     `Risk signals detected:\n${lines.join('\n')}\n` +
-    `Change strategy: try a different tool, smaller steps, or ask the user. Avoid repeating the failing pattern.`
+    `Change strategy first: try a different tool, different input, or smaller steps. Ask the user only when the blocker is something only they can resolve. Avoid repeating the failing pattern.`
   ).slice(0, 600);
 }

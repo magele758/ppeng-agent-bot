@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { RouteContext } from './routing.js';
 import { etagFromState, json, sendIfNotModified } from './http-utils.js';
 
-const META_KEYS = ['botId', 'canonicalBotChat', 'roomId', 'parentSessionId', 'spawnSource', 'botGoalWorker', 'sourceMessageId', 'subagentRole', 'userId', 'tenantId'];
+const META_KEYS = ['botId', 'canonicalBotChat', 'roomId', 'parentSessionId', 'spawnSource', 'botGoalWorker', 'sourceMessageId', 'subagentRole', 'userId', 'tenantId', 'favorited'];
 type ListSession = { id: string; title?: string; mode?: string; status?: string; agentId?: string; background?: boolean; createdAt?: string; updatedAt?: string; metadata?: Record<string, unknown> };
 export function sessionListSummary(session: ListSession) {
  const metadata = Object.fromEntries(META_KEYS.flatMap<[string, string | boolean]>(key => {

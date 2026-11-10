@@ -1502,12 +1502,29 @@ Bot 以高并发同时推进多件工作
 - `apps/web-console/lib/soft-bot-face.test.ts`
 - `packages/core/test/bots.test.js`
 
+### bot-finish-follow-through
+
+Bot 收尾时由运行时盯着做完
+
+- `apps/daemon/test/bot-finish-settings.test.ts`
+- `apps/web-console/lib/bot-finish.test.ts`
+- `packages/agent-loop/src/recovery/advisory-grace.test.ts`
+- `packages/agent-loop/src/turn/kernel.test.ts`
+- `packages/core/test/bot-finish-follow-through.test.js`
+
 ### bot-flow-read-projection
 
 工作流只接收展示所需的会话数据
 
 - `apps/daemon/test/bot-flow-projection.test.ts`
 - `apps/web-console/lib/bot-activity-flow.test.ts`
+
+### bot-followup-cache-prefix
+
+追问时复用上一轮已缓存的对话前缀
+
+- `packages/agent-loop/src/model/chat-cache-prefix.test.ts`
+- `packages/core/test/bot-followup-cache-prefix.test.js`
 
 ### bot-fork-sessions-in-detail
 
@@ -3345,6 +3362,14 @@ Secure Form fill-from-Vault
 - `scripts/test/harness-quality.test.mjs`
 - `scripts/test/session-eval-lift.test.mjs`
 - `scripts/test/session-eval-suites.test.mjs`
+
+### session-favorite
+
+当前会话一键收藏
+
+- `apps/daemon/test/session-favorite.test.ts`
+- `apps/web-console/components/SessionFavorite.test.ts`
+- `apps/web-console/lib/session-favorite.test.ts`
 
 ### session-lifecycle-state-consistency
 
