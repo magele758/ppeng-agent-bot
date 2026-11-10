@@ -1,3 +1,4 @@
+import {sanitizeSpawnEnv} from './command-env.mjs';
 import {updateMaterialTargets} from './material-source-isolation.mjs';
 import {transition} from './cube-transition.mjs';
 import fs from 'node:fs';
@@ -30,7 +31,7 @@ async function supply(name,material){
  if(job.metadata.deliveryPolicy?.inputSources===facts&&job.prompt===prompt)return;
  await api('cron/jobs/'+job.id,{prompt,deliveryPolicy:{changesOnly:true,approvalBeforeSend:false,failureThreshold:1,...job.metadata.deliveryPolicy,inputSources:facts}},'PATCH');
 }
-async function command(cmd,args){try{const r=await run(cmd,args,{timeout:9000,maxBuffer:8192});return {ok:true,text:r.stdout.trim()};}catch{return {ok:false,text:''};}}
+async function command(cmd,args){try{const r=await run(cmd,args,{timeout:9000,maxBuffer:8192,env:sanitizeSpawnEnv()});return {ok:true,text:r.stdout.trim()};}catch{return {ok:false,text:''};}}
 const file=path.join(dir,'cube-state.json');
 function save(file,o){fs.writeFileSync(file+'.tmp',JSON.stringify(o,null,2),{mode:0o600});fs.renameSync(file+'.tmp',file);}
 async function cube(){
