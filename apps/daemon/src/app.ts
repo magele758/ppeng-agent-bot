@@ -10,6 +10,7 @@ import { botRoomsRoutes } from './routes/bot-rooms.js';
 import { botFunctionalGroupRoutes } from './routes/bot-functional-groups.js';
 import { botWorkRoutes } from './routes/bot-work.js';
 import { botGoalsRoutes } from './routes/bot-goals.js';
+import { botFinishRoutes } from './routes/bot-finish.js';
 import { botHistoryRoutes } from './routes/bot-history.js';
 import { computerUseRoutes } from './routes/computer-use.js';
 import { appControlRoutes } from './routes/app-control.js';
@@ -118,6 +119,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(clientErrorRoutes(runtime))
     .addAll(botWorkRoutes(runtime))
     .addAll(botGoalsRoutes(runtime))
+    .addAll(botFinishRoutes(runtime))
     .addAll(botRoomsRoutes(runtime))
     .addAll(factoryRoutes(runtime))
     .addAll(botHistoryRoutes(runtime))

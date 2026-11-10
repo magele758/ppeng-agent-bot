@@ -20,6 +20,8 @@ import { createRoomRetrievalTools } from './rooms/room-retrieval-tools.js';
 import { recordRetrieved } from './rooms/touched-memory.js';
 import { prepareGoalIntake, goalExecutionTask, bindGoalExecution, settleGoalExecution, createGoalCheckpointTool, goalScope, goalWorkKind, type GoalRuntimeHost } from './bots/goals/runtime-host.js';
 import { clearQueryOutputReview } from './bots/strict-output.js';
+import { clearFinishRun, noteFinishRunStart } from './bots/goals/finish-check.js';
+import { tickFinishWakes } from './bots/goals/finish-wake.js';
 import { tickBotGoals } from './bots/goals/scheduler.js';
 import { createRuntimeGoalDispatchTool } from './bots/goals/runtime-dispatch.js';
 import { observeGoalBudget } from './bots/goals/budget.js';
@@ -1621,6 +1623,7 @@ export class RawAgentRuntime {
     await this.factory.tick().catch(error => this.log.warn('Factory scheduler failed', {error:String(error)}));
     await tickBotWork(this.botWorkRuntimeHost());
     await tickBotGoals(this.goalRuntimeHost());
+    tickFinishWakes(this.goalRuntimeHost());
     await this.rooms.tick().catch((error) => this.log.warn('Room scheduler failed', { error: String(error) }));
     await runSchedulerFn(schedulerFrom(this.l5()));
     await this.drainHumanContinuations();
@@ -2082,6 +2085,7 @@ export class RawAgentRuntime {
       this.log.info(`runSession kernel=${kernelVariant} assembly=${assemblyPreset}`);
       const runController = new AbortController();
       this.sessionAbortControllers.set(sessionId, runController);
+      if (parked?.metadata.canonicalBotChat === true) noteFinishRunStart(this.store, sessionId);
       const unlinkCallerSignal = this.cancelOnAbort(sessionId, callerSignal);
       const coreHost = bindTurnKernelHost(this.l5());
       const sessionMaxTurns = resolveSessionMaxTurns(
@@ -2162,6 +2166,7 @@ export class RawAgentRuntime {
         if (this.sessionAbortControllers.get(sessionId) === runController) {
           this.sessionAbortControllers.delete(sessionId);
           clearQueryOutputReview(this.store, sessionId);
+          clearFinishRun(this.store, sessionId);
         }
         this.runningSessions.delete(sessionId);
         clearActiveWorkPiece(sessionId);

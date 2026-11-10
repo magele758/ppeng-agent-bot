@@ -39,6 +39,7 @@ import { turnStartTraceData } from './turn-start-trace.js';
 import {
   mergeOutcomeMetadata,
   runOutcomeFromEnd,
+  TURN_LIMIT_REASON,
   type RunOutcome,
   type RunOutcomeRewind,
 } from '../session/run-outcome.js';
@@ -420,9 +421,10 @@ async function runSessionKernel(
   const persistOutcome = (
     record: SessionRecord,
     reason: string,
-    rewind?: RunOutcomeRewind
+    rewind?: RunOutcomeRewind,
+    answered?: boolean
   ): { record: SessionRecord; outcome: RunOutcome } => {
-    const outcome = runOutcomeFromEnd({ reason, sessionStatus: record.status, rewind });
+    const outcome = runOutcomeFromEnd({ reason, sessionStatus: record.status, rewind, answered });
     const next = host.store.updateSession(record.id, {
       metadata: mergeOutcomeMetadata(record.metadata ?? {}, outcome),
     });
@@ -484,10 +486,10 @@ async function runSessionKernel(
     return next;
   };
 
-  const finishEnded = async (record: SessionRecord, reason: string) => {
+  const finishEnded = async (record: SessionRecord, reason: string, answered?: boolean) => {
     emitKernelReady(startup);
     await endRunTx(reason);
-    const { record: next, outcome } = persistOutcome(record, reason);
+    const { record: next, outcome } = persistOutcome(record, reason, undefined, answered);
     void host.emitTrace(next.id, {
       kind: 'turn_end',
       data: { terminal: true, reason, outcome },
@@ -1725,6 +1727,7 @@ goal = await host.evaluateGoalGate?.({
           agent,
           signal,
           workspaceRoot: workspaceRoot ?? host.repoRoot,
+          finalTurn: lastTurn === true,
         });
 return undefined;
 }
@@ -1752,13 +1755,22 @@ return undefined;
 }
 async function __gate94() {
 if (steeredNow.length > 0) return kernelTurnSignal('continue');
-host.onSessionOutcome?.({
-          sessionId: session.id,
-          agentId: agent.id,
-          outcome: 'success',
-        });
+// The forced last turn answers because the turn limit closed the tools, not
+// because the work ended. Record that limit as the reason.
+host.onSessionOutcome?.(lastTurn
+          ? {
+              sessionId: session.id,
+              agentId: agent.id,
+              outcome: 'partial',
+              signals: { reason: 'max_turns_exhausted', maxTurns, answered: true },
+            }
+          : {
+              sessionId: session.id,
+              agentId: agent.id,
+              outcome: 'success',
+            });
 return kernelTurnSignal('return', await host.handleTurnCompletion(session, agent).then((completed) =>
-          finishEnded(completed, 'end')
+          lastTurn ? finishEnded(completed, TURN_LIMIT_REASON, true) : finishEnded(completed, 'end')
         ));
 return undefined;
 }
@@ -2100,7 +2112,7 @@ if (kernelFinished !== undefined) return kernelFinished as SessionRecord;
     });
     return await finishEnded(
       host.store.updateSession(session.id, { status: 'idle' }),
-      'max_turns'
+      TURN_LIMIT_REASON
     );
   } catch (err) {
     emitKernelReady(startup);

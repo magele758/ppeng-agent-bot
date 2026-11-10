@@ -3,6 +3,7 @@ import type {SqliteStateStore} from '../storage.js';
 import {botPrincipalKey,principalFromSession} from '../bots/bot-identity.js';
 import {getBotTask} from '../bots/bot-work.js';
 import type {Observation,WaitSource} from './types.js';
+import {endedWithAnswer,parseRunOutcome} from '../session/run-outcome.js';
 const registries=new WeakMap<SqliteStateStore,Map<string,WaitSource>>();
 const denied=():Observation=>({availability:'unauthorized',reason:'Resource is not authorized for this execution'});
 const unavailable=():Observation=>({availability:'unavailable',reason:'Resource is unavailable'});
@@ -14,8 +15,8 @@ function builtins():Map<string,WaitSource>{return new Map([
   const seen=new Set<string>();let ancestor=target.parentSessionId;
   while(ancestor&&ancestor!==scope.id&&!seen.has(ancestor)){seen.add(ancestor);ancestor=store.getSession(ancestor)?.parentSessionId;}
   if(ancestor!==scope.id)return denied();
-  const outcome=target.metadata.outcome as {kind?:string;reason?:string}|undefined;
-  const status=target.status==='idle'&&(outcome?.kind==='completed'||outcome?.kind==='idle'&&outcome.reason==='end')?'completed':outcome?.kind==='aborted'?'cancelled':target.status;
+  const outcome=parseRunOutcome(target.metadata.outcome);
+  const status=target.status==='idle'&&(outcome?.kind==='completed'||outcome?.kind==='idle'&&endedWithAnswer(outcome))?'completed':outcome?.kind==='aborted'?'cancelled':target.status;
   return {availability:'available',facts:{status,version:target.updatedAt}};
  }}],
  ['bot_task',{fields:['status','attempt','version'],observe({store,scope},ref){

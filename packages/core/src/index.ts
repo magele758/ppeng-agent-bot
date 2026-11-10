@@ -53,6 +53,7 @@ export type { FactoryMachine, FactoryTask, FactorySettings, FactoryTransport } f
 export type { DevelopmentPolicy, DevelopmentSpec, DevelopmentState, DevelopmentPreflight } from './factory/development-types.js';
 export { BotGoalService } from './bots/goals/service.js';
 export type { BotGoal, GoalSettings, GoalReport } from './bots/goals/types.js';
+export { DEFAULT_BOT_FINISH_SETTINGS, readBotFinishSettings, writeBotFinishSettings, type BotFinishSettings } from './bots/goals/finish-settings.js';
 
 export { updateTaskContract, contractAppendix, type TaskContract } from './session/task-contract.js';
 

@@ -4,6 +4,7 @@ import { ThinkingEffortSettingsCard } from '../../../ThinkingEffortSettingsCard'
 import { InputSuggestionSettingsCard } from '../../../InputSuggestionSettingsCard';
 import { SessionRecapSettingsCard } from '../../../SessionRecapSettingsCard';
 import { GoalSettingsCard } from '../../../GoalSettingsCard';
+import { BotFinishSettingsCard } from '../../../BotFinishSettingsCard';
 import { DeliveryQuietHoursSettingsCard } from '../../../DeliveryQuietHoursSettingsCard';
 import { BotLimits } from '../../../bot-work/BotLimits';
 import type { SettingsEntry } from '../registry';
@@ -57,6 +58,13 @@ export const behaviorEntries: SettingsEntry[] = [
     titleKey: 'settingsEntries.goal.title',
     keywordsKey: 'settingsEntries.goal.keywords',
     render: () => <GoalSettingsCard />
+  },
+  {
+    id: 'botFinish',
+    category: 'behavior',
+    titleKey: 'settingsEntries.botFinish.title',
+    keywordsKey: 'settingsEntries.botFinish.keywords',
+    render: () => <BotFinishSettingsCard />
   },
   {
     id: 'deliveryQuietHours',

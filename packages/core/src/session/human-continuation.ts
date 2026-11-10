@@ -4,7 +4,7 @@ import { checkBotWorkCapacity } from '../bots/bot-work.js';
 import { principalFromSession } from '../bots/bot-identity.js';
 import { INBOX_OVERFLOW_KEY } from './inbox-overflow.js';
 import type { InboxItem } from './step-inbox.js';
-import { parseRunOutcome } from './run-outcome.js';
+import { endedWithAnswer, parseRunOutcome } from './run-outcome.js';
 
 const PREFIX='session.humanContinuation:';
 interface HumanRequest { id:string; seq:number; kind?:'steer'; text?:string; role?:string; key?:string; summaryId?:string; summarySeqFloor?:number; deliveryKey?:string; deliverySeqFloor?:number; }
@@ -114,7 +114,7 @@ export function hasHumanContinuationLease(store:SqliteStateStore,sessionId:strin
 function cleanIdle(store:SqliteStateStore,id:string):boolean {
  const session=store.getSession(id);if(!session||session.status!=='idle'||session.activeWriterRunId)return false;
  const outcome=parseRunOutcome(session.metadata.outcome);
- if(outcome&&(!(outcome.kind==='idle'||outcome.kind==='completed')||outcome.reason!=='end'))return false;
+ if(outcome&&(!(outcome.kind==='idle'||outcome.kind==='completed')||!endedWithAnswer(outcome)))return false;
  return !store.db.prepare("SELECT 1 FROM approvals WHERE session_id=? AND status='pending' LIMIT 1").get(id);
 }
 function candidates(store:SqliteStateStore):string[]{
@@ -190,15 +190,15 @@ export function unansweredHumanWork(store: SqliteStateStore, sessionId: string, 
 function continuationBlocked(store: SqliteStateStore, sessionId: string): boolean {
   return Boolean(state(store, sessionId).blockedReason);
 }
-function openEnded(kind: string | undefined, reason: string | undefined): boolean {
-  if (kind !== 'idle' && kind !== 'completed') return false;
-  return reason === 'end';
+function openEnded(outcome: { kind?: string; reason?: string; answered?: boolean }): boolean {
+  if (outcome.kind !== 'idle' && outcome.kind !== 'completed') return false;
+  return endedWithAnswer({ reason: outcome.reason ?? '', answered: outcome.answered });
 }
-function endedCleanly(session: { status?: string; metadata?: { outcome?: { kind?: string; reason?: string } } } | undefined): boolean {
+function endedCleanly(session: { status?: string; metadata?: { outcome?: { kind?: string; reason?: string; answered?: boolean } } } | undefined): boolean {
   if (!session || session.status === 'running' || session.status === 'waiting_approval') return false;
   const outcome = session.metadata?.outcome;
   if (!outcome) return true;
-  return openEnded(outcome.kind, outcome.reason);
+  return openEnded(outcome);
 }
 /**
  * A send that joins an in-flight turn returns before the new message is read.

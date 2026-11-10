@@ -204,6 +204,8 @@ export interface TurnKernelHost {
     agent: AgentSpec;
     signal?: AbortSignal;
     workspaceRoot?: string;
+    /** True on the forced last turn; a `continue` answer cannot run another turn. */
+    finalTurn?: boolean;
   }): Promise<{
     met: boolean;
     reason?: string;

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 429,
+    "implemented": 431,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -393,6 +393,13 @@
       "file": "acceptance/bot-face-soft-style.yaml"
     },
     {
+      "id": "bot-finish-follow-through",
+      "title": "Bot 收尾时由运行时盯着做完",
+      "requirement": "用户反馈：Bot 完成目标的能力弱，经常停下来等用户指导，希望运行时在收尾时检查并盯着 agent 做完，而不是只靠 agent 自觉。\n\nA. 后续消息接续未完成目标 + 无目标 run 的轻量收尾检查\n- Bot 私聊里，当该会话存在最近的未完成目标（运行中/排队/等待/受阻/待审核等非终态，具体哪些状态可接续由你按现有状态机判断）时，「继续/接着做/go on」类催促、进度追问（「什么进度了」「跑完了吗」「干完了吗」）以及明显针对该目标的追问，应当绑定到该目标上执行，使收尾时有判官检查；「继续」类应当真正推进目标而不是只回答一句。不要因此把真正的闲聊、无关问句变成任务；不要推翻 bot-goal-only-when-needed 里「独立的分析/说明/检查类新请求不建新目标」的既有约定——这里是接续旧目标，不是新建。\n- 没有绑定任何目标的 Bot run 在软停时做一次轻量收尾检查：确定性信号优先（本轮 run 内写入或更新过的 todo 仍有未完成项；注意不要用会话里残留的旧 todo），另加一个语义判断（可复用现有 completeText 判官通道）识别「承诺了继续做却没做 / 在明显可自行决定的下一步上停下来问用户」。命中则注入续跑消息继续，而不是结束。必须放过：答完问题后的可选提议、确实需要用户提供的东西（登录、凭证、不可逆操作确认、用户要求先讨论）。\n- 续跑必须有上限和「连续无进展即停」（例如被打回后没有新的工具调用或产出就停），并且绝不覆盖：等审批、ask_user、用户中止、预算或尝试次数耗尽、循环防护/复读/思考空转等 recovery 中止。判官出错时的行为要明确（有限次重试后放行，并在 trace 里记为出错放行）。\n\nB. 异步等待必须登记唤醒\n- run 要结束时，如果本轮自己起了仍在运行的后台/远端长任务，或回复里承诺「稍后/有结果再汇报」，而没有登记任何持久的等待或定时唤醒，就不能直接放行：要么打回让 agent 用现有机制登记唤醒，要么由运行时自动登记一次到期唤醒。唤醒触发后 bot 应核验状态并向用户汇报或继续推进。\n- 唤醒要有次数/时长上限，避免无限轮询；用户可见的回复不要刷屏。\n- 「说了稍后汇报但没登记等待」要有 trace 标记。\n\nC. 轮数上限不再伪装成正常结束\n- 因轮数上限收尾的 run（包括最后一轮被强制文本回答的情况）要有可区分的终结原因，不再记成普通 end；trace 与 run 结局归类要一致。\n- 已绑定目标且目标未完成时，达到轮数上限不应让主对话静默停住：在目标预算/尝试次数限额内继续推进（复用现有续跑路径即可），并让用户看得到「还在继续」。成本由现有目标预算兜底。\n\nD. 可观测性\n- Bot 收尾判官及新加的轻量收尾检查每次判定都发 trace：结论、理由、来源、是否出错或超时放行、已续跑次数。\n- intake 分类结果与降级原因（如因问号降级、self-contained 释放、接续到哪个目标）完整落到 trace 或库。\n\nE. 提示语\n- 去掉循环防护提示里主动建议 ask the user 的措辞，改为先换策略、确实只有用户能解决时才问。\n\n开关与阈值走 Lab UI + 持久化配置，不新增环境变量；默认开启。",
+      "verificationStage": "software",
+      "file": "acceptance/bot-finish-follow-through.yaml"
+    },
+    {
       "id": "bot-first-task-dismissal",
       "title": "首次任务引导可关闭且不干扰已有对话",
       "requirement": "这个也非常的干扰，要么显示过了不要显示了，要么加个关闭，现在关闭也管不了",
@@ -412,6 +419,13 @@
       "requirement": "要能根据我的bot对话的实际情况来动态生成，不要搞一个配置来搞这个，要零侵入的实现这个流的能力",
       "verificationStage": "software",
       "file": "acceptance/bot-flow-read-projection.yaml"
+    },
+    {
+      "id": "bot-followup-cache-prefix",
+      "title": "追问时复用上一轮已缓存的对话前缀",
+      "requirement": "为什么老是响应较慢？分析排查一下\n\n发现的问题都查一下和解决",
+      "verificationStage": "software",
+      "file": "acceptance/bot-followup-cache-prefix.yaml"
     },
     {
       "id": "bot-forever-chat",
