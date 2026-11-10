@@ -1108,3 +1108,9 @@
 - `user-preference-sync` 用户长期偏好入库与迁移
 - `user-vault-ref-fill` User Vault reference fill (distinct from secret-vault)
 - `user-vault-tools` User Vault assistant tools and Lab reference-fill
+
+## whole（1）
+
+需求正文见 [other](other.md)。
+
+- `whole-reply-hover` 同一条 Bot 回复共享悬停操作

@@ -2981,6 +2981,13 @@
       "requirement": "Ship UserVault product surface: vault_* assistant tools + Lab/product card fill UX aligned with Grok Vault reference-fill (uvref). This is product Vault entries, NOT SecretVault.",
       "verificationStage": "software",
       "file": "acceptance/user-vault-tools.yaml"
+    },
+    {
+      "id": "whole-reply-hover",
+      "title": "同一条 Bot 回复共享悬停操作",
+      "requirement": "hover到模型返回的内容，现在会显示 “会话时间” “纠错转评测” 和 “引用” 这个要针对模型的一次完整的返回段落去触发，不要一行行的去触发",
+      "verificationStage": "software",
+      "file": "acceptance/whole-reply-hover.yaml"
     }
   ],
   "pending": [

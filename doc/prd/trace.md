@@ -3723,3 +3723,9 @@ User Vault assistant tools and Lab reference-fill
 - `apps/daemon/test/user-vault-http.test.ts`
 - `apps/web-console/lib/user-vault.test.ts`
 - `packages/core/test/vault-tools.test.js`
+
+### whole-reply-hover
+
+同一条 Bot 回复共享悬停操作
+
+- `e2e/composer-quote-layout.spec.ts`
