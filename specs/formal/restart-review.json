@@ -378,7 +378,7 @@
     "packages/core/src/runtime.ts": "6b95a21ae25b5ec72e145d9c361a999e840e27dc356896753ad000b5fe59c9d1",
     "packages/core/src/storage.ts": "fcf7f62aa8a6318d5053e515cf7379acc38be89b9b2f83ca9d3417fc710e4ebf",
     "packages/core/src/stores/session-store.ts": "b5e3444614a0fef3bcd6ac9aecb374c4d470486a4c64fd8678251efee723a470",
-    "packages/core/src/bots/bot-work.ts": "fddf02e15525029f722dd7987b677d979b522735e068d8ebc5c3c7d6f0b70b78",
+    "packages/core/src/bots/bot-work.ts": "41a18c2e5b1072a5fd728f06fb02ad07d70f33f60bb1e21e49e8626fddaa5709",
     "packages/core/src/runtime/subagent-policy.ts": "9d02a1c115e51b4e0bb02069439f4a4cf80aac673268178a12a5c28d0ac9d758",
     "packages/core/src/runtime/session-control.ts": "8f42a13096811dd960ed726e7d9685350fa041e08c57960e9e2f57cf7c5d55b4",
     "packages/core/src/runtime/session-facade.ts": "e51309153c623da43076ff3125d9e119bb7ecc571a82e31c09b7b45bb548ecef",
