@@ -3635,6 +3635,15 @@
       ]
     },
     {
+      "id": "room-budgets-default-off",
+      "title": "群预算默认关闭，预算停下时写完的回复照常出现",
+      "tests": [
+        "apps/web-console/components/play-group/room-console.test.ts",
+        "apps/web-console/lib/room-turn-notice.test.ts",
+        "packages/core/test/bot-room-budget-default-off.test.js"
+      ]
+    },
+    {
       "id": "rotate-page-share",
       "title": "Rotate library page share links without deleting content",
       "tests": [

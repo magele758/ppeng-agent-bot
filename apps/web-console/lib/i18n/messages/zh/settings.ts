@@ -61,7 +61,7 @@ export const settings = {
     },
     roomCapacity: {
       title: '群规模',
-      keywords: '群 成员 名册 上限 每轮发言 room roster capacity'
+      keywords: '群 成员 名册 上限 每轮发言 预算 费用 工具调用 room roster capacity budget cost'
     }
   },
   saveState: {
@@ -216,6 +216,9 @@ export const settings = {
     rosterCap: '名册上限',
     maxRoomMembers: '单群人数上限',
     maxWaveSpeakers: '每轮发言人数',
+    newRoomBudgets: '新建群的默认预算。填 0 表示关闭，默认关闭。只影响之后新建的群，已有的群在各自的群设置里改。',
+    defaultMaxCostUsd: '新群默认费用预算（美元，每轮）',
+    defaultMaxToolCalls: '新群默认工具调用上限（每轮）',
     save: '保存',
     saved: '已保存',
     saveFailed: '无法保存群规模设置'

@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 428 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 429 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -851,10 +851,11 @@
 
 - `risk-advisory-ui` 对话里的运行策略提醒
 
-## room（1）
+## room（2）
 
 需求正文见 [other](other.md)。
 
+- `room-budgets-default-off` 群预算默认关闭，预算停下时写完的回复照常出现
 - `room-task-collaboration` 群聊临时负责人任务协作模式
 
 ## rotate（1）
