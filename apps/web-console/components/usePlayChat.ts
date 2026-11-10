@@ -23,6 +23,8 @@ import {
 } from '@/lib/feed-window';
 import { prependHistoryPage, unpersistedAssistantText } from '@/lib/history-window';
 import { api, pollApi } from '@/lib/api';
+import { startPollTimer } from '@/lib/poll-timer';
+import { noteLocalSending, noteSessionStatus, sessionPollPace } from '@/lib/session-activity';
 import { loadSessionPanelResource, transcriptModelView } from '@/lib/session-panel-resource';
 import { readRetryProgress, type RetryProgress } from '@/lib/model-retry';
 import { modelErrorText } from '@/lib/model-errors';
@@ -761,7 +763,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const load = async () => {
       const ticket = ++generation;
       try {
-        const data = (await api('/api/session-recap/settings')) as { settings?: { active?: boolean } };
+        const data = (await pollApi('/api/session-recap/settings')) as { settings?: { active?: boolean } };
         if (cancelled || ticket !== generation) return;
         setRecapActive(data.settings?.active === false ? false : true);
       } catch {
@@ -1305,6 +1307,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           };
           inbox?: SteerInboxItem[];
         };
+        noteSessionStatus(sid, data.session.status);
         if (cancelled || selectedSessionRef.current !== sid) return;
         if (data.session.title) {
           setPlayTitle((prev) => (prev === data.session.title ? prev : data.session.title!));
@@ -1323,13 +1326,17 @@ export function usePlayChat(deps: PlayChatDeps) {
         /* open-page chrome pull is best-effort */
       }
     };
-    void pullChrome();
-    const timer = setInterval(() => void pullChrome(), 2000);
+    // Idle: the session list already reports a status change within one refresh, so this one can wait.
+    const stop = startPollTimer({ run: pullChrome, ...sessionPollPace(sid, 2000, 6000) });
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      stop();
     };
   }, [selectedSessionId, selectedSessionRef]);
+
+  useEffect(() => {
+    noteLocalSending(selectedSessionRef.current, playSending);
+  }, [playSending, selectedSessionRef]);
 
   useEffect(() => {
     publishImmediateSteer();

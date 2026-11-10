@@ -2647,7 +2647,11 @@ Lab Settings → Tools → Registered Machines panel
 
 - `apps/daemon/test/session-detail-logs.test.ts`
 - `apps/web-console/lib/api.test.ts`
+- `apps/web-console/lib/bot-work-state.test.ts`
 - `apps/web-console/lib/lab-tick.test.ts`
+- `apps/web-console/lib/overview-plan.test.ts`
+- `apps/web-console/lib/poll-timer.test.ts`
+- `apps/web-console/lib/session-activity.test.ts`
 
 ### lab-startup-timing
 
