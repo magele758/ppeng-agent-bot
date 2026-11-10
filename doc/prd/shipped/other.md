@@ -514,6 +514,11 @@ browser_navigate).
 
 先按你建议的顺序推进第一批：记忆删除抑制、严格预检、定时任务故障治理。按仓库的验收优先流程，先写验收标准给我确认。
 
+## memory-read-source-unavailable
+读不到的记忆来源一轮只说明一次
+
+memory_read SOURCE_UNAVAILABLE must be surfaced once and not retried for the same source in that turn. Do not search logs. Do not weaken security denials.
+
 ## message-body-search
 按消息正文搜索可见会话
 

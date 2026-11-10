@@ -103,7 +103,10 @@ test('memory reference read rechecks user tenant bot and current ownership [AC:c
   assert.equal((await read.execute(ctx, { ref: 'memory:user:id' })).ok, true);
   for (const patch of [{ userId: 'other' }, { tenantId: 'other' }, { agentId: 'private' }]) {
     const saved = { ...row }; row = { ...row, ...patch };
-    assert.deepEqual(await read.execute(ctx, { ref: 'memory:user:id' }), { ok: false, content: 'Source unavailable.' });
+    const denied = await read.execute(ctx, { ref: 'memory:user:id' });
+    assert.equal(denied.ok, false);
+    assert.equal(JSON.parse(denied.content).error_code, 'SOURCE_UNAVAILABLE');
+    assert.equal(denied.content.includes('SECRET'), false);
     row = saved;
   }
   ctx.session.metadata = {};
