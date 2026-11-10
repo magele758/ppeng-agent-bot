@@ -482,10 +482,11 @@
 - `global-default-model-clarity` 全局默认模型配置与群聊模型来源可见
 - `global-default-model-row-align` 全局默认模型行左右对齐
 
-## goal（4）
+## goal（5）
 
 需求正文见 [goal](goal.md)。
 
+- `goal-checkpoint-no-goal-once` 未分配目标时进度保存只报一次
 - `goal-history-toolbar-align` 目标历史与标题栏按钮垂直居中
 - `goal-intake-hot-path` 开轮不再等待目标判定和数据库锁
 - `goal-restart-resume` 重启后从安全检查点继续 Goal

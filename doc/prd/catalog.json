@@ -1681,6 +1681,13 @@
       "file": "acceptance/global-default-model-row-align.yaml"
     },
     {
+      "id": "goal-checkpoint-no-goal-once",
+      "title": "未分配目标时进度保存只报一次",
+      "requirement": "goal_checkpoint with no goal assigned must return the existing clear error once and must not be retried in the same turn. Do not invent a goal. Do not search logs. Do not weaken security denials.",
+      "verificationStage": "software",
+      "file": "acceptance/goal-checkpoint-no-goal-once.yaml"
+    },
+    {
       "id": "goal-history-toolbar-align",
       "title": "目标历史与标题栏按钮垂直居中",
       "requirement": "聊天标题栏里的「目标历史」没居中对齐。\n选中节点：header.chat-panel-header.chat-panel-header--bot 里的 details.goal-history，data-testid=goal-history，组件 GoalHistory，在 PlayPanel 的 play-toolbar。visible_text=目标历史。bounds 高 32px。附图里「目标历史」和右边那个方框图标不在同一垂直中线，文字/三角看起来偏了。\n只做对齐：\n- 「目标历史」这一项（summary 的三角和文字）在工具条里与相邻按钮垂直居中，左右不要单独上移或下移。\n- 展开三角和「目标历史」四个字彼此垂直居中。\n- 不要改目标历史的数据和展开行为，不要改文案。",
