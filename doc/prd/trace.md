@@ -2229,6 +2229,12 @@ Lab connector authorization states and SecretVault grant
 
 - `e2e/bot-interaction-polish.spec.ts`
 
+### cron-detail-markdown
+
+定时任务详情直接阅读 Markdown
+
+- `e2e/cron-message-details.spec.ts`
+
 ### cron-message-details
 
 聊天中的定时任务详情

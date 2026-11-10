@@ -2527,6 +2527,13 @@
       ]
     },
     {
+      "id": "cron-detail-markdown",
+      "title": "定时任务详情直接阅读 Markdown",
+      "tests": [
+        "e2e/cron-message-details.spec.ts"
+      ]
+    },
+    {
       "id": "cron-message-details",
       "title": "聊天中的定时任务详情",
       "tests": [
