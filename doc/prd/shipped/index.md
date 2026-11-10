@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 429 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 430 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（135）
+## bot（136）
 
 需求正文见 [bot](bot.md)。
 
@@ -118,6 +118,7 @@
 - `bot-extreme-concurrency` Bot 以高并发同时推进多件工作
 - `bot-face-readable-shapes` 脸型圆润，列表里能看见表情，干活时更忙
 - `bot-face-soft-style` 软萌机器人脸与经典脸并存
+- `bot-finish-follow-through` Bot 收尾时由运行时盯着做完
 - `bot-first-task-dismissal` 首次任务引导可关闭且不干扰已有对话
 - `bot-first-task-new-user` 首次任务引导只给新用户看
 - `bot-flow-read-projection` 工作流只接收展示所需的会话数据

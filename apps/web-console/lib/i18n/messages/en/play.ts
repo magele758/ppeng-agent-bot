@@ -12,6 +12,7 @@ export const play = {
     "stopped": "Execution stopped",
     "fallback": "Model switch",
     "goal": "Goal check",
+    "continuing": "Goal still in progress",
     "compact": "Context maintenance",
     "hook": "Extension notice",
     "collaboration": "Collaboration update",
@@ -21,6 +22,7 @@ export const play = {
     "recoveryHint": "Automatic recovery, retries, or execution details awaiting verification.",
     "stoppedHint": "The runtime stopped this execution. See the details for the reason.",
     "fallbackHint": "Model fallback or replacement information.",
+    "continuingHint": "This run reached its step limit before the goal was confirmed complete. The goal is queued and continues automatically; you do not need to nudge it.",
     "goalHint": "A goal check or coordination record, not the goal’s current live status.",
     "compactHint": "Conversation compaction and context maintenance information.",
     "hookHint": "Runtime information from an execution hook or extension.",
@@ -418,6 +420,7 @@ export const play = {
     missing_assistant: 'Missing assistant reply',
     before_turn_blocked: 'Turn blocked',
     rewound: 'Rewound',
+    max_turns: 'Reached the step limit for one run',
     other: '{reason}'
   },
 

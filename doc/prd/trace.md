@@ -1502,6 +1502,16 @@ Bot 以高并发同时推进多件工作
 - `apps/web-console/lib/soft-bot-face.test.ts`
 - `packages/core/test/bots.test.js`
 
+### bot-finish-follow-through
+
+Bot 收尾时由运行时盯着做完
+
+- `apps/daemon/test/bot-finish-settings.test.ts`
+- `apps/web-console/lib/bot-finish.test.ts`
+- `packages/agent-loop/src/recovery/advisory-grace.test.ts`
+- `packages/agent-loop/src/turn/kernel.test.ts`
+- `packages/core/test/bot-finish-follow-through.test.js`
+
 ### bot-flow-read-projection
 
 工作流只接收展示所需的会话数据

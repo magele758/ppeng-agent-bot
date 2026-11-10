@@ -65,7 +65,8 @@ export class AdvisoryGrace {
 export function formatRecoveryAdvisory(reason: string): string {
   return (
     `[recovery-advisory] Loop risk detected (${reason}). ` +
-    `You have one more chance: change strategy (different tool, smaller step, or ask the user). ` +
+    `You have one more chance: change strategy first (different tool, different input, or a smaller step). ` +
+    `Ask the user only when the blocker is something only they can resolve. ` +
     `Repeating the same failing pattern will stop the run.`
   );
 }

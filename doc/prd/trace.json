@@ -1700,6 +1700,17 @@
       ]
     },
     {
+      "id": "bot-finish-follow-through",
+      "title": "Bot 收尾时由运行时盯着做完",
+      "tests": [
+        "apps/daemon/test/bot-finish-settings.test.ts",
+        "apps/web-console/lib/bot-finish.test.ts",
+        "packages/agent-loop/src/recovery/advisory-grace.test.ts",
+        "packages/agent-loop/src/turn/kernel.test.ts",
+        "packages/core/test/bot-finish-follow-through.test.js"
+      ]
+    },
+    {
       "id": "bot-flow-read-projection",
       "title": "工作流只接收展示所需的会话数据",
       "tests": [

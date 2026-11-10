@@ -4,6 +4,7 @@ import { restoreTaskContract, type TaskContract } from '../session/task-contract
 import { diagnosePrompt, type CacheDiagnostic } from '../session/cache-diagnostics.js';
 import { usesDurableBotGoals, reviewDirectGoalBeforeEnd, type GoalRuntimeHost } from '../bots/goals/runtime-host.js';
 import { completionModelView, reviewQueryOutput } from '../bots/strict-output.js';
+import { reviewUnboundFinish } from '../bots/goals/finish-check.js';
 import { observeModelRequests } from './request-metrics.js';
 import {
   commitPrepareSnapshot,
@@ -1038,7 +1039,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       const picked = await applyJevRecoveryChoice(rt.store, situation, options);
       return picked ?? defaultId;
     },
-    evaluateGoalGate: async ({ session, signal, workspaceRoot }) => {
+    evaluateGoalGate: async ({ session, signal, workspaceRoot, finalTurn }) => {
       const snapshot = foldGoalJudgeSnapshot(rt.store, session.id);
       // Soft-stop boundary: one Jev route fan-out before goal / deep-model judge.
       const route = await applyJevRoute(rt.store, { state: snapshot, signal });
@@ -1052,12 +1053,17 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       }
 
       if (usesDurableBotGoals(rt.store, session) && rt.goalRuntimeHost) {
-        const review = await reviewDirectGoalBeforeEnd(rt.goalRuntimeHost(), session.id, signal);
+        const review = await reviewDirectGoalBeforeEnd(rt.goalRuntimeHost(), session.id, signal, finalTurn === true);
         if (review) return review;
       }
       if (isCanonicalBotChat(session)) {
-        const formatReview = reviewQueryOutput(rt.store, session.id, signal);
+        const formatReview = finalTurn ? undefined : reviewQueryOutput(rt.store, session.id, signal);
         if (formatReview) return formatReview;
+        // No goal owns this turn, so nothing else checks whether it stopped early.
+        const finishReview = rt.goalRuntimeHost
+          ? await reviewUnboundFinish(rt.goalRuntimeHost(), session, signal, finalTurn === true)
+          : undefined;
+        if (finishReview) return finishReview;
       }
       const gate = usesDurableBotGoals(rt.store, session) ? undefined : createGoalGateFromMetadata(session.metadata, process.env);
       if (!gate?.isActive()) return { met: true };

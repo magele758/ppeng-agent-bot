@@ -137,6 +137,9 @@ const sessionRecord = await miniLoop.run('session-web-1');
 - `checkToolApprovals` / `resolveTurnTools` 可以返回同步结果，也可以返回 `Promise`。内核会 `await`。
 - `buildMemoryAppendix` 也可以返回 `string | Promise<string>`（附录编译含异步 I/O 时）。
 - `beforeModelTurn?`（mini 可不实现）：主模型调用前；返回 `skip_goal_done` 时跳过深模型并以目标已完成收尾（不伪造 assistant 正文）。
+- `evaluateGoalGate?`：软停时调用。入参带 `finalTurn`：为 `true` 表示这是轮数上限强制作答的最后一轮，工具已关闭，返回 `continue` 也不会再跑一轮。宿主的完成检查在这一轮应只记录结论，不要打回。
+- **轮数上限的结局**：`forceAnswerOnLastTurn` 的最后一轮正常作答后，`session.metadata.outcome` 记为 `{ kind: 'idle', reason: 'max_turns', answered: true }`，`onSessionOutcome` 报 `partial`（`signals.reason='max_turns_exhausted'`、`answered: true`），不再记成 `end`。循环跑满而没有作答时仍是 `reason: 'max_turns'`，没有 `answered`。只关心「有没有可投递的答复」的调用方用 `endedWithAnswer(outcome)`（`@ppeng/agent-loop/session` 导出，同时导出 `TURN_LIMIT_REASON`），不要直接比较 `reason === 'end'`。
+- **恢复提示措辞**：`formatRecoveryAdvisory` 与 `formatRiskAdvisory` 要求先换策略（换工具、换输入、拆小步），只有确实只有用户能解决时才问用户。
 - `chooseRecovery?`（mini 可不实现）：在内核已有的离散恢复动作中择一；返回 `null`/非法 id 则保持硬编码路径。
 - **PTC `resolveJevHooks?`（`createPtcExecTool` 依赖，仅 max/`node:vm` 路径）**：宿主可在每次 `ptc_exec` 时返回 `{ noul(instructions), choice(instructions, options) }`，注入到沙箱全局 `jev`；返回 `undefined` 则**完全不注入** `jev`。SDK **禁止**静态 import Jev HTTP 客户端（尤其 mini 链路）。产品侧仅在 Jev `profile=custom` 且勾选 `ptcDecide`、已保存 baseUrl 时由 `packages/core` 提供实现（复用 `askJev`）。
 - **PTC 只读工具与审批**：`ptc.kind==='read'` 的工具在 cell 内直接 `execute`，不走审批。若该调用的 `tool.needsApproval(context,args)` 为 true（例如 `read_file` 带 `machineId` 读远端机器），`buildPtcNamespace` 的绑定返回 `{ ok:false, error:'approval_required' }` 而不执行，模型需在 cell 外直接调用该工具。

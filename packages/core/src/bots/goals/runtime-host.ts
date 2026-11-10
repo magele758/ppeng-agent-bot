@@ -17,6 +17,12 @@ import { listPendingHumanWork } from '../../session/human-continuation.js';
 import { preserveGoalBudgetReport } from './budget.js';
 import { isGoalWorkerCurrent } from './worker-fence.js';
 import { WriterClaimError } from '../../session/writer-claim.js';
+import { readBotFinishSettings } from './finish-settings.js';
+import { CONTINUE_UNBOUND_INSTRUCTION, FOLLOWUP_JUDGE_PROMPT, followupInstruction, followupKind, isOpenGoal, mayConcernGoal, parseFollowupVerdict, planFollowup, recentOpenGoal, type FollowupKind, type FollowupPlan } from './followup.js';
+import { TURN_LIMIT_REASON } from '../../session/run-outcome.js';
+
+/** Trace kinds the goal runtime writes. */
+export type GoalTraceKind = 'child_session' | 'goal_eval' | 'goal_intake' | 'finish_check' | 'finish_wake';
 
 export interface GoalRuntimeHost {
  store: SqliteStateStore;
@@ -28,7 +34,7 @@ export interface GoalRuntimeHost {
  cancelSpecialty?(parent:SessionRecord,goal:BotGoal):boolean|Promise<boolean>;
  judge?: ModelAdapter['completeText'];
  judgeForSession?(session: SessionRecord): ModelAdapter['completeText'];
- emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
+ emitTrace?(sessionId: string, event: { kind: GoalTraceKind; payload: Record<string, unknown> }): void;
  /** True when this process no longer owns the execution, including after a restart. */
  executionInterrupted?(sessionId: string): boolean;
  /** Missing means the external effect is unverified and must not be resumed. */
@@ -164,33 +170,145 @@ function applyIntakeIntent(host:GoalRuntimeHost,session:SessionRecord,service:Bo
   host.store.enqueueSteer(session.id,`[goal control not applied] ${String(error)}. Explain the current state and available next action; preserve the existing execution and do not create replacement work.`,{role:'system',key:`goal-control-refused:${sourceId}`});
  }
 }
-async function classifyReceipt(service:BotGoalService,botId:string,messages:Map<string,{parts:{type:string;text?:string}[]}>,known:Record<string,string>,receipt:{id:string}):Promise<GoalIntentProposal[]|undefined> {
+interface IntakeRecord {
+ messageId:string;
+ text:string;
+ intents:Array<{kind:string;goalId?:string}>;
+ /** Why a message did not become the goal work its wording suggests. */
+ downgrades:string[];
+ followup?:{kind:FollowupKind|'continue_unbound';goalId?:string;action:string;reason:string};
+}
+interface ClassifiedReceipt { id:string; intents:GoalIntentProposal[]; record:IntakeRecord; plan?:FollowupPlan; continueUnbound?:boolean }
+const ATTACH_PREFIX='bot.goal-attach:';
+/** Receipts whose turn works on an existing goal instead of a new one. */
+export function readGoalAttachments(store:Pick<SqliteStateStore,'getDaemonControl'>,sessionId:string):Record<string,string> {
+ return store.getDaemonControl<Record<string,string>>(ATTACH_PREFIX+sessionId)??{};
+}
+function writeGoalAttachments(store:SqliteStateStore,sessionId:string,attachments:Record<string,string>):void {
+ store.setDaemonControl(ATTACH_PREFIX+sessionId,attachments);
+}
+function receiptText(message:{parts:{type:string;text?:string}[]}|undefined):string {
+ return message?.parts.filter(part=>part.type==='text').map(part=>part.text).join('\n')??'';
+}
+/** Another human message since the goal last moved means a bare follow-up may be about that instead. */
+function humanSpokeSince(messages:Iterable<{id:string;role:string;key?:string;createdAt:string;parts:{type:string;text?:string}[]}>,since:string,pending:Set<string>):boolean {
+ for(const message of messages){
+  if(message.role!=='user'||message.key||pending.has(message.id)||message.createdAt<=since)continue;
+  if(!followupKind(receiptText(message)))return true;
+ }
+ return false;
+}
+function downgradeReasons(raw:GoalIntentProposal[],opened:GoalIntentProposal[],released:GoalIntentProposal[]):string[] {
+ const reasons:string[]=[];
+ released.forEach((intent,index)=>{
+  if(raw[index]!.kind!==opened[index]!.kind)reasons.push('open_inquiry');
+  else if(opened[index]!.kind!==intent.kind)reasons.push('self_contained');
+  else if(intent.kind==='chat'&&/[?？]\s*$/.test(intent.text))reasons.push('question_mark');
+ });
+ return reasons;
+}
+async function confirmedAboutGoal(host:GoalRuntimeHost,session:SessionRecord,text:string,goal:BotGoal):Promise<boolean> {
+ const judge=sessionJudge(host,session);
+ if(!judge)return false;
+ try{
+  const output=await judge({system:FOLLOWUP_JUDGE_PROMPT,user:JSON.stringify({message:text,goal:{title:goal.title.slice(0,300),status:goal.status,progress:goal.progress.slice(0,600)}}),jsonMode:true,signal:AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)});
+  return parseFollowupVerdict(output);
+ }catch{return false;}
+}
+interface FollowupContext { host:GoalRuntimeHost; session:SessionRecord; goals:BotGoal[]; messages:Map<string,{id:string;role:string;key?:string;createdAt:string;parts:{type:string;text?:string}[]}>; pending:Set<string> }
+async function followupFor(ctx:FollowupContext,text:string):Promise<{plan?:FollowupPlan;continueUnbound?:boolean}> {
+ const settings=readBotFinishSettings(ctx.host.store);
+ if(!settings.followupAttachEnabled||/^\s*\[goal:/.test(text))return {};
+ const kind=followupKind(text);
+ const goal=recentOpenGoal(ctx.goals,Date.now(),settings.followupWindowHours*3_600_000);
+ if(kind&&goal&&!humanSpokeSince(ctx.messages.values(),goal.updatedAt,ctx.pending))return {plan:planFollowup(kind,goal)};
+ if(kind==='continue'&&ctx.goals.filter(isOpenGoal).length!==1)return {continueUnbound:true};
+ if(!kind&&goal&&mayConcernGoal(text)&&await confirmedAboutGoal(ctx.host,ctx.session,text,goal))return {plan:planFollowup('about_goal',goal)};
+ return {};
+}
+async function classifyReceipt(ctx:FollowupContext,service:BotGoalService,botId:string,known:Record<string,string>,receipt:{id:string}):Promise<ClassifiedReceipt|undefined> {
  if(known[receipt.id])return;
- const message=messages.get(receipt.id);
- const text=message?.parts.filter(part=>part.type==='text').map(part=>part.text).join('\n')??'';
+ const text=receiptText(ctx.messages.get(receipt.id));
  if(!text.trim())return;
+ const record:IntakeRecord={messageId:receipt.id,text:text.slice(0,200),intents:[],downgrades:[]};
  const request=botConversationRequest(text);
- if(request && request!=='format-receipt')return [{kind:'chat',text}];
- return (await classifyGoalIntents(text,service.list(botId))).map(releaseOpenInquiry).map(releaseSelfContainedBotWork);
+ if(request && request!=='format-receipt'){
+  record.downgrades.push('conversation_request');
+  return {id:receipt.id,intents:[{kind:'chat',text}],record};
+ }
+ const follow=await followupFor(ctx,text);
+ if(follow.plan||follow.continueUnbound)return {id:receipt.id,intents:[{kind:'chat',text}],record,...follow};
+ const raw=await classifyGoalIntents(text,service.list(botId));
+ const opened=raw.map(releaseOpenInquiry);
+ const released=opened.map(releaseSelfContainedBotWork);
+ record.downgrades.push(...downgradeReasons(raw,opened,released));
+ return {id:receipt.id,intents:released,record};
+}
+/** Make an idle goal claimable by this turn. A goal that cannot be reopened stays as it is. */
+function reopenForFollowup(service:BotGoalService,botId:string,goal:BotGoal):boolean {
+ try{
+  if(goal.status==='blocked'||goal.status==='paused')service.control(botId,goal.id,'resume');
+  else if(goal.status==='pending_review')service.control(botId,goal.id,'verify',{accepted:false,reason:'Check the recorded result against the objective, finish what remains, then report.'});
+  return service.get(botId,goal.id)?.status==='queued';
+ }catch{return false;}
+}
+function reportGoalStatus(host:GoalRuntimeHost,session:SessionRecord,receiptId:string,goal:BotGoal,note:string):void {
+ host.store.enqueueSteer(session.id,`[goal status] ${JSON.stringify({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,nextStep:goal.nextStep,reason:goal.blockedReason})}\n${note}`,{role:'system',key:`goal-query:${receiptId}`});
+}
+function applyFollowup(host:GoalRuntimeHost,session:SessionRecord,scope:{botId:string;service:BotGoalService},known:Record<string,string>,item:ClassifiedReceipt):void {
+ const plan=item.plan!;
+ const goal=scope.service.get(scope.botId,plan.goalId);
+ if(!goal)return;
+ if(plan.action==='attach'&&reopenForFollowup(scope.service,scope.botId,goal)){
+  writeGoalAttachments(host.store,session.id,{...readGoalAttachments(host.store,session.id),[item.id]:goal.id});
+  host.store.enqueueSteer(session.id,followupInstruction(plan.kind,goal),{role:'system',key:`goal-followup:${item.id}`});
+  known[item.id]=`attach:${goal.id}`;
+  item.record.followup={kind:plan.kind,goalId:goal.id,action:'attach',reason:plan.reason};
+  return;
+ }
+ const live=scope.service.get(scope.botId,goal.id)??goal;
+ reportGoalStatus(host,session,item.id,live,'This goal is not started again by this message. Tell the user where it stands; do not start duplicate work.');
+ item.record.followup={kind:plan.kind,goalId:goal.id,action:'status',reason:plan.action==='attach'?'reopen_refused':plan.reason};
+}
+function applyClassified(host:GoalRuntimeHost,session:SessionRecord,scope:{botId:string;service:BotGoalService},known:Record<string,string>,item:ClassifiedReceipt):void {
+ if(item.plan){applyFollowup(host,session,scope,known,item);return;}
+ if(item.continueUnbound){
+  host.store.enqueueSteer(session.id,CONTINUE_UNBOUND_INSTRUCTION,{role:'system',key:`goal-followup:${item.id}`});
+  item.record.followup={kind:'continue_unbound',action:'none',reason:'no_recent_goal'};
+  return;
+ }
+ for(const [index,intent] of item.intents.entries())applyIntakeIntent(host,session,scope.service,scope.botId,known,item.id,intent,index);
+}
+function recordIntake(host:GoalRuntimeHost,session:SessionRecord,known:Record<string,string>,item:ClassifiedReceipt):void {
+ item.record.intents=item.intents.map(intent=>({kind:intent.kind,...('goalId' in intent&&intent.goalId?{goalId:intent.goalId}:{})}));
+ const created=known[item.id];
+ host.emitTrace?.(session.id,{kind:'goal_intake',payload:{...item.record,...(created?.startsWith('goal_')?{createdGoalId:created}:{})}});
+}
+function prunedAttachments(store:SqliteStateStore,sessionId:string,pending:Set<string>):void {
+ const attachments=readGoalAttachments(store,sessionId);
+ const kept=Object.fromEntries(Object.entries(attachments).filter(([receipt])=>pending.has(receipt)));
+ if(Object.keys(kept).length!==Object.keys(attachments).length)writeGoalAttachments(store,sessionId,kept);
 }
 async function ingestPending(host:GoalRuntimeHost,session:SessionRecord,scope:{botId:string;sessionId:string;service:BotGoalService}):Promise<void> {
  const pending=listPendingHumanWork(host.store,session.id);
  if(!pending.length)return;
  const messages=new Map(host.store.foldMessages(session.id).map(message=>[message.id,message]));
  const known=host.store.getDaemonControl<Record<string,string>>(`bot.goal-intake:${session.id}`)??{};
- const classified:Array<{id:string;intents:GoalIntentProposal[]}>=[];
+ const pendingIds=new Set(pending.map(receipt=>receipt.id));
+ const ctx:FollowupContext={host,session,goals:scope.service.list(scope.botId),messages,pending:pendingIds};
+ const classified:ClassifiedReceipt[]=[];
  for(const receipt of pending){
-  const intents=await classifyReceipt(scope.service,scope.botId,messages,known,receipt);
-  if(!intents)continue;
+  const item=await classifyReceipt(ctx,scope.service,scope.botId,known,receipt);
+  if(!item)continue;
   known[receipt.id]='chat';
-  classified.push({id:receipt.id,intents});
+  classified.push(item);
  }
  withSqliteBusyWait(host.store.db,GOAL_INTAKE_BUSY_WAIT_MS,()=>{
-  for(const item of classified){
-   for(const [index,intent] of item.intents.entries())applyIntakeIntent(host,session,scope.service,scope.botId,known,item.id,intent,index);
-  }
+  prunedAttachments(host.store,session.id,pendingIds);
+  for(const item of classified)applyClassified(host,session,scope,known,item);
   host.store.setDaemonControl(`bot.goal-intake:${session.id}`,known);
  });
+ for(const item of classified)recordIntake(host,session,known,item);
 }
 async function applyGoalIntake(host:GoalRuntimeHost,session:SessionRecord):Promise<void> {
  try {
@@ -234,22 +352,29 @@ function blockedSubagent(session:SessionRecord,goal:BotGoal|undefined):boolean {
  return session.mode==='subagent'&&!!goal&&goal.status!=='queued';
 }
 /** The idle fork planner reserves the first unforked receipt for the foreground. */
-function unforkedQueued(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string):BotGoal|undefined {
+function unforkedQueued(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string):{goal:BotGoal;attached:boolean}|undefined {
  const forks=Array.isArray(session.metadata.concurrentBotForks)?session.metadata.concurrentBotForks:[];
  const forked=new Set(forks.map((fork:{sourceMessageId?:string})=>fork.sourceMessageId));
  const pending=listPendingHumanWork(host.store,session.id);
  if(!pending.length)return undefined;
- const queued=new Map(service.list(botId).filter(goal=>goal.status==='queued').map(goal=>[goal.sourceMessageId,goal]));
+ const goals=service.list(botId).filter(goal=>goal.status==='queued');
+ const queued=new Map(goals.map(goal=>[goal.sourceMessageId,goal]));
+ const attachments=readGoalAttachments(host.store,session.id);
  for(const receipt of pending){
+  if(forked.has(receipt.id))continue;
+  const attached=goals.find(goal=>goal.id===attachments[receipt.id]);
+  if(attached)return {goal:attached,attached:true};
   const goal=queued.get(receipt.id);
-  if(goal&&!forked.has(receipt.id))return goal;
+  if(goal)return {goal,attached:false};
  }
  return undefined;
 }
 function queuedGoal(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string,currentGoal:BotGoal|undefined):BotGoal|undefined {
  if(session.metadata?.canonicalBotChat!==true)return currentGoal?.status==='queued'?currentGoal:undefined;
  const queued=unforkedQueued(host,session,service,botId);
- return queued&&goalAlreadyHandled(host,session,queued)?undefined:queued;
+ if(!queued)return undefined;
+ // A follow-up attached to an old goal is a request to work on it, whatever the chat already said.
+ return !queued.attached&&goalAlreadyHandled(host,session,queued.goal)?undefined:queued.goal;
 }
 function modePreferenceOf(strategy:string):GoalWorkKind|undefined {
  if(strategy==='deep_research')return 'research';
@@ -296,6 +421,17 @@ function startBoundGoal(host:GoalRuntimeHost,session:SessionRecord,scope:NonNull
  host.store.enqueueSteer(session.id,goalInstructions(goal,route.strategy!,route.reason),{role:'system',key:`goal-execution:${execution.id}`});
  return true;
 }
+/** An attached follow-up is used once. When the goal could not start, the turn explains why. */
+function settleAttachment(host:GoalRuntimeHost,session:SessionRecord,scope:NonNullable<ReturnType<typeof goalScope>>,goal:BotGoal,bound:boolean):void {
+ const attachments=readGoalAttachments(host.store,session.id);
+ const receipt=Object.keys(attachments).find(id=>attachments[id]===goal.id);
+ if(!receipt)return;
+ const {[receipt]:_used,...rest}=attachments;
+ writeGoalAttachments(host.store,session.id,rest);
+ if(bound)return;
+ const live=scope.service.get(scope.botId,goal.id)??goal;
+ reportGoalStatus(host,session,receipt,live,'This goal could not be started in this turn. Tell the user its state and the reason; do not start replacement work.');
+}
 function answerCanonicalChat(session:SessionRecord,bound:boolean):boolean {
  return bound||session.metadata.canonicalBotChat===true;
 }
@@ -306,6 +442,7 @@ export function bindGoalExecution(host:GoalRuntimeHost,session:SessionRecord):bo
  if(session.metadata.botGoalWorker===true)return isGoalWorkerCurrent(host.store,session);
  const decided=decidedBind(host,session,scope);
  const bound=decided.done?decided.result:startBoundGoal(host,session,scope,decided.goal);
+ if(!decided.done)settleAttachment(host,session,scope,decided.goal,bound);
  return answerCanonicalChat(session,bound);
 }
 function goalInstructions(goal:BotGoal,strategy:string,reason:string):string {
@@ -370,16 +507,37 @@ function abortedReport(outcome:{kind?:string}|undefined):GoalReport|undefined {
  if(outcome?.kind!=='aborted')return undefined;
  return {kind:'blocked',summary:'Execution was interrupted; review progress before resuming'};
 }
-async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId=goal.sessionId,signal?:AbortSignal,prepared?:CompletionEvidence):Promise<GoalReport> {
+/** Every completion verdict is traced, including the ones let through because the judge failed. */
+function traceCompletionVerdict(host:GoalRuntimeHost,sessionId:string,goal:BotGoal,stage:CompletionStage,report:GoalReport,failure?:{error:string;timedOut:boolean}):void {
+ const met=report.kind==='candidate_completed'&&report.verified===true;
+ host.emitTrace?.(sessionId,{kind:'goal_eval',payload:{
+  source:'bot_goal_completion',stage,goalId:goal.id,title:goal.title.slice(0,120),
+  met,verdict:report.kind,verified:report.verified===true,
+  reason:(failure?.error??report.nextStep??report.summary??'').slice(0,400),
+  failOpen:Boolean(failure),...(failure?{error:failure.error.slice(0,400),timedOut:failure.timedOut}:{}),
+  continuations:goal.attempts,
+ }});
+}
+type CompletionStage='before_end'|'settle'|'child';
+async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId=goal.sessionId,signal?:AbortSignal,prepared?:CompletionEvidence,stage:CompletionStage='settle'):Promise<GoalReport> {
  const session=host.store.getSession(sessionId);
  const judge=session ? sessionJudge(host,session) : host.judge;
- if(!judge)return {...report,verified:false};
+ if(!judge){
+  const unverified={...report,verified:false};
+  traceCompletionVerdict(host,sessionId,goal,stage,unverified,{error:'No completion judge is available',timedOut:false});
+  return unverified;
+ }
+ const timeout=AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS);
  try {
   const packet=prepared??verificationPacket(host,goal,assistant);
-  const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:signal?AbortSignal.any([signal,AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)]):AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)});
-  return completionReport(JSON.parse(result),packet,goal);
- }catch{
-  return {...report,kind:'candidate_completed',verified:false,summary:report.summary||assistant||'Completion verification unavailable; recorded result kept for review',evidence:report.evidence?.length?report.evidence:[assistant].filter(Boolean)};
+  const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:signal?AbortSignal.any([signal,timeout]):timeout});
+  const verdict=completionReport(JSON.parse(result),packet,goal);
+  traceCompletionVerdict(host,sessionId,goal,stage,verdict);
+  return verdict;
+ }catch(error){
+  const kept:GoalReport={...report,kind:'candidate_completed',verified:false,summary:report.summary||assistant||'Completion verification unavailable; recorded result kept for review',evidence:report.evidence?.length?report.evidence:[assistant].filter(Boolean)};
+  traceCompletionVerdict(host,sessionId,goal,stage,kept,{error:String(error),timedOut:timeout.aborted});
+  return kept;
  }
 }
 type CompletionReview = { executionId:string; revision:number; fingerprint?:string; report?:GoalReport };
@@ -405,7 +563,7 @@ function reusableCompletionReview(prior: CompletionReview | undefined, execution
  return packet.userInstructions.length===0||prior.fingerprint===fingerprint;
 }
 /** Recheck additive steering while progress changes; the existing run budget still bounds work. */
-export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:string,signal?:AbortSignal):Promise<{met:boolean;action?:'continue';systemMessage?:string}|undefined> {
+export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:string,signal?:AbortSignal,finalTurn=false):Promise<{met:boolean;action?:'continue';systemMessage?:string}|undefined> {
  const ctx=settleContext(host,sessionId);
  if(!ctx||ctx.execution.strategy!=='direct'||holdForApproval(host,sessionId,ctx.session,ctx.ids.executionId)||signal?.aborted)return undefined;
  const goal=ctx.scope.service.get(ctx.scope.botId,ctx.ids.goalId)!;
@@ -417,12 +575,18 @@ export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:s
  const fingerprint=completionFingerprint(packet);
  if(reusableCompletionReview(prior,ctx.ids.executionId,goal.revision,packet,fingerprint))return {met:true};
  cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision});
- const report=await verifyCompletion(host,goal,tail,assistant,baseReport(undefined,assistant,goal),sessionId,signal,packet);
+ const report=await verifyCompletion(host,goal,tail,assistant,baseReport(undefined,assistant,goal),sessionId,signal,packet,'before_end');
  const live=settleContext(host,sessionId);
  if(!live||live.ids.executionId!==ctx.ids.executionId||signal?.aborted||live.scope.service.get(live.scope.botId,goal.id)?.revision!==goal.revision)return {met:true};
  cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision,fingerprint,report});
  if(report.kind!=='progress'||!report.nextStep||report.correctionNeeded===false)return {met:true};
+ // The turn limit already closed the tools. The settlement requeues the goal from this verdict.
+ if(finalTurn){traceBeforeEnd(host,sessionId,goal,'turn_limit',report.nextStep);return {met:true};}
+ traceBeforeEnd(host,sessionId,goal,'continue',report.nextStep);
  return {met:false,action:'continue',systemMessage:`[completion review] The requested outcome is not complete: ${report.nextStep}\nContinue within the existing turn budget until the original objective and all live user instructions are addressed. Complete only this remaining work using existing observations. Do not replay confirmed side effects or create extra records just to preserve evidence. Honor the current user's exact output requirements. If a required action is blocked, honor any user-specified failure reply or stop condition exactly, without extra explanation; otherwise report the remaining gap honestly.`};
+}
+function traceBeforeEnd(host:GoalRuntimeHost,sessionId:string,goal:BotGoal,decision:'continue'|'turn_limit',reason:string):void {
+ host.emitTrace?.(sessionId,{kind:'goal_eval',payload:{source:'bot_goal_before_end',goalId:goal.id,title:goal.title.slice(0,120),met:false,decision,reason:reason.slice(0,400),failOpen:false,continuations:decision==='continue'?1:0}});
 }
 async function maybeVerify(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId:string):Promise<GoalReport> {
  if(report.kind!=='candidate_completed'&&report.kind!=='progress')return report;
@@ -432,7 +596,7 @@ async function maybeVerify(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<Goa
 export async function judgeChildCompletion(host:GoalRuntimeHost,goal:BotGoal,childId:string,assistant:string):Promise<GoalReport|undefined> {
  if(!assistant.trim())return undefined;
  const transcript=evidenceTranscript(host.store,childId);
- return verifyCompletion(host,goal,transcript,assistant,{kind:'candidate_completed',summary:assistant,evidence:[assistant],verified:false},childId);
+ return verifyCompletion(host,goal,transcript,assistant,{kind:'candidate_completed',summary:assistant,evidence:[assistant],verified:false},childId,undefined,undefined,'child');
 }
 /** A waiting dispatch becomes a durable wait. The model does not have to call wait_for for it. */
 function parkDispatchWait(host:GoalRuntimeHost,goal:BotGoal,checkpoint:GoalReport|undefined,session:SessionRecord,execution:{id:string}):GoalReport|undefined {
@@ -475,15 +639,28 @@ function restoreOriginalProfile(host:GoalRuntimeHost,sessionId:string):void {
  if(!(live&&profile))return;
  host.store.updateSession(sessionId,{metadata:{...live.metadata,taskRunMode:profile.taskRunMode??undefined,orchestrationEngine:profile.orchestrationEngine??undefined,botGoalOriginalProfile:undefined}});
 }
+/** A turn limit is not a finished goal. Unverified results go back to the queue instead of waiting for review. */
+function turnLimitReport(report:GoalReport,outcome:{reason?:string}|undefined):GoalReport {
+ if(outcome?.reason!==TURN_LIMIT_REASON||report.kind!=='candidate_completed'||report.verified===true)return report;
+ return {...report,kind:'progress',nextStep:report.nextStep??'The turn limit ended the previous run. Check what is done against the objective and finish the remaining work.'};
+}
+/** The chat would otherwise look stopped while the goal waits for its next run. */
+function announceTurnLimitContinuation(host:GoalRuntimeHost,goal:BotGoal,outcome:{reason?:string}|undefined,maxAttempts:number):void {
+ if(outcome?.reason!==TURN_LIMIT_REASON||goal.status!=='queued')return;
+ const title=(goal.title??'').trim()||goal.id;
+ const limit=maxAttempts+(goal.extraAttempts??0);
+ host.store.appendMessage(goal.sessionId,'system',[{type:'text',text:`[goal-continuing] ${title} — this run reached its step limit before the goal was confirmed complete. The goal is queued and continues automatically (attempt ${goal.attempts} of ${limit}).`}],{key:`goal-turn-limit:${goal.id}:${goal.attempts}`});
+}
 async function finishSettlement(host:GoalRuntimeHost,sessionId:string,ctx:NonNullable<ReturnType<typeof settleContext>>,error?:unknown):Promise<void> {
  if(ctx.execution.leaseUntil>Date.now())ctx.scope.service.updateExecution(ctx.scope.botId,ctx.execution.id,{messageEndSeq:host.store.listSurfaceNodes(sessionId).at(-1)?.seq??0});
  const checkpoint=ctx.session.metadata.botGoalCheckpoint as GoalReport|undefined;
  const {tail,assistant}=assistantTranscript(evidenceTranscript(host.store,sessionId),ctx.execution.startedAt);
  const outcome=ctx.session.metadata.outcome as {kind?:string;reason?:string}|undefined;
  const goal=ctx.scope.service.get(ctx.scope.botId,ctx.ids.goalId)!;
- const report=await settledReport(host,goal,tail,assistant,checkpoint,error,ctx.session.status,outcome,ctx.session,ctx.execution);
+ const report=turnLimitReport(await settledReport(host,goal,tail,assistant,checkpoint,error,ctx.session.status,outcome,ctx.session,ctx.execution),outcome);
  const settled=ctx.scope.service.report(ctx.scope.botId,ctx.ids.executionId,preserveGoalBudgetReport(host,sessionId,{...withCheckpointWait(report,checkpoint,reportCost(ctx.session.metadata)),owner:ctx.execution.owner,fence:ctx.execution.fence}));
  announceGoalState(host,settled);
+ announceTurnLimitContinuation(host,settled,outcome,ctx.scope.service.readSettings().maxAttempts);
  restoreOriginalProfile(host,sessionId);
 }
 export async function settleGoalExecution(host:GoalRuntimeHost,sessionId:string,error?:unknown):Promise<void> {

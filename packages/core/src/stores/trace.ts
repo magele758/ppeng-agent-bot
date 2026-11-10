@@ -39,8 +39,14 @@ export type TraceEventKind =
   | 'recovery_advisory'
   /** RiskEngine enqueued a multi-signal advisory */
   | 'risk_advisory'
-  /** Goal soft-gate evaluation at soft-complete */
+  /** Goal completion verdict at soft-complete: session goal gate or Bot goal judge (see payload.source) */
   | 'goal_eval'
+  /** How a Bot chat message was classified, and why it was not turned into goal work */
+  | 'goal_intake'
+  /** Soft-stop check of a Bot turn that no goal owns */
+  | 'finish_check'
+  /** A wake registered for a promise to report later fired or was dropped */
+  | 'finish_wake'
   /** Evolving: background reviewer persisted a case */
   | 'evolving_case'
   /** Evolving: shadow coach injected advisory */
