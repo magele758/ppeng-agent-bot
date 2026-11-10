@@ -3328,6 +3328,14 @@ Secure Form fill-from-Vault
 - `scripts/test/session-eval-lift.test.mjs`
 - `scripts/test/session-eval-suites.test.mjs`
 
+### session-favorite
+
+当前会话一键收藏
+
+- `apps/daemon/test/session-favorite.test.ts`
+- `apps/web-console/components/SessionFavorite.test.ts`
+- `apps/web-console/lib/session-favorite.test.ts`
+
 ### session-lifecycle-state-consistency
 
 生命周期验证发现的结束原因与部分审批状态一致性修复

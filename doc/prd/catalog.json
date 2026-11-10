@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 425,
+    "implemented": 427,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2561,6 +2561,13 @@
       "requirement": "结合最新代码，这个评估集，需要做什么升级和配合来检测新的功能是带来提升还是下降？\n分多个agent去帮我开发完成",
       "verificationStage": "software",
       "file": "acceptance/session-eval-lift.yaml"
+    },
+    {
+      "id": "session-favorite",
+      "title": "当前会话一键收藏",
+      "requirement": "在当前会话里一键把这个会话收进收藏，之后能从会话列表找到。",
+      "verificationStage": "software",
+      "file": "acceptance/session-favorite.yaml"
     },
     {
       "id": "session-lifecycle-state-consistency",

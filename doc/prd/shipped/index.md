@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 425 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 427 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -911,13 +911,14 @@
 - `secure-form-multi` 对话里的多字段安全表单
 - `secure-form-vault` Secure Form fill-from-Vault
 
-## session（12）
+## session（13）
 
 需求正文见 [session](session.md)。
 
 - `session-brief` 会话可以只看关键信息
 - `session-eval-baseline` 会话评估能留下基准并发现短板
 - `session-eval-lift` 会话评估能区分能力提升和下降
+- `session-favorite` 当前会话一键收藏
 - `session-lifecycle-state-consistency` 生命周期验证发现的结束原因与部分审批状态一致性修复
 - `session-lifecycle-verification` 会话生命周期验证：取消、重试与审批恢复
 - `session-multiprocess-concurrency-verification` 多进程并发验证：写入占用、迟到结果与审批恢复

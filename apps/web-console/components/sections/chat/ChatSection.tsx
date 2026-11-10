@@ -2,7 +2,7 @@
 
 import './chat.css';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { filterSessionsByQuery } from '@ppeng/api-types';
+import { filterFavoriteSessions, sessionIsFavorited, sessionsForSidebar, withSessionFavorite } from '@/lib/session-favorite';
 import { api } from '@/lib/api';
 import { pickDefaultAgentId } from '@/lib/default-agent';
 import { useI18n } from '@/lib/i18n';
@@ -43,6 +43,7 @@ export function ChatSection({ active }: { active: boolean }) {
     upsertBot,
     tick,
     loadOverview,
+    patchSessionSummary,
     location,
     navigate,
     setModelSetupOpen,
@@ -50,6 +51,7 @@ export function ChatSection({ active }: { active: boolean }) {
   } = lab;
 
   const [sessionSidebarFilter, setSessionSidebarFilter] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [playSurface, setPlaySurfaceState] = useState<PlaySurface>('chat');
   const lastChatSessionRef = useRef<string | null>(null);
   const lastBotSessionRef = useRef<string | null>(null);
@@ -63,8 +65,8 @@ export function ChatSection({ active }: { active: boolean }) {
   botsRef.current = bots;
 
   const sidebarSessions = useMemo(
-    () => filterSessionsByQuery(sessions, sessionSidebarFilter),
-    [sessions, sessionSidebarFilter]
+    () => sessionsForSidebar(sessions, sessionSidebarFilter, favoritesOnly),
+    [sessions, sessionSidebarFilter, favoritesOnly]
   );
 
   /** 筛选时若当前选中会话被筛掉，仍置顶展示以便高亮可见 */
@@ -78,8 +80,11 @@ export function ChatSection({ active }: { active: boolean }) {
   }, [sessions, sidebarSessions, selectedSessionId, sessionSidebarFilter]);
 
   const playSidebarSessions = useMemo(
-    () => sessionsForPlaySurface(playOpsSidebarSessions, bots, playSurface, selectedSessionId),
-    [playOpsSidebarSessions, bots, playSurface, selectedSessionId]
+    () => filterFavoriteSessions(
+      sessionsForPlaySurface(playOpsSidebarSessions, bots, playSurface, selectedSessionId),
+      favoritesOnly
+    ),
+    [playOpsSidebarSessions, bots, playSurface, selectedSessionId, favoritesOnly]
   );
 
   const setPlaySurface = useCallback((next: PlaySurface) => {
@@ -319,6 +324,9 @@ export function ChatSection({ active }: { active: boolean }) {
       chat={chat}
       sessionFilter={sessionSidebarFilter}
       onSessionFilterChange={setSessionSidebarFilter}
+      favoritesOnly={favoritesOnly}
+      onFavoritesOnlyChange={setFavoritesOnly}
+      onSessionFavorite={(session) => patchSessionSummary(session.id, (current) => withSessionFavorite(current, sessionIsFavorited(session)))}
       onOpenModelSetup={() => setModelSetupOpen(true)}
     />
   );

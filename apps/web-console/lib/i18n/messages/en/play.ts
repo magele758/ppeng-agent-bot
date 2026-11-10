@@ -217,6 +217,8 @@ export const play = {
     filterAria: 'Filter session list',
     noBots: 'No Bots',
     noSessions: 'No sessions',
+    favoritesOnly: 'Saved only',
+    noFavorites: 'No saved sessions',
     select: 'Select',
     selectAria: 'Select sessions in bulk',
     selectAll: 'Select all',
@@ -361,8 +363,15 @@ export const play = {
     actionFailed: 'Could not update this goal'
   },
 
+  favorite: {
+    save: 'Save',
+    saved: 'Saved',
+    failed: 'Could not update saved sessions: {detail}'
+  },
+
   sessionGroup: {
     today: 'Today',
+    favorites: 'Saved',
     yesterday: 'Yesterday',
     week: 'Last 7 days',
     month: 'Last 30 days',

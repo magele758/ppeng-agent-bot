@@ -1,4 +1,5 @@
 import { flowSessionView } from './flow-session-view.js';
+import { applySessionFavorite } from '../session-favorite.js';
 import { sendSessionList } from '../session-list-summary.js';
 import { goalScope } from '@ppeng/agent-core';
 import { readFileSync } from 'node:fs';
@@ -688,6 +689,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       handler: async ({ requireParam, readBody, response }) => {
         const id = requireParam('id');
         const body = (await readBody()) as Record<string, unknown>;
+        applySessionFavorite(runtime, id, body);
         const goalPatch: Record<string, unknown> = {};
         if (typeof body.goalCondition === 'string') {
           const cond = body.goalCondition.trim();

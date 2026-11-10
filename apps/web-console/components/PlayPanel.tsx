@@ -50,7 +50,8 @@ import { GoalStatusCard } from './GoalStatusCard';
 import { TrajectoryPanel } from './TrajectoryPanel';
 import { ContextStackPanel } from './ContextStackPanel';
 import { groupAgentsByDomain, sortAgentsById } from '@/lib/sort-utils';
-import { groupSessionsByDate } from '@/lib/session-groups';
+import { groupSessionsWithFavorites, sessionListEmptyText } from '@/lib/session-favorite';
+import { SessionFavoriteButton, SessionFavoriteFilter, SessionFavoriteMark } from './SessionFavorite';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
 import { useBotWorkMood } from './bot-work/BotWorkState';
@@ -120,6 +121,9 @@ export interface PlayPanelProps {
   chat: ReturnType<typeof usePlayChat>;
   sessionFilter?: string;
   onSessionFilterChange?: (value: string) => void;
+  favoritesOnly?: boolean;
+  onFavoritesOnlyChange?: (next: boolean) => void;
+  onSessionFavorite?: (session: { id: string; metadata?: Record<string, unknown> }) => void;
   onOpenModelSetup: () => void;
   accountMenu?: ReactNode;
   /** Full session catalog. The sidebar `sessions` list omits bot child tasks. */
@@ -274,6 +278,25 @@ function sessionGroupDisplay(
   }
 }
 
+function sessionGroupHeading(
+  bucket: string,
+  fallback: string,
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string
+): string {
+  if (bucket === 'favorites') return t('play.sessionGroup.favorites');
+  return sessionGroupDisplay(bucket, fallback, t);
+}
+
+function favoriteSessionForHeader(
+  selected: SessionSummary | null,
+  catalog: SessionSummary[] | undefined,
+  selectedSessionId: string | null
+): SessionSummary | null {
+  if (selected) return selected;
+  if (!catalog || !selectedSessionId) return null;
+  return catalog.find((session) => session.id === selectedSessionId) ?? null;
+}
+
 function PlaySidebarToggleIcon({ collapsed }: { collapsed: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -320,6 +343,9 @@ export function PlayPanel({
   chat,
   sessionFilter = '',
   onSessionFilterChange,
+  favoritesOnly = false,
+  onFavoritesOnlyChange,
+  onSessionFavorite,
   onOpenModelSetup,
   accountMenu,
   catalogSessions
@@ -740,7 +766,7 @@ export function PlayPanel({
     () => collectActivityTools(chat.sessionMessages, chat.streamOverlay?.segments),
     [chat.sessionMessages, chat.streamOverlay]
   );
-  const sessionGroups = useMemo(() => groupSessionsByDate(sessions), [sessions]);
+  const sessionGroups = useMemo(() => groupSessionsWithFavorites(sessions), [sessions]);
   const visibleIds = useMemo(() => sessions.map((s) => s.id), [sessions]);
   const checkedVisible = useMemo(
     () => checkedIds.filter((id) => visibleIds.includes(id)),
@@ -1010,12 +1036,15 @@ export function PlayPanel({
         selectMode={selectMode}
         deleting={deleting}
         status={
-          rowBot ? <BotWorkSummary botId={rowBot.id} /> : statusKey ? (
-            <span className={`session-item__status session-item__status--${s.status}`}>
-              <span className={statusDotClass(s.status)} aria-hidden="true" />
-              {t(statusKey)}
-            </span>
-          ) : null
+          <>
+            <SessionFavoriteMark session={s} />
+            {rowBot ? <BotWorkSummary botId={rowBot.id} /> : statusKey ? (
+              <span className={`session-item__status session-item__status--${s.status}`}>
+                <span className={statusDotClass(s.status)} aria-hidden="true" />
+                {t(statusKey)}
+              </span>
+            ) : null}
+          </>
         }
         onOpen={() => {
           setOpenGroupId(null);
@@ -1084,6 +1113,7 @@ export function PlayPanel({
               ) : null}
             </div>
             <button type="button" className="btn btn-ghost" aria-label={t('play.sidebar.filterSessions')} title={t('play.sidebar.filterSessions')} aria-expanded={filterOpen} onClick={() => setFilterOpen(value => !value)}><WorkspaceIcon kind="search" /></button>
+            <SessionFavoriteFilter pressed={favoritesOnly} onChange={onFavoritesOnlyChange} />
             <div className="play-sidebar__end">
           {onDeleteSessions && sessions.length ? (
             <div
@@ -1203,11 +1233,15 @@ export function PlayPanel({
                 onRoomDeleted={(id) => setOpenGroupId((current) => current === id ? null : current)}
               />
             ) : !sessions.length ? (
-              <div className="empty-hint">{botSurface ? t('play.sidebar.noBots') : t('play.sidebar.noSessions')}</div>
+              <div className="empty-hint">{sessionListEmptyText({ botSurface, favoritesOnly }, {
+                noBots: t('play.sidebar.noBots'),
+                noSessions: t('play.sidebar.noSessions'),
+                noFavorites: t('play.sidebar.noFavorites')
+              })}</div>
             ) : sessions.length ? (
               sessionGroups.map((group) => (
                 <section key={group.bucket} className="session-date-group">
-                  <h3 className="session-date-group__label">{sessionGroupDisplay(group.bucket, group.label, t)}</h3>
+                  <h3 className="session-date-group__label">{sessionGroupHeading(group.bucket, group.label, t)}</h3>
                   <div className="session-date-group__items">
                     {group.sessions.map(renderSession)}
                   </div>
@@ -1305,6 +1339,11 @@ export function PlayPanel({
                 >
                   {t('play.trace')}
                 </button></DebugOnly>
+                <SessionFavoriteButton
+                  session={favoriteSessionForHeader(selectedSession, catalogSessions, selectedSessionId)}
+                  onUpdated={onSessionFavorite}
+                  onFailed={(detail) => chat.setPlayStatus({ text: t('play.favorite.failed', { detail }), err: true })}
+                />
                 <div className="more-menu" ref={moreMenuRef}>
                   <button
                     type="button"
