@@ -149,3 +149,9 @@
 /* This control also works if a cached document cannot hydrate after a release. */
 [data-auth-reload] { animation: auth-reload-delay 8s step-end both; }
 @keyframes auth-reload-delay { from { visibility: hidden; } to { visibility: visible; } }
+
+[data-boot-error],
+[data-boot-failed] [data-boot-loading],
+[data-boot-failed] .auth-spinner { display: none; }
+[data-boot-failed] [data-boot-error] { display: inline; }
+[data-boot-failed] [data-auth-reload] { animation: none; }

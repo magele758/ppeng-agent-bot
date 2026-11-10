@@ -1,0 +1,14 @@
+id: daydream-unlimited-resume
+title: 每日复盘移除额度并续跑
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: 先把额度管理的能力去掉吧，以后有需要再加
+criteria:
+  - id: AC-1
+    given: Bot 已用完旧额度
+    when: 处理当天证据
+    then: 继续处理到完成
+  - id: AC-2
+    given: 已部分完成的旧复盘超过七天
+    when: 调度重新运行
+    then: 接着处理未完成证据并保留已完成产出

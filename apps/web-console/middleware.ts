@@ -35,11 +35,19 @@ function appendLabForwarding(request: NextRequest, headers: Headers): void {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/pages/:path*']
+  matcher: ['/', '/api/:path*', '/pages/:path*']
 };
 
 /** 构建时 next.config rewrites 会固化目标；e2e 随机 daemon 端口必须在运行时解析 DAEMON_PROXY_TARGET */
 export async function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname === '/') {
+    if (request.nextUrl.searchParams.has('labRetry')) {
+      const target = request.nextUrl.clone();
+      target.pathname = '/lab-recovery';
+      return NextResponse.rewrite(target);
+    }
+    return NextResponse.next();
+  }
   const targetUrl = `${daemonBase()}${request.nextUrl.pathname}${request.nextUrl.search}`;
   const headers = sanitizeProxyHeaders(request.headers);
   appendDaemonBearerIfConfigured(headers);

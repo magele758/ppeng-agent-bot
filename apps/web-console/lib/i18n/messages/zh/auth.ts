@@ -1,4 +1,5 @@
 export const auth = {
+  bootFailed: 'Agent Home 启动失败，请重新加载页面。',
   connectionFailed: '无法确认登录状态。请检查连接后重试。',
   retry: '重试',
   reload: '重新加载页面',

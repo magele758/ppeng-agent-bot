@@ -1,5 +1,4 @@
 export interface DaydreamSettings {
-    maxChunks: number;
     enabled: boolean;
     dailyAt: string;
     timezone: string;

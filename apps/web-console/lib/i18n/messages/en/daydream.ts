@@ -14,8 +14,6 @@ export const daydream = {
     dismissFeedback: "Dismiss feedback",
     resolved: "Resolved",
     dismissed: "Dismissed",
-    maxChunks: "Analysis chunk limit per batch",
-    maxChunksHelp: "Limits segments per manual run and total segments per day for automatic reviews. Unfinished work keeps its progress; this is not a token or cost limit.",
     outputCount: "This review produced {count} candidates or saved results",
     revoke: "Revoke sharing",
     revokeConfirm: "Recipients will no longer be able to load this knowledge. Revoke?",

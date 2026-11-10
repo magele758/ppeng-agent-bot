@@ -11,6 +11,11 @@ daemon 不能被绕过令牌直接访问；通过 Lab 控制台使用时浏览�
 
 很奇怪，为什么现在在chatgpt里，网页一直加载不回来？
 
+## lab-bootstrap-retry
+工作台启动失败后恢复
+
+这个无法进入页面的问题又浮现了，赶紧修复一下，彻底修复
+
 ## lab-library-pages
 Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 
