@@ -4,6 +4,7 @@
 
 import { envBool } from '../env.js';
 import type { PromptBuilder } from '../model/prompt-builder.js';
+import { isSkillAllowed } from '../skills/skill-allowlist.js';
 import { loadSkillNameDecision } from '../skills/skill-router.js';
 import type { SkillManifest } from '../skills/skill-manifest.js';
 import { discloseSkillBody, formatDisclosedSkillContent } from '../skills/skill-disclosure.js';
@@ -84,20 +85,41 @@ export async function resolveSkillLoad(
   sessionId: string
 ): Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string; requiredSkills?: string[] }> {
   const skills = await host.promptBuilder.skillsForSession(sessionId);
+  const allowed = host.promptBuilder.getAllowedSkills(sessionId);
   const normalizedName = name.trim().toLowerCase();
   const matches = skills.filter((skill) => {
     const lookupKeys = [skill.name, skill.id, ...(skill.aliases ?? [])];
     return lookupKeys.some((candidate) => candidate.trim().toLowerCase() === normalizedName);
   });
-  const exact = matches.find(s => s.ownerBotId && s.id.toLowerCase() === normalizedName);
-  if (!exact && matches.length > 1) {
+  const allowedMatches = matches.filter((skill) => isSkillAllowed(skill, allowed));
+  if (matches.length > 0 && allowedMatches.length === 0) {
+    const denied = matches[0]!;
+    const allowedDecision = loadSkillNameDecision(name, allowed, denied);
+    void host.emitTrace(sessionId, {
+      kind: 'skill_load',
+      payload: {
+        name,
+        skillId: denied.id,
+        skillName: denied.name,
+        rejected: true,
+        reason: 'not_in_allowed_skills'
+      }
+    });
+    return {
+      error: allowedDecision.ok
+        ? `Skill "${denied.name}" is not enabled for this turn's allowedSkills. Stop. Do not load another name.`
+        : allowedDecision.error
+    };
+  }
+  const exact = allowedMatches.find(s => s.ownerBotId && s.id.toLowerCase() === normalizedName);
+  if (!exact && allowedMatches.length > 1) {
     void host.emitTrace(sessionId, {
       kind: 'skill_load',
       payload: { name, rejected: true, reason: 'ambiguous' }
     });
-    return { error: `Ambiguous skill "${name}". Choose an id: ${matches.map(s => `${s.id} (Bot ${s.ownerBotId ?? 'shared'})`).join(', ')}` };
+    return { error: `Ambiguous skill "${name}". Choose an id: ${allowedMatches.map(s => `${s.id} (Bot ${s.ownerBotId ?? 'shared'})`).join(', ')}` };
   }
-  const found = exact ?? matches[0];
+  const found = exact ?? allowedMatches[0];
   if (!found?.content) {
     void host.emitTrace(sessionId, {
       kind: 'skill_load',

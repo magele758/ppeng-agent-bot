@@ -147,7 +147,7 @@ export async function applyNormalSessionRequestBudget<T extends GuardedModelRequ
   if (!fit.summarizePrefix || !fit.summaryKept) {
     if (fit.requestTokens > fit.capTokens) {
       deps.emitTrace?.(overBudgetTrace(fit, 'unresolved'));
-      return withMessages(prepared, fit.messages);
+      return prepared;
     }
     const removed = prepared.messages.filter(message => !fit.messages.includes(message));
     return withMessages(prepared, addSourceNavigation(prepared, fit.messages, removed, fit.capTokens));

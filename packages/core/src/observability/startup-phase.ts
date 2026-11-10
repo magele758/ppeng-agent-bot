@@ -90,6 +90,63 @@ export function startupTraceDisposition(payload: StartupPhasePayload): 'summary'
   return payload.durationMs < 1000 ? 'summary' : 'detail';
 }
 
+const pendingOrdinaryPhases = new Map<string, Record<string, number>>();
+const startupReadySent = new Set<string>();
+
+/** A new run must not inherit the previous ready fold. */
+export function resetStartupPhaseFold(sessionId: string): void {
+  pendingOrdinaryPhases.delete(sessionId);
+  startupReadySent.delete(sessionId);
+}
+
+function rememberOrdinaryPhase(sessionId: string, payload: StartupPhasePayload): void {
+  if (!/^[a-z0-9_]+$/.test(payload.phase)) return;
+  const phases = pendingOrdinaryPhases.get(sessionId) ?? {};
+  phases[payload.phase] = Math.max(0, Math.round(payload.durationMs));
+  pendingOrdinaryPhases.set(sessionId, phases);
+}
+
+function mergeOrdinaryPhases(sessionId: string, payload: Record<string, unknown>): void {
+  const extra = pendingOrdinaryPhases.get(sessionId);
+  pendingOrdinaryPhases.delete(sessionId);
+  startupReadySent.add(sessionId);
+  if (!extra) return;
+  const phases: Record<string, number> = {};
+  const existing = payload.phases;
+  if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+    for (const [name, ms] of Object.entries(existing as Record<string, unknown>)) {
+      if (/^[a-z0-9_]+$/.test(name) && typeof ms === 'number' && Number.isFinite(ms)) {
+        phases[name] = Math.max(0, Math.round(ms));
+      }
+    }
+  }
+  for (const [name, ms] of Object.entries(extra)) {
+    if (!(name in phases)) phases[name] = ms;
+  }
+  payload.phases = phases;
+}
+
+/**
+ * Log every phase. Kernel slices already live inside ready.phases, so their
+ * individual lines stay omitted. Other short phases are debug plus one ready
+ * summary. Slow phases and a ~1s ready are not dropped.
+ * Returns true when the individual event must not be appended.
+ */
+export function foldStartupPhase(sessionId: string, payload: Record<string, unknown>): boolean {
+  const startup = startupPhaseFromRecord(payload);
+  if (!startup) return false;
+  logStartupPhase(sessionId, startup);
+  if (startup.scope === 'kernel' && startup.phase === 'ready') {
+    mergeOrdinaryPhases(sessionId, payload);
+    return false;
+  }
+  if (startupTraceDisposition(startup) !== 'summary') return false;
+  if (startup.scope === 'kernel') return true;
+  if (startupReadySent.has(sessionId)) return false;
+  rememberOrdinaryPhase(sessionId, startup);
+  return true;
+}
+
 /** Boot lines only. Ordinary phases under the slow threshold are debug; slow phases warn. */
 export function logStartupPhase(sessionId: string | undefined, payload: StartupPhasePayload): void {
   try {
@@ -99,11 +156,11 @@ export function logStartupPhase(sessionId: string | undefined, payload: StartupP
       log.warn('bot_startup_slow', { sessionId, ...clean });
       return;
     }
-    if (disposition === 'summary' || clean.scope !== 'boot') {
-      log.debug('bot_startup', sessionId ? { sessionId, ...clean } : clean);
+    if (clean.scope === 'boot') {
+      log.info('bot_startup', sessionId ? { sessionId, ...clean } : clean);
       return;
     }
-    log.info('bot_startup', sessionId ? { sessionId, ...clean } : clean);
+    log.debug('bot_startup', sessionId ? { sessionId, ...clean } : clean);
   } catch {
     /* tracing must not fail startup */
   }

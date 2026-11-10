@@ -78,6 +78,8 @@ import {
   tryCreateDynToolStore
 } from '../dyn-tools/index.js';
 import { filterToolsForSession } from './resolve-turn-tools.js';
+import { toolsForCellExecution } from '../runtime/tool-loop.js';
+import type { SqliteStateStore } from '../storage.js';
 import { isContextOverflowError } from '../session/auto-compact.js';
 import type { AgentLoopLatch, AgentStepEvent } from '../runtime/agent-loop.js';
 import {
@@ -297,14 +299,26 @@ async function hydrateResolveTurnTools(
     session,
     query,
     materializeDeps: {
-      getAuthorizedTools: (ctx) =>
-        filterToolsForSession({
+      getAuthorizedTools: (ctx) => {
+        const store = host.store as { setDaemonControl?: unknown };
+        return toolsForCellExecution({
+          tools: host.tools,
+          store: host.store as unknown as Parameters<typeof toolsForCellExecution>[0]['store'],
+          modelAdapter: host.modelAdapter,
+          stateDir: host.stateDir,
+          emitTrace: (sessionId, event) => {
+            void host.emitTrace(sessionId, event as Parameters<typeof host.emitTrace>[1]);
+          },
+          sessionAbortControllers: host.sessionAbortControllers,
+          governanceStore: typeof store.setDaemonControl === 'function' ? host.store as unknown as SqliteStateStore : undefined
+        }, filterToolsForSession({
           env: process.env,
           tools: host.tools,
           agent: ctx.agent,
           session: ctx.session,
           settingsStore: host.store
-        }).tools,
+        }).tools);
+      },
       previewAuthorizedTools: filterToolsForSession({
         env: process.env,
         tools: host.tools,

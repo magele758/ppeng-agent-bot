@@ -2,7 +2,7 @@ import { ValidationError, NotFoundError } from '../errors.js';
 import type { WebSettingsReadStore } from './web-settings.js';
 import type { SqliteStateStore } from '../storage.js';
 import { enforceSkillManifest } from '../skills/skill-manifest.js';
-import { manifestsForSession } from '../skills/skill-manifest-gate.js';
+import { currentSkillManifest } from '../skills/skill-manifest-gate.js';
 export interface ToolGroup {
     id: string;
     tier: number;
@@ -504,7 +504,7 @@ export function toolsExposedForSkillTurn<T extends { name: string }>(
   session: { id: string; metadata?: Record<string, unknown> },
   tools: readonly T[]
 ): T[] {
-  const current = manifestsForSession(session.id, session.metadata).at(-1);
+  const current = currentSkillManifest(session.id, session.metadata);
   if (!current) return tools as T[];
   return tools.filter((tool) => enforceSkillManifest(current, { tool: tool.name }).ok);
 }

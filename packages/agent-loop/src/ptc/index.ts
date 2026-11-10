@@ -1,3 +1,4 @@
+export { linkAbortParent, turnAbortSignal } from '../runtime/abort-lineage.js';
 export * from './types.js';
 export * from './mode.js';
 export * from './isolate.js';

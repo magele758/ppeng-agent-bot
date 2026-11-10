@@ -64,7 +64,8 @@ import {
   stripAutoReviewFlags,
   type FileApprovalPolicy as LoopFilePolicy,
   type ToolLoopHost,
-  type ToolLoopResult
+  type ToolLoopResult,
+  turnAbortSignal
 } from '@ppeng/agent-loop';
 import {
   getBoundSecretVault,
@@ -142,8 +143,12 @@ const SOURCE_UNAVAILABLE_TOOLS = new Set(['memory_read', 'history_search', 'hist
 const unavailableBySignal = new WeakMap<AbortSignal, Set<string>>();
 const unavailableByWriter = new Map<string, Set<string>>();
 
+function turnSignal(context: RunContext): AbortSignal | undefined {
+  return turnAbortSignal(context.abortSignal) ?? context.abortSignal;
+}
+
 function unavailableSeen(context: RunContext): Set<string> {
-  const signal = context.abortSignal;
+  const signal = turnSignal(context);
   if (signal) {
     let seen = unavailableBySignal.get(signal);
     if (!seen) {
@@ -169,7 +174,7 @@ function endTurn(deps: ToolLoopDeps, context: RunContext, sessionId: string, rec
       payload: { reason: recovery.reason, tool: recovery.tool, trigger: recovery.reason }
     });
   }
-  deps.abortTurn?.(sessionId, context.abortSignal);
+  deps.abortTurn?.(sessionId, turnSignal(context));
 }
 
 function finishToolResult(
@@ -222,7 +227,7 @@ function withTurnStops(
   }));
 }
 
-function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): ToolContract<Record<string, unknown>>[] {
+export function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): ToolContract<Record<string, unknown>>[] {
   const tools=wrapSkillManifestTools((turnTools ?? deps.tools) as ToolContract<Record<string, unknown>>[]);
   if(!deps.governanceStore)return withTurnStops(deps, tools);
   const ledger=new SourceLedger(deps.governanceStore);
@@ -237,6 +242,37 @@ function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): Tool
     if(result.content.includes('«external'))ledger.record(context.session.id,{kind:'tool',ref:tool.name+':'+Date.now(),label:tool.name});
     return result;
   }})));
+}
+
+/** PTC and harvested cells call tool.execute directly. Bind the same turn stops. */
+export function toolsForCellExecution(
+  input: {
+    tools: ToolContract<any>[];
+    store: ToolLoopStore;
+    modelAdapter: ModelAdapter;
+    stateDir: string;
+    emitTrace: ToolLoopDeps['emitTrace'];
+    sessionAbortControllers: Map<string, AbortController>;
+    governanceStore?: SqliteStateStore;
+  },
+  cellTools: ToolContract<any>[]
+): ToolContract<Record<string, unknown>>[] {
+  return toolsForTurn({
+    tools: input.tools,
+    store: input.store,
+    governanceStore: input.governanceStore,
+    envApprovalPolicy: undefined,
+    maxParallelToolCalls: 1,
+    modelAdapter: input.modelAdapter,
+    stateDir: input.stateDir,
+    emitTrace: input.emitTrace,
+    abortTurn(sessionId, signal) {
+      const controller = input.sessionAbortControllers.get(sessionId);
+      if (!controller || controller.signal.aborted) return;
+      if (signal && controller.signal !== signal) return;
+      controller.abort();
+    }
+  }, cellTools);
 }
 
 function adaptFilePolicy(policy: FileApprovalPolicy | undefined): LoopFilePolicy | undefined {

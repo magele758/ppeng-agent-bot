@@ -1,7 +1,7 @@
 /**
  * Active skill manifests constrain later tool calls.
- * No manifest ⇒ no extra restriction. A present manifest is a ceiling:
- * every loaded manifest must allow the tool, path, and network host.
+ * No manifest ⇒ no extra restriction.
+ * allowTools follows the current skill. Path and network stay a ceiling of every loaded manifest.
  */
 
 import type { SkillManifest } from './skill-manifest.js';
@@ -9,17 +9,24 @@ import { enforceSkillManifest, networkHostFromInput } from './skill-manifest.js'
 import { gateMandatorySkillsForSession } from './mandatory-skill-gate.js';
 
 const noted = new Map<string, SkillManifest[]>();
+const currentManifest = new Map<string, SkillManifest>();
 
 const PATH_TOOLS = new Set(['read_file', 'write_file', 'edit_file', 'grep', 'glob', 'delete_file', 'apply_patch']);
 const SHELL_TOOLS = new Set(['bash', 'bg_run', 'shell', 'work_evidence']);
 const NET_HINT = /\b(?:curl|wget|nc|ncat|ssh|scp)\b|https?:\/\//i;
 
 export function resetActiveSkillManifests(sessionId?: string): void {
-  if (sessionId) noted.delete(sessionId);
-  else noted.clear();
+  if (sessionId) {
+    noted.delete(sessionId);
+    currentManifest.delete(sessionId);
+  } else {
+    noted.clear();
+    currentManifest.clear();
+  }
 }
 
 export function noteActiveSkillManifest(sessionId: string, manifest: SkillManifest): void {
+  currentManifest.set(sessionId, manifest);
   const cur = noted.get(sessionId) ?? [];
   const key = JSON.stringify(manifest);
   if (cur.some((item) => JSON.stringify(item) === key)) return;
@@ -55,13 +62,21 @@ export function manifestsForSession(sessionId: string, metadata?: Record<string,
   return dedupeManifests([...storedManifests(metadata), ...(noted.get(sessionId) ?? [])]);
 }
 
+/** Latest noted skill. After a restart, the last stored manifest is the fallback. */
+export function currentSkillManifest(
+  sessionId: string,
+  metadata?: Record<string, unknown>
+): SkillManifest | undefined {
+  return currentManifest.get(sessionId) ?? manifestsForSession(sessionId, metadata).at(-1);
+}
+
 /** Selection can check names. Paths and network hosts are checked with real arguments at execution. */
 export function manifestVisibleTools<T extends { name: string }>(
   session: { id: string; metadata?: Record<string, unknown> }, tools: T[]
 ): T[] {
-  const manifests = manifestsForSession(session.id, session.metadata);
-  if (!manifests.length) return tools;
-  return tools.filter(tool => manifests.every(manifest => enforceSkillManifest(manifest, {tool: tool.name}).ok));
+  const current = currentSkillManifest(session.id, session.metadata);
+  if (!current) return tools;
+  return tools.filter(tool => enforceSkillManifest(current, { tool: tool.name }).ok);
 }
 
 interface ManifestSessionStore {
@@ -135,12 +150,23 @@ function actionFromTool(tool: string, args: unknown): { tool: string; path?: str
 export function gateActiveSkillManifests(
   manifests: SkillManifest[],
   tool: string,
-  args: unknown
+  args: unknown,
+  current?: SkillManifest
 ): { ok: true } | { ok: false; reason: string } {
-  if (manifests.length === 0) return { ok: true };
+  if (manifests.length === 0 && !current) return { ok: true };
   const action = actionFromTool(tool, args);
+  const toolSource = current ?? manifests.at(-1);
+  if (toolSource && action.tool) {
+    const toolDecision = enforceSkillManifest(toolSource, { tool: action.tool });
+    if (!toolDecision.ok) return toolDecision;
+  }
+  if (action.path === undefined && action.networkHost === undefined) return { ok: true };
+  const ceiling = {
+    ...(action.path !== undefined ? { path: action.path } : {}),
+    ...(action.networkHost !== undefined ? { networkHost: action.networkHost } : {})
+  };
   for (const manifest of manifests) {
-    const decision = enforceSkillManifest(manifest, action);
+    const decision = enforceSkillManifest(manifest, ceiling);
     if (!decision.ok) return decision;
   }
   return { ok: true };
@@ -190,10 +216,12 @@ export async function runWithSkillManifest<T extends { ok: boolean; content: str
 ): Promise<T | { ok: false; content: string }> {
   const mandatory = gateMandatorySkillsForSession(context.session.id, context.session.metadata, toolName, args);
   if (!mandatory.ok) return { ok: false, content: mandatory.content };
+  const manifests = manifestsForSession(context.session.id, context.session.metadata);
   const decision = gateActiveSkillManifests(
-    manifestsForSession(context.session.id, context.session.metadata),
+    manifests,
     toolName,
-    args
+    args,
+    currentSkillManifest(context.session.id, context.session.metadata)
   );
   if (!decision.ok) return { ok: false, content: decision.reason };
   return run();

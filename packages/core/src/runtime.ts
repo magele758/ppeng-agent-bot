@@ -42,7 +42,7 @@ import { createAppControlTools } from './app-control/tools.js';
 import { readAppControlSettings } from './app-control/settings.js';
 import { createLogger } from './logger.js';
 import { emitAdmitPhase } from './observability/admit-trace.js';
-import { logStartupPhase, setStartupPhaseEmitter, startupTraceDisposition, startupPhaseFromRecord } from './observability/startup-phase.js';
+import { foldStartupPhase, logStartupPhase, resetStartupPhaseFold, setStartupPhaseEmitter } from './observability/startup-phase.js';
 import { NotFoundError, ValidationError } from './errors.js';
 import type { AgentSandbox } from './sandbox/agent-sandbox-types.js';
 import { SelfHealScheduler } from './self-heal/self-heal-scheduler.js';
@@ -217,6 +217,7 @@ import { flushPreparedContextSnapshots,
   sessionFacadeFrom,
   spawnFrom,
   toolLoopDepsFrom,
+  toolsStoppingThisTurn,
   type L5Bindable
 } from './runtime/l5-bindings.js';
 import { autoCompactSession } from './runtime/compact-host.js';
@@ -633,13 +634,13 @@ export class RawAgentRuntime {
     ].map(tool => guardRuntimeCapability(this.store, tool));
     const ptcExec = createPtcExecTool({
       getAuthorizedTools: (context) =>
-        filterToolsForSession({
+        toolsStoppingThisTurn(this.l5(), filterToolsForSession({
           env: process.env,
           tools: toolsWithoutPtc,
           agent: context.agent,
           session: context.session,
           settingsStore: this.store
-        }).tools,
+        }).tools),
       spawnSubagent: (context, spec, signal) =>
         toolServices.spawnSubagent(
           context,
@@ -676,13 +677,13 @@ export class RawAgentRuntime {
         settingsStore: this.store,
         getProcessTools: () => this.tools,
         getAuthorizedTools: (context) =>
-          filterToolsForSession({
+          toolsStoppingThisTurn(this.l5(), filterToolsForSession({
             env: process.env,
             tools: toolsWithoutPtc,
             agent: context.agent,
             session: context.session,
             settingsStore: this.store
-          }).tools,
+          }).tools),
         spawnSubagent: (context, spec, signal) =>
           toolServices.spawnSubagent(context, spec.task, spec.role ?? spec.agent, {
             allowedTools: spec.allowed_tools,
@@ -2000,6 +2001,7 @@ export class RawAgentRuntime {
     }
   ): Promise<SessionRecord> {
     if (this.desktopUpdateSuspended) throw new ValidationError("Desktop update in progress");
+    if (!this.runningSessions.has(sessionId)) resetStartupPhaseFold(sessionId);
     const admitStarted = Date.now();
     this.pendingSessionAdmissions++;
     try {
@@ -2244,13 +2246,7 @@ export class RawAgentRuntime {
 
   /** Trace JSONL on disk; optional PG fan-out when `EVENT_BUFFER_PROVIDER=redis_postgres`. */
   private emitTrace(sessionId: string, rawEvent: Omit<TraceEvent, 'ts' | 'sessionId'>): void {
-    if (rawEvent.kind === 'startup_phase' && rawEvent.payload) {
-      const startup = startupPhaseFromRecord(rawEvent.payload);
-      if (startup) {
-        if (startupTraceDisposition(startup) === 'summary') return;
-        logStartupPhase(sessionId, startup);
-      }
-    }
+    if (rawEvent.kind === 'startup_phase' && rawEvent.payload && foldStartupPhase(sessionId, rawEvent.payload)) return;
     if (rawEvent.kind === 'turn_end') {
       const session = this.store.getSession(sessionId);
       const agent = session && this.store.getAgent(session.agentId);
