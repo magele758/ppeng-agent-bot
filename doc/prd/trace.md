@@ -2485,6 +2485,12 @@ Lab 只读查看本机 Grok Bot 会话
 - `apps/web-console/lib/room-sidebar-placement.test.ts`
 - `packages/core/test/bot-functional-groups.test.js`
 
+### group-chat-stable-layout
+
+群聊顶部状态更新和输入区布局
+
+- `e2e/group-chat-stable-layout.spec.ts`
+
 ### group-command-same-as-dm
 
 群里的命令跟该 Bot 单聊同一套放行

@@ -2819,6 +2819,13 @@
       ]
     },
     {
+      "id": "group-chat-stable-layout",
+      "title": "群聊顶部状态更新和输入区布局",
+      "tests": [
+        "e2e/group-chat-stable-layout.spec.ts"
+      ]
+    },
+    {
       "id": "group-command-same-as-dm",
       "title": "群里的命令跟该 Bot 单聊同一套放行",
       "tests": [

@@ -382,13 +382,25 @@
   font-size: var(--ui-text-xs);
 }
 
-.play-group-composer textarea {
-  flex: 1;
+.play-group-composer__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.play-group-composer .play-group-composer__row textarea {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: none;
+  outline: none;
   min-height: 44px;
   max-height: 160px;
-  resize: vertical;
+  resize: none;
   padding: 8px 10px;
-  border: 1px solid var(--color-border-strong);
+  border: 0;
   border-radius: var(--radius-control, 8px);
   background: transparent;
   color: inherit;

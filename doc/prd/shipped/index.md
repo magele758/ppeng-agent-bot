@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 421 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 422 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -493,13 +493,14 @@
 
 - `grok-local-history` Lab 只读查看本机 Grok Bot 会话
 
-## group（12）
+## group（13）
 
 需求正文见 [group](group.md)。
 
 - `group-active-header` 群聊顶部仅显示工作中的成员
 - `group-chat-settings-save` 群聊设置改完可以保存
 - `group-chat-sidebar-placement` 群聊可置顶并可拖入功能分组
+- `group-chat-stable-layout` 群聊顶部状态更新和输入区布局
 - `group-command-same-as-dm` 群里的命令跟该 Bot 单聊同一套放行
 - `group-face` 群聊行展示成员头像
 - `group-member-partial-roster` 群里有旧成员时仍可添加当前可选的 Bot
