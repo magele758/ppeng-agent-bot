@@ -39,6 +39,11 @@
 
 群聊列表项把群里 Bot 的头像拼成一个群头像，最多四个，让人在点进去之前知道群里有谁
 
+## group-member-partial-roster
+群里有旧成员时仍可添加当前可选的 Bot
+
+这个怎么又不能把bot加入群聊了？
+
 ## group-member-quiet
 群聊成员区只留成员本身的信息
 

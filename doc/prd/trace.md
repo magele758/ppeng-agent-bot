@@ -2497,6 +2497,12 @@ Lab 只读查看本机 Grok Bot 会话
 
 - `apps/web-console/lib/group-members.test.ts`
 
+### group-member-partial-roster
+
+群里有旧成员时仍可添加当前可选的 Bot
+
+- `apps/web-console/lib/bot-group.test.ts`
+
 ### group-member-quiet
 
 群聊成员区只留成员本身的信息

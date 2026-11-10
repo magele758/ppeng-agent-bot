@@ -154,3 +154,13 @@ test('sidebar filter matches a group title or member without treating it as one 
   assert.equal(groupMatchesQuery(room, '小八', nameOf), true);
   assert.equal(groupMatchesQuery(room, 'deskbot', nameOf), false);
 });
+
+test('adding a listed bot preserves members missing from the roster [AC:group-member-partial-roster#AC-1]', () => {
+  const current = ['host', 'former-bot'];
+  const roster = new Set(['host', 'super-bot']);
+  assert.deepEqual(addGroupMember(current, 'super-bot', roster), {
+    ok: true, members: ['host', 'former-bot', 'super-bot']
+  });
+  assert.deepEqual(addGroupMember(current, 'missing', roster), { ok: false, code: 'unknown' });
+  assert.deepEqual(addGroupMember(current, 'former-bot', roster), { ok: false, code: 'duplicate' });
+});

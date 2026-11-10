@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 419,
+    "implemented": 420,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1721,6 +1721,13 @@
       "requirement": "群聊列表项把群里 Bot 的头像拼成一个群头像，最多四个，让人在点进去之前知道群里有谁",
       "verificationStage": "software",
       "file": "acceptance/group-face.yaml"
+    },
+    {
+      "id": "group-member-partial-roster",
+      "title": "群里有旧成员时仍可添加当前可选的 Bot",
+      "requirement": "这个怎么又不能把bot加入群聊了？",
+      "verificationStage": "software",
+      "file": "acceptance/group-member-partial-roster.yaml"
     },
     {
       "id": "group-member-quiet",
