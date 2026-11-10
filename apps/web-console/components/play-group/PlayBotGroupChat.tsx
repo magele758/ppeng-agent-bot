@@ -310,18 +310,25 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
     setContextNotice('');
     setError('');
     let active = true;
-    const refresh = (older = false) => {
-      void loadRoom(older).catch(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let loading = false;
+    const refresh = () => {
+      if (loading) return;
+      clearTimeout(timer);
+      loading = true;
+      void loadRoom().catch(() => {
         if (active && roomIdRef.current === roomId) setLoadError(true);
+      }).finally(() => {
+        loading = false;
+        if (active) timer = setTimeout(refresh, 2000);
       });
     };
     refresh();
-    const timer = setInterval(() => refresh(false), 2000);
-    const onModelsChanged=()=>refresh(false);
+    const onModelsChanged = refresh;
     window.addEventListener(MODEL_PROVIDERS_CHANGED_EVENT,onModelsChanged);
     return () => {
       active = false;
-      clearInterval(timer);
+      clearTimeout(timer);
       window.removeEventListener(MODEL_PROVIDERS_CHANGED_EVENT,onModelsChanged);
     };
     // cursor is read only for the older-page action, not the poll.

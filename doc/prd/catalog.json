@@ -995,6 +995,13 @@
       "file": "acceptance/bot-startup-trace.yaml"
     },
     {
+      "id": "bot-status-polling",
+      "title": "工作状态轮询区分慢响应和断线",
+      "requirement": "再排查一下，为什么 Bot 工作状态会这么频繁地提示连接中断？看看是接口响应太慢还是真的断了，把原因也修一下。",
+      "verificationStage": "software",
+      "file": "acceptance/bot-status-polling.yaml"
+    },
+    {
       "id": "bot-steer-visible",
       "title": "Bot 对话里的实时插话马上出现在对话流",
       "requirement": "我在bot对话流中，实时插话，没有立即显示在对话流的UI中，经常延迟很久，插话时机的逻辑不用改，这个ui调整一下",

@@ -8,6 +8,14 @@ import { ConnectionNotice } from './ConnectionNotice';
 
 import { useDesktopNotices } from './DesktopNotices';
 
+type PollFailure = 'botWork.connectionUnconfirmed' | 'botWork.statusSlow' | 'botWork.statusUnavailable';
+
+function failureMessage(failures: number, timedOut: boolean, error: unknown): PollFailure | undefined {
+  if (failures < 2) return undefined;
+  if (timedOut) return 'botWork.statusSlow';
+  return error instanceof TypeError ? 'botWork.connectionUnconfirmed' : 'botWork.statusUnavailable';
+}
+
 const EMPTY: BotWorkStates = {};
 const BotWorkContext = createContext<BotWorkStates>(EMPTY);
 const BotOverviewContext = createContext<BotWorkOverview>({});
@@ -17,17 +25,19 @@ export function BotWorkStateProvider({ children }: { children: ReactNode }) {
   const notice = useDesktopNotices();
   const [states, setStates] = useState<BotWorkStates>(EMPTY);
   const [overview, setOverview] = useState<BotWorkOverview>({});
-  const [disconnected, setDisconnected] = useState(false);
+  const [failure, setFailure] = useState<PollFailure>();
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null);
   useEffect(() => {
+    let failures = 0;
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     let controller: AbortController | undefined;
     async function poll() {
-      controller = new AbortController();
-      const timeout = setTimeout(() => controller?.abort(), 5000);
+      const request = new AbortController();
+      controller = request;
+      const timeout = setTimeout(() => request.abort(), 5000);
       try {
-        const snapshot = await api('/api/bot-work/status', {signal: controller.signal});
+        const snapshot = await api('/api/bot-work/status', {signal: request.signal});
         const next = parseBotWorkStates(snapshot);
         if (!disposed) {
           notice.current(snapshot);
@@ -35,20 +45,22 @@ export function BotWorkStateProvider({ children }: { children: ReactNode }) {
           const summary = parseBotWorkOverview(snapshot);
           setOverview(previous => JSON.stringify(previous) === JSON.stringify(summary) ? previous : summary);
           setLastUpdatedAt(new Date().toISOString());
-          setDisconnected(false);
+          failures = 0;
+          setFailure(undefined);
         }
-      } catch {
-        if (!disposed) setDisconnected(true);
+      } catch (error) {
+        failures++;
+        if (!disposed) setFailure(failureMessage(failures, request.signal.aborted, error));
       } finally {
         clearTimeout(timeout);
-        if (!disposed) timer = setTimeout(poll, 1000);
+        if (!disposed) timer = setTimeout(poll, Math.min(8000, 1000 * Math.max(1, failures)));
       }
     }
     void poll();
     return () => { disposed = true; clearTimeout(timer); controller?.abort(); };
   }, []);
   return <BotOverviewContext.Provider value={overview}><BotWorkContext.Provider value={states}>
-    <ConnectionNotice className="bot-work-connection-notice" disconnected={disconnected} lastUpdatedAt={lastUpdatedAt} testId="bot-work-connection" />
+    <ConnectionNotice className="bot-work-connection-notice" disconnected={Boolean(failure)} messageKey={failure} lastUpdatedAt={lastUpdatedAt} testId="bot-work-connection" />
     {children}
   </BotWorkContext.Provider></BotOverviewContext.Provider>;
 }

@@ -24,13 +24,15 @@ test('task lookup prevents cross-user result access',async()=>{
  await assert.rejects(()=>call(rt,'GET','/api/bot-work/tasks/:id',{}, {id:accepted.body.task.id},{...ANONYMOUS_AUTH,user:{id:'other',tenantId:'t'}}),/Task not found/);
 });
 
-test('live Bot work is shared per member and survives concurrent completion [AC:bot-working-animation#AC-2] [AC:bot-working-animation#AC-4]', async () => {
+test('live Bot work is shared per member and survives concurrent completion [AC:bot-working-animation#AC-2] [AC:bot-working-animation#AC-4] [AC:bot-status-polling#AC-1]', async () => {
  const rt=runtime();
  const worker=rt.createBot({name:'Motion worker'}), idle=rt.createBot({name:'Idle member'});
  const sessions=[worker,idle,worker].map((bot,index)=>rt.createChatSession({agentId:bot.id,title:`run ${index}`,background:true,metadata:{botId:bot.id,roomId:'room-motion'}}));
  const executing=new Set([sessions[0].id,sessions[2].id]);
  rt.isSessionRunning=id=>executing.has(id);
  sessions.forEach(session=>rt.store.updateSession(session.id,{status:'running'}));
+ rt.store.listSessions = () => assert.fail("polled all historical sessions");
+ rt.store.listBackgroundJobs = () => assert.fail("polled all historical jobs");
  const snapshot=async()=> (await call(rt,'GET','/api/bot-work/status')).body.bots;
  let rows=await snapshot();
  assert.equal(rows.find(row=>row.bot.id===worker.id).activeWorkCount,2);
