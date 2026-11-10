@@ -85,7 +85,8 @@ export async function resolveSkillLoad(
   sessionId: string
 ): Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string; requiredSkills?: string[] }> {
   const skills = await host.promptBuilder.skillsForSession(sessionId);
-  const allowed = host.promptBuilder.getAllowedSkills(sessionId);
+  // A missing allowlist method means every skill, same as an absent allowedSkills list.
+  const allowed = host.promptBuilder.getAllowedSkills?.(sessionId);
   const normalizedName = name.trim().toLowerCase();
   const matches = skills.filter((skill) => {
     const lookupKeys = [skill.name, skill.id, ...(skill.aliases ?? [])];

@@ -819,7 +819,9 @@ export function botWorkStatus(host:BotWorkHost,principal:BotPrincipal):unknown[]
  return host.store.listBots({includeHidden:true}).flatMap(bot=>{
   const canonical=host.store.getSession(bot.canonicalSessionId);
   const owner=canonical?principalFromSession(host.store,canonical):botDefinitionOwner(host.store,bot.id);if(!owner)return [];if(!sameBotPrincipal(owner,principal)&&!sameBotPrincipal(owner,installation))return [];
-  const mine=chats.get(bot.id);
+  const projected=chats.get(bot.id);
+  // The install chat is already loaded. A viewer's own formal chat is one more read; background rows stay in SQL.
+  const mine=projected?.id===bot.canonicalSessionId?(canonical??projected):projected?(host.store.getSession(projected.id)??projected):undefined;
   const pending=host.store.db.prepare("SELECT count(*) AS n FROM bot_work_messages WHERE principal=? AND target_bot=? AND status='pending'").get(botPrincipalKey(principal),bot.id) as {n:number};
   return [{bot,control:botWorkControl(host.store,principal,bot.id),sessionId:mine?.id??null,status:mine?.status??(canonical?'idle':'unknown'),pending:pending.n,taskCounts:countsByBot.get(bot.id)??{},tasks:tasks.filter(t=>t.targetBotId===bot.id)}];
  });
