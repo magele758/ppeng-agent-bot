@@ -5,7 +5,9 @@ import { preferenceStorage } from '@/lib/user-preference-storage';
 
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, pollApi } from '@/lib/api';
+import { startPollTimer } from '@/lib/poll-timer';
+import { sessionPollPace } from '@/lib/session-activity';
 import { useI18n } from '@/lib/i18n';
 import './skill-capture.css';
 import { BotSkillSharing, useSkillBots } from './BotSkillSharing';
@@ -70,20 +72,17 @@ export function SkillCaptureCards({ sessionId, onLayoutChange }: { sessionId: st
   useEffect(() => {
     alive.current = true;
     let disposed = false;
-    let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const data = await api(endpoint) as { captures: Capture[] };
+        const data = await pollApi(endpoint) as { captures: Capture[] };
         if (!disposed) setCaptures(current => JSON.stringify(current) === JSON.stringify(data.captures) ? current : data.captures);
       } catch {
         // Existing daemon versions may not expose this optional panel yet.
-      } finally {
-        if (!disposed) timer = setTimeout(() => void poll(), 2000);
       }
     }
-    void poll();
-    return () => { disposed = true; alive.current = false; clearTimeout(timer); };
-  }, [endpoint]);
+    const stop = startPollTimer({ run: poll, ...sessionPollPace(sessionId, 2000, 3000) });
+    return () => { disposed = true; alive.current = false; stop(); };
+  }, [endpoint, sessionId]);
 
   async function decide(capture: Capture, action: 'confirm' | 'reject') {
     if (pending.current.has(capture.id)) return;

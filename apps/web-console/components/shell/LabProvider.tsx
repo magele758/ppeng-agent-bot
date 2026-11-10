@@ -29,7 +29,10 @@ import {
 } from '@/lib/nav';
 import type { ModelProvidersResponse } from '@/lib/model-providers';
 import { runLabTick } from '@/lib/lab-tick';
-import { fetchList, idleLabListState, settleList, type LabListKey, type LabListState, type ListFetch } from '@/lib/list-load';
+import { createOverviewCadence, refreshForPage } from '@/lib/overview-plan';
+import { pageVisibility, startPollTimer } from '@/lib/poll-timer';
+import { createTabReturnWatch, noteSessionStatuses, onTabVisibility, sessionStamp } from '@/lib/session-activity';
+import { idleLabListState, settleList, type LabListKey, type LabListState, type ListFetch } from '@/lib/list-load';
 import type { OutboundIdentity } from '@/lib/outbound-draft-preview';
 import { shouldRefreshOpenSession } from '@/lib/run-leave';
 import { sameData } from '@/lib/same-data';
@@ -220,7 +223,9 @@ export function LabProvider({ children }: { children: ReactNode }) {
     orchestrationRuns
   };
   const chatBridgeRef = useRef<ChatBridge | null>(null);
-  const tickTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const locationRef = useRef(location);
+  locationRef.current = location;
+  const cadence = useMemo(() => createOverviewCadence({ fresh: api, shared: pollApi }), []);
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -272,45 +277,46 @@ export function LabProvider({ children }: { children: ReactNode }) {
   const loadOverview = useCallback(async () => {
     const listScroll = scrollSnapshot(LIST_SCROLL_IDS);
     const sidNow = selectedSessionRef.current;
+    const plan = cadence.plan(locationRef.current);
     const [sess, tasksRes, socialRes, appr, draftRes, ag, ws, jobsRes, swarmRes, orchRes, botsRes, mailRes] =
       await Promise.all([
-      api('/api/sessions?view=summary').catch(() => ({ sessions: undefined })),
-      fetchList(async () => {
-        const r = (await api('/api/tasks')) as { tasks?: TaskSummary[] };
+      plan.read('/api/sessions?view=summary').catch(() => ({ sessions: undefined })),
+      plan.list('tasks', async () => {
+        const r = (await plan.read('/api/tasks')) as { tasks?: TaskSummary[] };
         return r.tasks ?? [];
       }),
-      fetchList(async () => {
-        const r = (await api('/api/social-post-schedules')) as { items?: SocialPostScheduleItem[] };
+      plan.list('socialSchedules', async () => {
+        const r = (await plan.read('/api/social-post-schedules')) as { items?: SocialPostScheduleItem[] };
         return r.items ?? [];
       }),
-      fetchList(async () => {
-        const r = (await api('/api/approvals?status=pending')) as { approvals?: ApprovalItem[] };
+      plan.list('approvals', async () => {
+        const r = (await plan.read('/api/approvals?status=pending')) as { approvals?: ApprovalItem[] };
         return pendingApprovals(r.approvals);
       }),
-      fetchList(async () => {
-        const r = (await api('/api/outbound-drafts')) as { drafts?: OutboundDraftItem[] };
+      plan.list('outboundDrafts', async () => {
+        const r = (await plan.read('/api/outbound-drafts')) as { drafts?: OutboundDraftItem[] };
         return r.drafts ?? [];
       }),
-      api('/api/agents').catch(() => ({ agents: undefined })),
-      fetchList(async () => {
-        const r = (await api('/api/workspaces')) as { workspaces?: WorkspaceRow[] };
+      plan.agents().catch(() => ({ agents: undefined })),
+      plan.list('workspaces', async () => {
+        const r = (await plan.read('/api/workspaces')) as { workspaces?: WorkspaceRow[] };
         return r.workspaces ?? [];
       }),
-      fetchList(async () => {
-        const r = (await api('/api/background-jobs')) as { jobs?: JobRow[] };
+      plan.list('jobs', async () => {
+        const r = (await plan.read('/api/background-jobs')) as { jobs?: JobRow[] };
         return r.jobs ?? [];
       }),
-      fetchList(async () => {
-        const r = (await api('/api/swarm/runs')) as { runs?: SwarmRunRow[] };
+      plan.list('swarmRuns', async () => {
+        const r = (await plan.read('/api/swarm/runs')) as { runs?: SwarmRunRow[] };
         return r.runs ?? [];
       }),
-      fetchList(async () => {
-        const r = (await api('/api/orchestration/runs')) as { runs?: OrchestrationRunRow[] };
+      plan.list('orchestrationRuns', async () => {
+        const r = (await plan.read('/api/orchestration/runs')) as { runs?: OrchestrationRunRow[] };
         return r.runs ?? [];
       }),
-      api('/api/bots').catch(() => ({ bots: undefined })),
-      fetchList(async () => {
-        const r = (await api('/api/mailbox/all?limit=200')) as { mail?: MailItem[] };
+      plan.read('/api/bots').catch(() => ({ bots: undefined })),
+      plan.list('mail', async () => {
+        const r = (await plan.read('/api/mailbox/all?limit=200')) as { mail?: MailItem[] };
         return r.mail ?? [];
       })
     ]);
@@ -320,6 +326,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
     // 拉取失败（undefined）时保留现有列表，避免瞬时错误清空会话/Agent。
     // 内容没变时保留原引用，避免 2.8s 轮询重渲染整页、冲掉文本选区。
     const sList = sessFetched ?? sessionsRef.current;
+    noteSessionStatuses(sList);
     if (sessFetched) setSessions((prev) => (sameData(prev, sessFetched) ? prev : sessFetched));
     if (agFetched) setAgents((prev) => (sameData(prev, agFetched) ? prev : agFetched));
     if (botsFetched) setBots((prev) => (sameData(prev, botsFetched) ? prev : botsFetched));
@@ -358,7 +365,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       }
       sessionListStickTopRef.current = false;
     }
-  }, []);
+  }, [cadence]);
   const refreshOverview = useMemo(() => singleFlight(loadOverview), [loadOverview]);
 
   const upsertBot = useCallback((bot: BotInfo) => {
@@ -376,35 +383,53 @@ export function LabProvider({ children }: { children: ReactNode }) {
       const includePlayPanel = opts?.includePlayPanel !== false;
       await runLabTick({
         refreshMeta,
+        metaDue: cadence.metaDue,
         refreshOverview,
         refreshPlayPanel: includePlayPanel ? async () => chatBridgeRef.current?.refreshPlayPanel() : undefined
       });
     },
-    [refreshMeta, refreshOverview]
+    [refreshMeta, refreshOverview, cadence]
   );
 
   useEffect(() => {
-    void tick({ includePlayPanel: false });
+    cadence.markTimer();
+    void tick({ includePlayPanel: false }).finally(cadence.clearTimer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- initial load
 
+  // A page that shows its own lists gets them on arrival instead of on the next timer refresh.
+  const pageKey = `${location.section}/${location.sub ?? ''}`;
+  const firstPageRef = useRef(true);
   useEffect(() => {
-    if (tickTimerRef.current) clearInterval(tickTimerRef.current);
-    tickTimerRef.current = null;
-    if (autoRefresh) {
-      tickTimerRef.current = setInterval(() => {
-        const selected = sessionsRef.current.find((session) => session.id === selectedSessionRef.current);
-        const includePlayPanel = shouldRefreshOpenSession({
-          openSessionId: selectedSessionRef.current,
-          selectedSessionId: selected?.id ?? null,
-          selectedStatus: selected?.status
-        });
-        void tick({ includePlayPanel });
-      }, 2800);
+    if (firstPageRef.current) {
+      firstPageRef.current = false;
+      return;
     }
+    void refreshForPage(refreshOverview, cadence, () => locationRef.current);
+  }, [pageKey, refreshOverview, cadence]);
+
+  const timerTick = useCallback(() => {
+    const selected = sessionsRef.current.find((session) => session.id === selectedSessionRef.current);
+    const includePlayPanel = shouldRefreshOpenSession({
+      openSessionId: selectedSessionRef.current,
+      selectedSessionId: selected?.id ?? null,
+      selectedStatus: selected?.status
+    });
+    cadence.markTimer();
+    return tick({ includePlayPanel }).finally(cadence.clearTimer);
+  }, [tick, cadence, selectedSessionRef]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const watch = createTabReturnWatch(() => sessionStamp(selectedSessionRef.current));
+    const stopTimer = startPollTimer({ run: timerTick, delayMs: () => 2800, immediate: false });
+    const stopWatch = pageVisibility.subscribe(() => {
+      void onTabVisibility(pageVisibility.hidden(), watch, refreshOverview, () => chatBridgeRef.current?.refreshPlayPanel());
+    });
     return () => {
-      if (tickTimerRef.current) clearInterval(tickTimerRef.current);
+      stopTimer();
+      stopWatch();
     };
-  }, [autoRefresh, tick]);
+  }, [autoRefresh, timerTick, refreshOverview, selectedSessionRef]);
 
   const registerChatBridge = useCallback((bridge: ChatBridge | null) => {
     chatBridgeRef.current = bridge;

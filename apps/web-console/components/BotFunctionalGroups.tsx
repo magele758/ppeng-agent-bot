@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode } from 'react';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { botForCanonicalSession } from '@/lib/bots';
-import { api } from '@/lib/api';
+import { api, pollApi } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import styles from './BotFunctionalGroups.module.css';
 import { RowActionMenu } from './RowActionMenu';
@@ -64,7 +64,7 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
 
   useEffect(() => {
     let alive = true;
-    void api('/api/bot-functional-groups').then((data) => {
+    void pollApi('/api/bot-functional-groups').then((data) => {
       if (!alive) return;
       const next = withRoomIds((data as { groups: FunctionalGroup[] }).groups ?? []);
       setGroups(next);

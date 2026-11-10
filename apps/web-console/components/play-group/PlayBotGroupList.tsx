@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type DragEvent } from 'react';
 import type { BotInfo } from '@/lib/types';
-import { api } from '@/lib/api';
+import { api, pollApi } from '@/lib/api';
+import { startPollTimer } from '@/lib/poll-timer';
 import { sameData } from '@/lib/same-data';
 import { useI18n, type I18nContextValue } from '@/lib/i18n';
 import {
@@ -35,6 +36,9 @@ import {
 import { RowActionMenu } from '../RowActionMenu';
 import { GroupFace, type GroupMemberFace } from './GroupFace';
 import './play-group.css';
+
+/** Group rows change on this page through events; the timer only catches changes made elsewhere. */
+const ROOM_POLL_MS = 3000;
 
 export type SidebarRoom = {
   id: string;
@@ -192,9 +196,9 @@ export function PlayBotGroupList({
 
   useEffect(() => {
     let active = true;
-    const loadRooms = () => {
+    const loadRooms = (read: typeof api) => {
       const revision = roomRevision.current;
-      void api('/api/bot-rooms')
+      return read('/api/bot-rooms')
         .then((data) => {
           if (!active || revision !== roomRevision.current) return;
           const list = (data as { rooms?: SidebarRoom[] }).rooms;
@@ -207,7 +211,7 @@ export function PlayBotGroupList({
     };
     const loadGroups = () => {
       const revision = placementRevision.current;
-      void api('/api/bot-functional-groups')
+      void pollApi('/api/bot-functional-groups')
         .then((data) => {
           if (!active || revision !== placementRevision.current) return;
           const list = (data as { groups?: PlacementGroup[] }).groups;
@@ -218,12 +222,11 @@ export function PlayBotGroupList({
           if (active && revision === placementRevision.current) setPlacementReady(true);
         });
     };
-    loadRooms();
     loadGroups();
-    const timer = setInterval(loadRooms, 2000);
+    const stopRooms = startPollTimer({ run: () => loadRooms(pollApi), delayMs: () => ROOM_POLL_MS });
     const onChanged = () => {
       roomRevision.current += 1;
-      loadRooms();
+      void loadRooms(api);
     };
     const onPlacement = (event: Event) => {
       const detail = event instanceof CustomEvent ? event.detail : undefined;
@@ -239,7 +242,7 @@ export function PlayBotGroupList({
     window.addEventListener(FUNCTIONAL_GROUPS_CHANGED_EVENT, onPlacement);
     return () => {
       active = false;
-      clearInterval(timer);
+      stopRooms();
       window.removeEventListener(BOT_GROUPS_CHANGED_EVENT, onChanged);
       window.removeEventListener(FUNCTIONAL_GROUPS_CHANGED_EVENT, onPlacement);
     };

@@ -1,12 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { pollApi } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 
 export type SkillBot = { id: string; name: string };
 export function useSkillBots() {
   const [bots, setBots] = useState<SkillBot[]>([]);
-  useEffect(() => { let alive = true; void api('/api/bots').then(data => {
+  useEffect(() => { let alive = true; void pollApi('/api/bots').then(data => {
     if (alive) setBots((data as { bots?: SkillBot[] }).bots ?? []);
   }).catch(() => {}); return () => { alive = false; }; }, []);
   return bots;

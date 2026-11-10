@@ -295,6 +295,14 @@ test('偏好同步后经典深色不再被盖上毛玻璃 [AC:classic-solid-dark
   apiState.values = { theme: 'dark', 'lab.skin': null };
   const hooks = createHooks();
   hookSlot.current = hooks;
+  // Other browsers' edits are pulled every 15 seconds; move the clock so each check reads.
+  const realNow = Date.now;
+  let ahead = 0;
+  const nextRemoteRead = () => {
+    ahead += 15_000;
+    Date.now = () => realNow() + ahead;
+    browser.win.interval?.();
+  };
   try {
     const mod = loadTsx(path.join(here, 'UserPreferenceSync.tsx'), reactHooks());
     const UserPreferenceSync = mod.UserPreferenceSync as () => null;
@@ -307,23 +315,24 @@ test('偏好同步后经典深色不再被盖上毛玻璃 [AC:classic-solid-dark
     assert.equal(browser.root.getAttribute('data-theme'), 'dark');
 
     apiState.values = { theme: 'dark', 'lab.skin': 'classic' };
-    browser.win.interval?.();
+    nextRemoteRead();
     await flush();
     assert.equal(browser.root.getAttribute('data-skin'), null);
     assert.equal(browser.root.getAttribute('data-theme'), 'dark');
 
     apiState.values = { theme: 'dark', 'lab.skin': 'sanctum' };
-    browser.win.interval?.();
+    nextRemoteRead();
     await flush();
     assert.equal(browser.root.getAttribute('data-skin'), 'sanctum');
     assert.equal(browser.root.getAttribute('data-theme'), 'dark');
 
     apiState.values = { theme: 'light', 'lab.skin': null };
-    browser.win.interval?.();
+    nextRemoteRead();
     await flush();
     assert.equal(browser.root.getAttribute('data-skin'), null);
     assert.equal(browser.root.getAttribute('data-theme'), 'light');
   } finally {
+    Date.now = realNow;
     hooks.cleanup();
     browser.restore();
   }
