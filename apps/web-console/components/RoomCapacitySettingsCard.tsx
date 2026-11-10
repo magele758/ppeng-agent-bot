@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { SettingsGroup } from './ui';
@@ -13,11 +13,15 @@ interface RoomSettings {
   defaultMaxCostUsd: number;
 }
 
-type Change = (patch: Partial<RoomSettings>) => void;
+function merged(current: RoomSettings | null, patch: Partial<RoomSettings>): RoomSettings | null {
+  return current ? { ...current, ...patch } : current;
+}
 
 /** Budgets a new group starts with. 0 leaves that budget off; each group can still set its own. */
-function NewRoomBudgetFields({ settings, disabled, onChange }: { settings: RoomSettings | null; disabled: boolean; onChange: Change }) {
+function NewRoomBudgetFields({ settings, busy, setSettings }: { settings: RoomSettings | null; busy: boolean; setSettings: Dispatch<SetStateAction<RoomSettings | null>> }) {
   const { t } = useI18n();
+  const disabled = !settings || busy;
+  const onChange = (patch: Partial<RoomSettings>) => setSettings(current => merged(current, patch));
   return (
     <>
       <p>{t('settings.roomCapacity.newRoomBudgets')}</p>
@@ -79,7 +83,7 @@ export function RoomCapacitySettingsCard() {
           {t('settings.roomCapacity.maxWaveSpeakers')}
           <input data-testid="room-capacity-wave" type="number" min={1} max={10} value={settings?.maxWaveSpeakers ?? ''} disabled={!settings || busy} onChange={event => setSettings(current => current ? { ...current, maxWaveSpeakers: Number(event.target.value) } : current)} />
         </label>
-        <NewRoomBudgetFields settings={settings} disabled={!settings || busy} onChange={patch => setSettings(current => current ? { ...current, ...patch } : current)} />
+        <NewRoomBudgetFields settings={settings} busy={busy} setSettings={setSettings} />
         <button type="button" data-testid="room-capacity-save" disabled={!settings || busy} onClick={() => void save()}>{t('settings.roomCapacity.save')}</button>
         {status ? <p>{status}</p> : null}
       </SettingsGroup>
