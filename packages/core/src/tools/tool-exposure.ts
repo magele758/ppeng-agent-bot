@@ -113,6 +113,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
         "tools": [
             "bot_list",
             "bot_get",
+            "bot_coaching_get",
             "message_agent",
             "ask_bot_help"
         ]
@@ -229,6 +230,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
             "bot_create",
             "create_bot",
             "bot_update",
+            "bot_coaching_save",
             "bot_open",
             "bot_work_control_set",
             "bot_shared_context_get",

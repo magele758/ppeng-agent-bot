@@ -1411,6 +1411,7 @@ Bot 行为契约与有证据的经验沉淀
 
 - `apps/daemon/test/bot-coaching.test.ts`
 - `packages/core/test/bot-coaching.test.js`
+- `packages/core/test/product-admin-tools.test.js`
 
 ### bot-completion-reliability
 

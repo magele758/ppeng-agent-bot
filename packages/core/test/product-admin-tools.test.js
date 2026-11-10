@@ -687,3 +687,7 @@ test('task creation ignores forged permission and Bot fields and refuses cross-B
     assert.equal(ordinary.ok, false);
   } finally { fx.store.db.close(); }
 });
+
+test('coach tools persist authorized contracts but reject plan mode and foreign callers [AC:bot-coaching-loop#AC-6]',async()=>{
+ const fx=fixture();fx.session={...fx.session,metadata:{...fx.session.metadata,userId:'alice'}};try{const made=await call(fx,'bot_create',{name:'Coach target'});const id=made.body.bot.id;const read=await call(fx,'bot_coaching_get',{bot:id});assert.equal(read.body.coaching.revision,0);const input={bot:id,revision:0,profile:{host:'Ubuntu2'},lessons:[]};assert.equal((await call(fx,'bot_coaching_save',input,{...fx.session,metadata:{...fx.session.metadata,permissionMode:'plan'}})).ok,false);assert.equal((await call(fx,'bot_coaching_save',input)).ok,true);assert.equal((await call(fx,'bot_coaching_save',input)).ok,false);const saved=await call(fx,'bot_coaching_get',{bot:id});assert.equal(saved.body.coaching.profile.host,'Ubuntu2');assert.equal((await call(fx,'bot_coaching_get',{bot:id},{...fx.session,metadata:{userId:'foreign'}})).ok,false);}finally{fx.store.db.close();}
+});

@@ -1593,7 +1593,8 @@
       "title": "Bot 行为契约与有证据的经验沉淀",
       "tests": [
         "apps/daemon/test/bot-coaching.test.ts",
-        "packages/core/test/bot-coaching.test.js"
+        "packages/core/test/bot-coaching.test.js",
+        "packages/core/test/product-admin-tools.test.js"
       ]
     },
     {
