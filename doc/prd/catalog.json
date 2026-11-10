@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 419,
+    "implemented": 421,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1723,6 +1723,13 @@
       "file": "acceptance/group-face.yaml"
     },
     {
+      "id": "group-member-partial-roster",
+      "title": "群里有旧成员时仍可添加当前可选的 Bot",
+      "requirement": "这个怎么又不能把bot加入群聊了？",
+      "verificationStage": "software",
+      "file": "acceptance/group-member-partial-roster.yaml"
+    },
+    {
       "id": "group-member-quiet",
       "title": "群聊成员区只留成员本身的信息",
       "requirement": "用户指着 Lab 群聊界面说这一块和顶部都是一团糟，大块无意义信息。\n群聊成员区只留成员本身需要的信息：头像、名字、移出、加入 Bot。不要把 Bot 的系统提示 / 职责描述 / persona 长文铺在卡片里。\n每张卡不要重复「全局默认 · 本地服务 / grok/grok-4.7」这种跟顶部一模一样的模型路径。只有该 Bot 有与全局默认不同的专属模型时，用一行短文本标出模型名（不要再写「全局默认」「这里展示普通文本模型配置」这类讲解）。\n顶部那两行解释收掉。若还需要进入全局默认模型设置，只留一个短链接/按钮，不要段落。\n不要改加入/移出/群聊共享信息的行为。\n用户可见文案走 i18n：zh 与 en 同一套 key，禁止硬编码中英文。不要新增 RAW_AGENT_* 开关。",
@@ -1742,6 +1749,13 @@
       "requirement": "这个是干嘛的？有必要留吗？\n这里的回复模式，介绍的详细点，现在太简单了，没说清楚\n群聊需要加定时任务的能力吗？还是由默认协调者来控制即可？群聊只做组织形式？",
       "verificationStage": "software",
       "file": "acceptance/group-mode-explanations.yaml"
+    },
+    {
+      "id": "group-mode-instant-selection",
+      "title": "群聊回复方式可以连续切换",
+      "requirement": "这个回复方式怎么切换选择这么卡顿",
+      "verificationStage": "software",
+      "file": "acceptance/group-mode-instant-selection.yaml"
     },
     {
       "id": "group-reply-mode",

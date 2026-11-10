@@ -30,7 +30,10 @@ export function addGroupMember(
   botId: string,
   knownIds?: ReadonlySet<string>
 ): GroupMembers {
-  return groupMemberIds([...current, botId], knownIds);
+  const result = groupMemberIds([...current, botId]);
+  if (!result.ok) return result;
+  if (knownIds && !knownIds.has(botId.trim())) return { ok: false, code: 'unknown' };
+  return result;
 }
 
 export function removeGroupMember(current: readonly string[], botId: string): GroupMembers {

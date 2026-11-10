@@ -1,12 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import {
-  loadGroupReplyMode,
-  saveGroupReplyMode,
-  type GroupReplyMode
-} from '@/lib/group-reply-mode';
+import { useState, useSyncExternalStore } from 'react';
+import type { GroupReplyMode } from '@/lib/group-reply-mode';
+import { roomReplySelection } from './reply-mode-selection';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import './play-group.css';
 
@@ -16,40 +12,10 @@ const OPTIONS: readonly { mode: GroupReplyMode; labelKey: MessageKey; hintKey: M
   { mode: 'all-members', labelKey: 'play.groupSettings.allMembers', hintKey: 'play.groupSettings.allMembersHint', flowKey: 'play.groupSettings.allMembersFlow', useKey: 'play.groupSettings.allMembersUse' }
 ];
 
-export function GroupReplyModeControl({ roomId }: { roomId: string }) {
+export function GroupReplyModeControl({ roomId, initialMode }: { roomId: string; initialMode: GroupReplyMode }) {
   const { t } = useI18n();
-  const [mode, setMode] = useState<GroupReplyMode | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    setMode(null);
-    setError('');
-    void loadGroupReplyMode(api, roomId)
-      .then((loaded) => {
-        if (active) setMode(loaded);
-      })
-      .catch((cause: unknown) => {
-        if (!active) return;
-        setError(cause instanceof Error && cause.message ? cause.message : t('play.groupSettings.saveFailed'));
-      });
-    return () => {
-      active = false;
-    };
-  }, [roomId, t]);
-
-  async function choose(next: GroupReplyMode) {
-    if (mode === null || next === mode || busy) return;
-    const previous = mode;
-    setBusy(true);
-    setMode(next);
-    setError('');
-    const result = await saveGroupReplyMode(api, roomId, previous, next);
-    setMode(result.mode);
-    setError(result.saved ? '' : result.error === 'not-confirmed' ? t('play.groupSettings.saveFailed') : result.error);
-    setBusy(false);
-  }
+  const [selection] = useState(() => roomReplySelection(roomId, initialMode));
+  const { mode, error } = useSyncExternalStore(selection.subscribe, selection.snapshot, selection.snapshot);
 
   return (
     <fieldset className="play-group-reply-mode" data-testid="group-reply-mode">
@@ -64,8 +30,7 @@ export function GroupReplyModeControl({ roomId }: { roomId: string }) {
               value={option.mode}
               data-testid={`group-reply-mode-${option.mode}`}
               checked={mode === option.mode}
-              disabled={mode === null || busy}
-              onChange={() => void choose(option.mode)}
+              onChange={() => void selection.choose(option.mode)}
             />
             <span>{t(option.labelKey)}</span>
             <small className="play-group-reply-mode__hint">{t(option.hintKey)}</small>
@@ -83,7 +48,7 @@ export function GroupReplyModeControl({ roomId }: { roomId: string }) {
         ))}
         <p>{t('play.groupSettings.mentionRules')}</p>
       </details>
-      {error ? <p role="alert" className="play-group-reply-mode__error" data-testid="group-reply-mode-error">{error}</p> : null}
+      {error ? <p role="alert" className="play-group-reply-mode__error" data-testid="group-reply-mode-error">{error === 'not-confirmed' ? t('play.groupSettings.saveFailed') : error}</p> : null}
     </fieldset>
   );
 }

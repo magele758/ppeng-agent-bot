@@ -79,10 +79,8 @@ test('群聊设置能在两种模式间切换并把 replyMode 交给现有保存
   assert.ok(en.play.groupSettings.saveFailed.length > 0);
 
   assert.match(chat, /data-testid="room-settings"[\s\S]*<BotRooms/);
-  assert.match(rooms, /selectedRoomId \? <GroupReplyModeControl roomId=\{selectedRoomId\} \/> : null/);
-  assert.match(control, /saveGroupReplyMode\(api, roomId, previous, next\)/);
-  assert.match(control, /setMode\(result\.mode\)/);
-  assert.match(control, /loadGroupReplyMode\(api, roomId\)/);
+  assert.match(rooms, /initialMode=\{readGroupReplyMode\(room\)\}/);
+  assert.doesNotMatch(control, /loadGroupReplyMode\(/);
   assert.match(control, /data-testid="group-reply-mode"/);
   assert.match(control, /play\.groupSettings\.saveFailed/);
   assert.match(control, /data-testid=\{`group-reply-mode-\$\{option\.mode\}`\}/);

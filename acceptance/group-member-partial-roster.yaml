@@ -1,0 +1,10 @@
+id: group-member-partial-roster
+title: 群里有旧成员时仍可添加当前可选的 Bot
+status: implemented
+requirement: 这个怎么又不能把bot加入群聊了？
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 已有群成员未出现在当前 Bot 名单，待加入的 Bot 在名单里
+    when: 在群聊设置中添加该 Bot
+    then: 可以加入且保留全部原成员；仍拒绝名单外的新成员和重复成员
