@@ -9,6 +9,7 @@ import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
 import { readMessageSessionId } from '@/lib/goal-update-notice';
 import { omitStreamTextSavedOnTurn } from '@/lib/history-window';
+import { groupReplySlots } from '@/lib/reply-hover-run';
 import { continuedAssistantIndexes } from '@/lib/assistant-label-run';
 import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
 import { rowsForSessionBrief, showProcessNote } from '@/lib/session-brief';
@@ -22,7 +23,7 @@ import { placeChildTaskEntries, type ChildTaskStreamEntry } from '@/lib/bot-chil
 import { ApprovalBanner } from './ApprovalBanner';
 import { BotChildTaskStreamEntry } from './BotChildTaskStreamEntry';
 import { ChatFeedWindow } from './ChatFeedWindow';
-import { ContinuedAssistantContext, ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
+import { ReplyRunContext, ContinuedAssistantContext, ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
 import { SkillOperationCards } from './SkillOperationCards';
 import { SkillCaptureCards } from './SkillCaptureCards';
@@ -64,8 +65,8 @@ export function PlayTranscript(props: {
       <ChatFeedWindow
         layoutKey={props.layoutKey}
         scrollerRef={props.chat.playMessagesRef}
-        slots={slots}
-        renderSlot={(slot) => renderTranscriptSlot(slot, view, props, brief)}
+        slots={groupReplySlots(slots, view.messages, brief, props.botSurface)}
+        renderSlot={(slot) => renderReplySlot(slot, child => renderTranscriptSlot(child, view, props, brief))}
         stickToBottomRef={props.chat.playStickToBottomRef}
         scrollIntentRef={props.chat.feedScrollIntentRef}
         revision={props.chat.feedRevision}
@@ -88,6 +89,15 @@ export function PlayTranscript(props: {
     </UserMessageActionsContext.Provider>
     </AssistantNameContext.Provider>
   );
+}
+
+function renderReplySlot(slot: FeedSlot, render: (child: FeedSlot) => ReactNode) {
+  if (!slot.replyRun) return render(slot);
+  return <ReplyRunContext.Provider value={slot.replyRun}>
+    <div className="chat-reply-run">
+      {slot.folded?.map(child => <div key={child.key}>{render(child)}</div>)}
+    </div>
+  </ReplyRunContext.Provider>;
 }
 
 function roleAt(messages: ChatMessage[], i: number): string | undefined {

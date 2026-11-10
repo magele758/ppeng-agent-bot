@@ -4222,6 +4222,13 @@
         "apps/web-console/lib/user-vault.test.ts",
         "packages/core/test/vault-tools.test.js"
       ]
+    },
+    {
+      "id": "whole-reply-hover",
+      "title": "同一条 Bot 回复共享悬停操作",
+      "tests": [
+        "e2e/composer-quote-layout.spec.ts"
+      ]
     }
   ]
 }

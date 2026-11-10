@@ -1087,3 +1087,8 @@ Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk 
 
 上游模型服务出各种状况（输出被截断、连接中断、限流、卡住不动）时，
 用户看到的是准确的结果或明确的错误，不会把半截回答当成完整回答，也不会看到重复的文字。
+
+## whole-reply-hover
+同一条 Bot 回复共享悬停操作
+
+hover到模型返回的内容，现在会显示 “会话时间” “纠错转评测” 和 “引用” 这个要针对模型的一次完整的返回段落去触发，不要一行行的去触发

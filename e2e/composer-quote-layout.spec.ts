@@ -4,7 +4,7 @@ test.use({ viewport: { width: 1218, height: 1104 }, reducedMotion: 'reduce' });
 const sid = 'polish-session';
 const bot = { id: 'polish-bot', name: 'Polish Bot', agentId: 'general', canonicalSessionId: sid };
 const session = { id: sid, title: bot.name, mode: 'chat', status: 'idle', agentId: 'general', metadata: { botId: bot.id, canonicalBotChat: true } };
-const message = (id: string, text: string, role = 'assistant', key?: string) => ({ id, seq: Number(id.replace(/\D/g, '')) || 1, role, parts: [{ type: 'text', text }], ...(key ? { key } : {}) });
+const message = (id: string, text: string, role = 'assistant', key?: string, createdAt?: string) => ({ id, createdAt, seq: Number(id.replace(/\D/g, '')) || 1, role, parts: [{ type: 'text', text }], ...(key ? { key } : {}) });
 async function setup(page: Page, messages = [message('m1', '这是一条可引用的回复。\n'.repeat(12))]) {
   await page.addInitScript(() => { localStorage.setItem('lab.locale', 'zh'); localStorage.setItem('theme', 'light'); });
   await page.route('**/api/bots', r => r.fulfill({ json: { bots: [bot] } }));
@@ -60,4 +60,33 @@ test('quote controls float without a blank row and preserve drafts [AC:composer-
   await quote.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('composer-reply-quote')).toBeVisible();
+});
+
+test('all parts of a bot reply share the same hover actions [AC:whole-reply-hover#AC-1]', async ({page}) => {
+  const endedAt = '2026-11-10T07:50:00Z';
+  await setup(page, [
+    message('m1', '检查进度', 'user'),
+    message('m2', '已读取配置。'),
+    message('m3', '工具记录', 'tool'),
+    message('m4', '检查完成。', 'assistant', undefined, endedAt),
+    message('m5', '下一题', 'user'),
+    message('m6', '另一条回复。')
+  ]);
+  const quotes = page.getByTestId('reply-quote-start');
+  await expect(quotes).toHaveCount(2);
+  const quote = quotes.first();
+  await page.getByText('已读取配置。', {exact:true}).hover();
+  await expect(quote).toHaveCSS('opacity', '1');
+  const bar = quote.locator('..');
+  await expect(bar.locator('time')).toHaveAttribute('datetime', endedAt);
+  const position = await bar.boundingBox();
+  await page.getByText('检查完成。', {exact:true}).hover();
+  await expect(quote).toHaveCSS('opacity', '1');
+  await expect(bar.locator('.correction-capture__trigger')).toHaveCSS('opacity','1');
+  expect(await bar.boundingBox()).toEqual(position);
+  await page.getByText('另一条回复。', {exact:true}).hover();
+  await expect(quote).toHaveCSS('opacity','0');
+  await page.getByText('检查完成。', {exact:true}).hover();
+  await quote.click();
+  await expect(page.getByTestId('composer-reply-quote')).toContainText('已读取配置。 检查完成。');
 });

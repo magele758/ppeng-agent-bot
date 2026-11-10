@@ -100,6 +100,14 @@ function buildModClass(
 /** 同一连续助手发言的后续消息：message index 集合，由 PlayTranscript 提供。 */
 export const ContinuedAssistantContext = createContext<ReadonlySet<number>>(new Set());
 
+export const ReplyRunContext = createContext<import('@/lib/reply-hover-run').ReplyRun | undefined>(undefined);
+function ReplyActions({ index, ...props }: TurnActionsProps & { index: number }) {
+  const run = useContext(ReplyRunContext);
+  if (!run) return <TurnActions {...props} />;
+  if (index !== run.first) return null;
+  return <TurnActions {...props} m={run.last} parts={[{ type: 'text', text: run.text }]} />;
+}
+
 function roleLabelText(role: string, t: (key: MessageKey) => string, hidden: boolean, assistantName: string): string {
   return hidden ? '' : roleLabel(role, t, assistantName);
 }
@@ -1019,7 +1027,7 @@ export function ChatTurnFromMessage({
   const cronPrompt = r === 'user' ? parseCronUserPrompt(msgPartsToText(shown.parts)) : null;
   const cronBubble = cronBubbleOr(cronPrompt, shown.parts, bubble);
   const actions = (
-    <TurnActions m={m} role={r} sessionId={sessionId} quoteBot={quoteBot} onQuote={onQuote} parts={shown.parts} />
+    <ReplyActions index={msgIndex} m={m} role={r} sessionId={sessionId} quoteBot={quoteBot} onQuote={onQuote} parts={shown.parts} />
   );
   return (
     <div className={`chat-turn ${buildModClass(r)}${continuedClass(hideRoleLabel)}${noAvatar ? ' chat-turn--no-avatar' : ''}`}>

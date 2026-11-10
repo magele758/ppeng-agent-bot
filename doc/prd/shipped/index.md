@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 424 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 425 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -1107,3 +1107,9 @@
 - `user-preference-sync` 用户长期偏好入库与迁移
 - `user-vault-ref-fill` User Vault reference fill (distinct from secret-vault)
 - `user-vault-tools` User Vault assistant tools and Lab reference-fill
+
+## whole（1）
+
+需求正文见 [other](other.md)。
+
+- `whole-reply-hover` 同一条 Bot 回复共享悬停操作
