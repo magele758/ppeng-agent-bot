@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 434,
+    "implemented": 435,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2120,6 +2120,13 @@
       "requirement": "减少无效工具注入，只注入必要的工具",
       "verificationStage": "software",
       "file": "acceptance/necessary-tool-injection.yaml"
+    },
+    {
+      "id": "night-runtime-reliability",
+      "title": "夜间运行可靠性修复",
+      "requirement": "最新一版很多问题：\n1、输出死循环次数增多\n2、经常定时任务不回复\n3、实时对话流输出有重复，又消失\n你好好查一下今天晚上的运行日志，看看还有什么问题，深度挖掘一下，然后解决一下",
+      "verificationStage": "software",
+      "file": "acceptance/night-runtime-reliability.yaml"
     },
     {
       "id": "no-windows-desktop-pack",

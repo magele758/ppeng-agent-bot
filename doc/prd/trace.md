@@ -2904,6 +2904,17 @@ macOS 应用控制（外层宿主）
 - `packages/core/test/deferred-tool-load.test.js`
 - `packages/core/test/necessary-tool-injection.test.js`
 
+### night-runtime-reliability
+
+夜间运行可靠性修复
+
+- `apps/web-console/lib/live-stream-once.test.ts`
+- `apps/web-console/lib/stream-segments.test.ts`
+- `e2e/chat-basics.spec.ts`
+- `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
+- `packages/core/test/skill-manifest-gate.test.js`
+- `scripts/workflows/material-source-isolation.test.mjs`
+
 ### no-windows-desktop-pack
 
 不再打 Windows 桌面安装包

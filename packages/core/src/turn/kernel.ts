@@ -1682,6 +1682,7 @@ const __gateSignal = await __gate26();
 if (__gateSignal) return __gateSignal;
 }
 assistantMessage = host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+options?.onModelStreamChunk?.({ type: 'assistant_saved', messageId: assistantMessage.id });
 if (pendingRecoveryAdvisory) {
         host.store.appendMessage(session.id, 'system', [textPart(pendingRecoveryAdvisory)]);
       }
