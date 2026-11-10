@@ -530,7 +530,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'bot_room_create',
-      description: 'Create a group chat. You can do this. Same capability as create_room. Required: title and at least 2 different botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20, this room only), maxToolCalls, maxCostUsd. The member count cannot exceed the saved per-room member cap (default 50). Changing that global cap does not change this room\'s maxBotTurns.',
+      description: 'Create a group chat. You can do this. Same capability as create_room. Required: title and at least 2 different botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20, this room only), maxToolCalls, maxCostUsd (both per round; omitted means the saved default for new rooms, which is off unless changed). The member count cannot exceed the saved per-room member cap (default 50). Changing that global cap does not change this room\'s maxBotTurns.',
       properties: {
         title: { type: 'string' },
         botIds: { type: 'array', items: { type: 'string' } },
@@ -1298,7 +1298,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
       return [spec, {
         ...spec,
         name: 'create_room',
-        description: 'Create a group chat. You can do this; the tool name is create_room. Required: title and at least 2 different botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20, this room only), maxToolCalls, maxCostUsd. The member count cannot exceed the saved per-room member cap (default 50). Changing that global cap does not change this room\'s maxBotTurns.'
+        description: 'Create a group chat. You can do this; the tool name is create_room. Required: title and at least 2 different botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20, this room only), maxToolCalls, maxCostUsd (both per round; omitted means the saved default for new rooms, which is off unless changed). The member count cannot exceed the saved per-room member cap (default 50). Changing that global cap does not change this room\'s maxBotTurns.'
       }];
     }
     return [spec];

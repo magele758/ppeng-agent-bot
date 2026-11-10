@@ -243,13 +243,13 @@ test('tool and cost limits stop before further member tool execution [AC:bot-roo
     await options.onEvent({type:'model_done',stopReason:'tool_use',assistant:{parts:[{type:'tool_call',toolCallId:'x',name:'bash',input:{}},{type:'tool_call',toolCallId:'y',name:'bash',input:{}}]}});
     f.store.updateSession(id,{status:'idle'});
   };
-  const room=f.rooms.create(f.principal,{title:'Tools',botIds:[f.a.id,f.b.id],maxToolCalls:1});
+  const room=f.rooms.create(f.principal,{title:'Tools',botIds:[f.a.id,f.b.id],maxToolCalls:1,maxCostUsd:1});
   f.rooms.send(f.principal,room.id,{text:'tools',mentions:[f.a.id]});await f.rooms.tick();
   assert.equal(cancelled,1);
   assert.equal(f.rooms.turns(f.principal,room.id)[0].terminationReason,'tool_budget');
   f.host.runSession=async(id,options)=>{
     const session=f.store.getSession(id);f.store.updateSession(id,{metadata:{...session.metadata,usageCostUsd:2}});
-    await options.onEvent({type:'model_done',stopReason:'end',assistant:{parts:[{type:'text',text:'cost'}]}});
+    await options.onEvent({type:'model_done',stopReason:'tool_use',assistant:{parts:[{type:'tool_call',toolCallId:'z',name:'bash',input:{}}]}});
     f.store.updateSession(id,{status:'idle'});
   };
   f.rooms.send(f.principal,room.id,{text:'cost',mentions:[f.a.id]});await f.rooms.tick();
@@ -1637,10 +1637,10 @@ test('a new room does not stop conversation rounds when the cap switch is off [A
   const room = f.rooms.create(f.principal, { title: 'Open', botIds: ids, hostBotId: f.a.id });
   assert.equal(room.maxBotTurns, 0);
   assert.notEqual(room.turnCapEnabled, true);
-  assert.equal(room.maxToolCalls, 100);
-  assert.equal(room.maxCostUsd, 1);
-  assert.equal(room.toolCapEnabled, true);
-  assert.equal(room.costCapEnabled, true);
+  assert.equal(room.maxToolCalls, 0);
+  assert.equal(room.maxCostUsd, 0);
+  assert.equal(room.toolCapEnabled, false);
+  assert.equal(room.costCapEnabled, false);
   const sent = f.rooms.send(f.principal, room.id, { text: 'keep going', mentions: ids });
   assert.equal(sent.turn.maxBotTurns, 0);
   await f.rooms.tick();

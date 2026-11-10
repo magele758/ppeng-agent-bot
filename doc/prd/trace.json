@@ -3117,6 +3117,13 @@
       ]
     },
     {
+      "id": "memory-read-source-unavailable",
+      "title": "读不到的记忆来源一轮只说明一次",
+      "tests": [
+        "packages/core/test/memory-read-source-unavailable.test.js"
+      ]
+    },
+    {
       "id": "message-body-search",
       "title": "按消息正文搜索可见会话",
       "tests": [
@@ -3617,6 +3624,15 @@
       "tests": [
         "apps/web-console/lib/risk-advisory.test.ts",
         "e2e/risk-advisory.spec.ts"
+      ]
+    },
+    {
+      "id": "room-budgets-default-off",
+      "title": "群预算默认关闭，预算停下时写完的回复照常出现",
+      "tests": [
+        "apps/web-console/components/play-group/room-console.test.ts",
+        "apps/web-console/lib/room-turn-notice.test.ts",
+        "packages/core/test/bot-room-budget-default-off.test.js"
       ]
     },
     {

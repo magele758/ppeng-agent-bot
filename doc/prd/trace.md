@@ -2745,6 +2745,12 @@ macOS 应用控制（外层宿主）
 - `e2e/first-batch-reliability.spec.ts`
 - `packages/core/test/memory-deletion-suppression.test.js`
 
+### memory-read-source-unavailable
+
+读不到的记忆来源一轮只说明一次
+
+- `packages/core/test/memory-read-source-unavailable.test.js`
+
 ### message-body-search
 
 按消息正文搜索可见会话
@@ -3186,6 +3192,14 @@ microVM 命令不会悄悄改在宿主机上跑
 
 - `apps/web-console/lib/risk-advisory.test.ts`
 - `e2e/risk-advisory.spec.ts`
+
+### room-budgets-default-off
+
+群预算默认关闭，预算停下时写完的回复照常出现
+
+- `apps/web-console/components/play-group/room-console.test.ts`
+- `apps/web-console/lib/room-turn-notice.test.ts`
+- `packages/core/test/bot-room-budget-default-off.test.js`
 
 ### rotate-page-share
 

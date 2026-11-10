@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 427,
+    "implemented": 429,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1989,6 +1989,13 @@
       "file": "acceptance/memory-deletion-suppression.yaml"
     },
     {
+      "id": "memory-read-source-unavailable",
+      "title": "读不到的记忆来源一轮只说明一次",
+      "requirement": "memory_read SOURCE_UNAVAILABLE must be surfaced once and not retried for the same source in that turn. Do not search logs. Do not weaken security denials.",
+      "verificationStage": "software",
+      "file": "acceptance/memory-read-source-unavailable.yaml"
+    },
+    {
       "id": "message-body-search",
       "title": "按消息正文搜索可见会话",
       "requirement": "已登录用户可以按消息正文搜索自己能看到的会话。GET /api/search/messages?q=&limit=\n返回命中列表。摘录是命中处的短片段，不是整段消息。空白查询返回空列表，不扫描全表。\nlimit 默认 20，最大 50。不返回其他用户或不可见会话的消息。只出现在标题或 Bot 名字里、\n正文没有的词不算命中。Bot 名字搜索保持不变。",
@@ -2421,6 +2428,13 @@
       "requirement": "这种是什么？为什么会有这个提醒？算警告？给他先加个ui，然后分析下他警告的是否合理，我看这个最近挺频繁的",
       "verificationStage": "software",
       "file": "acceptance/risk-advisory-ui.yaml"
+    },
+    {
+      "id": "room-budgets-default-off",
+      "title": "群预算默认关闭，预算停下时写完的回复照常出现",
+      "requirement": "发现的问题都查一下和解决，群预算也都默认关闭",
+      "verificationStage": "software",
+      "file": "acceptance/room-budgets-default-off.yaml"
     },
     {
       "id": "room-task-collaboration",
