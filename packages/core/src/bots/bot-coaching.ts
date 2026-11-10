@@ -4,6 +4,7 @@ import type { SkillRoutingResult } from '../skills/skill-router.js';
 export interface CoachingStore {
   getDaemonControl?<T>(key: string): T | undefined;
   setDaemonControl(key: string, value: unknown): void;
+  transaction?<T>(run: () => T): T;
 }
 export interface CoachingProfile { role?: string; host?: string; executor?: string; completion?: string; requiredSkills?: string[] }
 export interface CoachingCheck { scenario: string; outcome: 'passed'|'failed'|'blocked'; evidence: string }
@@ -68,6 +69,10 @@ export class BotCoachingService {
   constructor(store: CoachingStore) { this.store = store; }
   read(botId: string): BotCoaching { return this.store.getDaemonControl?.<BotCoaching>(key(botId)) ?? {revision:0,profile:{},lessons:[]}; }
   save(botId: string, revision: unknown, profile: unknown, lessons: unknown): BotCoaching {
+    const run=()=>this.saveCurrent(botId,revision,profile,lessons);
+    return this.store.transaction ? this.store.transaction(run) : run();
+  }
+  private saveCurrent(botId: string, revision: unknown, profile: unknown, lessons: unknown): BotCoaching {
     const before = this.read(botId);
     if (revision !== before.revision) throw Error('Coaching configuration changed; refresh before saving');
     const result = {revision:before.revision+1,updatedAt:new Date().toISOString(),profile:profileFrom(profile),lessons:lessonsFrom(lessons)};
