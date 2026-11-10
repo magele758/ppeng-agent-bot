@@ -2863,6 +2863,13 @@
       ]
     },
     {
+      "id": "group-mode-instant-selection",
+      "title": "群聊回复方式可以连续切换",
+      "tests": [
+        "e2e/group-mode-instant-selection.spec.ts"
+      ]
+    },
+    {
       "id": "group-reply-mode",
       "title": "群聊回复模式",
       "tests": [

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 420,
+    "implemented": 421,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1749,6 +1749,13 @@
       "requirement": "这个是干嘛的？有必要留吗？\n这里的回复模式，介绍的详细点，现在太简单了，没说清楚\n群聊需要加定时任务的能力吗？还是由默认协调者来控制即可？群聊只做组织形式？",
       "verificationStage": "software",
       "file": "acceptance/group-mode-explanations.yaml"
+    },
+    {
+      "id": "group-mode-instant-selection",
+      "title": "群聊回复方式可以连续切换",
+      "requirement": "这个回复方式怎么切换选择这么卡顿",
+      "verificationStage": "software",
+      "file": "acceptance/group-mode-instant-selection.yaml"
     },
     {
       "id": "group-reply-mode",

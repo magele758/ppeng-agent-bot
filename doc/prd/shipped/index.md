@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 420 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 421 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -493,7 +493,7 @@
 
 - `grok-local-history` Lab 只读查看本机 Grok Bot 会话
 
-## group（11）
+## group（12）
 
 需求正文见 [group](group.md)。
 
@@ -506,6 +506,7 @@
 - `group-member-quiet` 群聊成员区只留成员本身的信息
 - `group-member-sections` 群成员分成已在群里和添加成员
 - `group-mode-explanations` 群聊回复模式与运行限制说明
+- `group-mode-instant-selection` 群聊回复方式可以连续切换
 - `group-reply-mode` 群聊回复模式
 - `group-settings-clarity` 群聊设置分区与成员提及清理
 

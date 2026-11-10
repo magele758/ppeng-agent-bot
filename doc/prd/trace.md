@@ -2523,6 +2523,12 @@ Lab 只读查看本机 Grok Bot 会话
 
 - `e2e/group-mode-explanations.spec.ts`
 
+### group-mode-instant-selection
+
+群聊回复方式可以连续切换
+
+- `e2e/group-mode-instant-selection.spec.ts`
+
 ### group-reply-mode
 
 群聊回复模式
