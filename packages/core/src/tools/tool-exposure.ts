@@ -1,6 +1,8 @@
 import { ValidationError, NotFoundError } from '../errors.js';
 import type { WebSettingsReadStore } from './web-settings.js';
 import type { SqliteStateStore } from '../storage.js';
+import { enforceSkillManifest } from '../skills/skill-manifest.js';
+import { manifestsForSession } from '../skills/skill-manifest-gate.js';
 export interface ToolGroup {
     id: string;
     tier: number;
@@ -495,4 +497,14 @@ export function toolDirectory(store?: WebSettingsReadStore): string {
     if (readToolExposure(store).searchStrategy === 'enhanced')
         return 'Tool delivery is progressive. Use provided tools directly. When a capability is missing, call tool_search with a short intent or exact tool name. It searches authorized tools, including already loaded tools. Hits marked already_loaded are callable now; newly loaded tools are callable next turn. Never execute tools absent from the current tools list. If no match, use the returned groups: search with query="" and group=<id>, then nextOffset to browse further. No match is not proof that a capability is absent; try a shorter query or browse a group. Loading never executes a tool or grants permission.';
     return 'Tool delivery is progressive. Daily tools are provided directly. Search other capabilities with tool_search; matching tools are loaded automatically (up to 5), callable next turn. Never execute tools absent from the current tools list. Capability groups: ' + TOOL_GROUPS.filter(g => g.tier > 1).map(g => g.id + ': ' + g.labelEn + ' / ' + g.labelZh).join('; ') + '; extensions: unclassified registered tools. Availability still depends on permissions and configuration.';
+}
+
+/** A skill turn shows the model only the current skill's allowTools. Execution still uses the manifest gate. */
+export function toolsExposedForSkillTurn<T extends { name: string }>(
+  session: { id: string; metadata?: Record<string, unknown> },
+  tools: readonly T[]
+): T[] {
+  const current = manifestsForSession(session.id, session.metadata).at(-1);
+  if (!current) return tools as T[];
+  return tools.filter((tool) => enforceSkillManifest(current, { tool: tool.name }).ok);
 }

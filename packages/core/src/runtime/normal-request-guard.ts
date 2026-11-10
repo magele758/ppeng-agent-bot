@@ -63,7 +63,10 @@ function overBudgetTrace(fit: NormalRequestFit, reason: string): NormalRequestBu
       capTokens: fit.capTokens,
       windowTokens: fit.windowTokens,
       pinnedTokens: fit.pinnedTokens,
-      ratio: NORMAL_SESSION_REQUEST_RATIO
+      ratio: NORMAL_SESSION_REQUEST_RATIO,
+      ...(reason === 'unresolved'
+        ? { fold: 'not_in_turn', note: 'do not fold into the current ordinary turn' }
+        : {})
     }
   };
 }
@@ -142,7 +145,10 @@ export async function applyNormalSessionRequestBudget<T extends GuardedModelRequ
   }
 
   if (!fit.summarizePrefix || !fit.summaryKept) {
-    if (fit.requestTokens > fit.capTokens) deps.emitTrace?.(overBudgetTrace(fit, 'unresolved'));
+    if (fit.requestTokens > fit.capTokens) {
+      deps.emitTrace?.(overBudgetTrace(fit, 'unresolved'));
+      return withMessages(prepared, fit.messages);
+    }
     const removed = prepared.messages.filter(message => !fit.messages.includes(message));
     return withMessages(prepared, addSourceNavigation(prepared, fit.messages, removed, fit.capTokens));
   }

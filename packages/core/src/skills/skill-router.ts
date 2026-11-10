@@ -6,6 +6,7 @@
  */
 import { setImmediate as yieldToIO } from 'node:timers/promises';
 import type { SkillSpec } from '../types.js';
+import { filterSkillsByAllowlist, isSkillAllowed } from './skill-allowlist.js';
 import { matchSkills } from './builtin-skills.js';
 import {
   assessRoutingConfidence,
@@ -384,4 +385,27 @@ export async function buildSkillRoutingCooperative(
   }
   ranked.sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name));
   return finishSkillRouting(userText, allSkills, mode, ranked.slice(0, topK));
+}
+
+/** Catalog and load_skill share this turn's allowedSkills. Empty means every skill. */
+export function skillsAllowedThisTurn<T extends { name: string; id?: string; aliases?: string[] }>(
+  skills: T[],
+  allowedSkills: readonly string[] | undefined
+): T[] {
+  return filterSkillsByAllowlist(skills, allowedSkills);
+}
+
+/** Reject a load_skill name that is not this turn's allowedSkills. No alternate name. */
+export function loadSkillNameDecision(
+  name: string,
+  allowedSkills: readonly string[] | undefined,
+  skill?: { name: string; id?: string; aliases?: string[] }
+): { ok: true } | { ok: false; error: string } {
+  const subject = skill ?? { name };
+  if (isSkillAllowed(subject, allowedSkills)) return { ok: true };
+  const label = skill?.name ?? name.trim();
+  return {
+    ok: false,
+    error: `Skill "${label}" is not enabled for this turn's allowedSkills. Stop. Do not load another name.`
+  };
 }

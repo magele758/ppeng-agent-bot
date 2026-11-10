@@ -24,10 +24,11 @@ import {
 import { ensureRepoTrust } from '../trust/repo-trust.js';
 import {
   buildSkillRoutingCooperative,
+  skillsAllowedThisTurn,
   type SkillRoutingMode,
   type SkillRoutingResult,
 } from '../skills/skill-router.js';
-import { filterSkillsByAllowlist, readAllowedSkillNames } from '../skills/skill-allowlist.js';
+import { readAllowedSkillNames } from '../skills/skill-allowlist.js';
 import {
   resolveSkillDisclosureMode,
   resolveSkillRoutingSettings,
@@ -435,7 +436,7 @@ export class PromptBuilder {
         : undefined;
     if (session) {
       const profile = runProfileFromSession(session);
-      skills = filterSkillsByAllowlist(
+      skills = skillsAllowedThisTurn(
         filterSkillsByScope(skills, profile.skillScope, requestedSkillNames(session.metadata)),
         readAllowedSkillNames(session.metadata)
       );
@@ -686,7 +687,7 @@ export class PromptBuilder {
     try {
     const profile = runProfileFromSession(ctx.session);
     const skills = skillsForPrompt(
-      filterSkillsByAllowlist(
+      skillsAllowedThisTurn(
         filterSkillsByScope(
           await this.skillsForSession(ctx.session.id),
           profile.skillScope,

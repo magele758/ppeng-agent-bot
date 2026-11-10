@@ -79,22 +79,30 @@ export function startupPhaseFromRecord(raw: Record<string, unknown>): StartupPha
   return sanitizeStartupPhase(payload);
 }
 
+/** Above this, every phase is recorded and warned. A ~1s ready stays under it. */
+const SLOW_STARTUP_MS = 50_000;
+
 /** Both kernels include these fast slices in the ready summary. Keep slow slices for live diagnosis. */
 export function startupTraceDisposition(payload: StartupPhasePayload): 'summary' | 'detail' | 'warn' {
-  if (payload.scope !== 'kernel') return 'detail';
-  if (payload.phase === 'ready') return payload.durationMs >= 50_000 ? 'warn' : 'detail';
+  if (payload.durationMs >= SLOW_STARTUP_MS) return 'warn';
+  if (payload.scope !== 'kernel') return 'summary';
+  if (payload.phase === 'ready') return 'detail';
   return payload.durationMs < 1000 ? 'summary' : 'detail';
 }
 
-/** Boot lines only. Per-turn phases stay in the session trace. */
+/** Boot lines only. Ordinary phases under the slow threshold are debug; slow phases warn. */
 export function logStartupPhase(sessionId: string | undefined, payload: StartupPhasePayload): void {
   try {
     const clean = sanitizeStartupPhase(payload);
-    if (startupTraceDisposition(clean) === 'warn') {
+    const disposition = startupTraceDisposition(clean);
+    if (disposition === 'warn') {
       log.warn('bot_startup_slow', { sessionId, ...clean });
       return;
     }
-    if (clean.scope !== 'boot') return;
+    if (disposition === 'summary' || clean.scope !== 'boot') {
+      log.debug('bot_startup', sessionId ? { sessionId, ...clean } : clean);
+      return;
+    }
     log.info('bot_startup', sessionId ? { sessionId, ...clean } : clean);
   } catch {
     /* tracing must not fail startup */

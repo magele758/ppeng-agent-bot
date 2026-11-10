@@ -449,6 +449,12 @@ export function toolLoopDepsFrom(rt: L5Bindable): ToolLoopDeps {
         /* index is best-effort; files remain readable */
       }
     },
+    abortTurn: (sessionId, signal) => {
+      const controller = rt.sessionAbortControllers.get(sessionId);
+      if (!controller || controller.signal.aborted) return;
+      if (signal && controller.signal !== signal) return;
+      controller.abort();
+    },
     checkCapabilityPin: (toolName, inputSchema) => {
       if (!resolveDiscoveryEnabled(rt.store, process.env)) {
         return { ok: true };
@@ -733,6 +739,14 @@ function fitProductModelRequest(
         kind: event.kind,
         payload: event.payload
       });
+      if (event.kind !== 'request_over_budget' || event.payload?.reason !== 'unresolved' || !session) return;
+      const folding = session;
+      void autoCompactForTurn(compactFrom(rt), {
+        session: folding,
+        agent: input.agent,
+        repoRoot: rt.repoRoot,
+        stateDir: rt.stateDir
+      }).catch(() => undefined);
     },
     summarize: (messages) =>
       adapter.summarizeMessages({

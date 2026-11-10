@@ -57,6 +57,9 @@ export interface ArtifactSearchResult {
   hasMore: boolean;
   totalMatchesEstimate: number;
   totalChars: number;
+  /** Set once when the handle is already gone. Callers must not search it again. */
+  terminal?: boolean;
+  gone?: boolean;
 }
 
 const ARTIFACT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -274,6 +277,24 @@ export function readPagedArtifactLines(input: {
   };
 }
 
+function goneArtifactSearch(input: {
+  handle: string;
+  query: string;
+  mode?: 'substring' | 'regex';
+}): ArtifactSearchResult {
+  return {
+    handle: input.handle,
+    query: input.query,
+    mode: input.mode || 'substring',
+    matches: [],
+    hasMore: false,
+    totalMatchesEstimate: 0,
+    totalChars: 0,
+    terminal: true,
+    gone: true
+  };
+}
+
 export function searchPagedArtifact(input: {
   stateDir: string;
   sessionId: string;
@@ -283,7 +304,18 @@ export function searchPagedArtifact(input: {
   maxResults?: number;
   contextChars?: number;
 }): ArtifactSearchResult {
-  const manifest = readPagedArtifactManifest(input.stateDir, input.sessionId, input.handle);
+  const manifestPathname = manifestPath(input.stateDir, input.sessionId, input.handle);
+  if (!existsSync(manifestPathname)) return goneArtifactSearch(input);
+  let manifest: PagedArtifactManifest;
+  try {
+    manifest = readPagedArtifactManifest(input.stateDir, input.sessionId, input.handle);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith('分页内容不存在') || message.startsWith('分页内容数据文件不存在')) {
+      return goneArtifactSearch(input);
+    }
+    throw error;
+  }
   const content = readContent(input.stateDir, manifest);
   const mode = input.mode || 'substring';
   const maxResults = Math.min(Math.max(1, input.maxResults || 20), 100);

@@ -1,4 +1,5 @@
 import { BOT_COMPRESSION_TIMEOUT_MS } from './session/compact-summary-deadline.js';
+import { WriterClaimError } from './session/writer-claim.js';
 import { DaydreamHost } from './runtime/daydream-host.js';
 import { reconcileBypassApprovals } from './runtime/bypass-approvals.js';
 import {createWaitForTool} from './waits/tool.js';
@@ -380,6 +381,8 @@ export class RawAgentRuntime {
   private readonly pendingTraceWrites = new Map<string, Set<Promise<void>>>();
   /** Late subscribers (Lab follow after ask_user) receive chunks from the in-flight run. */
   private readonly modelStreamListeners = new Map<string, Set<(chunk: ModelStreamChunk) => void>>();
+  /** Old model streams already stopped after a newer writer took the session. */
+  private readonly staleModelStreams = new WeakSet<AbortController>();
   private readonly sessionViewListeners = new Map<string, Set<(view: { session: SessionRecord }) => void>>();
   private readonly sessionRunWaiters = new Map<string, Set<(run: Promise<SessionRecord>) => void>>();
   /**
@@ -1862,11 +1865,17 @@ export class RawAgentRuntime {
   private deliverModelStreamChunk(
     sessionId: string,
     chunk: ModelStreamChunk,
-    direct?: (chunk: ModelStreamChunk) => void
+    direct?: (chunk: ModelStreamChunk) => void,
+    owner?: AbortController
   ): void {
     try { this.store.assertCurrentWriter(sessionId); }
-    catch {
-      this.emitTrace(sessionId, { kind: 'stale_writer_rejected', payload: { channel: 'model_stream' } });
+    catch (error) {
+      if (!(error instanceof WriterClaimError)) throw error;
+      if (!owner || !this.staleModelStreams.has(owner)) {
+        this.emitTrace(sessionId, { kind: 'stale_writer_rejected', payload: { channel: 'model_stream' } });
+        if (owner) this.staleModelStreams.add(owner);
+      }
+      owner?.abort();
       return;
     }
     try {
@@ -2058,16 +2067,18 @@ export class RawAgentRuntime {
       const observeBudget = observeGoalBudget(this.goalRuntimeHost(), sessionId);
       const callerEvent = options?.onEvent;
       options = { ...options, onEvent: async event => { await observeHuman(event); await observeBudget(event); await callerEvent?.(event); } };
+      const runController = new AbortController();
+      this.sessionAbortControllers.set(sessionId, runController);
       const directChunk = options?.onModelStreamChunk;
       if (directChunk || (this.modelStreamListeners.get(sessionId)?.size ?? 0) > 0) {
         options = {
           ...options,
-          onModelStreamChunk: (chunk) => this.deliverModelStreamChunk(sessionId, chunk, directChunk)
+          onModelStreamChunk: (chunk) => this.deliverModelStreamChunk(sessionId, chunk, directChunk, runController)
         };
       }
       const { signal: callerSignal, ...runOptions } = options ?? {};
       expireDueUnattendedApprovals(this.store);
-  
+
       // Kernel selection: `loop_settings.kernelVariant` (Lab UI). Default is
       // `@ppeng/agent-loop` (`agent-loop`). Explicit `ppeng` keeps the local
       // packages/core kernel as a reference path.
@@ -2080,8 +2091,6 @@ export class RawAgentRuntime {
       const kernelVariant = engineOn ? (loopKv?.kernelVariant ?? 'agent-loop') : 'agent-loop';
       const assemblyPreset: LoopPreset = engineOn ? (parseLoopPreset(loopKv?.assemblyPreset) ?? 'max') : 'max';
       this.log.info(`runSession kernel=${kernelVariant} assembly=${assemblyPreset}`);
-      const runController = new AbortController();
-      this.sessionAbortControllers.set(sessionId, runController);
       const unlinkCallerSignal = this.cancelOnAbort(sessionId, callerSignal);
       const coreHost = bindTurnKernelHost(this.l5());
       const sessionMaxTurns = resolveSessionMaxTurns(
