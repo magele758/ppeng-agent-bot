@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 423 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 424 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -537,7 +537,7 @@
 
 - `knowledge-library-dirs` 本地资料目录进入知识库并可检索
 
-## lab（7）
+## lab（8）
 
 需求正文见 [lab](lab.md)。
 
@@ -547,6 +547,7 @@
 - `lab-library-pages` Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 - `lab-poll-crash-diagnostics` 轻量会话列表与客户端异常诊断
 - `lab-registered-machines` Lab Settings → Tools → Registered Machines panel
+- `lab-startup-request-load` 控制台启动时的请求负担
 - `lab-startup-timing` Lab 会话显示启动耗时
 
 ## lcu（2）

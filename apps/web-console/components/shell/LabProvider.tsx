@@ -13,7 +13,7 @@ import {
   type MutableRefObject,
   type ReactNode
 } from 'react';
-import { api } from '@/lib/api';
+import { api, pollApi } from '@/lib/api';
 import { BotFaceCatalog } from '../BotFaceCatalog';
 import { BotWorkStateProvider } from '../bot-work/BotWorkState';
 import { pendingApprovals } from '@/lib/approvals';
@@ -28,6 +28,7 @@ import {
   type SectionId
 } from '@/lib/nav';
 import type { ModelProvidersResponse } from '@/lib/model-providers';
+import { runLabTick } from '@/lib/lab-tick';
 import { fetchList, idleLabListState, settleList, type LabListKey, type LabListState, type ListFetch } from '@/lib/list-load';
 import type { OutboundIdentity } from '@/lib/outbound-draft-preview';
 import { shouldRefreshOpenSession } from '@/lib/run-leave';
@@ -258,7 +259,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
 
   const refreshMeta = useCallback(async () => {
     try {
-      const [ver, health] = await Promise.all([api('/api/version'), api('/api/health')]);
+      const [ver, health] = await Promise.all([pollApi('/api/version'), pollApi('/api/health')]);
       const v = ver as { name?: string; version?: string };
       const h = health as { adapter?: string };
       const next = { name: v.name ?? '—', version: v.version ?? '—', adapter: h.adapter };
@@ -373,9 +374,11 @@ export function LabProvider({ children }: { children: ReactNode }) {
   const tick = useCallback(
     async (opts?: { includePlayPanel?: boolean }) => {
       const includePlayPanel = opts?.includePlayPanel !== false;
-      await refreshMeta();
-      await refreshOverview();
-      if (includePlayPanel) await chatBridgeRef.current?.refreshPlayPanel();
+      await runLabTick({
+        refreshMeta,
+        refreshOverview,
+        refreshPlayPanel: includePlayPanel ? async () => chatBridgeRef.current?.refreshPlayPanel() : undefined
+      });
     },
     [refreshMeta, refreshOverview]
   );

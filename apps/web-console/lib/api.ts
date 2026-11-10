@@ -33,7 +33,41 @@ export function loginRequiredEventLocksLab(detail: { loginRequired?: boolean } |
   return detail?.loginRequired !== false;
 }
 
-export async function api(path: string, init?: RequestInit): Promise<unknown> {
+/** Timer-driven reads that have not returned yet, by address. */
+const pendingPolls = new Map<string, Promise<unknown>>();
+
+function isWrite(init: RequestInit | undefined): boolean {
+  return Boolean(init?.method) && init!.method!.toUpperCase() !== 'GET';
+}
+
+/** A poll issued after a change must not join one sent before it, so writes drop the pending set at both ends. */
+function sendWrite(path: string, init: RequestInit): Promise<unknown> {
+  pendingPolls.clear();
+  return request(path, init).finally(() => pendingPolls.clear());
+}
+
+/**
+ * For reads repeated on a timer. While one is still out, the next tick for the
+ * same address waits for it instead of stacking more work on the daemon; a slow
+ * daemon otherwise collects several copies of the same large read at once.
+ * Reads that follow an event (open, send, stream end) must use `api` so they
+ * never receive an answer that was already on its way.
+ */
+export function pollApi(path: string): Promise<unknown> {
+  const pending = pendingPolls.get(path);
+  if (pending) return pending;
+  const read = request(path).finally(() => {
+    if (pendingPolls.get(path) === read) pendingPolls.delete(path);
+  });
+  pendingPolls.set(path, read);
+  return read;
+}
+
+export function api(path: string, init?: RequestInit): Promise<unknown> {
+  return isWrite(init) ? sendWrite(path, init!) : request(path, init);
+}
+
+async function request(path: string, init?: RequestInit): Promise<unknown> {
   const cacheable = isCacheableGet(path, init);
   const cached = cacheable ? etagCache.get(path) : undefined;
   const headers = new Headers(init?.headers ?? {});

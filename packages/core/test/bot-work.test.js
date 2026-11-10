@@ -253,7 +253,7 @@ test('team status projects only own canonical chats amid background context grow
  store.db.exec('BEGIN IMMEDIATE');for(let i=0;i<10000;i++)insert.run(`status-background-${i}`,background.id);store.db.exec('COMMIT');
  const originalGet=store.getSession.bind(store);const reads=[];store.getSession=id=>{reads.push(id);return originalGet(id);};store.listSessions=()=>{throw new Error('status must not hydrate every context');};
  const before=store.db.prepare('SELECT total_changes() AS n').get().n;
- const status=botWorkStatus(host,principal);assert.equal(status.length,1);assert.equal(status[0].sessionId,mine.sessionId);assert.equal(status[0].status,'waiting_approval');assert.deepEqual(reads.sort(),[bot.canonicalSessionId,mine.sessionId].sort());assert.equal(store.db.prepare('SELECT total_changes() AS n').get().n,before);
+ const status=botWorkStatus(host,principal);assert.equal(status.length,1);assert.equal(status[0].sessionId,mine.sessionId);assert.equal(status[0].status,'waiting_approval');assert.deepEqual(reads,[bot.canonicalSessionId]);assert.equal(store.db.prepare('SELECT total_changes() AS n').get().n,before);
  reads.length=0;const installed=botWorkStatus(host,installation);assert.equal(installed[0].sessionId,bot.canonicalSessionId);assert.ok(reads.every(id=>id===bot.canonicalSessionId));
  store.db.close();
 });

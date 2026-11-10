@@ -2991,6 +2991,15 @@
       ]
     },
     {
+      "id": "lab-startup-request-load",
+      "title": "控制台启动时的请求负担",
+      "tests": [
+        "apps/daemon/test/session-detail-logs.test.ts",
+        "apps/web-console/lib/api.test.ts",
+        "apps/web-console/lib/lab-tick.test.ts"
+      ]
+    },
+    {
       "id": "lab-startup-timing",
       "title": "Lab 会话显示启动耗时",
       "tests": [
