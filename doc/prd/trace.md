@@ -2229,6 +2229,12 @@ Lab connector authorization states and SecretVault grant
 
 - `e2e/bot-interaction-polish.spec.ts`
 
+### cron-message-details
+
+聊天中的定时任务详情
+
+- `e2e/cron-message-details.spec.ts`
+
 ### daydream-tick-cost
 
 每日复盘调度不能拖死 daemon

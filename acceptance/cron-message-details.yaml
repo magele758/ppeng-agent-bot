@@ -1,0 +1,14 @@
+id: cron-message-details
+title: 聊天中的定时任务详情
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: 这种定时任务不用展示全内容，只展示是哪个定时任务的，点击再用弹窗显示详情，免得占用太多视图
+criteria:
+  - id: AC-1
+    given: 会话中有带输入资料的定时任务和一条普通消息
+    when: 查看历史或关闭详情
+    then: 定时任务显示名称，长正文收起，普通消息正常显示
+  - id: AC-2
+    given: 定时任务显示为任务名
+    when: 点击名称
+    then: 弹窗显示该次任务的完整指令和输入资料，可以关闭并返回原消息

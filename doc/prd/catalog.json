@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 414,
+    "implemented": 415,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1448,6 +1448,13 @@
       "requirement": "按你分析的优先级，把这七个问题完整修掉，补齐跨状态、跨执行入口和跨用户的回归测试，再审查一遍整个链路，没问题就提交 PR 合并。",
       "verificationStage": "software",
       "file": "acceptance/create-menu-trigger-hit-area.yaml"
+    },
+    {
+      "id": "cron-message-details",
+      "title": "聊天中的定时任务详情",
+      "requirement": "这种定时任务不用展示全内容，只展示是哪个定时任务的，点击再用弹窗显示详情，免得占用太多视图",
+      "verificationStage": "software",
+      "file": "acceptance/cron-message-details.yaml"
     },
     {
       "id": "daydream-tick-cost",
