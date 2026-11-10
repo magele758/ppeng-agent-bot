@@ -853,11 +853,12 @@
 
 - `risk-advisory-ui` 对话里的运行策略提醒
 
-## room（2）
+## room（3）
 
 需求正文见 [other](other.md)。
 
 - `room-budgets-default-off` 群预算默认关闭，预算停下时写完的回复照常出现
+- `room-debate-mode` 群聊辩论回复方式
 - `room-task-collaboration` 群聊临时负责人任务协作模式
 
 ## rotate（1）
