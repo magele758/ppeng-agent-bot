@@ -29,6 +29,8 @@ export {
   runOutcomeFromEnd,
   parseRunOutcome,
   mergeOutcomeMetadata,
+  endedWithAnswer,
+  TURN_LIMIT_REASON,
   RUN_OUTCOME_METADATA_KEY
 } from './run-outcome.js';
 export type {

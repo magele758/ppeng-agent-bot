@@ -10,6 +10,7 @@ import { botPrincipalKey, principalFromSession, sameBotPrincipal, resolveBotPrin
 import type { SqliteStateStore } from '../storage.js';
 import type { MessageReplyTo, SessionRecord } from '../types.js';
 import { normalizeReplyQuote } from '../session/reply-quote.js';
+import { endedWithAnswer, parseRunOutcome } from '../session/run-outcome.js';
 import type { KernelHookListener } from '@ppeng/agent-loop';
 import { fenceExternalContent } from '../safety/external-content.js';
 import { contextSourceModelText, normalizeContextSources, type ContextSource } from '../ingestion/context-sources.js';
@@ -589,9 +590,9 @@ export class BotRoomService {
     return this.store.updateSession(session.id,{metadata});
   }
   private applyOutcome(turn:BotRoomTurn,session:SessionRecord,botId:string):boolean {
-    const outcome=session.metadata?.outcome as {kind?:string;reason?:string}|undefined;
+    const outcome=parseRunOutcome(session.metadata?.outcome);
     const aborted = outcome?.kind === 'aborted';
-    const failed = outcome?.kind === 'failed' || (outcome?.kind === 'idle' && outcome.reason !== 'end');
+    const failed = outcome?.kind === 'failed' || (outcome?.kind === 'idle' && !endedWithAnswer(outcome));
     if (!aborted && !failed) return false;
     const reason = outcome?.reason ?? (aborted ? 'member_aborted' : 'member_not_completed');
     if (this.hasOtherSpeakers(turn, botId)) {

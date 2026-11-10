@@ -34,6 +34,8 @@
 - **Tool result 回流脱敏**：`packages/core/src/sandbox/result-redaction.ts` 把敏感 env 值从全部工具结果替换为 `[REDACTED:NAME]`（防 printenv 进 LLM/trace/会话库）。`read_file` / `grep_files` 还会直接拒绝 `isBlockedPath` 以及 `.env` / `id_rsa` / `credentials` 这类文件名
 - **Unknown-tool 自愈**：未知工具返回结构化 JSON（`did_you_mean` / `available_tools_sample`），保持 tool_call↔result 配对
 - **Recovery AdvisoryGrace**：LoopGuard 将 abort 时默认宽限 1 轮并注入 `[recovery-advisory]`（`RAW_AGENT_RECOVERY_ADVISORY_GRACE` / `_BUDGET`）
+- **Bot 收尾跟进**：`bots/goals/finish-check.ts`（无目标一轮的软停检查，先看承诺/反问/本轮待办信号，有信号才问判官）、`finish-wake.ts`（说了稍后汇报却没有等待时登记到期唤醒）、`followup.ts`（「继续」与进度追问接到最近的未完成目标）。轮数上限的最后一轮结局是 `reason: 'max_turns'` + `answered: true`，判断「有没有答复」用 `endedWithAnswer`，不要比较 `reason === 'end'`。开关与上限在 Lab「设置 → Agent 行为 → Bot 收尾跟进」（KV `bot_finish_settings`），没有环境变量。trace：`goal_intake` / `goal_eval` / `finish_check` / `finish_wake`。见 `doc/harness/06-goal-gate.md`
+- **Bot 收尾跟进**：`bots/goals/finish-check.ts`（无目标一轮的软停检查，先看承诺/反问/本轮待办信号，有信号才问判官）、`finish-wake.ts`（说了稍后汇报却没有等待时登记到期唤醒）、`followup.ts`（「继续」与进度追问接到最近的未完成目标）。轮数上限的最后一轮结局是 `reason: 'max_turns'` + `answered: true`，判断「有没有答复」用 `endedWithAnswer`，不要比较 `reason === 'end'`。开关与上限在 Lab「设置 → Agent 行为 → Bot 收尾跟进」（KV `bot_finish_settings`），没有环境变量。trace：`goal_intake` / `goal_eval` / `finish_check` / `finish_wake`。见 `doc/harness/06-goal-gate.md`
 - **Goal soft-gate**：`metadata.goalCondition` + `goal/`；软完成判官 `completeText`（JSON met/reason）；fail-open；`RAW_AGENT_GOAL_GATE`
 - **RiskEngine + AdvisoryQueue**：多信号 → 入队 → 下轮 system；`RAW_AGENT_RISK_ENGINE`
 - **Case governance**：`evolving/case-governance`（decay/archive/capacity）；schema v10

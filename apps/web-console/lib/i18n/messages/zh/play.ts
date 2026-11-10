@@ -12,6 +12,7 @@ export const play = {
     "stopped": "执行已停止",
     "fallback": "模型切换",
     "goal": "目标检查",
+    "continuing": "目标还在继续",
     "compact": "上下文整理",
     "hook": "扩展通知",
     "collaboration": "协作消息",
@@ -21,6 +22,7 @@ export const play = {
     "recoveryHint": "记录自动恢复、重试或待核实的执行信息。",
     "stoppedHint": "运行时已停止本次执行，具体原因见下方详情。",
     "fallbackHint": "记录模型回退或替换信息。",
+    "continuingHint": "这一轮到达步数上限，目标还没被确认完成。它已回到排队，会自动接着做，不需要你再催。",
     "goalHint": "本条记录目标检查或协调信息，不代表当前目标的实时状态。",
     "compactHint": "记录会话压缩与上下文整理过程。",
     "hookHint": "来自执行钩子或扩展的运行信息。",
@@ -416,6 +418,7 @@ export const play = {
     missing_assistant: '缺少助手回复',
     before_turn_blocked: '开轮被拦截',
     rewound: '已回滚',
+    max_turns: '到达单次执行步数上限',
     other: '{reason}'
   },
 

@@ -192,6 +192,41 @@ export const settingsEntries = {
       inboxCap: 'No limit'
     }
   },
+  botFinish: {
+    title: 'Bot follow-through',
+    keywords: 'finish follow through continue go on progress stopped waiting report later wake goal todo',
+    desc: 'When a Bot is about to end a turn, the runtime checks whether the work is really finished. A Bot that said it would keep going but stopped, or asked you about a step it can decide itself, is told to continue. A Bot that promised to report later with nothing set up to bring it back is woken when the time comes. It is not sent back when it truly needs you to log in, provide credentials or confirm an irreversible action.',
+    fields: {
+      followupAttachEnabled: {
+        label: 'Attach "continue" and progress questions to the unfinished goal',
+        hint: 'On by default. When the chat has a recent unfinished goal, messages such as "continue" or "any progress?" make this turn work on that goal, and the completion check applies when it ends. A goal that is already running is only reported. Off treats them as ordinary messages.'
+      },
+      followupWindowHours: {
+        label: 'How recent a goal must be to be picked up (hours)',
+        hint: 'A goal untouched for longer than this is not picked up by a bare "continue".'
+      },
+      finishCheckEnabled: {
+        label: 'Check turns without a goal for stopping early',
+        hint: 'On by default. The extra model check runs only when the reply says things like "next I will…" or "shall I continue?", or when the to-do list written in this turn still has open items. If the check fails, the turn ends as usual.'
+      },
+      maxContinuations: {
+        label: 'Times one turn can be told to continue',
+        hint: 'A turn that makes no new tool call after being told to continue ends right away.'
+      },
+      wakeEnabled: {
+        label: 'Come back automatically after a promise to report later',
+        hint: 'On by default. When the Bot says it will report once a job finishes but no background job, timer or wait is tracking it, the runtime registers one wake. A new message from you before it is due cancels that wake.'
+      },
+      wakeDelayMinutes: {
+        label: 'Wait before the first check (minutes)',
+        hint: 'Each later check waits twice as long.'
+      },
+      maxWakes: {
+        label: 'Checks for one promise',
+        hint: 'After the last check the Bot tells you how to ask for the result later.'
+      }
+    }
+  },
   sessionRecap: {
     title: 'Session recap',
     keywords: 'recap away return summary progress where I left off end of session switch',

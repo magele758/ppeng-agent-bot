@@ -28,7 +28,7 @@ import type { ApprovalRecord, SessionRecord } from '../types.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../runtime/spawn-policy.js';
 import { enqueueSteer, textPart } from '../runtime/session-facade.js';
 import { stampSessionWake } from '../approval/unattended-approval.js';
-import { parseRunOutcome } from '../session/run-outcome.js';
+import { endedWithAnswer, parseRunOutcome } from '../session/run-outcome.js';
 import { assistantTextsFromFold } from '../session/visible-assistant.js';
 import { BotQueueCapacityError, checkBotWorkCapacity, botWorkControl, resumeApprovedBotSession } from '../bots/bot-work.js';
 import { openBot } from '../bots/bot-facade.js';
@@ -328,7 +328,7 @@ function completionResult(host:RoutineRuntimeHost,run:RoutineRun,session:Session
  if(refusal)return {status:'failed',result,error:refusal,failureClass:'hard'};
  const observation=linkedObservation(host,run,result);if(observation)return observation;
  const denied=approvals.some(approval=>approval.status==='rejected');const outcome=parseRunOutcome(session?.metadata?.outcome);
- const stopped=outcome?.kind==='aborted'||outcome?.kind==='failed'||(outcome?.kind==='idle'&&outcome.reason!=='end');
+ const stopped=outcome?.kind==='aborted'||outcome?.kind==='failed'||(outcome?.kind==='idle'&&!endedWithAnswer(outcome));
  const failed=stopped||!session||!['idle','completed'].includes(session.status)||denied||!result.trim();
  return failed?{status:'failed',result,error:completionError(session,denied,result)}:{status:routineQuiet(result)?'silent':'completed',result};
 }

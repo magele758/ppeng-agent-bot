@@ -152,7 +152,8 @@ const STOP_REASON_DETAIL: Record<string, MessageKey> = {
   repeat_detection: 'play.stopReason.repeat_detection',
   missing_assistant: 'play.stopReason.missing_assistant',
   before_turn_blocked: 'play.stopReason.before_turn_blocked',
-  rewound: 'play.stopReason.rewound'
+  rewound: 'play.stopReason.rewound',
+  max_turns: 'play.stopReason.max_turns'
 };
 
 function stopReasonKindKey(kind: SessionRunOutcome['kind']): MessageKey {

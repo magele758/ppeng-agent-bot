@@ -20,6 +20,24 @@ export interface RunOutcome {
   reason: string;
   failureStage?: FailureStage;
   rewind?: RunOutcomeRewind;
+  /**
+   * Only with reason `max_turns`: the run was cut by the turn limit, but the
+   * forced last turn still produced a final text answer.
+   */
+  answered?: boolean;
+}
+
+/** Reason recorded when the turn limit, not the model, ended the run. */
+export const TURN_LIMIT_REASON = 'max_turns';
+
+/**
+ * True when the run stopped with a final answer: a normal `end`, or a
+ * turn-limit stop whose forced last turn answered. Use this where a consumer
+ * needs "there is a reply to deliver", not "the work is finished".
+ */
+export function endedWithAnswer(outcome: Pick<RunOutcome, 'reason' | 'answered'> | undefined): boolean {
+  if (!outcome) return false;
+  return outcome.reason === 'end' || (outcome.reason === TURN_LIMIT_REASON && outcome.answered === true);
 }
 
 export const RUN_OUTCOME_METADATA_KEY = 'outcome';
@@ -29,10 +47,12 @@ export function buildRunOutcome(input: {
   reason: string;
   failureStage?: FailureStage;
   rewind?: RunOutcomeRewind;
+  answered?: boolean;
 }): RunOutcome {
   const outcome: RunOutcome = { kind: input.kind, reason: input.reason };
   if (input.failureStage) outcome.failureStage = input.failureStage;
   if (input.rewind) outcome.rewind = input.rewind;
+  if (input.answered === true && input.reason === TURN_LIMIT_REASON) outcome.answered = true;
   return outcome;
 }
 
@@ -42,9 +62,12 @@ export function runOutcomeFromEnd(input: {
   sessionStatus: string;
   failureStage?: FailureStage;
   rewind?: RunOutcomeRewind;
+  /** Turn-limit stop whose forced last turn still answered. */
+  answered?: boolean;
 }): RunOutcome {
   const reason = input.reason;
   const rewind = input.rewind;
+  const answered = input.answered;
   if (reason === 'abort' || reason === 'closed' || reason === 'user_abort') {
     return buildRunOutcome({
       kind: 'aborted',
@@ -111,7 +134,7 @@ export function runOutcomeFromEnd(input: {
     });
   }
   if (input.sessionStatus === 'completed') {
-    return buildRunOutcome({ kind: 'completed', reason, rewind });
+    return buildRunOutcome({ kind: 'completed', reason, rewind, answered });
   }
   if (input.sessionStatus === 'waiting_approval') {
     return buildRunOutcome({
@@ -121,7 +144,7 @@ export function runOutcomeFromEnd(input: {
       rewind
     });
   }
-  return buildRunOutcome({ kind: 'idle', reason, rewind });
+  return buildRunOutcome({ kind: 'idle', reason, rewind, answered });
 }
 
 export function parseRunOutcome(raw: unknown): RunOutcome | undefined {
@@ -140,7 +163,7 @@ export function parseRunOutcome(raw: unknown): RunOutcome | undefined {
   const reason = typeof obj.reason === 'string' ? obj.reason : 'unknown';
   const failureStage = parseFailureStage(obj.failureStage);
   const rewind = parseRewind(obj.rewind);
-  return buildRunOutcome({ kind, reason, failureStage, rewind });
+  return buildRunOutcome({ kind, reason, failureStage, rewind, answered: obj.answered === true });
 }
 
 function parseFailureStage(raw: unknown): FailureStage | undefined {
