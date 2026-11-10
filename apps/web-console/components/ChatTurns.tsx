@@ -25,6 +25,7 @@ import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { parseCronUserPrompt } from '@/lib/cron';
 import { isApprovalContinueMessage } from '@/lib/approval-continue';
 import { parseBotRelayMessage } from '@/lib/bot-relay-message';
+import { CronMessageTurn } from './CronMessageTurn';
 import { BotRelayTurn } from './BotRelayStrip';
 import { quietRoutineResult } from '@/lib/routine-quiet';
 import { presentGoalUpdate, readMessageSessionId } from '@/lib/goal-update-notice';
@@ -1059,9 +1060,15 @@ function botRelayOf(props: Parameters<typeof ChatTurnFromMessage>[0]) {
   if (props.modelView) return null;
   return parseBotRelayMessage(normalizedRole(props.m), msgPartsToText(props.m.parts));
 }
+function compactCronName(message: ChatMessage, modelView?: boolean) {
+  if (modelView || normalizedRole(message) !== 'user') return null;
+  return parseCronUserPrompt(msgPartsToText(message.parts))?.name;
+}
 export function ChatTurnIfVisible(props: Parameters<typeof ChatTurnFromMessage>[0]) {
   const continued = useContext(ContinuedAssistantContext);
   if (hiddenStoredMessage(props.m)) return null;
+  const cronName = compactCronName(props.m, props.modelView);
+  if (cronName) return <CronMessageTurn name={cronName}><ChatTurnFromMessage {...props} brief={false} /></CronMessageTurn>;
   const relay = botRelayOf(props);
   if (relay) return <BotRelayTurn relay={relay} />;
   return <ChatTurnFromMessage {...props} hideRoleLabel={continued.has(props.msgIndex ?? -1)} />;

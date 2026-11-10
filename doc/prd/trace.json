@@ -2527,6 +2527,13 @@
       ]
     },
     {
+      "id": "cron-message-details",
+      "title": "聊天中的定时任务详情",
+      "tests": [
+        "e2e/cron-message-details.spec.ts"
+      ]
+    },
+    {
       "id": "daydream-tick-cost",
       "title": "每日复盘调度不能拖死 daemon",
       "tests": [

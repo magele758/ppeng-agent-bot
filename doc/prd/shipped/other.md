@@ -215,6 +215,11 @@ No new RAW_AGENT_* feature flags. Acceptance-first, user asked to fix now, tests
 
 按你分析的优先级，把这七个问题完整修掉，补齐跨状态、跨执行入口和跨用户的回归测试，再审查一遍整个链路，没问题就提交 PR 合并。
 
+## cron-message-details
+聊天中的定时任务详情
+
+这种定时任务不用展示全内容，只展示是哪个定时任务的，点击再用弹窗显示详情，免得占用太多视图
+
 ## daydream-tick-cost
 每日复盘调度不能拖死 daemon
 
