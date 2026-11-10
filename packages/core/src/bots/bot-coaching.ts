@@ -2,7 +2,7 @@ import type { SkillSpec } from '../types.js';
 import type { SkillRoutingResult } from '../skills/skill-router.js';
 /** Operator-managed contracts and evidence ledger. No automatic promotion from chat summaries. */
 export interface CoachingStore {
-  getDaemonControl<T>(key: string): T | undefined;
+  getDaemonControl?<T>(key: string): T | undefined;
   setDaemonControl(key: string, value: unknown): void;
 }
 export interface CoachingProfile { role?: string; host?: string; executor?: string; completion?: string; requiredSkills?: string[] }
@@ -66,7 +66,7 @@ function preserveEvidence(before: CoachingLesson[], after: CoachingLesson[]): vo
 export class BotCoachingService {
   private readonly store: CoachingStore;
   constructor(store: CoachingStore) { this.store = store; }
-  read(botId: string): BotCoaching { return this.store.getDaemonControl<BotCoaching>(key(botId)) ?? {revision:0,profile:{},lessons:[]}; }
+  read(botId: string): BotCoaching { return this.store.getDaemonControl?.<BotCoaching>(key(botId)) ?? {revision:0,profile:{},lessons:[]}; }
   save(botId: string, revision: unknown, profile: unknown, lessons: unknown): BotCoaching {
     const before = this.read(botId);
     if (revision !== before.revision) throw Error('Coaching configuration changed; refresh before saving');

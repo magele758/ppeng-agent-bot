@@ -1,3 +1,4 @@
+import { BotCoachingService } from './bot-coaching.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { SessionRecord } from '../types.js';
 import type { BotRecord } from './types.js';
@@ -10,12 +11,17 @@ function mayUseContract(store: SqliteStateStore, session: SessionRecord, bot: Bo
   const legacy=principalFromSession(store,canonical);
   return sameBotPrincipal(legacy,resolveBotPrincipal(store))||sameBotPrincipal(legacy,principalFromSession(store,session));
 }
-/** Metadata is caller-controlled on task creation; it cannot confer another Bot's contract. */
-export function coachingBotId(store: SqliteStateStore, session?: SessionRecord): string|undefined {
+function sessionIdentity(session?: SessionRecord): string|undefined {
   if(!session)return undefined;
   const id=session.metadata?.botId;
-  if(typeof id!=='string'||session.agentId!==id)return undefined;
+  return typeof id==='string'&&session.agentId===id?id:undefined;
+}
+/** Metadata is caller-controlled on task creation; it cannot confer another Bot's contract. */
+export function coachingBotId(store: SqliteStateStore, session?: SessionRecord): string|undefined {
+  const id=sessionIdentity(session);
+  if(!id)return undefined;
+  if(!new BotCoachingService(store).read(id).revision)return undefined;
   const bot=store.getBot(id);
-  if(!bot||!mayUseContract(store,session,bot))return undefined;
-  return id;
+  if(!bot)return undefined;
+  return mayUseContract(store,session!,bot)?id:undefined;
 }
