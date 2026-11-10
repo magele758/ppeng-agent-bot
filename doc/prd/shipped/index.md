@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（134）
+## bot（135）
 
 需求正文见 [bot](bot.md)。
 
@@ -121,6 +121,7 @@
 - `bot-first-task-dismissal` 首次任务引导可关闭且不干扰已有对话
 - `bot-first-task-new-user` 首次任务引导只给新用户看
 - `bot-flow-read-projection` 工作流只接收展示所需的会话数据
+- `bot-followup-cache-prefix` 追问时复用上一轮已缓存的对话前缀
 - `bot-forever-chat` Bot 永久主会话命令
 - `bot-fork-retrievable-inheritance` Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文
 - `bot-fork-sessions-in-detail` Bot 子任务会话放进详情菜单

@@ -414,6 +414,13 @@
       "file": "acceptance/bot-flow-read-projection.yaml"
     },
     {
+      "id": "bot-followup-cache-prefix",
+      "title": "追问时复用上一轮已缓存的对话前缀",
+      "requirement": "为什么老是响应较慢？分析排查一下\n\n发现的问题都查一下和解决",
+      "verificationStage": "software",
+      "file": "acceptance/bot-followup-cache-prefix.yaml"
+    },
+    {
       "id": "bot-forever-chat",
       "title": "Bot 永久主会话命令",
       "requirement": "Implement bot forever-chat commands only. Current bots already have a canonical session (RawAgentRuntime createBot/openBot). Gap: in that canonical bot chat, `/new` must NOT open a new session; it compacts the same session (like Hermes desktop Bot Mode). Also support `/stop` (abort current turn) and `/model` (switch that bot's model) as channel/composer commands that hit the bot's canonical session. Wire this for Lab chat when a bot is selected AND for gateway inbound text if a botId is bound. Do not rewrite the gateway security code from PR #76 beyond a small command hook.\nConfig via existing bot settings / Lab, no new RAW_AGENT_* env.",
