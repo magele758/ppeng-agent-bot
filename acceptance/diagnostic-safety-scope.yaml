@@ -1,0 +1,23 @@
+id: diagnostic-safety-scope
+title: 远程诊断与后台通知保持正确权限边界
+status: implemented
+requirement: |
+  那你分多个Agent修复一下问题
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 本地工作目录受信任且使用标准 SSH 命令诊断远端机器
+    when: 远端字面量命令进入远端目录
+    then: 不因远端目录位于本地工作区之外而误拦
+  - id: AC-2
+    given: 历史资料仅有来源包装且无恶意诱导指令
+    when: 在受信任目录运行正常脚本诊断
+    then: 不因历史来源包装而误拦
+  - id: AC-3
+    given: 命令包含本地目录逃逸或历史外部内容包含恶意诱导指令
+    when: 运行相应逃逸命令或动态求值
+    then: 仍在执行前拒绝，SSH 引号与本地展开不能隐藏本地逃逸
+  - id: AC-4
+    given: 当前请求已经加载受限技能
+    when: 收到后台任务完成回执后继续同一请求
+    then: 回执不被当作新的用户请求，也不释放当前请求的技能限制

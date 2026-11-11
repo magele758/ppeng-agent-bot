@@ -112,7 +112,7 @@ export async function resolveSkillLoad(
         : allowedDecision.error
     };
   }
-  const exact = allowedMatches.find(s => s.ownerBotId && s.id.toLowerCase() === normalizedName);
+  const exact = allowedMatches.find(s => s.id.trim().toLowerCase() === normalizedName);
   if (!exact && allowedMatches.length > 1) {
     void host.emitTrace(sessionId, {
       kind: 'skill_load',

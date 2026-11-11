@@ -4,6 +4,8 @@ import {
   defaultLangfuseSettings,
   publicLangfuseSettings,
   readLangfuseSettings,
+  readLangfuseDelivery,
+  probeLangfuse,
   resolveLangfuseChain,
   writeLangfuseSettings,
   buildLangfuseBatch,
@@ -346,4 +348,71 @@ test('mirrorTraceToLangfuse: off skips fetch; on posts Basic; fetch throw swallo
 
   await mirrorTraceToLangfuse(store, 's1', { kind: 'turn_end', payload: {} }, {}, throwingFetch);
   assert.equal(calls, 1);
+});
+
+function deliveryStore() {
+  const store = kvStore();
+  writeLangfuseSettings(store, {baseUrl:'http://langfuse.test',enabled:true,publicKey:'pk-secret',secretKey:'sk-secret'});
+  return store;
+}
+const goodDelivery = async () => ({ok:true,status:207,json:async()=>({})});
+
+test('business delivery outcomes remain visible without leaking errors [AC:langfuse-delivery-health#AC-1]', async () => {
+  const store=deliveryStore();
+  const send=fetchImpl=>mirrorTraceToLangfuse(store,'delivery-test',{kind:'turn_end'}, {}, fetchImpl);
+  await send(goodDelivery);
+  assert.equal(readLangfuseDelivery(store,{}).succeeded,1);
+  assert.ok(readLangfuseDelivery(store,{}).lastSuccessAt);
+  for(const [fetchImpl,error] of [
+    [async()=>{throw Error('sk-secret credential');},'network'],
+    [async()=>({ok:false,status:401}),'HTTP 401'],
+    [async()=>({ok:true,status:200,json:async()=>{throw Error('sk-secret');}}),'invalid_response'],
+    [async()=>({ok:true,status:207,json:async()=>({errors:[{message:'sk-secret'}]})}),'ingestion_errors']
+  ]) {
+    await assert.doesNotReject(send(fetchImpl));
+    assert.equal(readLangfuseDelivery(store,{}).lastError,error);
+  }
+  const state=readLangfuseDelivery(store,{});
+  assert.equal(state.attempted,5);assert.equal(state.failed,4);assert.equal(state.inFlight,0);
+  assert.ok(state.lastFailureAt);assert.doesNotMatch(JSON.stringify(state),/credential|sk-secret/);
+  state.failed=999;assert.equal(readLangfuseDelivery(store,{}).failed,4);
+});
+
+test('request and response-body deadlines abort after five seconds [AC:langfuse-delivery-health#AC-2]', async t=>{
+  const store=deliveryStore();
+  t.mock.timers.enable({apis:['setTimeout']});
+  let signal;
+  const pending=mirrorTraceToLangfuse(store,'delivery-deadline',{kind:'turn_end'}, {},async(_url,init)=>{
+    signal=init.signal;return new Promise(()=>{});
+  });
+  assert.equal(readLangfuseDelivery(store,{}).inFlight,1);
+  t.mock.timers.tick(5000);await pending;
+  assert.equal(signal.aborted,true);assert.equal(readLangfuseDelivery(store,{}).lastError,'timeout');
+  const reading=mirrorTraceToLangfuse(store,'delivery-body',{kind:'turn_end'}, {},async(_url,init)=>{
+    signal=init.signal;return {ok:true,status:207,json:()=>new Promise(()=>{})};
+  });
+  await Promise.resolve();t.mock.timers.tick(5000);await reading;
+  assert.equal(signal.aborted,true);assert.equal(readLangfuseDelivery(store,{}).failed,2);
+  assert.equal(readLangfuseDelivery(store,{}).inFlight,0);
+});
+
+test('probes, stores and changed connections do not share delivery history [AC:langfuse-delivery-health#AC-3]',async()=>{
+  const store=deliveryStore();
+  await mirrorTraceToLangfuse(store,'delivery-scope',{kind:'turn_end'}, {},goodDelivery);
+  await probeLangfuse({baseUrl:'http://langfuse.test',publicKey:'pk-secret',secretKey:'sk-secret'},goodDelivery);
+  assert.equal(readLangfuseDelivery(store,{}).attempted,1);
+  assert.equal(readLangfuseDelivery(deliveryStore(),{}).attempted,0);
+  writeLangfuseSettings(store,{baseUrl:'http://other.test'});
+  assert.equal(readLangfuseDelivery(store,{}).attempted,0);
+  assert.equal(readLangfuseDelivery(store,{}).lastSuccessAt,null);
+});
+
+test('old in-flight deliveries cannot mutate the next connection counters [AC:langfuse-delivery-health#AC-3]',async()=>{
+  const store=deliveryStore();let finish;
+  const pending=mirrorTraceToLangfuse(store,'delivery-old',{kind:'turn_end'}, {},()=>new Promise(resolve=>{finish=resolve;}));
+  assert.equal(readLangfuseDelivery(store,{}).inFlight,1);
+  writeLangfuseSettings(store,{secretKey:'new-secret'});
+  assert.equal(readLangfuseDelivery(store,{}).attempted,0);
+  finish(await goodDelivery());await pending;
+  assert.equal(readLangfuseDelivery(store,{}).succeeded,0);
 });

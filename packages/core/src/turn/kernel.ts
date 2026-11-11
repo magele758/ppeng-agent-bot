@@ -689,6 +689,14 @@ async function runSessionKernel(
       /* fail-soft */
     }
   };
+  const saveRetainedAssistant = (turn: number, parts: MessagePart[]) => {
+    const message = host.store.appendMessage(sid, 'assistant', parts);
+    const checkpoint = saveStepCheckpoint(host.store, sid, { turn, label: 'retained-assistant' });
+    if (!checkpoint.ok) throw new Error(`Cannot commit retained assistant reply: ${checkpoint.reason.kind}`);
+    commitEventLogStep(host.store, sid, { turn, label: 'retained-assistant' });
+    options?.onModelStreamChunk?.({ type: 'assistant_saved', messageId: message.id });
+    return message;
+  };
   const tryAutoFork = (trigger: 'repetition-aborted' | 'deadloop-exhausted'): boolean => {
     try {
       const current = host.store.getSession(sid);
@@ -1590,7 +1598,7 @@ async function __gate22() {
 let strike: any;
 strike = noteCriticalHit(recoveryState);
 if (strike.action === 'abort') {
-            host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+            saveRetainedAssistant(turn, turnResult.assistantParts);
             host.store.appendMessage(session.id, 'system', [
               textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
             ]);
@@ -1607,7 +1615,7 @@ return undefined;
 async function __gate23() {
 
 if (graceOut.action === 'abort') {
-          host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+          saveRetainedAssistant(turn, turnResult.assistantParts);
           await host.injectEvolvingCoachBeforeRecovery(session, agent, 'repetition', graceOut.reason);
           host.store.appendMessage(session.id, 'system', [textPart(`[recovery] Stopped: ${graceOut.reason}`)]);
           void host.emitTrace(sid, {
@@ -1674,7 +1682,7 @@ return undefined;
 function __gate28() {
 if (recovery.action === 'retry-after-nudge') {
         if (!recovery.discardAssistant && turnResult.assistantParts.length > 0) {
-          host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+          saveRetainedAssistant(turn, turnResult.assistantParts);
         }
         host.store.appendMessage(sid, 'system', [textPart(recovery.nudge)]);
         return kernelTurnSignal('continue');
@@ -1705,7 +1713,7 @@ if (turnResult.assistantParts.length === 0) {
       }
 spinReason = spinWatchdog?.noteParts(turnResult.assistantParts);
 if (spinReason) {
-        host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+        saveRetainedAssistant(turn, turnResult.assistantParts);
         host.store.appendMessage(sid, 'system', [textPart(`[recovery] Stopped: ${spinReason}`)]);
         void host.emitTrace(sid, {
           kind: 'reasoning_spin_abort',

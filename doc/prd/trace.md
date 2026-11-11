@@ -1833,6 +1833,13 @@ Auto 对话连续执行
 
 - `packages/core/test/local-source-unlock.test.js`
 
+### background-job-notice
+
+后台任务回执保留系统身份
+
+- `apps/web-console/lib/system-message-kind.test.ts`
+- `packages/core/test/bot-autonomous-lifecycle.test.js`
+
 ### background-job-restart
 
 重启后中断无人执行的后台命令
@@ -2672,6 +2679,13 @@ Delete library pages and revoke public shares
 - `scripts/test/dev-tailnet-https.test.mjs`
 - `scripts/test/dev-tailnet-start.test.mjs`
 
+### diagnostic-safety-scope
+
+远程诊断与后台通知保持正确权限边界
+
+- `packages/core/test/default-deny-policy.test.js`
+- `packages/core/test/skill-manifest-gate.test.js`
+
 ### discovery-default-on
 
 能力发现总开关默认开启
@@ -2986,6 +3000,14 @@ Lab Settings → Tools → Registered Machines panel
 Lab 会话显示启动耗时
 
 - `apps/web-console/lib/turn-feed-stats.test.ts`
+
+### langfuse-delivery-health
+
+Langfuse 实际上报状态与超时
+
+- `apps/daemon/test/langfuse-delivery.test.ts`
+- `apps/web-console/components/langfuse-delivery-status.test.ts`
+- `packages/core/test/langfuse-settings.test.js`
 
 ### lcu-app-grant
 
@@ -3737,6 +3759,12 @@ Secure Form fill-from-Vault
 - `apps/web-console/components/SharedFactsPanel.test.ts`
 - `e2e/bot-interaction-polish.spec.ts`
 
+### shared-skill-exact-id
+
+共享技能精确标识可加载
+
+- `packages/core/test/skill-load-recovery.test.js`
+
 ### shell-output-untrusted-fence
 
 命令输出作为不可信内容围栏后再给模型
@@ -3946,6 +3974,14 @@ Slack Events 入站按线程唤醒例行任务
 - `packages/agent-loop/src/recovery/session-loop-guard.test.ts`
 - `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
 - `packages/core/test/session-loop-guard.test.js`
+
+### trace-stream-retention
+
+恢复路径消息身份与长句复读保护
+
+- `packages/agent-loop/src/streaming/repetition-watchdog.test.ts`
+- `packages/agent-loop/src/turn/kernel.test.ts`
+- `packages/core/test/bot-startup-kernel.test.ts`
 
 ### turn-end-actions
 

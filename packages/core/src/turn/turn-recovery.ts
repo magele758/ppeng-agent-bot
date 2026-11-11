@@ -163,7 +163,9 @@ export function decideTurnRecovery(input: DecideTurnRecoveryInput): RecoveryActi
   }
 
   if (truncated) {
-    if (hasIncompleteToolCalls(parts)) {
+    // A parseable call is still part of an unfinished shot; do not persist or
+    // execute a potentially partial parallel tool wave.
+    if (calls.length > 0) {
       if (input.state.protocolRetries < MAX_PROTOCOL_RETRIES) {
         input.state.protocolRetries += 1;
         return { action: 'retry-same-input' };

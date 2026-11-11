@@ -77,6 +77,12 @@ Auto 对话连续执行
 
 auto的权限太低了，一点也不auto，这种怎么都要我审批，简直不能用，导致我只有bypass的能用
 
+## background-job-notice
+后台任务回执保留系统身份
+
+这个是什么东西
+那你分多个Agent修复一下问题
+
 ## background-job-restart
 重启后中断无人执行的后台命令
 
@@ -280,6 +286,11 @@ Card reads/writes only through the existing quiet-hours API. i18n zh+en.
 
 把 HTTPS 和 Tailscale 访问整合到项目启动流程里，以后 pnpm run dev 启动就能直接访问，端口变化也自动更新转发地址。别泄露隐私
 
+## diagnostic-safety-scope
+远程诊断与后台通知保持正确权限边界
+
+那你分多个Agent修复一下问题
+
 ## discovery-default-on
 能力发现总开关默认开启
 
@@ -414,6 +425,11 @@ Lab 只读查看本机 Grok Bot 会话
 4. 文案走 i18n，zh 与 en 同一套 key。不要新增 RAW_AGENT_*。不要把用户私人路径写进仓库。
 5. 选择器 API 只给已登录的本机 Lab 用，不要变成远程替别人弹窗或读任意路径的漏洞。只索引选中的目录，继续跳过密钥文件。
 用户看着本地资料目录列表说「没对齐」。每一行同一高度。路径靠左，从同一条左缘开始；「移除」固定在右侧同一列，两行的按钮左缘/右缘对齐，不要跟着路径长短乱跑。路径和「移除」在行内垂直居中。路径过长时单行省略，不要把按钮挤到下一行或撑歪行高。列表本身和上方「选择文件夹」按钮、卡片内容区左右对齐，不要单独缩进或凸出。
+
+## langfuse-delivery-health
+Langfuse 实际上报状态与超时
+
+那你分多个Agent修复一下问题
 
 ## lcu-app-grant
 桌面操作应用授权：全自动免审批，批准一次后同会话记住
@@ -977,6 +993,11 @@ token、encryptKey、secret、发送者白名单、botId），密钥永不回显
 
 这里展示优化一下，太乱了，界面占用太多了
 
+## shared-skill-exact-id
+共享技能精确标识可加载
+
+那你分多个Agent修复一下问题
+
 ## shell-output-untrusted-fence
 命令输出作为不可信内容围栏后再给模型
 
@@ -1090,6 +1111,11 @@ Super Bot 独立配好多机软件工厂
 思考力度
 
 现在这个有没有thinking Effect level的控制？没有就规划一下，加一个
+
+## trace-stream-retention
+恢复路径消息身份与长句复读保护
+
+那你分多个Agent修复一下问题
 
 ## turn-end-actions
 完整回复结束后才在末尾显示操作

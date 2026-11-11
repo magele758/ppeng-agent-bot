@@ -1,0 +1,15 @@
+id: shared-skill-exact-id
+title: 共享技能精确标识可加载
+status: implemented
+requirement: |
+  那你分多个Agent修复一下问题
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 当前会话可见且允许的共享与私有技能同名
+    when: 按共享或私有技能的精确标识加载
+    then: 返回对应技能正文，不被另一同名技能阻断
+  - id: AC-2
+    given: 技能不在允许名单内或尚未满足严格搜索发现要求
+    when: 按精确标识加载技能
+    then: 仍拒绝加载，其他会话不能借用搜索记录

@@ -5,6 +5,8 @@
 import { builtinAgents } from '../builtin-agents.js';
 import { ResearchPipeline } from '../deepresearch/pipeline.js';
 import { NotFoundError } from '../errors.js';
+import { fenceShellOutput } from '../safety/external-content.js';
+import { redactToolContent } from '../sandbox/result-redaction.js';
 import { inheritBotIdentityMetadata } from '../memory/bot-memory-scope.js';
 import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { CommandHardlineDeniedError, matchCommandHardline } from '../sandbox/command-hardline.js';
@@ -383,6 +385,18 @@ export async function spawnTeammateOutcome(
   return withChildSession({ ok: true, content: spawned }, session.id, 'teammateSessionId');
 }
 
+function recordBackgroundReceipt(host: SpawnHost, job: BackgroundJobRecord): void {
+  const output = redactToolContent(job.result ?? '(no output)');
+  const text = `[background-job] ${job.id} ${job.status}; finished_at=${job.updatedAt}\n${fenceShellOutput('background job output', output.slice(0, 4000))}`;
+  host.store.runWithoutWriterScope(() => {
+    const item = host.store.enqueueSteer(job.sessionId, text, {
+      role: 'system', source: 'event', key: `background-job:${job.id}`
+    });
+    // Inbox application preserves this receipt's ID and completion timestamp.
+    host.store.appendMessage(job.sessionId, 'system', [textPart(text)], { key: item.key });
+  });
+}
+
 export async function startBackgroundJob(
   host: SpawnHost,
   sessionId: string,
@@ -448,13 +462,14 @@ export async function startBackgroundJob(
       host.backgroundJobAborts.delete(job.id);
       if (!host.store.db.isOpen) return;
       const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n') || '(no output)';
-      host.store.updateBackgroundJob(job.id, 'completed', output);
-      host.store.runWithoutWriterScope(() => host.store.enqueueSteer(sessionId, `Background job ${job.id} completed.\n${output.slice(0, 4000)}`, {role:'user',key:`background-job:${job.id}`}));
+      const status = result.code === 0 && !result.signal ? 'completed' : 'error';
+      const record = host.store.updateBackgroundJob(job.id, status, `${output}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`);
+      recordBackgroundReceipt(host, record);
     }).catch((error) => {
       host.backgroundJobAborts.delete(job.id);
       if (!host.store.db.isOpen) return;
-      host.store.updateBackgroundJob(job.id, 'error', String(error));
-      host.store.runWithoutWriterScope(() => host.store.enqueueSteer(sessionId, `Background job ${job.id} failed: ${String(error)}`, {role:'user',key:`background-job:${job.id}`}));
+      const record = host.store.updateBackgroundJob(job.id, 'error', String(error));
+      recordBackgroundReceipt(host, record);
     });
 
   return job;

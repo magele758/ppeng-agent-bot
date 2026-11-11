@@ -65,3 +65,37 @@ test('catalog warmup shares the pending read and recovers after a failed read [A
   assert.ok((await pb.allSkills()).length);
   assert.equal(reads,2);
 });
+
+function overlappingSkillHost({ allowed, mode = 'full', searched = new Map() } = {}) {
+  const shared = { id: 'diagnostics', name: 'diagnostics', content: '# shared diagnostics', source: 'workspace' };
+  const own = { id: 'bot-owner:diagnostics', name: 'diagnostics', content: '# private diagnostics', source: 'user', ownerBotId: 'owner' };
+  return { promptBuilder: {
+    skillsForSession: async () => [shared, own],
+    getAllowedSkills: () => allowed,
+    getSkillDisclosure: () => mode,
+    getSkillRoutingSettings: () => ({ strictLoad: true, routingMode: 'hybrid' }),
+    getRouting: () => ({ shortlistNames: [], confidence: { level: 'low' } }),
+    getLastSkillSearchNames: sessionId => searched.get(sessionId) ?? [],
+    isOwnSkill: () => false
+  }, emitTrace() {} };
+}
+
+test('shared exact ID wins over overlapping private name [AC:shared-skill-exact-id#AC-1]', async () => {
+  const host = overlappingSkillHost();
+  assert.match((await resolveSkillLoad(host, 'diagnostics', 's')).content ?? '', /shared diagnostics/);
+  assert.match((await resolveSkillLoad(host, 'bot-owner:diagnostics', 's')).content ?? '', /private diagnostics/);
+});
+
+test('exact IDs cannot bypass allowed skills [AC:shared-skill-exact-id#AC-2]', async () => {
+  const host = overlappingSkillHost({ allowed: ['other'] });
+  assert.match((await resolveSkillLoad(host, 'diagnostics', 's')).error ?? '', /allowedSkills/);
+});
+
+test('shared exact IDs retain session discovery boundaries [AC:shared-skill-exact-id#AC-2]', async () => {
+  const searched = new Map();
+  const host = overlappingSkillHost({ mode: 'lazy', searched });
+  assert.match((await resolveSkillLoad(host, 'diagnostics', 's1')).error ?? '', /search_skills/);
+  searched.set('s1', ['diagnostics']);
+  assert.match((await resolveSkillLoad(host, 'diagnostics', 's1')).content ?? '', /shared diagnostics/);
+  assert.match((await resolveSkillLoad(host, 'diagnostics', 's2')).error ?? '', /search_skills/);
+});

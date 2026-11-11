@@ -59,8 +59,12 @@ export function isToolResultTrimmed(content: string): boolean {
   return content.includes('output trimmed from') || content.includes('chars truncated');
 }
 
-export function normalizedRole(m: ChatMessage): 'user' | 'assistant' | 'tool' | 'system' {
-  const r = m.role;
+export function normalizedRole(m: ChatMessage & {key?: string}): 'user' | 'assistant' | 'tool' | 'system' {
+  const r = sourceRole(m);
   if (r === 'user' || r === 'assistant' || r === 'tool' || r === 'system') return r;
   return 'assistant';
+}
+
+function sourceRole(m: ChatMessage & {key?: string}): ChatMessage['role'] {
+  return /^(?:source:event:)?background-job:bg_[\w-]+$/.test(m.key ?? '') ? 'system' : m.role;
 }

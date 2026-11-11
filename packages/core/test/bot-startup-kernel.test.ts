@@ -150,6 +150,101 @@ async function createHost(opts?: { throwTrace?: boolean; abort?: boolean; slowPr
   return { host, session, events, modelCalls: () => modelCalls };
 }
 
+test('reference kernel keeps normal and truncated saved shot identities [AC:trace-stream-retention#AC-1]', async () => {
+  const { runSessionKernel } = await loadKernel();
+  const { host, session } = await createHost();
+  let count = 0;
+  host.runTurnWithRetries = async () => {
+    count += 1;
+    return {
+      stopReason: 'end' as const,
+      assistantParts: [{ type: 'text' as const, text: count === 1 ? 'partial' : 'continued' }],
+      ...(count === 1 ? { truncated: true, finishReason: 'length' } : {}),
+    };
+  };
+  const ids: string[] = [];
+  await runSessionKernel(host, session.id, {
+    onModelStreamChunk(chunk) {
+      if (chunk.type === 'assistant_saved') ids.push(chunk.messageId);
+    },
+  });
+  const messages = host.store.foldMessages(session.id).filter(message => message.role === 'assistant');
+  assert.equal(messages.length, 2);
+  assert.deepEqual(ids, messages.map(message => message.id));
+});
+
+test('reference kernel preserves the spin-abort shot after rewind [AC:trace-stream-retention#AC-1]', async (t) => {
+  const { ReasoningSpinWatchdog } = await import('@ppeng/agent-loop');
+  t.mock.method(ReasoningSpinWatchdog.prototype, 'noteParts', () => 'test spin stop');
+  const { runSessionKernel } = await loadKernel();
+  const { host, session } = await createHost();
+  const ids: string[] = [];
+  await runSessionKernel(host, session.id, {
+    onModelStreamChunk(chunk) {
+      if (chunk.type === 'assistant_saved') ids.push(chunk.messageId);
+    },
+  });
+  const messages = host.store.foldMessages(session.id).filter(message => message.role === 'assistant');
+  assert.equal(messages.length, 1);
+  assert.deepEqual(ids, messages.map(message => message.id));
+});
+
+test('reference kernel discards a truncated complete tool wave and retries safely [AC:trace-stream-retention#AC-1] [AC:trace-stream-retention#AC-3]', async () => {
+  const { runSessionKernel } = await loadKernel();
+  const { host, session } = await createHost();
+  let count = 0;
+  host.runTurnWithRetries = async () => count++ === 0 ? {
+    stopReason: 'tool_use' as const, truncated: true, finishReason: 'length',
+    assistantParts: [{ type: 'tool_call' as const, toolCallId: 'truncated-complete', name: 'echo', input: {} }],
+  } : { stopReason: 'end' as const, assistantParts: [{ type: 'text' as const, text: 'recovered answer' }] };
+  const ids: string[] = [];
+  await runSessionKernel(host, session.id, { onModelStreamChunk(chunk) {
+    if (chunk.type === 'assistant_saved') ids.push(chunk.messageId);
+  } });
+  const messages = host.store.foldMessages(session.id).filter(m => m.role === 'assistant');
+  assert.equal(messages.length, 1);
+  assert.equal(messages.flatMap(m => m.parts).some(p => p.type === 'tool_call'), false);
+  assert.deepEqual(ids, messages.map(m => m.id));
+});
+
+test('reference kernel does not publish a retained shot when checkpoint persistence fails [AC:trace-stream-retention#AC-1]', async () => {
+  const { runSessionKernel } = await loadKernel();
+  const { host, session } = await createHost();
+  host.runTurnWithRetries = async () => ({
+    stopReason: 'end' as const, truncated: true,
+    assistantParts: [{ type: 'text' as const, text: 'partial reply' }],
+  });
+  const update = host.store.updateSession;
+  host.store.updateSession = (id, patch) => {
+    if (patch.metadata?.stepCheckpoints) throw new Error('checkpoint write failed');
+    return update(id, patch);
+  };
+  const ids: string[] = [];
+  await assert.rejects(runSessionKernel(host, session.id, {
+    onModelStreamChunk(chunk) {
+      if (chunk.type === 'assistant_saved') ids.push(chunk.messageId);
+    },
+  }), /checkpoint write failed/);
+  assert.deepEqual(ids, []);
+});
+
+test('reference kernel rejects a refused checkpoint without announcing a save [AC:trace-stream-retention#AC-1]', async () => {
+  const { runSessionKernel } = await loadKernel();
+  const { host, session } = await createHost();
+  host.runTurnWithRetries = async () => ({
+    stopReason: 'end' as const, truncated: true,
+    assistantParts: [{ type: 'text' as const, text: 'partial reply' }],
+  });
+  host.store.listSurfaceNodes = () => [];
+  const ids: string[] = [];
+  await assert.rejects(runSessionKernel(host, session.id, {
+    onModelStreamChunk(chunk) {
+      if (chunk.type === 'assistant_saved') ids.push(chunk.messageId);
+    },
+  }), /Cannot commit retained assistant reply: empty-log/);
+  assert.deepEqual(ids, []);
+});
+
 test('kernel records shared startup phases without message text [AC:bot-startup-trace#AC-1] [AC:bot-startup-trace#AC-5]', async () => {
   const { runSessionKernel } = await loadKernel();
   const { host, session, events } = await createHost({ slowPrompt: true });

@@ -1,0 +1,19 @@
+id: langfuse-delivery-health
+title: Langfuse 实际上报状态与超时
+status: implemented
+requirement: |
+  那你分多个Agent修复一下问题
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 已开启 Langfuse 上报
+    when: 一次业务上报成功或因网络、响应或服务错误失败
+    then: Lab 可查看尝试、成功、失败和发送中数量及最近成功失败时间，失败原因不包含密钥或原始异常，业务任务继续运行
+  - id: AC-2
+    given: Langfuse 请求或响应读取一直没有完成
+    when: 等待达到五秒
+    then: 上报结束等待并记录超时失败，取消该请求
+  - id: AC-3
+    given: 已有业务上报统计
+    when: 测试连接、查询另一个运行实例或更换连接配置
+    then: 测试连接不冒充业务上报，实例之间统计隔离，更换连接后不沿用旧连接成功状态

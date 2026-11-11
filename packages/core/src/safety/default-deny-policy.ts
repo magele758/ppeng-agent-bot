@@ -26,6 +26,15 @@ const HIGH_PRIVILEGE = new Set<string>([
   'apply_patch'
 ]);
 
+const UNTRUSTED_INSTRUCTION_MARKERS = [
+  'Ignore previous instructions',
+  'ignore all previous instructions',
+  'sudo rm -rf /',
+  'curl | bash',
+  'curl|bash',
+  'wget | sh'
+];
+
 /** Markers that indicate tool input was induced by untrusted markdown / PR text. */
 const UNTRUSTED_INDUCTION_MARKERS = [
   '«external ',
@@ -34,12 +43,7 @@ const UNTRUSTED_INDUCTION_MARKERS = [
   'BEGIN PR BODY',
   'BEGIN UNTRUSTED MARKDOWN',
   '<!-- untrusted-pr -->',
-  'Ignore previous instructions',
-  'ignore all previous instructions',
-  'sudo rm -rf /',
-  'curl | bash',
-  'curl|bash',
-  'wget | sh'
+  ...UNTRUSTED_INSTRUCTION_MARKERS
 ];
 
 export interface DefaultDenyInput {
@@ -51,7 +55,7 @@ export interface DefaultDenyInput {
   inductionText?: string;
   /** Shell text checked for cwd / eval escape. Defaults to inductionText. */
   command?: string;
-  /** Prior tool or web text. Fenced untrusted content blocks eval escape. */
+  /** Prior tool or web text. Explicit untrusted instructions block eval escape. */
   untrustedCorpus?: string;
   /** Explicit session/metadata flag that cwd is untrusted. */
   cwdUntrusted?: boolean;
@@ -158,13 +162,44 @@ function cdTargetEscapes(raw: string, cwd: string, roots: string[]): boolean {
   return targetOutsideWorkspace(target, cwd, roots);
 }
 
+function isShellQuote(quote: string | undefined): boolean {
+  return quote === "'" || quote === '"';
+}
+
+function hasLocalExpansion(quote: string | undefined, body: string): boolean {
+  return quote === '"' && /[$`\\]/.test(body);
+}
+
+function literalRemoteBodyEnd(command: string, start: number): number {
+  const quote = command[start];
+  if (!isShellQuote(quote)) return -1;
+  const end = command.indexOf(quote!, start + 1);
+  if (end < 0 || hasLocalExpansion(quote, command.slice(start + 1, end))) return -1;
+  return /^\s*(?:$|[;&|])/.test(command.slice(end + 1)) ? end : -1;
+}
+
+/** Exclude only a statically literal SSH body, never local expansions or tails. */
+function localCommandText(command: string): string {
+  const prefix = /^\s*(?:\/usr\/bin\/)?ssh[ \t]+(?:(?:-(?:p|i|l|F|J|o)[ \t]+[A-Za-z0-9_@.\/:=,+-]+|-o[A-Za-z0-9_@.\/:=,+-]+|-[A-Za-z0-9]+)[ \t]+)*[A-Za-z0-9_@.:\[\]-]+[ \t]+/.exec(command);
+  if (!prefix) return command;
+  const start = prefix[0].length;
+  const end = literalRemoteBodyEnd(command, start);
+  return end < 0 ? command : command.slice(0, start) + "''" + command.slice(end + 1);
+}
+
+function hasUntrustedInstructions(corpus: string): boolean {
+  const lower = corpus.toLowerCase();
+  return UNTRUSTED_INSTRUCTION_MARKERS.some(marker => lower.includes(marker.toLowerCase()));
+}
+
 /** `cd` / `pushd` / `chdir` that leaves every trusted root, including `..`. */
 export function commandLeavesWorkspace(command: string, cwd: string, roots: string[]): boolean {
   const re = /\b(?:cd|pushd|chdir)\s+([^\s;|&]+)/gi;
-  let match: RegExpExecArray | null = re.exec(command);
+  const local = localCommandText(command);
+  let match: RegExpExecArray | null = re.exec(local);
   while (match) {
     if (cdTargetEscapes(match[1] ?? '', cwd, roots)) return true;
-    match = re.exec(command);
+    match = re.exec(local);
   }
   return false;
 }
@@ -205,7 +240,7 @@ export function untrustedEscapeReason(
   roots: string[]
 ): string | undefined {
   if (commandLeavesWorkspace(command, cwd, roots)) return 'cwd escape';
-  if (corpus && detectUntrustedInduction(corpus).induced && commandEvaluatesCode(command)) {
+  if (corpus && hasUntrustedInstructions(corpus) && commandEvaluatesCode(command)) {
     return 'eval escape induced by untrusted content';
   }
   return undefined;

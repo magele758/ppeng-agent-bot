@@ -6,6 +6,7 @@
 import {
   publicLangfuseSettings,
   readLangfuseSettings,
+  readLangfuseDelivery,
   writeLangfuseSettings,
   probeLangfuse,
   type LangfuseSettingsPatch,
@@ -24,7 +25,8 @@ export function langfuseRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         json(response, 200, {
           settings,
           effective: {
-            source: runtime.store.getDaemonControl('langfuse_settings') ? 'ui' : 'default'
+            source: runtime.store.getDaemonControl('langfuse_settings') ? 'ui' : 'default',
+            delivery: readLangfuseDelivery(runtime.store)
           }
         });
       }
@@ -37,7 +39,7 @@ export function langfuseRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const saved = writeLangfuseSettings(runtime.store, body ?? {});
         json(response, 200, {
           settings: publicLangfuseSettings(saved, process.env),
-          effective: { source: 'ui' as const }
+          effective: { source: 'ui' as const, delivery: readLangfuseDelivery(runtime.store) }
         });
       }
     },

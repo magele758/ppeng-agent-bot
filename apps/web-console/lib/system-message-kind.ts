@@ -1,8 +1,12 @@
-export type SystemMessageKind = 'recovery' | 'stopped' | 'fallback' | 'goal' | 'continuing' | 'compact' | 'hook' | 'collaboration' | 'access' | 'context' | 'generic';
+export type SystemMessageKind = 'recovery' | 'stopped' | 'fallback' | 'goal' | 'continuing' | 'compact' | 'hook' | 'collaboration' | 'access' | 'context' | 'generic' | 'backgroundJob';
+
+function initialMessageKind(raw: string): SystemMessageKind {
+  return /^(?:\[background-job\]|Background job bg_[\w-]+ (?:completed\.|failed:))/.test(raw.trimStart()) ? 'backgroundJob' : 'generic';
+}
 /** Classify explicit producer markers only; free-form text does not establish a status. */
 export function classifySystemMessage(raw: string): { kind: SystemMessageKind; warning: boolean; raw: string } {
   const tag = raw.trimStart().match(/^\[([^\]\r\n]+)\]/)?.[1] ?? '';
-  let kind: SystemMessageKind = 'generic';
+  let kind: SystemMessageKind = initialMessageKind(raw);
   if (tag === 'recovery' && /^\[recovery\]\s+Stopped:/.test(raw.trimStart())) kind = 'stopped';
   else if (['recovery', 'recovery-advisory', 'recovery:unknown', 'self-heal'].includes(tag)) kind = 'recovery';
   else if (tag === 'model-fallback') kind = 'fallback';

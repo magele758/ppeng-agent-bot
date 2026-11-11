@@ -52,7 +52,7 @@ import {
   type RunInterruptState,
 } from '../session/interrupt.js';
 import { claimAndApplyInbox } from '../session/apply-claimed-inbox.js';
-import { decideRewindTail, latestCheckpoint } from '../session/checkpoint.js';
+import { decideRewindTail, isClosedBoundary, latestCheckpoint } from '../session/checkpoint.js';
 import { clampFoldToVisible } from '../session/fold-budget.js';
 import { DEFAULT_MICRO_COMPACT_CONFIG, microCompactMessages } from '../session/micro-compact.js';
 import { resultsToPersist, toolWaveHeldForApproval } from '../runtime/tool-loop.js';
@@ -546,6 +546,18 @@ async function runSessionKernel(
   const stepInfo = (turn: number, kind: KernelStepInfo['kind']): KernelStepInfo => {
     stepCursor += 1;
     return { turn, step: stepCursor, kind, sessionId: sid };
+  };
+  const saveRetainedAssistant = async (turn: number, parts: MessagePart[]) => {
+    const history = host.store.foldMessages(sid);
+    if (parts.some(part => part.type === 'tool_call') || (history.length > 0 && !isClosedBoundary(history))) {
+      throw new Error('Cannot commit a retained assistant reply with an unclosed tool wave');
+    }
+    const info = stepInfo(turn, 'model_done');
+    await host.stepTx?.beginStep?.(info);
+    const message = host.store.appendMessage(sid, 'assistant', parts);
+    await host.stepTx?.commitStep?.(info);
+    options?.onModelStreamChunk?.({ type: 'assistant_saved', messageId: message.id });
+    return message;
   };
   const rollbackOpenStep = async (reason: string) => {
     try {
@@ -1579,10 +1591,10 @@ if (recovery.action === 'retry-same-input') {
       }
 return undefined;
 }
-function __gate113() {
+async function __gate113() {
 if (recovery.action === 'retry-after-nudge') {
         if (!recovery.discardAssistant && turnResult.assistantParts.length > 0) {
-          host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+          await saveRetainedAssistant(turn, turnResult.assistantParts);
         }
         host.store.appendMessage(sid, 'system', [textPart(recovery.nudge)]);
         return kernelTurnSignal('continue');
@@ -1618,7 +1630,7 @@ if (turnResult.assistantParts.length === 0) {
       }
 spinReason = spinWatchdog?.noteParts(turnResult.assistantParts);
 if (spinReason) {
-        host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+        await saveRetainedAssistant(turn, turnResult.assistantParts);
         host.store.appendMessage(sid, 'system', [textPart(`[recovery] Stopped: ${spinReason}`)]);
         void host.emitTrace(sid, {
           kind: 'reasoning_spin_abort',
@@ -1647,7 +1659,7 @@ rep = applyRepeatGuard({
 return undefined;
 }
 async function __gateGrp116() {
-const __gateSignal = await (await __gate111() ?? await __gate112() ?? __gate113() ?? await __gate114());
+const __gateSignal = await (await __gate111() ?? await __gate112() ?? await __gate113() ?? await __gate114());
 if (__gateSignal) return __gateSignal;
 return undefined;
 }
@@ -1674,7 +1686,7 @@ guardChoice = await maybeChooseRecovery(
           graceOut.action
         );
 if (guardChoice === 'abort') {
-          host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+          await saveRetainedAssistant(turn, turnResult.assistantParts);
           await host.injectRecoveryCoach?.({
             session,
             agent,
@@ -1706,7 +1718,7 @@ async function __gate88() {
 if (guardChoice === 'advise') {
           const strike = noteCriticalHit(recoveryState);
           if (strike.action === 'abort') {
-            host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+            await saveRetainedAssistant(turn, turnResult.assistantParts);
             host.store.appendMessage(session.id, 'system', [
               textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`),
             ]);

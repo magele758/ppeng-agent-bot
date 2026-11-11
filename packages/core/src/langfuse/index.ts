@@ -4,6 +4,7 @@ export {
   normalizeLangfuseSettings,
   publicLangfuseSettings,
   readLangfuseSettings,
+  readLangfuseDelivery,
   resolveLangfuseChain,
   writeLangfuseSettings,
   buildLangfuseBatch,
@@ -19,5 +20,6 @@ export type {
   LangfuseSettings,
   LangfuseSettingsPatch,
   LangfuseSettingsPublic,
-  LangfuseSettingsStore
+  LangfuseSettingsStore,
+  LangfuseDeliveryStatus
 } from './settings.js';

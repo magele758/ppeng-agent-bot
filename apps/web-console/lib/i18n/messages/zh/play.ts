@@ -8,6 +8,8 @@ export const play = {
   markdown: { copyCode: '复制代码', copied: '已复制' },
 
   systemNotice: {
+    backgroundJob: '后台任务状态',
+    backgroundJobHint: '这是系统生成的命令执行回执，不是你发送的消息；命令结束不代表整个任务已验证完成。',
     "recovery": "执行恢复",
     "stopped": "执行已停止",
     "fallback": "模型切换",
