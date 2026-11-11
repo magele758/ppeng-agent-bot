@@ -2803,6 +2803,7 @@ macOS 应用控制（外层宿主）
 读不到的记忆来源一轮只说明一次
 
 - `packages/core/test/memory-read-source-unavailable.test.js`
+- `packages/core/test/source-unavailable-turn-stop.test.js`
 
 ### message-body-search
 
@@ -3750,6 +3751,12 @@ Bot 完成检查覆盖本次全部插话
 - `e2e/tool-exposure.spec.ts`
 - `packages/core/test/tool-search-experiment.test.js`
 - `scripts/test/settings-route-contracts.test.mjs`
+
+### unattended-stream-observation
+
+后台运行保持流式观察与复读保护
+
+- `packages/core/test/multi-page-live-session.test.js`
 
 ### unified-bot-goal-lifecycle
 

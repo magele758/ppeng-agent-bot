@@ -3180,7 +3180,8 @@
       "id": "memory-read-source-unavailable",
       "title": "读不到的记忆来源一轮只说明一次",
       "tests": [
-        "packages/core/test/memory-read-source-unavailable.test.js"
+        "packages/core/test/memory-read-source-unavailable.test.js",
+        "packages/core/test/source-unavailable-turn-stop.test.js"
       ]
     },
     {
@@ -4258,6 +4259,13 @@
         "e2e/tool-exposure.spec.ts",
         "packages/core/test/tool-search-experiment.test.js",
         "scripts/test/settings-route-contracts.test.mjs"
+      ]
+    },
+    {
+      "id": "unattended-stream-observation",
+      "title": "后台运行保持流式观察与复读保护",
+      "tests": [
+        "packages/core/test/multi-page-live-session.test.js"
       ]
     },
     {

@@ -134,3 +134,95 @@ test('页面状态变化会通知每个正在看这场对话的网页 [AC:multi-
     await runtime.destroy();
   }
 });
+
+test('background run admits a late follower without restarting or losing saved identity [AC:unattended-stream-observation#AC-1]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'late-background-follower-'));
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  let calls = 0, streamedCalls = 0;
+  const answer = 'background start then finish';
+  const execute = async (_input, emit) => {
+    calls++;
+    if (emit) streamedCalls++;
+    emit?.({ type: 'text_delta', text: 'background start' });
+    entered();
+    await gate;
+    emit?.({ type: 'text_delta', text: ' then finish' });
+    return { stopReason: 'end', assistantParts: [{ type: 'text', text: answer }] };
+  };
+  const runtime = new RawAgentRuntime({ repoRoot: join(dir, 'repo'), stateDir: join(dir, 'state'),
+    modelAdapter: { name: 'late-background', summarizeMessages: async () => '', completeText: async () => '{"met":true}', runTurn: execute, runTurnStream: execute } });
+  let running, detach = () => {};
+  const received = [];
+  try {
+    const session = runtime.createChatSession({ message: 'background work' });
+    running = runtime.runSession(session.id);
+    await ready;
+    detach = runtime.subscribeModelStream(session.id, chunk => received.push(chunk));
+    release();
+    await running;
+    assert.equal(calls, 1);
+    assert.equal(streamedCalls, 1);
+    assert.deepEqual(textOf(received), [' then finish']);
+    const saved = received.filter(chunk => chunk.type === 'assistant_saved');
+    assert.equal(saved.length, 1);
+    const replies = runtime.store.listMessages(session.id).filter(message => message.role === 'assistant');
+    assert.equal(replies.length, 1);
+    assert.equal(saved[0].messageId, replies[0].id);
+    assert.equal(runtime.getLatestAssistantText(session.id), answer);
+  } finally {
+    release(); detach(); await running?.catch(() => {}); await runtime.destroy();
+  }
+});
+
+test('unattended model repetition is guarded in both kernels [AC:unattended-stream-observation#AC-2]', async () => {
+  for (const kernelVariant of ['agent-loop', 'ppeng']) {
+    const dir = mkdtempSync(join(tmpdir(), 'background-repetition-'));
+    let streamedCalls = 0, plainCalls = 0;
+    const spam = '覆'.repeat(500);
+    const runtime = new RawAgentRuntime({ repoRoot: join(dir, 'repo'), stateDir: join(dir, 'state'),
+      modelAdapter: { name: 'background-repetition', summarizeMessages: async () => '', completeText: async () => '{"met":true}',
+        async runTurn() { plainCalls++; return { stopReason: 'end', assistantParts: [{ type: 'text', text: spam }] }; },
+        async runTurnStream(input, emit) {
+          streamedCalls++;
+          emit({ type: 'text_delta', text: spam });
+          if (input.signal?.aborted) throw new Error('stream aborted');
+          return { stopReason: 'end', assistantParts: [{ type: 'text', text: spam }] };
+        }
+      } });
+    try {
+      runtime.store.setDaemonControl('loop_settings', { kernelVariant });
+      const session = runtime.createChatSession({ message: 'background check' });
+      await runtime.runSession(session.id);
+      assert.equal(plainCalls, 0, kernelVariant);
+      assert.equal(streamedCalls, 2, kernelVariant);
+      assert.equal((runtime.getLatestAssistantText(session.id) ?? "").includes(spam), false, kernelVariant);
+      assert.equal(runtime.getSession(session.id).metadata.outcome.reason, 'repetition', kernelVariant);
+    } finally { await runtime.destroy(); }
+  }
+});
+
+test('explicit stream-off and non-stream adapters keep their fallback [AC:unattended-stream-observation#AC-3]', async () => {
+  const previous = process.env.RAW_AGENT_STREAM;
+  for (const mode of ['disabled', 'unsupported']) {
+    if (mode === 'disabled') process.env.RAW_AGENT_STREAM = '0';
+    else delete process.env.RAW_AGENT_STREAM;
+    const dir = mkdtempSync(join(tmpdir(), 'background-no-stream-'));
+    let plainCalls = 0;
+    const adapter = { name: 'background-fallback', summarizeMessages: async () => '',
+      async runTurn() { plainCalls++; return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'saved normally' }] }; } };
+    if (mode === 'disabled') adapter.runTurnStream = async () => { throw new Error('stream explicitly disabled'); };
+    const runtime = new RawAgentRuntime({ repoRoot: join(dir, 'repo'), stateDir: join(dir, 'state'), modelAdapter: adapter });
+    try {
+      const session = runtime.createChatSession({ message: 'background fallback' });
+      await runtime.runSession(session.id);
+      assert.equal(plainCalls, 1);
+      assert.equal(runtime.getLatestAssistantText(session.id), 'saved normally');
+    } finally {
+      await runtime.destroy();
+      if (previous === undefined) delete process.env.RAW_AGENT_STREAM;
+      else process.env.RAW_AGENT_STREAM = previous;
+    }
+  }
+});
