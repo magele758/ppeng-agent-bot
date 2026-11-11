@@ -57,3 +57,33 @@ test('a reconnect knows durable identity before its first shot and done is not a
  rollbackToCheckpoint(segments,checkpointAfterModelDone(segments,committed,true));
  assert.deepEqual(segments,[]);
 });
+
+test('下一枪增量抢在保存之前时，已保存正文和新正文都留下 [AC:night-runtime-reliability#AC-8]', async () => {
+  const { applySavedStreamEvent, streamCheckpoint, rollbackToCheckpoint } = await import('./stream-segments.ts');
+  const { omitStreamTextSavedOnTurn } = await import('./history-window.ts');
+  const segments: StreamSegment[] = [{ kind: 'text', id: 's1', raw: 'saved', html: 'saved', messageId: '' }];
+  const seal = streamCheckpoint(segments);
+  const live = segments[0] as Extract<StreamSegment, { kind: 'text' }>;
+  live.raw += 'NEW';
+  live.html += 'NEW';
+  assert.equal(applySavedStreamEvent('model', { type: 'assistant_saved', messageId: 'a1' }, segments, seal), true);
+  assert.equal(segments[0] && segments[0].kind === 'text' ? segments[0].raw : '', 'saved');
+  assert.equal(segments[0]?.messageId, 'a1');
+  assert.equal(segments[1] && segments[1].kind === 'text' ? segments[1].raw : '', 'NEW');
+  assert.equal(segments[1]?.messageId ?? '', '');
+  const asked = [{ id: 'u', role: 'user', text: 'q' }];
+  const beforeHistory = omitStreamTextSavedOnTurn(asked, segments);
+  assert.equal(beforeHistory.some((segment) => segment.kind === 'text' && segment.raw === 'saved'), true);
+  assert.equal(beforeHistory.some((segment) => segment.kind === 'text' && segment.raw === 'NEW'), true);
+  const checkpoint = streamCheckpoint(segments);
+  segments.push({ kind: 'text', id: 'failed', raw: 'discard', html: 'discard', messageId: '' });
+  rollbackToCheckpoint(segments, checkpoint);
+  assert.equal(segments.some((segment) => segment.id === 'failed'), false);
+  assert.equal(segments[0]?.messageId, 'a1');
+  assert.equal(segments[0] && segments[0].kind === 'text' ? segments[0].raw : '', 'saved');
+  assert.equal(segments.some((segment) => segment.kind === 'text' && segment.raw === 'NEW'), true);
+  const landed = [...asked, { id: 'a1', role: 'assistant', text: 'saved' }];
+  const afterHistory = omitStreamTextSavedOnTurn(landed, segments);
+  assert.equal(afterHistory.some((segment) => segment.kind === 'text' && segment.raw === 'saved'), false);
+  assert.equal(afterHistory.some((segment) => segment.kind === 'text' && segment.raw === 'NEW'), true);
+});

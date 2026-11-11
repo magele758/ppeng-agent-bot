@@ -167,13 +167,7 @@ export function unpersistedAssistantText(
   segments: ReadonlyArray<StreamTextPiece>
 ): string {
   const saved = currentTurnSavedBodies(messages);
-  return segments.map(segment => pendingStreamText(segment, messages, saved)).filter(Boolean).join('\n\n');
-}
-
-function unsavedHeldText(raw: string, saved: readonly string[]): string | null {
-  const visible = stripVisibleClockMarks(raw).trim();
-  if (saved.some(body => body.includes(visible))) return null;
-  return unsavedStreamText(raw, saved);
+  return visibleLiveSegments(messages, segments).map((segment) => heldPiece(segment, messages, saved)).filter(Boolean).join('\n\n');
 }
 
 type TranscriptRow = { id?: string; key?: unknown; role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> };
@@ -223,8 +217,7 @@ export function omitStreamTextSavedOnTurn<T extends { kind: string; raw?: string
   messages: ReadonlyArray<TranscriptRow>,
   segments: readonly T[]
 ): T[] {
-  const saved = currentTurnSavedBodies(messages);
-  return segments.flatMap(segment => unsavedSegment(segment, messages, saved));
+  return visibleLiveSegments(messages, segments);
 }
 
 /** True when a live text piece is still the same as a reply already saved on this turn. */
@@ -261,20 +254,122 @@ export function settleFinishedTurn<T extends { id: string; seq?: number; role?: 
   };
 }
 
-function streamIdentitySaved(messages: ReadonlyArray<TranscriptRow>, segment: {messageId?: string}): boolean {
-  return Boolean(segment.messageId) && messages.some(message => message.id === segment.messageId);
+function visibleLiveSegments<T extends StreamTextPiece & { html?: string }>(
+  messages: ReadonlyArray<TranscriptRow>,
+  segments: readonly T[]
+): T[] {
+  const saved = currentTurnSavedBodies(messages);
+  const budget = savedEchoBudget(saved);
+  const onStream = textsStillOnlyOnStream(segments, messages);
+  return segments.flatMap((segment) => keepSegment(segment, messages, saved, budget, onStream));
 }
 
-function pendingStreamText(segment: StreamTextPiece, messages: ReadonlyArray<TranscriptRow>, saved: readonly string[]): string {
-  if (segment.kind !== 'text' || streamIdentitySaved(messages, segment)) return '';
-  const text = segment.messageId !== undefined ? segment.raw : unsavedHeldText(streamTextRaw(segment), saved);
-  return text ? text.trim() : '';
+function savedEchoBudget(saved: readonly string[]): Map<string, number> {
+  const budget = new Map<string, number>();
+  for (const body of saved) noteEcho(budget, body);
+  return budget;
 }
 
-function unsavedSegment<T extends StreamTextPiece & {html?: string}>(segment: T, messages: ReadonlyArray<TranscriptRow>, saved: readonly string[]): T[] {
-  if (segment.messageId !== undefined) return streamIdentitySaved(messages, segment) ? [] : [segment];
+function noteEcho(budget: Map<string, number>, body: string): void {
+  budget.set(body, (budget.get(body) ?? 0) + 1);
+}
+
+function textsStillOnlyOnStream(
+  segments: readonly StreamTextPiece[],
+  messages: ReadonlyArray<TranscriptRow>
+): string[] {
+  return segments.flatMap((segment) => savedTextStillStreaming(segment, messages));
+}
+
+function savedTextStillStreaming(segment: StreamTextPiece, messages: ReadonlyArray<TranscriptRow>): string[] {
+  if (!streamingSavedText(segment, messages)) return [];
+  const visible = stripVisibleClockMarks(segment.raw ?? '').trim();
+  return visible ? [visible] : [];
+}
+
+function streamingSavedText(segment: StreamTextPiece, messages: ReadonlyArray<TranscriptRow>): boolean {
+  if (segment.kind !== 'text' || !segment.messageId) return false;
+  return !messages.some((message) => message.id === segment.messageId);
+}
+
+function keepSegment<T extends StreamTextPiece & { html?: string }>(
+  segment: T,
+  messages: ReadonlyArray<TranscriptRow>,
+  saved: readonly string[],
+  budget: Map<string, number>,
+  onStream: readonly string[]
+): T[] {
+  if (segment.messageId !== undefined) return keepIdentified(segment, messages, onStream);
   if (segment.kind !== 'text') return [segment];
+  return keepUnidentifiedText(segment, budget, saved);
+}
+
+function keepIdentified<T extends StreamTextPiece>(
+  segment: T,
+  messages: ReadonlyArray<TranscriptRow>,
+  onStream: readonly string[]
+): T[] {
+  if (segment.messageId && messages.some((message) => message.id === segment.messageId)) return [];
+  if (hideOpenDuplicate(segment, onStream)) return [];
+  return [segment];
+}
+
+function hideOpenDuplicate(segment: StreamTextPiece, onStream: readonly string[]): boolean {
+  if (segment.kind !== 'text' || segment.messageId) return false;
+  const visible = stripVisibleClockMarks(segment.raw ?? '').trim();
+  return Boolean(visible) && onStream.includes(visible);
+}
+
+function keepUnidentifiedText<T extends StreamTextPiece & { html?: string }>(
+  segment: T,
+  budget: Map<string, number>,
+  saved: readonly string[]
+): T[] {
+  const visible = stripVisibleClockMarks(segment.raw ?? '').trim();
+  if (exactSaved(visible, saved)) return consumeOrKeep(segment, budget, visible);
   return remainingTextSegment(segment, unsavedStreamText(segment.raw ?? '', saved));
+}
+
+function exactSaved(visible: string, saved: readonly string[]): boolean {
+  return Boolean(visible) && saved.some((body) => body === visible);
+}
+
+function consumeOrKeep<T extends StreamTextPiece>(segment: T, budget: Map<string, number>, visible: string): T[] {
+  if (takeEcho(budget, visible)) return [];
+  return [segment];
+}
+
+function takeEcho(budget: Map<string, number>, text: string): boolean {
+  const left = budget.get(text) ?? 0;
+  if (left <= 0) return false;
+  budget.set(text, left - 1);
+  return true;
+}
+
+function heldPiece(segment: StreamTextPiece, messages: ReadonlyArray<TranscriptRow>, saved: readonly string[]): string {
+  if (segment.kind !== 'text') return '';
+  if (segment.messageId !== undefined) return openOrStampedHeld(segment, messages);
+  return heldLegacyLoose(streamTextRaw(segment), saved);
+}
+
+function openOrStampedHeld(segment: StreamTextPiece, messages: ReadonlyArray<TranscriptRow>): string {
+  if (segment.messageId && messages.some((message) => message.id === segment.messageId)) return '';
+  return (segment.raw ?? '').trim();
+}
+
+function heldLegacyLoose(raw: string, saved: readonly string[]): string {
+  const visible = stripVisibleClockMarks(raw).trim();
+  const decided = heldBySavedBody(raw, visible, saved);
+  if (decided !== undefined) return decided;
+  const next = unsavedStreamText(raw, saved);
+  return next ? next.trim() : '';
+}
+
+function heldBySavedBody(raw: string, visible: string, saved: readonly string[]): string | undefined {
+  if (!visible) return '';
+  if (saved.some((body) => body === visible)) return raw.trim();
+  if (saved.some((body) => body.includes(visible))) return '';
+  return undefined;
 }
 
 function remainingTextSegment<T extends StreamTextPiece & {html?: string}>(segment: T, next: string | null): T[] {
