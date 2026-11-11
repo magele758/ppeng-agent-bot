@@ -26,6 +26,14 @@
   pointer-events: auto;
 }
 
+.chat-turn .chat-turn__actions .correction-capture__trigger.btn {
+  position: static;
+  top: auto;
+  right: auto;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .correction-capture__icon {
   display: block;
   width: 14px;

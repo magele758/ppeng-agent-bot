@@ -275,10 +275,10 @@ test('悬停操作显示该回复的本地结束时间且旧数据仍可引用 [
   }
 });
 
-test('仅悬停显示时间与引用 [AC:reply-hover-ended-at#AC-2]',()=>{
+test('已结束回复的末尾直接显示时间与引用 [AC:reply-hover-ended-at#AC-2] [AC:turn-end-actions#AC-1]',()=>{
   const css=readFileSync(new URL('../app/globals.css',import.meta.url),'utf8');
-  assert.doesNotMatch(css,/\.chat-turn:focus-within \.chat-reply-(?:ended-at|quote__start)/);
-  assert.doesNotMatch(css,/@media \(hover: none\)[^{]*\{[^}]*chat-reply-quote__start/);
-  assert.match(css,/\.chat-turn:hover \.chat-reply-ended-at \{ visibility: visible/);
-  assert.match(css,/\.chat-turn:hover \.chat-reply-quote__start \{ opacity: 1/);
+  assert.match(css,/\.chat-turn__actions\s*\{[^}]*position:\s*static/);
+  assert.doesNotMatch(css,/\.chat-turn__actions\s*\{[^}]*position:\s*absolute/);
+  assert.match(css,/\.chat-turn__actions \.chat-reply-ended-at\s*\{[^}]*visibility:\s*visible/);
+  assert.match(css,/\.chat-turn__actions \.chat-reply-quote__start\s*\{[^}]*opacity:\s*1/);
 });

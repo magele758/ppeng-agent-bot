@@ -60,6 +60,7 @@ import {
   type ReplyQuote,
   type ReplyTo
 } from '@/lib/reply-quote';
+import { assistantActionsHeld } from '@/lib/reply-end-actions';
 import { osSandboxReasonKey, parseOsSandboxReason } from '@/lib/os-sandbox-reason';
 import { parseSpawnBlocked } from '@/lib/spawn-blocked';
 import { SpawnBlockedNotice, SpawnBlockedPill } from './SpawnBlockedNotice';
@@ -102,10 +103,13 @@ function buildModClass(
 export const ContinuedAssistantContext = createContext<ReadonlySet<number>>(new Set());
 
 export const ReplyRunContext = createContext<import('@/lib/reply-hover-run').ReplyRun | undefined>(undefined);
+export const ReplyActionHoldContext = createContext<number | null>(null);
 function ReplyActions({ index, ...props }: TurnActionsProps & { index: number }) {
   const run = useContext(ReplyRunContext);
+  const hold = useContext(ReplyActionHoldContext);
+  if (assistantActionsHeld(props.role, hold, index)) return null;
   if (!run) return <TurnActions {...props} />;
-  if (index !== run.first) return null;
+  if (index !== run.end) return null;
   return <TurnActions {...props} m={run.last} parts={[{ type: 'text', text: run.text }]} />;
 }
 

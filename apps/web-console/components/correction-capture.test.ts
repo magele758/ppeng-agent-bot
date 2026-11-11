@@ -112,14 +112,16 @@ test('默认不展示文字按钮 [AC:correction-capture-hover#AC-1]', () => {
   assert.equal(/>\s*纠错转评测\s*</.test(button), false);
   assert.doesNotMatch(html, /<button\b[^>]*>\s*纠错转评测\s*<\/button>/);
   const css = readFileSync(cssPath, 'utf8');
-  const hidden = cssRules(css).filter((rule) =>
+  const shown = cssRules(css).find((rule) =>
+    rule.selector.includes('.chat-turn__actions') &&
     rule.selector.includes('.correction-capture__trigger') &&
     !rule.selector.includes(':hover') &&
-    !rule.selector.includes(':focus'));
-  assert.ok(hidden.some((rule) => /position:\s*absolute/.test(rule.body) && /opacity:\s*0/.test(rule.body)));
+    /position:\s*static/.test(rule.body) &&
+    /opacity:\s*1/.test(rule.body));
+  assert.ok(shown);
 });
 
-test('悬停或聚焦才出现图标 [AC:correction-capture-hover#AC-2]', () => {
+test('结束回复末尾的图标不靠悬停 [AC:correction-capture-hover#AC-2] [AC:turn-end-actions#AC-1]', () => {
   const zhHtml = assistantHtml('zh');
   const enHtml = assistantHtml('en');
   const zhButton = triggerMarkup(zhHtml);
@@ -136,15 +138,12 @@ test('悬停或聚焦才出现图标 [AC:correction-capture-hover#AC-2]', () => 
   assert.equal(capture.includes('纠错转评测'), false);
   assert.equal(capture.includes('Capture correction'), false);
   const rules = cssRules(readFileSync(cssPath, 'utf8'));
-  const reveal = rules.find((rule) =>
-    rule.selector.includes('.chat-turn:hover') &&
-    rule.selector.includes('.chat-turn:focus-within') &&
+  const shown = rules.find((rule) =>
+    rule.selector.includes('.chat-turn__actions') &&
     rule.selector.includes('.correction-capture__trigger') &&
+    !rule.selector.includes(':hover') &&
     /opacity:\s*1/.test(rule.body));
-  assert.ok(reveal);
-  for (const rule of rules) {
-    if (/opacity:\s*1/.test(rule.body)) assert.match(rule.selector, /:hover|:focus-within|:focus-visible/);
-  }
+  assert.ok(shown);
 });
 
 type HookSlot = {

@@ -3940,6 +3940,15 @@ Slack Events 入站按线程唤醒例行任务
 - `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
 - `packages/core/test/session-loop-guard.test.js`
 
+### turn-end-actions
+
+完整回复结束后才在末尾显示操作
+
+- `apps/web-console/components/ReplyQuote.test.ts`
+- `apps/web-console/components/correction-capture.test.ts`
+- `apps/web-console/lib/reply-end-actions.test.ts`
+- `e2e/composer-quote-layout.spec.ts`
+
 ### unattended-stream-observation
 
 后台运行保持流式观察与复读保护
@@ -4022,4 +4031,5 @@ User Vault assistant tools and Lab reference-fill
 
 同一条 Bot 回复共享悬停操作
 
+- `apps/web-console/lib/reply-end-actions.test.ts`
 - `e2e/composer-quote-layout.spec.ts`
