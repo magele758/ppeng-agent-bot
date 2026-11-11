@@ -2,7 +2,7 @@
 
 Bot 模式不另做一套安全规则。它用实验室里已经有的权限、审批、沙箱和敏感路径拒绝。这里只写 Bot 上人能看到、并能改的那一层。
 
-规格：`bots`、`bot-task-permission-inheritance`、`loop-guard-model-switch`、`bot-product-p0`、`unattended-approval-expiry`（无人值守的审批到期是全局规则，定时任务也走它）。
+规格：`bots`、`bot-task-permission-inheritance`、`loop-guard-model-switch`、`bot-product-p0`、`unattended-approval-expiry`（无人值守的审批到期是全局规则，定时任务也走它）、`night-runtime-reliability`、`skill-load-visible`、`literal-tool-identifiers`、`tool-search-experiment`。
 
 ## 权限档位
 

@@ -2,7 +2,7 @@
 
 Bot 工作台是列表、主对话、详情三块。切换 Bot 时，主画面、详情和还在输入的上下文一起换成新的那只，不把上一只正在吐的字留在新 Bot 的画面上。
 
-规格：`bot-console-selection`、`bot-switch-live-turn`、`bot-panel-reset`、`bot-entry-simplification`、`bot-pin-area`、`bot-functional-groups`、`bot-group-drag-only`、`bot-detail-menu`、`bot-detail-child-tasks-tab`、`bot-detail-skill-management`、`bot-skill-panel-layout`、`bot-child-task-chat-entry`、`bot-child-task-stream-entry`、`bot-goals-panel-threshold`、`bot-goals-panel-rules`、`low-interference-onboarding-goals`、`bot-first-task-new-user`、`bot-first-task-dismissal`、`goal-update-presentation`、`bot-workspace-interaction-polish`。
+规格：`bot-console-selection`、`bot-switch-live-turn`、`bot-panel-reset`、`bot-entry-simplification`、`bot-pin-area`、`bot-functional-groups`、`bot-group-drag-only`、`functional-group-disclosure`、`bot-group-disclosure-memory`、`bot-group-cleanup`、`bot-sidebar-routing`、`bot-detail-menu`、`bot-detail-child-tasks-tab`、`bot-detail-skill-management`、`bot-skill-panel-layout`、`bot-child-task-chat-entry`、`bot-child-task-stream-entry`、`bot-goals-panel-threshold`、`bot-goals-panel-rules`、`low-interference-onboarding-goals`、`bot-first-task-new-user`、`bot-first-task-dismissal`、`goal-update-presentation`、`bot-workspace-interaction-polish`。
 
 ## 列表
 

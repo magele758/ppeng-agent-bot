@@ -2,7 +2,7 @@
 
 人对 Bot 说的话都进它的主对话。这条对话不换 id。压缩是把较早的内容收成摘要，留在同一条里。
 
-规格：`bot-forever-chat`、`bot-dual-compact`、`bot-window-compact`、`bot-immediate-steer`、`bot-human-continuation`、`bot-reply-quote`、`bot-chat-image-compatibility`、`bot-input-suggestion`、`bot-working-animation`。
+规格：`bot-forever-chat`、`bot-dual-compact`、`bot-window-compact`、`bot-followup-cache-prefix`、`bot-immediate-steer`、`steer-model-flight`、`steer-completion-coverage`、`bot-human-continuation`、`bot-reply-quote`、`reply-hover-ended-at`、`bot-chat-image-compatibility`、`bot-input-suggestion`、`bot-working-animation`、`session-favorite`、`session-recap-model-routing`、`bot-browser-notices`、`bot-sidebar-load`、`bot-status-polling`、`lab-startup-request-load`。
 
 ## 三个整句命令
 

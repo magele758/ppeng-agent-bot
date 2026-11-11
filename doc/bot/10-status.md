@@ -103,6 +103,46 @@
 | `bot-software-execution` | 08。2026-10-28 软件验收收尾 |
 | `bot-steer-visible` | 04。2026-10-28 软件验收收尾 |
 | `default-super-bot` | 02、08。2026-10-28 软件验收收尾 |
+| `bot-coaching-loop` | 02。调教契约与经验验证持久化 |
+| `bot-coaching-playbook` | 02。调教工作流内置为仓库技能 |
+| `functional-group-disclosure` | 03。功能分组独立收起与展开 |
+| `bot-group-disclosure-memory` | 03。刷新保留分组展开收起状态 |
+| `bot-group-cleanup` | 03。删分组时可选一并删除组内 Bot |
+| `bot-sidebar-routing` | 03。按当前可见名册展示侧栏主对话 |
+| `bot-followup-cache-prefix` | 04。追问复用已缓存的对话前缀 |
+| `steer-model-flight` | 04。工具启动前检查实时插话转向 |
+| `steer-completion-coverage` | 04。结束核对覆盖当次全部用户插话 |
+| `reply-hover-ended-at` | 04。悬停回复显示结束时间与共享操作 |
+| `session-favorite` | 04。当前会话一键收藏与筛选 |
+| `session-recap-model-routing` | 04。会话回顾优先走会话所选模型 |
+| `bot-browser-notices` | 04。可选桌面浏览器通知 |
+| `bot-sidebar-load` | 04。仅加载屏幕内可见会话摘要 |
+| `bot-status-polling` | 04。工作状态轮询区分慢响应与断线 |
+| `lab-startup-request-load` | 04。控制台启动与空闲轮询减负 |
+| `bot-finish-follow-through` | 05。无目标软停跟进、到期唤醒与追问续做 |
+| `goal-checkpoint-no-goal-once` | 05。未分配目标或无效检查点只报一次并收口 |
+| `bot-goal-context-boundary` | 05。隔离压缩摘要与已完成目标的历史执行指令 |
+| `bot-task-terminal-wait` | 05。登记等待前已结束的委派可直接领取结果 |
+| `bot-delegation-lookup` | 05。首轮提供委派并拦截重复配置查询 |
+| `bot-activity-flow` | 05。任务页按真实运行记录展示工作流 |
+| `bot-flow-read-projection` | 05。工作流只读取关系、状态与用量摘要 |
+| `bot-network-and-schedule-list` | 05。多 Bot 协作图与紧凑定时任务列表 |
+| `bot-network-motion` | 05。从单 Bot 视角拉开至协作全图动效 |
+| `bot-network-pan` | 05。协作全景横向拖动与交接回放 |
+| `skill-load-recovery` | 06。严格加载下自建技能与搜索命中直接加载 |
+| `lean-default-skills` | 06。精简默认内置技能与短名单 |
+| `memory-read-source-unavailable` | 06。不可读记忆来源同轮只报一次并结束回合 |
+| `bot-turn-ownership` | 06。任务切换边界与后台复盘归属 |
+| `bot-routine-create-receipt` | 06。私聊直接创建定时任务与重复请求幂等 |
+| `daydream-unlimited-resume` | 06。每日复盘分段恢复执行 |
+| `room-budgets-default-off` | 07。群预算默认关闭且预算停轮保留已完成回复 |
+| `group-chat-stable-layout` | 07。断线提示浮层化与群聊输入区布局稳定 |
+| `group-member-partial-roster` | 07。群含旧成员时仍可添加当前可选 Bot |
+| `group-mode-instant-selection` | 07。群聊回复方式连续切换即时响应 |
+| `night-runtime-reliability` | 09。技能限制按普通请求隔离、流式防重与采集目标隔离 |
+| `skill-load-visible` | 09。实时与精简模式展示加载技能名称 |
+| `literal-tool-identifiers` | 09。保留完整查询标识符与先读后写依据 |
+| `tool-search-experiment` | 09。工具提供方式增强检索实验策略 |
 
 ## 已批准，还没标成已实现
 

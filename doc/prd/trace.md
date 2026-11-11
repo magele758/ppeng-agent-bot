@@ -84,6 +84,20 @@ Bot 对话头部只显示名字、活脸和权限入口
 - `apps/web-console/components/BotChildTaskStreamEntry.test.ts`
 - `apps/web-console/lib/bot-child-task-stream.test.ts`
 
+### bot-coaching-loop
+
+Bot 行为契约与有证据的经验沉淀
+
+- `apps/daemon/test/bot-coaching.test.ts`
+- `packages/core/test/bot-coaching.test.js`
+- `packages/core/test/product-admin-tools.test.js`
+
+### bot-coaching-playbook
+
+项目内置 Bot 调教流程
+
+- `packages/core/test/bot-coaching-playbook.test.js`
+
 ### bot-console-selection
 
 切换 Bot 时显示当前会话，开发态仍能载入默认 Bot
@@ -178,6 +192,19 @@ Bot 功能分组、共享范围优先级与头像修复
 
 - `e2e/bot-goals-panel-threshold.spec.ts`
 
+### bot-group-cleanup
+
+删除分组时可一并删除 Bot
+
+- `e2e/bot-functional-groups.spec.ts`
+- `scripts/test/bot-functional-group-routes.test.mjs`
+
+### bot-group-disclosure-memory
+
+刷新后记住各 Bot 分组的展开状态
+
+- `e2e/bot-functional-groups.spec.ts`
+
 ### bot-group-drag-only
 
 Bot 侧栏移组仅保留拖拽入口
@@ -219,6 +246,14 @@ Bot 显示稳定的机器人头像
 - `apps/web-console/lib/session-row.test.ts`
 - `e2e/agent-home-features.spec.ts`
 - `packages/core/test/bot-history-memory.test.js`
+
+### bot-sidebar-routing
+
+Bot 名册入口与主对话一致
+
+- `apps/web-console/lib/bots.test.ts`
+- `e2e/bot-functional-groups.spec.ts`
+- `e2e/grok-local-history.spec.ts`
 
 ### bot-skill-panel-layout
 
@@ -271,6 +306,12 @@ Bot 名册、互发消息与权限
 - `packages/core/test/message-agent.test.js`
 - `scripts/test/bot-work-routes.test.mjs`
 
+### functional-group-disclosure
+
+Bot 侧栏功能分组折叠与展开
+
+- `e2e/bot-functional-groups.spec.ts`
+
 ### low-interference-onboarding-goals
 
 仅向新用户展示首次引导并隐藏少量目标面板
@@ -298,6 +339,12 @@ Bot 名册、互发消息与权限
 
 点名来自：`doc/bot/04-conversation.md`
 
+### bot-browser-notices
+
+Bot 桌面通知
+
+- `e2e/bot-notices-auth.spec.ts`
+
 ### bot-chat-image-compatibility
 
 Bot 历史图片兼容与群聊发送恢复
@@ -319,6 +366,13 @@ Bot 输入框推荐下一句
 规范 Bot 会话的双阈值压缩
 
 - `packages/core/test/bot-dual-compact.test.js`
+
+### bot-followup-cache-prefix
+
+追问时复用上一轮已缓存的对话前缀
+
+- `packages/agent-loop/src/model/chat-cache-prefix.test.ts`
+- `packages/core/test/bot-followup-cache-prefix.test.js`
 
 ### bot-forever-chat
 
@@ -378,6 +432,20 @@ Bot 每轮推荐只生成一次并保留
 - `packages/core/test/human-continuation.test.js`
 - `packages/core/test/session-fork.test.js`
 
+### bot-sidebar-load
+
+Bot 侧栏按需加载与切换响应
+
+- `e2e/history-startup.spec.ts`
+
+### bot-status-polling
+
+工作状态轮询区分慢响应和断线
+
+- `e2e/bot-status-polling.spec.ts`
+- `scripts/test/bot-room-models.test.mjs`
+- `scripts/test/bot-work-routes.test.mjs`
+
 ### bot-steer-visible
 
 Bot 对话里的实时插话马上出现在对话流
@@ -399,6 +467,32 @@ Bot 工作期间持续动态、列表待机保持活性
 - `e2e/bot-working-state.spec.ts`
 - `scripts/test/bot-work-routes.test.mjs`
 
+### lab-startup-request-load
+
+控制台启动时的请求负担
+
+- `apps/daemon/test/session-detail-logs.test.ts`
+- `apps/web-console/lib/api.test.ts`
+- `apps/web-console/lib/bot-work-state.test.ts`
+- `apps/web-console/lib/lab-tick.test.ts`
+- `apps/web-console/lib/overview-plan.test.ts`
+- `apps/web-console/lib/poll-timer.test.ts`
+- `apps/web-console/lib/session-activity.test.ts`
+
+### reply-hover-ended-at
+
+悬停 Bot 回复时显示结束时间
+
+- `apps/web-console/components/ReplyQuote.test.ts`
+
+### session-favorite
+
+当前会话一键收藏
+
+- `apps/daemon/test/session-favorite.test.ts`
+- `apps/web-console/components/SessionFavorite.test.ts`
+- `apps/web-console/lib/session-favorite.test.ts`
+
 ### session-recap
 
 会话末尾回顾
@@ -408,11 +502,35 @@ Bot 工作期间持续动态、列表待机保持活性
 - `apps/daemon/test/session-recap-yield.test.ts`
 - `apps/web-console/lib/session-recap.test.ts`
 
+### session-recap-model-routing
+
+会话回顾使用会话配置的模型
+
+- `apps/daemon/test/session-recap-yield.test.ts`
+
+### steer-completion-coverage
+
+Bot 完成检查覆盖本次全部插话
+
+- `packages/core/test/bot-completion-reliability.test.js`
+
+### steer-model-flight
+
+模型生成期间插话与旧工具启动前转向
+
+- `packages/core/test/steer-tool-continuity.test.js`
+
 ## 目标、协作与外部软件
 
 现状：`doc/prd/current/04-goals-and-collaboration.md`
 
 点名来自：`doc/bot/05-goals-and-work.md`、`doc/bot/07-rooms.md`、`doc/bot/08-collaboration.md`
+
+### bot-activity-flow
+
+从 Bot 运行记录查看工作流
+
+- `apps/web-console/lib/bot-activity-flow.test.ts`
 
 ### bot-autonomous-execution-coverage
 
@@ -434,6 +552,30 @@ Bot 并发工作时派生子代理，并允许子代理复用记忆与互助
 
 - `packages/core/test/product-admin-tools.test.js`
 
+### bot-delegation-lookup
+
+Bot 对话直接委派并打断重复查询
+
+- `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
+- `packages/core/test/tool-exposure-tiers.test.js`
+
+### bot-finish-follow-through
+
+Bot 收尾时由运行时盯着做完
+
+- `apps/daemon/test/bot-finish-settings.test.ts`
+- `apps/web-console/lib/bot-finish.test.ts`
+- `packages/agent-loop/src/recovery/advisory-grace.test.ts`
+- `packages/agent-loop/src/turn/kernel.test.ts`
+- `packages/core/test/bot-finish-follow-through.test.js`
+
+### bot-flow-read-projection
+
+工作流只接收展示所需的会话数据
+
+- `apps/daemon/test/bot-flow-projection.test.ts`
+- `apps/web-console/lib/bot-activity-flow.test.ts`
+
 ### bot-fork-retrievable-inheritance
 
 Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文
@@ -441,6 +583,14 @@ Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文
 - `packages/core/test/bot-fork-retrieval.test.js`
 - `packages/core/test/bot-fork-spawn-inheritance.test.js`
 - `packages/core/test/fork-sibling-isolation.test.js`
+
+### bot-goal-context-boundary
+
+聊天隐藏内部摘要，历史 Goal 仅供回顾
+
+- `apps/web-console/lib/session-panel-resource.test.ts`
+- `packages/core/test/context-stack.test.js`
+- `packages/core/test/conversation-clock-summary.test.js`
 
 ### bot-goal-result-return
 
@@ -464,6 +614,25 @@ Bot 多目标持续执行与自动选择执行方式
 - `packages/core/test/bot-goals-executor-cancellation.test.js`
 - `packages/core/test/bot-goals-scheduler.test.js`
 - `packages/core/test/bot-goals.test.js`
+
+### bot-network-and-schedule-list
+
+多 Bot 协作关系图与紧凑的定时列表
+
+- `apps/web-console/components/routine-editor-dialog.test.ts`
+- `apps/web-console/lib/network-observations.test.ts`
+
+### bot-network-motion
+
+协作网络从 Bot 特写展开
+
+- `e2e/bot-network-motion.spec.ts`
+
+### bot-network-pan
+
+横向拖动的 Bot 协作全景
+
+- `e2e/bot-network-motion.spec.ts`
 
 ### bot-product-admin
 
@@ -624,6 +793,12 @@ Bot 软件连接与可靠执行
 - `packages/core/test/product-admin-tools.test.js`
 - `packages/core/test/subagent-blocked.test.js`
 
+### bot-task-terminal-wait
+
+已结束的委派能唤醒接收回执的 Bot
+
+- `packages/core/test/durable-wait-default.test.js`
+
 ### bots
 
 Bot 名册、互发消息与权限
@@ -651,11 +826,44 @@ Bot 名册、互发消息与权限
 - `packages/core/test/message-agent.test.js`
 - `scripts/test/bot-work-routes.test.mjs`
 
+### goal-checkpoint-no-goal-once
+
+未分配目标时进度保存只报一次
+
+- `packages/agent-loop/src/turn/kernel.test.ts`
+- `packages/core/test/goal-checkpoint-no-goal-once.test.js`
+
+### group-chat-stable-layout
+
+群聊顶部状态更新和输入区布局
+
+- `e2e/group-chat-stable-layout.spec.ts`
+
+### group-member-partial-roster
+
+群里有旧成员时仍可添加当前可选的 Bot
+
+- `apps/web-console/lib/bot-group.test.ts`
+
+### group-mode-instant-selection
+
+群聊回复方式可以连续切换
+
+- `e2e/group-mode-instant-selection.spec.ts`
+
 ### play-bot-group
 
 Bot 会话列表里的多 Bot 群聊
 
 - `apps/web-console/lib/bot-group.test.ts`
+
+### room-budgets-default-off
+
+群预算默认关闭，预算停下时写完的回复照常出现
+
+- `apps/web-console/components/play-group/room-console.test.ts`
+- `apps/web-console/lib/room-turn-notice.test.ts`
+- `packages/core/test/bot-room-budget-default-off.test.js`
 
 ### room-debate-mode
 
@@ -807,6 +1015,19 @@ IM 静默回复、至少一次投递与例行预检
 
 - `e2e/bot-goals-panel-threshold.spec.ts`
 
+### bot-group-cleanup
+
+删除分组时可一并删除 Bot
+
+- `e2e/bot-functional-groups.spec.ts`
+- `scripts/test/bot-functional-group-routes.test.mjs`
+
+### bot-group-disclosure-memory
+
+刷新后记住各 Bot 分组的展开状态
+
+- `e2e/bot-functional-groups.spec.ts`
+
 ### bot-group-drag-only
 
 Bot 侧栏移组仅保留拖拽入口
@@ -866,6 +1087,13 @@ Bot成果复用记忆纠错与持续协作
 - `scripts/test/bot-product-metrics.test.mjs`
 - `scripts/test/bot-product-p2.test.mjs`
 
+### bot-routine-create-receipt
+
+Bot 对话直接创建定时任务并取得确认
+
+- `packages/core/test/bot-history-memory.test.js`
+- `packages/core/test/routine-lifecycle.test.js`
+
 ### bot-routine-lifecycle
 
 Bot 可靠例行任务
@@ -897,6 +1125,14 @@ Bot 私有技能沉淀与指定 Bot 共享
 - `e2e/bot-scoped-skills.spec.ts`
 - `packages/core/test/bot-scoped-skills.test.js`
 
+### bot-sidebar-routing
+
+Bot 名册入口与主对话一致
+
+- `apps/web-console/lib/bots.test.ts`
+- `e2e/bot-functional-groups.spec.ts`
+- `e2e/grok-local-history.spec.ts`
+
 ### bot-skill-panel-layout
 
 Bot 技能面板布局清晰且适应窄屏
@@ -910,6 +1146,14 @@ Bot 技能面板布局清晰且适应窄屏
 - `apps/web-console/lib/live-turn-session.test.ts`
 - `apps/web-console/lib/session-panel-resource.test.ts`
 - `e2e/bot-switch-live-turn.spec.ts`
+
+### bot-turn-ownership
+
+Bot 当轮任务和目标审查归属
+
+- `packages/core/test/bot-goal-only-when-needed.test.js`
+- `packages/core/test/context-stack.test.js`
+- `scripts/test/bot-turn-ownership.test.mjs`
 
 ### bot-workspace-interaction-polish
 
@@ -937,6 +1181,24 @@ Bot 名册、互发消息与权限
 - `scripts/test/schema-migration-snapshots.test.mjs`
 - `scripts/test/session-bot-policy-routes.test.mjs`
 
+### daydream-unlimited-resume
+
+每日复盘移除额度并续跑
+
+- `packages/core/test/bot-daydream-local.test.js`
+
+### functional-group-disclosure
+
+Bot 侧栏功能分组折叠与展开
+
+- `e2e/bot-functional-groups.spec.ts`
+
+### lean-default-skills
+
+精简默认技能并保留按需发现
+
+- `packages/core/test/lean-default-skills.test.js`
+
 ### low-interference-onboarding-goals
 
 仅向新用户展示首次引导并隐藏少量目标面板
@@ -944,6 +1206,20 @@ Bot 名册、互发消息与权限
 - `e2e/bot-first-task-dismissal.spec.ts`
 - `e2e/bot-first-task-new-user.spec.ts`
 - `e2e/bot-goals-panel-threshold.spec.ts`
+
+### memory-read-source-unavailable
+
+读不到的记忆来源一轮只说明一次
+
+- `packages/agent-loop/src/runtime/tool-loop.test.ts`
+- `packages/core/test/memory-read-source-unavailable.test.js`
+- `packages/core/test/source-unavailable-turn-stop.test.js`
+
+### skill-load-recovery
+
+自建技能与搜索结果可加载
+
+- `packages/core/test/skill-load-recovery.test.js`
 
 ### turn-stats-end-time
 
@@ -956,6 +1232,12 @@ Bot 名册、互发消息与权限
 现状：`doc/prd/current/06-safety-and-runtime.md`
 
 点名来自：`doc/bot/02-identity.md`、`doc/bot/05-goals-and-work.md`、`doc/bot/09-safety.md`
+
+### bot-activity-flow
+
+从 Bot 运行记录查看工作流
+
+- `apps/web-console/lib/bot-activity-flow.test.ts`
 
 ### bot-autonomous-execution-coverage
 
@@ -971,6 +1253,20 @@ Bot 对话头部只显示名字、活脸和权限入口
 
 - `apps/web-console/lib/bot-chat-header.test.ts`
 
+### bot-coaching-loop
+
+Bot 行为契约与有证据的经验沉淀
+
+- `apps/daemon/test/bot-coaching.test.ts`
+- `packages/core/test/bot-coaching.test.js`
+- `packages/core/test/product-admin-tools.test.js`
+
+### bot-coaching-playbook
+
+项目内置 Bot 调教流程
+
+- `packages/core/test/bot-coaching-playbook.test.js`
+
 ### bot-concurrent-subagents
 
 Bot 并发工作时派生子代理，并允许子代理复用记忆与互助
@@ -983,12 +1279,36 @@ Bot 并发工作时派生子代理，并允许子代理复用记忆与互助
 
 - `packages/core/test/product-admin-tools.test.js`
 
+### bot-delegation-lookup
+
+Bot 对话直接委派并打断重复查询
+
+- `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
+- `packages/core/test/tool-exposure-tiers.test.js`
+
 ### bot-face-readable-shapes
 
 脸型圆润，列表里能看见表情，干活时更忙
 
 - `apps/web-console/components/BotFace.render.test.ts`
 - `apps/web-console/lib/bot-face.test.ts`
+
+### bot-finish-follow-through
+
+Bot 收尾时由运行时盯着做完
+
+- `apps/daemon/test/bot-finish-settings.test.ts`
+- `apps/web-console/lib/bot-finish.test.ts`
+- `packages/agent-loop/src/recovery/advisory-grace.test.ts`
+- `packages/agent-loop/src/turn/kernel.test.ts`
+- `packages/core/test/bot-finish-follow-through.test.js`
+
+### bot-flow-read-projection
+
+工作流只接收展示所需的会话数据
+
+- `apps/daemon/test/bot-flow-projection.test.ts`
+- `apps/web-console/lib/bot-activity-flow.test.ts`
 
 ### bot-fork-retrievable-inheritance
 
@@ -997,6 +1317,14 @@ Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文
 - `packages/core/test/bot-fork-retrieval.test.js`
 - `packages/core/test/bot-fork-spawn-inheritance.test.js`
 - `packages/core/test/fork-sibling-isolation.test.js`
+
+### bot-goal-context-boundary
+
+聊天隐藏内部摘要，历史 Goal 仅供回顾
+
+- `apps/web-console/lib/session-panel-resource.test.ts`
+- `packages/core/test/context-stack.test.js`
+- `packages/core/test/conversation-clock-summary.test.js`
 
 ### bot-goal-result-return
 
@@ -1026,6 +1354,25 @@ Bot 多目标持续执行与自动选择执行方式
 - `packages/core/test/bot-goals-executor-cancellation.test.js`
 - `packages/core/test/bot-goals-scheduler.test.js`
 - `packages/core/test/bot-goals.test.js`
+
+### bot-network-and-schedule-list
+
+多 Bot 协作关系图与紧凑的定时列表
+
+- `apps/web-console/components/routine-editor-dialog.test.ts`
+- `apps/web-console/lib/network-observations.test.ts`
+
+### bot-network-motion
+
+协作网络从 Bot 特写展开
+
+- `e2e/bot-network-motion.spec.ts`
+
+### bot-network-pan
+
+横向拖动的 Bot 协作全景
+
+- `e2e/bot-network-motion.spec.ts`
 
 ### bot-product-p0
 
@@ -1091,6 +1438,12 @@ Bot 显示稳定的机器人头像
 - `packages/core/test/product-admin-tools.test.js`
 - `packages/core/test/subagent-blocked.test.js`
 
+### bot-task-terminal-wait
+
+已结束的委派能唤醒接收回执的 Bot
+
+- `packages/core/test/durable-wait-default.test.js`
+
 ### bots
 
 Bot 名册、互发消息与权限
@@ -1118,6 +1471,20 @@ Bot 名册、互发消息与权限
 - `packages/core/test/message-agent.test.js`
 - `scripts/test/bot-work-routes.test.mjs`
 
+### goal-checkpoint-no-goal-once
+
+未分配目标时进度保存只报一次
+
+- `packages/agent-loop/src/turn/kernel.test.ts`
+- `packages/core/test/goal-checkpoint-no-goal-once.test.js`
+
+### literal-tool-identifiers
+
+保留完整查询标识符并以成功读取作为保存依据
+
+- `packages/core/test/prompt-variant-settings.test.js`
+- `scripts/test/session-failure-audit.test.mjs`
+
 ### loop-guard-model-switch
 
 重复检测默认只约束弱模型
@@ -1128,6 +1495,34 @@ Bot 名册、互发消息与权限
 - `packages/agent-loop/src/tools/shell-policy.test.ts`
 - `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
 - `packages/core/test/repeat-guard-settings.test.js`
+
+### night-runtime-reliability
+
+夜间运行可靠性修复
+
+- `apps/web-console/lib/live-stream-once.test.ts`
+- `apps/web-console/lib/stream-segments.test.ts`
+- `e2e/chat-basics.spec.ts`
+- `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
+- `packages/core/test/skill-manifest-gate.test.js`
+- `scripts/workflows/material-source-isolation.test.mjs`
+
+### skill-load-visible
+
+对话流直接显示加载的技能名称
+
+- `apps/web-console/components/correction-capture.test.ts`
+- `apps/web-console/lib/session-brief.test.ts`
+- `apps/web-console/lib/skill-load-label.test.ts`
+- `e2e/skill-load-visible.spec.ts`
+
+### tool-search-experiment
+
+可切换的增强工具检索实验
+
+- `e2e/tool-exposure.spec.ts`
+- `packages/core/test/tool-search-experiment.test.js`
+- `scripts/test/settings-route-contracts.test.mjs`
 
 ### unattended-approval-expiry
 
@@ -1150,6 +1545,12 @@ Bot 名册、互发消息与权限
 
 点名来自：`doc/bot/05-goals-and-work.md`
 
+### bot-activity-flow
+
+从 Bot 运行记录查看工作流
+
+- `apps/web-console/lib/bot-activity-flow.test.ts`
+
 ### bot-autonomous-execution-coverage
 
 Bot 自动选择并完整承接原有执行能力
@@ -1164,6 +1565,30 @@ Bot 并发工作时派生子代理，并允许子代理复用记忆与互助
 
 - `packages/core/test/bot-concurrent-subagents.test.js`
 
+### bot-delegation-lookup
+
+Bot 对话直接委派并打断重复查询
+
+- `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
+- `packages/core/test/tool-exposure-tiers.test.js`
+
+### bot-finish-follow-through
+
+Bot 收尾时由运行时盯着做完
+
+- `apps/daemon/test/bot-finish-settings.test.ts`
+- `apps/web-console/lib/bot-finish.test.ts`
+- `packages/agent-loop/src/recovery/advisory-grace.test.ts`
+- `packages/agent-loop/src/turn/kernel.test.ts`
+- `packages/core/test/bot-finish-follow-through.test.js`
+
+### bot-flow-read-projection
+
+工作流只接收展示所需的会话数据
+
+- `apps/daemon/test/bot-flow-projection.test.ts`
+- `apps/web-console/lib/bot-activity-flow.test.ts`
+
 ### bot-fork-retrievable-inheritance
 
 Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文
@@ -1171,6 +1596,14 @@ Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文
 - `packages/core/test/bot-fork-retrieval.test.js`
 - `packages/core/test/bot-fork-spawn-inheritance.test.js`
 - `packages/core/test/fork-sibling-isolation.test.js`
+
+### bot-goal-context-boundary
+
+聊天隐藏内部摘要，历史 Goal 仅供回顾
+
+- `apps/web-console/lib/session-panel-resource.test.ts`
+- `packages/core/test/context-stack.test.js`
+- `packages/core/test/conversation-clock-summary.test.js`
 
 ### bot-goal-result-return
 
@@ -1194,6 +1627,25 @@ Bot 多目标持续执行与自动选择执行方式
 - `packages/core/test/bot-goals-executor-cancellation.test.js`
 - `packages/core/test/bot-goals-scheduler.test.js`
 - `packages/core/test/bot-goals.test.js`
+
+### bot-network-and-schedule-list
+
+多 Bot 协作关系图与紧凑的定时列表
+
+- `apps/web-console/components/routine-editor-dialog.test.ts`
+- `apps/web-console/lib/network-observations.test.ts`
+
+### bot-network-motion
+
+协作网络从 Bot 特写展开
+
+- `e2e/bot-network-motion.spec.ts`
+
+### bot-network-pan
+
+横向拖动的 Bot 协作全景
+
+- `e2e/bot-network-motion.spec.ts`
 
 ### bot-product-p0
 
@@ -1244,6 +1696,19 @@ Bot成果复用记忆纠错与持续协作
 - `packages/core/test/bot-product-collaboration.test.js`
 - `packages/core/test/product-admin-tools.test.js`
 - `packages/core/test/subagent-blocked.test.js`
+
+### bot-task-terminal-wait
+
+已结束的委派能唤醒接收回执的 Bot
+
+- `packages/core/test/durable-wait-default.test.js`
+
+### goal-checkpoint-no-goal-once
+
+未分配目标时进度保存只报一次
+
+- `packages/agent-loop/src/turn/kernel.test.ts`
+- `packages/core/test/goal-checkpoint-no-goal-once.test.js`
 
 ## 没有被现状章节点名的已实现规格
 
@@ -1380,12 +1845,6 @@ Host parks durable wait for owned bg_run
 
 - `packages/core/test/bg-run-host-park.test.js`
 
-### bot-activity-flow
-
-从 Bot 运行记录查看工作流
-
-- `apps/web-console/lib/bot-activity-flow.test.ts`
-
 ### bot-async-summary
 
 Bot 历史摘要后台更新
@@ -1401,31 +1860,11 @@ Bloub 动态头像风格
 - `e2e/bot-bloub-dynamic.spec.ts`
 - `packages/core/test/bots.test.js`
 
-### bot-browser-notices
-
-Bot 桌面通知
-
-- `e2e/bot-notices-auth.spec.ts`
-
 ### bot-child-task-chip-fill
 
 子任务芯片有底色
 
 - `apps/web-console/components/BotChildTaskStreamEntry.test.ts`
-
-### bot-coaching-loop
-
-Bot 行为契约与有证据的经验沉淀
-
-- `apps/daemon/test/bot-coaching.test.ts`
-- `packages/core/test/bot-coaching.test.js`
-- `packages/core/test/product-admin-tools.test.js`
-
-### bot-coaching-playbook
-
-项目内置 Bot 调教流程
-
-- `packages/core/test/bot-coaching-playbook.test.js`
 
 ### bot-completion-reliability
 
@@ -1472,13 +1911,6 @@ Bot 每日复盘配置与治理界面
 
 - `e2e/bot-daydream.spec.ts`
 
-### bot-delegation-lookup
-
-Bot 对话直接委派并打断重复查询
-
-- `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
-- `packages/core/test/tool-exposure-tiers.test.js`
-
 ### bot-delete
 
 删除 Bot 并保留对话历史
@@ -1524,30 +1956,6 @@ Bot 以高并发同时推进多件工作
 - `apps/web-console/lib/soft-bot-face.test.ts`
 - `packages/core/test/bots.test.js`
 
-### bot-finish-follow-through
-
-Bot 收尾时由运行时盯着做完
-
-- `apps/daemon/test/bot-finish-settings.test.ts`
-- `apps/web-console/lib/bot-finish.test.ts`
-- `packages/agent-loop/src/recovery/advisory-grace.test.ts`
-- `packages/agent-loop/src/turn/kernel.test.ts`
-- `packages/core/test/bot-finish-follow-through.test.js`
-
-### bot-flow-read-projection
-
-工作流只接收展示所需的会话数据
-
-- `apps/daemon/test/bot-flow-projection.test.ts`
-- `apps/web-console/lib/bot-activity-flow.test.ts`
-
-### bot-followup-cache-prefix
-
-追问时复用上一轮已缓存的对话前缀
-
-- `packages/agent-loop/src/model/chat-cache-prefix.test.ts`
-- `packages/core/test/bot-followup-cache-prefix.test.js`
-
 ### bot-fork-sessions-in-detail
 
 Bot 子任务会话放进详情菜单
@@ -1562,14 +1970,6 @@ Bot 子任务会话放进详情菜单
 - `packages/core/test/bot-goal-conclusion.test.js`
 - `packages/core/test/bot-goals-scheduler.test.js`
 - `packages/core/test/bot-goals.test.js`
-
-### bot-goal-context-boundary
-
-聊天隐藏内部摘要，历史 Goal 仅供回顾
-
-- `apps/web-console/lib/session-panel-resource.test.ts`
-- `packages/core/test/context-stack.test.js`
-- `packages/core/test/conversation-clock-summary.test.js`
 
 ### bot-goal-lifecycle-boundaries
 
@@ -1602,19 +2002,6 @@ Bot 只在必须时才为目标再开子任务
 
 - `packages/core/test/bot-goal-only-when-needed.test.js`
 
-### bot-group-cleanup
-
-删除分组时可一并删除 Bot
-
-- `e2e/bot-functional-groups.spec.ts`
-- `scripts/test/bot-functional-group-routes.test.mjs`
-
-### bot-group-disclosure-memory
-
-刷新后记住各 Bot 分组的展开状态
-
-- `e2e/bot-functional-groups.spec.ts`
-
 ### bot-linked-watchers
 
 关联原工作的临时盯梢与观察证据
@@ -1645,25 +2032,6 @@ Bot 回复标签显示 Bot 名称
 
 - `apps/web-console/lib/assistant-name.test.ts`
 - `e2e/bot-message-name.spec.ts`
-
-### bot-network-and-schedule-list
-
-多 Bot 协作关系图与紧凑的定时列表
-
-- `apps/web-console/components/routine-editor-dialog.test.ts`
-- `apps/web-console/lib/network-observations.test.ts`
-
-### bot-network-motion
-
-协作网络从 Bot 特写展开
-
-- `e2e/bot-network-motion.spec.ts`
-
-### bot-network-pan
-
-横向拖动的 Bot 协作全景
-
-- `e2e/bot-network-motion.spec.ts`
 
 ### bot-pin-sync
 
@@ -1734,13 +2102,6 @@ Bot 间通信在聊天流里显示为紧凑通信条，点击弹窗看全文
 - `packages/core/test/bot-room-work-runtime.test.js`
 - `scripts/test/bot-room-work-continuity-http.test.mjs`
 
-### bot-routine-create-receipt
-
-Bot 对话直接创建定时任务并取得确认
-
-- `packages/core/test/bot-history-memory.test.js`
-- `packages/core/test/routine-lifecycle.test.js`
-
 ### bot-row-menu
 
 Bot 列表操作菜单
@@ -1778,25 +2139,11 @@ Bot 侧栏不列出子任务会话
 
 - `apps/web-console/lib/bot-child-tasks.test.ts`
 
-### bot-sidebar-load
-
-Bot 侧栏按需加载与切换响应
-
-- `e2e/history-startup.spec.ts`
-
 ### bot-sidebar-order
 
 Bot 列表同一区域内拖拽排序
 
 - `apps/web-console/lib/sidebar-order.test.ts`
-
-### bot-sidebar-routing
-
-Bot 名册入口与主对话一致
-
-- `apps/web-console/lib/bots.test.ts`
-- `e2e/bot-functional-groups.spec.ts`
-- `e2e/grok-local-history.spec.ts`
 
 ### bot-soft-create-runtime
 
@@ -1842,14 +2189,6 @@ Bot 启动耗时分段可观测
 - `packages/core/test/bot-startup-prepare.test.ts`
 - `packages/core/test/bot-startup-wake.test.ts`
 
-### bot-status-polling
-
-工作状态轮询区分慢响应和断线
-
-- `e2e/bot-status-polling.spec.ts`
-- `scripts/test/bot-room-models.test.mjs`
-- `scripts/test/bot-work-routes.test.mjs`
-
 ### bot-supervision-freshness
 
 Bot 监督状态新鲜度与回复关联
@@ -1857,20 +2196,6 @@ Bot 监督状态新鲜度与回复关联
 - `packages/core/test/bot-linked-watchers.test.js`
 - `packages/core/test/bot-supervision-freshness.test.js`
 - `packages/core/test/bot-supervision-runtime.test.js`
-
-### bot-task-terminal-wait
-
-已结束的委派能唤醒接收回执的 Bot
-
-- `packages/core/test/durable-wait-default.test.js`
-
-### bot-turn-ownership
-
-Bot 当轮任务和目标审查归属
-
-- `packages/core/test/bot-goal-only-when-needed.test.js`
-- `packages/core/test/context-stack.test.js`
-- `scripts/test/bot-turn-ownership.test.mjs`
 
 ### bot-work-durable-wait
 
@@ -2294,12 +2619,6 @@ Lab connector authorization states and SecretVault grant
 
 - `packages/core/test/daydream-tick-cost.test.js`
 
-### daydream-unlimited-resume
-
-每日复盘移除额度并续跑
-
-- `packages/core/test/bot-daydream-local.test.js`
-
 ### delete-page
 
 Delete library pages and revoke public shares
@@ -2435,12 +2754,6 @@ Bot 级外部 Agent 通信
 
 - `packages/agent-loop/src/session/fold-budget.test.ts`
 
-### functional-group-disclosure
-
-Bot 侧栏功能分组折叠与展开
-
-- `e2e/bot-functional-groups.spec.ts`
-
 ### gateway-im-security
 
 IM 网关入站安全（验签、去重、白名单、Bot 路由）
@@ -2479,13 +2792,6 @@ GitHub 事件不能靠换投递号重放
 全局默认模型行左右对齐
 
 - `e2e/global-default-model.spec.ts`
-
-### goal-checkpoint-no-goal-once
-
-未分配目标时进度保存只报一次
-
-- `packages/agent-loop/src/turn/kernel.test.ts`
-- `packages/core/test/goal-checkpoint-no-goal-once.test.js`
 
 ### goal-history-toolbar-align
 
@@ -2545,12 +2851,6 @@ Lab 只读查看本机 Grok Bot 会话
 - `apps/web-console/lib/room-sidebar-placement.test.ts`
 - `packages/core/test/bot-functional-groups.test.js`
 
-### group-chat-stable-layout
-
-群聊顶部状态更新和输入区布局
-
-- `e2e/group-chat-stable-layout.spec.ts`
-
 ### group-command-same-as-dm
 
 群里的命令跟该 Bot 单聊同一套放行
@@ -2562,12 +2862,6 @@ Lab 只读查看本机 Grok Bot 会话
 群聊行展示成员头像
 
 - `apps/web-console/lib/group-members.test.ts`
-
-### group-member-partial-roster
-
-群里有旧成员时仍可添加当前可选的 Bot
-
-- `apps/web-console/lib/bot-group.test.ts`
 
 ### group-member-quiet
 
@@ -2588,12 +2882,6 @@ Lab 只读查看本机 Grok Bot 会话
 群聊回复模式与运行限制说明
 
 - `e2e/group-mode-explanations.spec.ts`
-
-### group-mode-instant-selection
-
-群聊回复方式可以连续切换
-
-- `e2e/group-mode-instant-selection.spec.ts`
 
 ### group-reply-mode
 
@@ -2687,18 +2975,6 @@ Lab Settings → Tools → Registered Machines panel
 - `apps/web-console/components/sections/settings/machines/registered-machines-actions.test.ts`
 - `apps/web-console/components/sections/settings/machines/registered-machines-model.test.ts`
 
-### lab-startup-request-load
-
-控制台启动时的请求负担
-
-- `apps/daemon/test/session-detail-logs.test.ts`
-- `apps/web-console/lib/api.test.ts`
-- `apps/web-console/lib/bot-work-state.test.ts`
-- `apps/web-console/lib/lab-tick.test.ts`
-- `apps/web-console/lib/overview-plan.test.ts`
-- `apps/web-console/lib/poll-timer.test.ts`
-- `apps/web-console/lib/session-activity.test.ts`
-
 ### lab-startup-timing
 
 Lab 会话显示启动耗时
@@ -2718,19 +2994,6 @@ Lab 会话显示启动耗时
 - `e2e/lcu-computer-use.spec.ts`
 - `packages/agent-loop/src/runtime/tool-loop.test.ts`
 - `packages/core/test/lcu-computer-use.test.js`
-
-### lean-default-skills
-
-精简默认技能并保留按需发现
-
-- `packages/core/test/lean-default-skills.test.js`
-
-### literal-tool-identifiers
-
-保留完整查询标识符并以成功读取作为保存依据
-
-- `packages/core/test/prompt-variant-settings.test.js`
-- `scripts/test/session-failure-audit.test.mjs`
 
 ### live-bot-quality
 
@@ -2797,14 +3060,6 @@ macOS 应用控制（外层宿主）
 
 - `e2e/first-batch-reliability.spec.ts`
 - `packages/core/test/memory-deletion-suppression.test.js`
-
-### memory-read-source-unavailable
-
-读不到的记忆来源一轮只说明一次
-
-- `packages/agent-loop/src/runtime/tool-loop.test.ts`
-- `packages/core/test/memory-read-source-unavailable.test.js`
-- `packages/core/test/source-unavailable-turn-stop.test.js`
 
 ### message-body-search
 
@@ -2919,17 +3174,6 @@ macOS 应用控制（外层宿主）
 
 - `packages/core/test/deferred-tool-load.test.js`
 - `packages/core/test/necessary-tool-injection.test.js`
-
-### night-runtime-reliability
-
-夜间运行可靠性修复
-
-- `apps/web-console/lib/live-stream-once.test.ts`
-- `apps/web-console/lib/stream-segments.test.ts`
-- `e2e/chat-basics.spec.ts`
-- `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
-- `packages/core/test/skill-manifest-gate.test.js`
-- `scripts/workflows/material-source-isolation.test.mjs`
 
 ### no-windows-desktop-pack
 
@@ -3239,12 +3483,6 @@ microVM 命令不会悄悄改在宿主机上跑
 
 - `apps/web-console/lib/armed-delete.test.ts`
 
-### reply-hover-ended-at
-
-悬停 Bot 回复时显示结束时间
-
-- `apps/web-console/components/ReplyQuote.test.ts`
-
 ### request-metric-follows-turn
 
 已发送请求指标随所选轮变化
@@ -3258,14 +3496,6 @@ microVM 命令不会悄悄改在宿主机上跑
 
 - `apps/web-console/lib/risk-advisory.test.ts`
 - `e2e/risk-advisory.spec.ts`
-
-### room-budgets-default-off
-
-群预算默认关闭，预算停下时写完的回复照常出现
-
-- `apps/web-console/components/play-group/room-console.test.ts`
-- `apps/web-console/lib/room-turn-notice.test.ts`
-- `packages/core/test/bot-room-budget-default-off.test.js`
 
 ### rotate-page-share
 
@@ -3412,14 +3642,6 @@ Secure Form fill-from-Vault
 - `scripts/test/session-eval-lift.test.mjs`
 - `scripts/test/session-eval-suites.test.mjs`
 
-### session-favorite
-
-当前会话一键收藏
-
-- `apps/daemon/test/session-favorite.test.ts`
-- `apps/web-console/components/SessionFavorite.test.ts`
-- `apps/web-console/lib/session-favorite.test.ts`
-
 ### session-lifecycle-state-consistency
 
 生命周期验证发现的结束原因与部分审批状态一致性修复
@@ -3449,12 +3671,6 @@ Secure Form fill-from-Vault
 - `packages/core/test/superbot-factory-setup.test.js`
 - `packages/core/test/writer-claim.test.js`
 - `scripts/test/session-multiprocess-state-consistency.test.mjs`
-
-### session-recap-model-routing
-
-会话回顾使用会话配置的模型
-
-- `apps/daemon/test/session-recap-yield.test.ts`
 
 ### session-restart-recovery-state-consistency
 
@@ -3559,21 +3775,6 @@ Secure Form fill-from-Vault
 
 - `packages/core/test/skill-capture.test.js`
 
-### skill-load-recovery
-
-自建技能与搜索结果可加载
-
-- `packages/core/test/skill-load-recovery.test.js`
-
-### skill-load-visible
-
-对话流直接显示加载的技能名称
-
-- `apps/web-console/components/correction-capture.test.ts`
-- `apps/web-console/lib/session-brief.test.ts`
-- `apps/web-console/lib/skill-load-label.test.ts`
-- `e2e/skill-load-visible.spec.ts`
-
 ### skill-manifest-boundary
 
 技能能力边界
@@ -3630,18 +3831,6 @@ Slack Events 入站按线程唤醒例行任务
 启动时校验压缩策略、稳定前缀与重复守卫
 
 - `packages/core/test/startup-invariants.test.js`
-
-### steer-completion-coverage
-
-Bot 完成检查覆盖本次全部插话
-
-- `packages/core/test/bot-completion-reliability.test.js`
-
-### steer-model-flight
-
-模型生成期间插话与旧工具启动前转向
-
-- `packages/core/test/steer-tool-continuity.test.js`
 
 ### steer-timeline-order
 
@@ -3744,14 +3933,6 @@ Bot 完成检查覆盖本次全部插话
 - `packages/agent-loop/src/recovery/session-loop-guard.test.ts`
 - `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
 - `packages/core/test/session-loop-guard.test.js`
-
-### tool-search-experiment
-
-可切换的增强工具检索实验
-
-- `e2e/tool-exposure.spec.ts`
-- `packages/core/test/tool-search-experiment.test.js`
-- `scripts/test/settings-route-contracts.test.mjs`
 
 ### unattended-stream-observation
 

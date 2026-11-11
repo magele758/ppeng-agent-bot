@@ -2,7 +2,7 @@
 
 群是一份共享记录，不是每只 Bot 各说各的再拼起来。至少两只、互不重复的 Bot 才能建群。建好之后有自己的名字、成员和历史，重启还能读。
 
-规格：`play-bot-group`、`bot-rooms`、`room-debate-mode`、`bot-room-sparse-routing`、`bot-room-wave-dispatch`、`bot-room-recall`、`bot-room-touched-memory`、`bot-room-speaker-identity`、`bot-room-speaker-pick`、`bot-create-named-tools`。
+规格：`play-bot-group`、`bot-rooms`、`room-debate-mode`、`room-budgets-default-off`、`group-chat-stable-layout`、`group-member-partial-roster`、`group-mode-instant-selection`、`bot-room-sparse-routing`、`bot-room-wave-dispatch`、`bot-room-recall`、`bot-room-touched-memory`、`bot-room-speaker-identity`、`bot-room-speaker-pick`、`bot-create-named-tools`。
 
 从 Bot 列表的「新建」里建群，选已经有的 Bot。群出现在同一条列表里，和单只 Bot 的行区分开。之后可以再加入或移出成员，不能减到只剩一只，也不能把同一只加两次。不是成员的名字不会被拉进来。
 

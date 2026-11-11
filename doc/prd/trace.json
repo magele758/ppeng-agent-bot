@@ -95,6 +95,22 @@
           ]
         },
         {
+          "id": "bot-coaching-loop",
+          "title": "Bot 行为契约与有证据的经验沉淀",
+          "tests": [
+            "apps/daemon/test/bot-coaching.test.ts",
+            "packages/core/test/bot-coaching.test.js",
+            "packages/core/test/product-admin-tools.test.js"
+          ]
+        },
+        {
+          "id": "bot-coaching-playbook",
+          "title": "项目内置 Bot 调教流程",
+          "tests": [
+            "packages/core/test/bot-coaching-playbook.test.js"
+          ]
+        },
+        {
           "id": "bot-console-selection",
           "title": "切换 Bot 时显示当前会话，开发态仍能载入默认 Bot",
           "tests": [
@@ -201,6 +217,21 @@
           ]
         },
         {
+          "id": "bot-group-cleanup",
+          "title": "删除分组时可一并删除 Bot",
+          "tests": [
+            "e2e/bot-functional-groups.spec.ts",
+            "scripts/test/bot-functional-group-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-group-disclosure-memory",
+          "title": "刷新后记住各 Bot 分组的展开状态",
+          "tests": [
+            "e2e/bot-functional-groups.spec.ts"
+          ]
+        },
+        {
           "id": "bot-group-drag-only",
           "title": "Bot 侧栏移组仅保留拖拽入口",
           "tests": [
@@ -246,6 +277,15 @@
             "apps/web-console/lib/session-row.test.ts",
             "e2e/agent-home-features.spec.ts",
             "packages/core/test/bot-history-memory.test.js"
+          ]
+        },
+        {
+          "id": "bot-sidebar-routing",
+          "title": "Bot 名册入口与主对话一致",
+          "tests": [
+            "apps/web-console/lib/bots.test.ts",
+            "e2e/bot-functional-groups.spec.ts",
+            "e2e/grok-local-history.spec.ts"
           ]
         },
         {
@@ -305,6 +345,13 @@
           ]
         },
         {
+          "id": "functional-group-disclosure",
+          "title": "Bot 侧栏功能分组折叠与展开",
+          "tests": [
+            "e2e/bot-functional-groups.spec.ts"
+          ]
+        },
+        {
           "id": "low-interference-onboarding-goals",
           "title": "仅向新用户展示首次引导并隐藏少量目标面板",
           "tests": [
@@ -338,6 +385,13 @@
       ],
       "specs": [
         {
+          "id": "bot-browser-notices",
+          "title": "Bot 桌面通知",
+          "tests": [
+            "e2e/bot-notices-auth.spec.ts"
+          ]
+        },
+        {
           "id": "bot-chat-image-compatibility",
           "title": "Bot 历史图片兼容与群聊发送恢复",
           "tests": [
@@ -360,6 +414,14 @@
           "title": "规范 Bot 会话的双阈值压缩",
           "tests": [
             "packages/core/test/bot-dual-compact.test.js"
+          ]
+        },
+        {
+          "id": "bot-followup-cache-prefix",
+          "title": "追问时复用上一轮已缓存的对话前缀",
+          "tests": [
+            "packages/agent-loop/src/model/chat-cache-prefix.test.ts",
+            "packages/core/test/bot-followup-cache-prefix.test.js"
           ]
         },
         {
@@ -427,6 +489,22 @@
           ]
         },
         {
+          "id": "bot-sidebar-load",
+          "title": "Bot 侧栏按需加载与切换响应",
+          "tests": [
+            "e2e/history-startup.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-status-polling",
+          "title": "工作状态轮询区分慢响应和断线",
+          "tests": [
+            "e2e/bot-status-polling.spec.ts",
+            "scripts/test/bot-room-models.test.mjs",
+            "scripts/test/bot-work-routes.test.mjs"
+          ]
+        },
+        {
           "id": "bot-steer-visible",
           "title": "Bot 对话里的实时插话马上出现在对话流",
           "tests": [
@@ -451,6 +529,35 @@
           ]
         },
         {
+          "id": "lab-startup-request-load",
+          "title": "控制台启动时的请求负担",
+          "tests": [
+            "apps/daemon/test/session-detail-logs.test.ts",
+            "apps/web-console/lib/api.test.ts",
+            "apps/web-console/lib/bot-work-state.test.ts",
+            "apps/web-console/lib/lab-tick.test.ts",
+            "apps/web-console/lib/overview-plan.test.ts",
+            "apps/web-console/lib/poll-timer.test.ts",
+            "apps/web-console/lib/session-activity.test.ts"
+          ]
+        },
+        {
+          "id": "reply-hover-ended-at",
+          "title": "悬停 Bot 回复时显示结束时间",
+          "tests": [
+            "apps/web-console/components/ReplyQuote.test.ts"
+          ]
+        },
+        {
+          "id": "session-favorite",
+          "title": "当前会话一键收藏",
+          "tests": [
+            "apps/daemon/test/session-favorite.test.ts",
+            "apps/web-console/components/SessionFavorite.test.ts",
+            "apps/web-console/lib/session-favorite.test.ts"
+          ]
+        },
+        {
           "id": "session-recap",
           "title": "会话末尾回顾",
           "tests": [
@@ -458,6 +565,27 @@
             "apps/daemon/test/session-recap-text.test.ts",
             "apps/daemon/test/session-recap-yield.test.ts",
             "apps/web-console/lib/session-recap.test.ts"
+          ]
+        },
+        {
+          "id": "session-recap-model-routing",
+          "title": "会话回顾使用会话配置的模型",
+          "tests": [
+            "apps/daemon/test/session-recap-yield.test.ts"
+          ]
+        },
+        {
+          "id": "steer-completion-coverage",
+          "title": "Bot 完成检查覆盖本次全部插话",
+          "tests": [
+            "packages/core/test/bot-completion-reliability.test.js"
+          ]
+        },
+        {
+          "id": "steer-model-flight",
+          "title": "模型生成期间插话与旧工具启动前转向",
+          "tests": [
+            "packages/core/test/steer-tool-continuity.test.js"
           ]
         }
       ]
@@ -471,6 +599,13 @@
         "doc/bot/08-collaboration.md"
       ],
       "specs": [
+        {
+          "id": "bot-activity-flow",
+          "title": "从 Bot 运行记录查看工作流",
+          "tests": [
+            "apps/web-console/lib/bot-activity-flow.test.ts"
+          ]
+        },
         {
           "id": "bot-autonomous-execution-coverage",
           "title": "Bot 自动选择并完整承接原有执行能力",
@@ -495,12 +630,48 @@
           ]
         },
         {
+          "id": "bot-delegation-lookup",
+          "title": "Bot 对话直接委派并打断重复查询",
+          "tests": [
+            "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
+            "packages/core/test/tool-exposure-tiers.test.js"
+          ]
+        },
+        {
+          "id": "bot-finish-follow-through",
+          "title": "Bot 收尾时由运行时盯着做完",
+          "tests": [
+            "apps/daemon/test/bot-finish-settings.test.ts",
+            "apps/web-console/lib/bot-finish.test.ts",
+            "packages/agent-loop/src/recovery/advisory-grace.test.ts",
+            "packages/agent-loop/src/turn/kernel.test.ts",
+            "packages/core/test/bot-finish-follow-through.test.js"
+          ]
+        },
+        {
+          "id": "bot-flow-read-projection",
+          "title": "工作流只接收展示所需的会话数据",
+          "tests": [
+            "apps/daemon/test/bot-flow-projection.test.ts",
+            "apps/web-console/lib/bot-activity-flow.test.ts"
+          ]
+        },
+        {
           "id": "bot-fork-retrievable-inheritance",
           "title": "Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文",
           "tests": [
             "packages/core/test/bot-fork-retrieval.test.js",
             "packages/core/test/bot-fork-spawn-inheritance.test.js",
             "packages/core/test/fork-sibling-isolation.test.js"
+          ]
+        },
+        {
+          "id": "bot-goal-context-boundary",
+          "title": "聊天隐藏内部摘要，历史 Goal 仅供回顾",
+          "tests": [
+            "apps/web-console/lib/session-panel-resource.test.ts",
+            "packages/core/test/context-stack.test.js",
+            "packages/core/test/conversation-clock-summary.test.js"
           ]
         },
         {
@@ -526,6 +697,28 @@
             "packages/core/test/bot-goals-executor-cancellation.test.js",
             "packages/core/test/bot-goals-scheduler.test.js",
             "packages/core/test/bot-goals.test.js"
+          ]
+        },
+        {
+          "id": "bot-network-and-schedule-list",
+          "title": "多 Bot 协作关系图与紧凑的定时列表",
+          "tests": [
+            "apps/web-console/components/routine-editor-dialog.test.ts",
+            "apps/web-console/lib/network-observations.test.ts"
+          ]
+        },
+        {
+          "id": "bot-network-motion",
+          "title": "协作网络从 Bot 特写展开",
+          "tests": [
+            "e2e/bot-network-motion.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-network-pan",
+          "title": "横向拖动的 Bot 协作全景",
+          "tests": [
+            "e2e/bot-network-motion.spec.ts"
           ]
         },
         {
@@ -706,6 +899,13 @@
           ]
         },
         {
+          "id": "bot-task-terminal-wait",
+          "title": "已结束的委派能唤醒接收回执的 Bot",
+          "tests": [
+            "packages/core/test/durable-wait-default.test.js"
+          ]
+        },
+        {
           "id": "bots",
           "title": "Bot 名册、互发消息与权限",
           "tests": [
@@ -735,10 +935,48 @@
           ]
         },
         {
+          "id": "goal-checkpoint-no-goal-once",
+          "title": "未分配目标时进度保存只报一次",
+          "tests": [
+            "packages/agent-loop/src/turn/kernel.test.ts",
+            "packages/core/test/goal-checkpoint-no-goal-once.test.js"
+          ]
+        },
+        {
+          "id": "group-chat-stable-layout",
+          "title": "群聊顶部状态更新和输入区布局",
+          "tests": [
+            "e2e/group-chat-stable-layout.spec.ts"
+          ]
+        },
+        {
+          "id": "group-member-partial-roster",
+          "title": "群里有旧成员时仍可添加当前可选的 Bot",
+          "tests": [
+            "apps/web-console/lib/bot-group.test.ts"
+          ]
+        },
+        {
+          "id": "group-mode-instant-selection",
+          "title": "群聊回复方式可以连续切换",
+          "tests": [
+            "e2e/group-mode-instant-selection.spec.ts"
+          ]
+        },
+        {
           "id": "play-bot-group",
           "title": "Bot 会话列表里的多 Bot 群聊",
           "tests": [
             "apps/web-console/lib/bot-group.test.ts"
+          ]
+        },
+        {
+          "id": "room-budgets-default-off",
+          "title": "群预算默认关闭，预算停下时写完的回复照常出现",
+          "tests": [
+            "apps/web-console/components/play-group/room-console.test.ts",
+            "apps/web-console/lib/room-turn-notice.test.ts",
+            "packages/core/test/bot-room-budget-default-off.test.js"
           ]
         },
         {
@@ -914,6 +1152,21 @@
           ]
         },
         {
+          "id": "bot-group-cleanup",
+          "title": "删除分组时可一并删除 Bot",
+          "tests": [
+            "e2e/bot-functional-groups.spec.ts",
+            "scripts/test/bot-functional-group-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-group-disclosure-memory",
+          "title": "刷新后记住各 Bot 分组的展开状态",
+          "tests": [
+            "e2e/bot-functional-groups.spec.ts"
+          ]
+        },
+        {
           "id": "bot-group-drag-only",
           "title": "Bot 侧栏移组仅保留拖拽入口",
           "tests": [
@@ -979,6 +1232,14 @@
           ]
         },
         {
+          "id": "bot-routine-create-receipt",
+          "title": "Bot 对话直接创建定时任务并取得确认",
+          "tests": [
+            "packages/core/test/bot-history-memory.test.js",
+            "packages/core/test/routine-lifecycle.test.js"
+          ]
+        },
+        {
           "id": "bot-routine-lifecycle",
           "title": "Bot 可靠例行任务",
           "tests": [
@@ -1013,6 +1274,15 @@
           ]
         },
         {
+          "id": "bot-sidebar-routing",
+          "title": "Bot 名册入口与主对话一致",
+          "tests": [
+            "apps/web-console/lib/bots.test.ts",
+            "e2e/bot-functional-groups.spec.ts",
+            "e2e/grok-local-history.spec.ts"
+          ]
+        },
+        {
           "id": "bot-skill-panel-layout",
           "title": "Bot 技能面板布局清晰且适应窄屏",
           "tests": [
@@ -1026,6 +1296,15 @@
             "apps/web-console/lib/live-turn-session.test.ts",
             "apps/web-console/lib/session-panel-resource.test.ts",
             "e2e/bot-switch-live-turn.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-turn-ownership",
+          "title": "Bot 当轮任务和目标审查归属",
+          "tests": [
+            "packages/core/test/bot-goal-only-when-needed.test.js",
+            "packages/core/test/context-stack.test.js",
+            "scripts/test/bot-turn-ownership.test.mjs"
           ]
         },
         {
@@ -1057,12 +1336,49 @@
           ]
         },
         {
+          "id": "daydream-unlimited-resume",
+          "title": "每日复盘移除额度并续跑",
+          "tests": [
+            "packages/core/test/bot-daydream-local.test.js"
+          ]
+        },
+        {
+          "id": "functional-group-disclosure",
+          "title": "Bot 侧栏功能分组折叠与展开",
+          "tests": [
+            "e2e/bot-functional-groups.spec.ts"
+          ]
+        },
+        {
+          "id": "lean-default-skills",
+          "title": "精简默认技能并保留按需发现",
+          "tests": [
+            "packages/core/test/lean-default-skills.test.js"
+          ]
+        },
+        {
           "id": "low-interference-onboarding-goals",
           "title": "仅向新用户展示首次引导并隐藏少量目标面板",
           "tests": [
             "e2e/bot-first-task-dismissal.spec.ts",
             "e2e/bot-first-task-new-user.spec.ts",
             "e2e/bot-goals-panel-threshold.spec.ts"
+          ]
+        },
+        {
+          "id": "memory-read-source-unavailable",
+          "title": "读不到的记忆来源一轮只说明一次",
+          "tests": [
+            "packages/agent-loop/src/runtime/tool-loop.test.ts",
+            "packages/core/test/memory-read-source-unavailable.test.js",
+            "packages/core/test/source-unavailable-turn-stop.test.js"
+          ]
+        },
+        {
+          "id": "skill-load-recovery",
+          "title": "自建技能与搜索结果可加载",
+          "tests": [
+            "packages/core/test/skill-load-recovery.test.js"
           ]
         },
         {
@@ -1084,6 +1400,13 @@
       ],
       "specs": [
         {
+          "id": "bot-activity-flow",
+          "title": "从 Bot 运行记录查看工作流",
+          "tests": [
+            "apps/web-console/lib/bot-activity-flow.test.ts"
+          ]
+        },
+        {
           "id": "bot-autonomous-execution-coverage",
           "title": "Bot 自动选择并完整承接原有执行能力",
           "tests": [
@@ -1097,6 +1420,22 @@
           "title": "Bot 对话头部只显示名字、活脸和权限入口",
           "tests": [
             "apps/web-console/lib/bot-chat-header.test.ts"
+          ]
+        },
+        {
+          "id": "bot-coaching-loop",
+          "title": "Bot 行为契约与有证据的经验沉淀",
+          "tests": [
+            "apps/daemon/test/bot-coaching.test.ts",
+            "packages/core/test/bot-coaching.test.js",
+            "packages/core/test/product-admin-tools.test.js"
+          ]
+        },
+        {
+          "id": "bot-coaching-playbook",
+          "title": "项目内置 Bot 调教流程",
+          "tests": [
+            "packages/core/test/bot-coaching-playbook.test.js"
           ]
         },
         {
@@ -1114,11 +1453,38 @@
           ]
         },
         {
+          "id": "bot-delegation-lookup",
+          "title": "Bot 对话直接委派并打断重复查询",
+          "tests": [
+            "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
+            "packages/core/test/tool-exposure-tiers.test.js"
+          ]
+        },
+        {
           "id": "bot-face-readable-shapes",
           "title": "脸型圆润，列表里能看见表情，干活时更忙",
           "tests": [
             "apps/web-console/components/BotFace.render.test.ts",
             "apps/web-console/lib/bot-face.test.ts"
+          ]
+        },
+        {
+          "id": "bot-finish-follow-through",
+          "title": "Bot 收尾时由运行时盯着做完",
+          "tests": [
+            "apps/daemon/test/bot-finish-settings.test.ts",
+            "apps/web-console/lib/bot-finish.test.ts",
+            "packages/agent-loop/src/recovery/advisory-grace.test.ts",
+            "packages/agent-loop/src/turn/kernel.test.ts",
+            "packages/core/test/bot-finish-follow-through.test.js"
+          ]
+        },
+        {
+          "id": "bot-flow-read-projection",
+          "title": "工作流只接收展示所需的会话数据",
+          "tests": [
+            "apps/daemon/test/bot-flow-projection.test.ts",
+            "apps/web-console/lib/bot-activity-flow.test.ts"
           ]
         },
         {
@@ -1128,6 +1494,15 @@
             "packages/core/test/bot-fork-retrieval.test.js",
             "packages/core/test/bot-fork-spawn-inheritance.test.js",
             "packages/core/test/fork-sibling-isolation.test.js"
+          ]
+        },
+        {
+          "id": "bot-goal-context-boundary",
+          "title": "聊天隐藏内部摘要，历史 Goal 仅供回顾",
+          "tests": [
+            "apps/web-console/lib/session-panel-resource.test.ts",
+            "packages/core/test/context-stack.test.js",
+            "packages/core/test/conversation-clock-summary.test.js"
           ]
         },
         {
@@ -1160,6 +1535,28 @@
             "packages/core/test/bot-goals-executor-cancellation.test.js",
             "packages/core/test/bot-goals-scheduler.test.js",
             "packages/core/test/bot-goals.test.js"
+          ]
+        },
+        {
+          "id": "bot-network-and-schedule-list",
+          "title": "多 Bot 协作关系图与紧凑的定时列表",
+          "tests": [
+            "apps/web-console/components/routine-editor-dialog.test.ts",
+            "apps/web-console/lib/network-observations.test.ts"
+          ]
+        },
+        {
+          "id": "bot-network-motion",
+          "title": "协作网络从 Bot 特写展开",
+          "tests": [
+            "e2e/bot-network-motion.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-network-pan",
+          "title": "横向拖动的 Bot 协作全景",
+          "tests": [
+            "e2e/bot-network-motion.spec.ts"
           ]
         },
         {
@@ -1233,6 +1630,13 @@
           ]
         },
         {
+          "id": "bot-task-terminal-wait",
+          "title": "已结束的委派能唤醒接收回执的 Bot",
+          "tests": [
+            "packages/core/test/durable-wait-default.test.js"
+          ]
+        },
+        {
           "id": "bots",
           "title": "Bot 名册、互发消息与权限",
           "tests": [
@@ -1262,6 +1666,22 @@
           ]
         },
         {
+          "id": "goal-checkpoint-no-goal-once",
+          "title": "未分配目标时进度保存只报一次",
+          "tests": [
+            "packages/agent-loop/src/turn/kernel.test.ts",
+            "packages/core/test/goal-checkpoint-no-goal-once.test.js"
+          ]
+        },
+        {
+          "id": "literal-tool-identifiers",
+          "title": "保留完整查询标识符并以成功读取作为保存依据",
+          "tests": [
+            "packages/core/test/prompt-variant-settings.test.js",
+            "scripts/test/session-failure-audit.test.mjs"
+          ]
+        },
+        {
           "id": "loop-guard-model-switch",
           "title": "重复检测默认只约束弱模型",
           "tests": [
@@ -1271,6 +1691,37 @@
             "packages/agent-loop/src/tools/shell-policy.test.ts",
             "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
             "packages/core/test/repeat-guard-settings.test.js"
+          ]
+        },
+        {
+          "id": "night-runtime-reliability",
+          "title": "夜间运行可靠性修复",
+          "tests": [
+            "apps/web-console/lib/live-stream-once.test.ts",
+            "apps/web-console/lib/stream-segments.test.ts",
+            "e2e/chat-basics.spec.ts",
+            "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
+            "packages/core/test/skill-manifest-gate.test.js",
+            "scripts/workflows/material-source-isolation.test.mjs"
+          ]
+        },
+        {
+          "id": "skill-load-visible",
+          "title": "对话流直接显示加载的技能名称",
+          "tests": [
+            "apps/web-console/components/correction-capture.test.ts",
+            "apps/web-console/lib/session-brief.test.ts",
+            "apps/web-console/lib/skill-load-label.test.ts",
+            "e2e/skill-load-visible.spec.ts"
+          ]
+        },
+        {
+          "id": "tool-search-experiment",
+          "title": "可切换的增强工具检索实验",
+          "tests": [
+            "e2e/tool-exposure.spec.ts",
+            "packages/core/test/tool-search-experiment.test.js",
+            "scripts/test/settings-route-contracts.test.mjs"
           ]
         },
         {
@@ -1300,6 +1751,13 @@
       ],
       "specs": [
         {
+          "id": "bot-activity-flow",
+          "title": "从 Bot 运行记录查看工作流",
+          "tests": [
+            "apps/web-console/lib/bot-activity-flow.test.ts"
+          ]
+        },
+        {
           "id": "bot-autonomous-execution-coverage",
           "title": "Bot 自动选择并完整承接原有执行能力",
           "tests": [
@@ -1316,12 +1774,48 @@
           ]
         },
         {
+          "id": "bot-delegation-lookup",
+          "title": "Bot 对话直接委派并打断重复查询",
+          "tests": [
+            "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
+            "packages/core/test/tool-exposure-tiers.test.js"
+          ]
+        },
+        {
+          "id": "bot-finish-follow-through",
+          "title": "Bot 收尾时由运行时盯着做完",
+          "tests": [
+            "apps/daemon/test/bot-finish-settings.test.ts",
+            "apps/web-console/lib/bot-finish.test.ts",
+            "packages/agent-loop/src/recovery/advisory-grace.test.ts",
+            "packages/agent-loop/src/turn/kernel.test.ts",
+            "packages/core/test/bot-finish-follow-through.test.js"
+          ]
+        },
+        {
+          "id": "bot-flow-read-projection",
+          "title": "工作流只接收展示所需的会话数据",
+          "tests": [
+            "apps/daemon/test/bot-flow-projection.test.ts",
+            "apps/web-console/lib/bot-activity-flow.test.ts"
+          ]
+        },
+        {
           "id": "bot-fork-retrievable-inheritance",
           "title": "Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文",
           "tests": [
             "packages/core/test/bot-fork-retrieval.test.js",
             "packages/core/test/bot-fork-spawn-inheritance.test.js",
             "packages/core/test/fork-sibling-isolation.test.js"
+          ]
+        },
+        {
+          "id": "bot-goal-context-boundary",
+          "title": "聊天隐藏内部摘要，历史 Goal 仅供回顾",
+          "tests": [
+            "apps/web-console/lib/session-panel-resource.test.ts",
+            "packages/core/test/context-stack.test.js",
+            "packages/core/test/conversation-clock-summary.test.js"
           ]
         },
         {
@@ -1347,6 +1841,28 @@
             "packages/core/test/bot-goals-executor-cancellation.test.js",
             "packages/core/test/bot-goals-scheduler.test.js",
             "packages/core/test/bot-goals.test.js"
+          ]
+        },
+        {
+          "id": "bot-network-and-schedule-list",
+          "title": "多 Bot 协作关系图与紧凑的定时列表",
+          "tests": [
+            "apps/web-console/components/routine-editor-dialog.test.ts",
+            "apps/web-console/lib/network-observations.test.ts"
+          ]
+        },
+        {
+          "id": "bot-network-motion",
+          "title": "协作网络从 Bot 特写展开",
+          "tests": [
+            "e2e/bot-network-motion.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-network-pan",
+          "title": "横向拖动的 Bot 协作全景",
+          "tests": [
+            "e2e/bot-network-motion.spec.ts"
           ]
         },
         {
@@ -1401,6 +1917,21 @@
             "packages/core/test/bot-product-collaboration.test.js",
             "packages/core/test/product-admin-tools.test.js",
             "packages/core/test/subagent-blocked.test.js"
+          ]
+        },
+        {
+          "id": "bot-task-terminal-wait",
+          "title": "已结束的委派能唤醒接收回执的 Bot",
+          "tests": [
+            "packages/core/test/durable-wait-default.test.js"
+          ]
+        },
+        {
+          "id": "goal-checkpoint-no-goal-once",
+          "title": "未分配目标时进度保存只报一次",
+          "tests": [
+            "packages/agent-loop/src/turn/kernel.test.ts",
+            "packages/core/test/goal-checkpoint-no-goal-once.test.js"
           ]
         }
       ]
@@ -1560,13 +2091,6 @@
       ]
     },
     {
-      "id": "bot-activity-flow",
-      "title": "从 Bot 运行记录查看工作流",
-      "tests": [
-        "apps/web-console/lib/bot-activity-flow.test.ts"
-      ]
-    },
-    {
       "id": "bot-async-summary",
       "title": "Bot 历史摘要后台更新",
       "tests": [
@@ -1584,33 +2108,10 @@
       ]
     },
     {
-      "id": "bot-browser-notices",
-      "title": "Bot 桌面通知",
-      "tests": [
-        "e2e/bot-notices-auth.spec.ts"
-      ]
-    },
-    {
       "id": "bot-child-task-chip-fill",
       "title": "子任务芯片有底色",
       "tests": [
         "apps/web-console/components/BotChildTaskStreamEntry.test.ts"
-      ]
-    },
-    {
-      "id": "bot-coaching-loop",
-      "title": "Bot 行为契约与有证据的经验沉淀",
-      "tests": [
-        "apps/daemon/test/bot-coaching.test.ts",
-        "packages/core/test/bot-coaching.test.js",
-        "packages/core/test/product-admin-tools.test.js"
-      ]
-    },
-    {
-      "id": "bot-coaching-playbook",
-      "title": "项目内置 Bot 调教流程",
-      "tests": [
-        "packages/core/test/bot-coaching-playbook.test.js"
       ]
     },
     {
@@ -1666,14 +2167,6 @@
       ]
     },
     {
-      "id": "bot-delegation-lookup",
-      "title": "Bot 对话直接委派并打断重复查询",
-      "tests": [
-        "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
-        "packages/core/test/tool-exposure-tiers.test.js"
-      ]
-    },
-    {
       "id": "bot-delete",
       "title": "删除 Bot 并保留对话历史",
       "tests": [
@@ -1725,33 +2218,6 @@
       ]
     },
     {
-      "id": "bot-finish-follow-through",
-      "title": "Bot 收尾时由运行时盯着做完",
-      "tests": [
-        "apps/daemon/test/bot-finish-settings.test.ts",
-        "apps/web-console/lib/bot-finish.test.ts",
-        "packages/agent-loop/src/recovery/advisory-grace.test.ts",
-        "packages/agent-loop/src/turn/kernel.test.ts",
-        "packages/core/test/bot-finish-follow-through.test.js"
-      ]
-    },
-    {
-      "id": "bot-flow-read-projection",
-      "title": "工作流只接收展示所需的会话数据",
-      "tests": [
-        "apps/daemon/test/bot-flow-projection.test.ts",
-        "apps/web-console/lib/bot-activity-flow.test.ts"
-      ]
-    },
-    {
-      "id": "bot-followup-cache-prefix",
-      "title": "追问时复用上一轮已缓存的对话前缀",
-      "tests": [
-        "packages/agent-loop/src/model/chat-cache-prefix.test.ts",
-        "packages/core/test/bot-followup-cache-prefix.test.js"
-      ]
-    },
-    {
       "id": "bot-fork-sessions-in-detail",
       "title": "Bot 子任务会话放进详情菜单",
       "tests": [
@@ -1766,15 +2232,6 @@
         "packages/core/test/bot-goal-conclusion.test.js",
         "packages/core/test/bot-goals-scheduler.test.js",
         "packages/core/test/bot-goals.test.js"
-      ]
-    },
-    {
-      "id": "bot-goal-context-boundary",
-      "title": "聊天隐藏内部摘要，历史 Goal 仅供回顾",
-      "tests": [
-        "apps/web-console/lib/session-panel-resource.test.ts",
-        "packages/core/test/context-stack.test.js",
-        "packages/core/test/conversation-clock-summary.test.js"
       ]
     },
     {
@@ -1813,21 +2270,6 @@
       ]
     },
     {
-      "id": "bot-group-cleanup",
-      "title": "删除分组时可一并删除 Bot",
-      "tests": [
-        "e2e/bot-functional-groups.spec.ts",
-        "scripts/test/bot-functional-group-routes.test.mjs"
-      ]
-    },
-    {
-      "id": "bot-group-disclosure-memory",
-      "title": "刷新后记住各 Bot 分组的展开状态",
-      "tests": [
-        "e2e/bot-functional-groups.spec.ts"
-      ]
-    },
-    {
       "id": "bot-linked-watchers",
       "title": "关联原工作的临时盯梢与观察证据",
       "tests": [
@@ -1860,28 +2302,6 @@
       "tests": [
         "apps/web-console/lib/assistant-name.test.ts",
         "e2e/bot-message-name.spec.ts"
-      ]
-    },
-    {
-      "id": "bot-network-and-schedule-list",
-      "title": "多 Bot 协作关系图与紧凑的定时列表",
-      "tests": [
-        "apps/web-console/components/routine-editor-dialog.test.ts",
-        "apps/web-console/lib/network-observations.test.ts"
-      ]
-    },
-    {
-      "id": "bot-network-motion",
-      "title": "协作网络从 Bot 特写展开",
-      "tests": [
-        "e2e/bot-network-motion.spec.ts"
-      ]
-    },
-    {
-      "id": "bot-network-pan",
-      "title": "横向拖动的 Bot 协作全景",
-      "tests": [
-        "e2e/bot-network-motion.spec.ts"
       ]
     },
     {
@@ -1964,14 +2384,6 @@
       ]
     },
     {
-      "id": "bot-routine-create-receipt",
-      "title": "Bot 对话直接创建定时任务并取得确认",
-      "tests": [
-        "packages/core/test/bot-history-memory.test.js",
-        "packages/core/test/routine-lifecycle.test.js"
-      ]
-    },
-    {
       "id": "bot-row-menu",
       "title": "Bot 列表操作菜单",
       "tests": [
@@ -2014,26 +2426,10 @@
       ]
     },
     {
-      "id": "bot-sidebar-load",
-      "title": "Bot 侧栏按需加载与切换响应",
-      "tests": [
-        "e2e/history-startup.spec.ts"
-      ]
-    },
-    {
       "id": "bot-sidebar-order",
       "title": "Bot 列表同一区域内拖拽排序",
       "tests": [
         "apps/web-console/lib/sidebar-order.test.ts"
-      ]
-    },
-    {
-      "id": "bot-sidebar-routing",
-      "title": "Bot 名册入口与主对话一致",
-      "tests": [
-        "apps/web-console/lib/bots.test.ts",
-        "e2e/bot-functional-groups.spec.ts",
-        "e2e/grok-local-history.spec.ts"
       ]
     },
     {
@@ -2087,37 +2483,12 @@
       ]
     },
     {
-      "id": "bot-status-polling",
-      "title": "工作状态轮询区分慢响应和断线",
-      "tests": [
-        "e2e/bot-status-polling.spec.ts",
-        "scripts/test/bot-room-models.test.mjs",
-        "scripts/test/bot-work-routes.test.mjs"
-      ]
-    },
-    {
       "id": "bot-supervision-freshness",
       "title": "Bot 监督状态新鲜度与回复关联",
       "tests": [
         "packages/core/test/bot-linked-watchers.test.js",
         "packages/core/test/bot-supervision-freshness.test.js",
         "packages/core/test/bot-supervision-runtime.test.js"
-      ]
-    },
-    {
-      "id": "bot-task-terminal-wait",
-      "title": "已结束的委派能唤醒接收回执的 Bot",
-      "tests": [
-        "packages/core/test/durable-wait-default.test.js"
-      ]
-    },
-    {
-      "id": "bot-turn-ownership",
-      "title": "Bot 当轮任务和目标审查归属",
-      "tests": [
-        "packages/core/test/bot-goal-only-when-needed.test.js",
-        "packages/core/test/context-stack.test.js",
-        "scripts/test/bot-turn-ownership.test.mjs"
       ]
     },
     {
@@ -2601,13 +2972,6 @@
       ]
     },
     {
-      "id": "daydream-unlimited-resume",
-      "title": "每日复盘移除额度并续跑",
-      "tests": [
-        "packages/core/test/bot-daydream-local.test.js"
-      ]
-    },
-    {
       "id": "delete-page",
       "title": "Delete library pages and revoke public shares",
       "tests": [
@@ -2761,13 +3125,6 @@
       ]
     },
     {
-      "id": "functional-group-disclosure",
-      "title": "Bot 侧栏功能分组折叠与展开",
-      "tests": [
-        "e2e/bot-functional-groups.spec.ts"
-      ]
-    },
-    {
       "id": "gateway-im-security",
       "title": "IM 网关入站安全（验签、去重、白名单、Bot 路由）",
       "tests": [
@@ -2809,14 +3166,6 @@
       "title": "全局默认模型行左右对齐",
       "tests": [
         "e2e/global-default-model.spec.ts"
-      ]
-    },
-    {
-      "id": "goal-checkpoint-no-goal-once",
-      "title": "未分配目标时进度保存只报一次",
-      "tests": [
-        "packages/agent-loop/src/turn/kernel.test.ts",
-        "packages/core/test/goal-checkpoint-no-goal-once.test.js"
       ]
     },
     {
@@ -2887,13 +3236,6 @@
       ]
     },
     {
-      "id": "group-chat-stable-layout",
-      "title": "群聊顶部状态更新和输入区布局",
-      "tests": [
-        "e2e/group-chat-stable-layout.spec.ts"
-      ]
-    },
-    {
       "id": "group-command-same-as-dm",
       "title": "群里的命令跟该 Bot 单聊同一套放行",
       "tests": [
@@ -2905,13 +3247,6 @@
       "title": "群聊行展示成员头像",
       "tests": [
         "apps/web-console/lib/group-members.test.ts"
-      ]
-    },
-    {
-      "id": "group-member-partial-roster",
-      "title": "群里有旧成员时仍可添加当前可选的 Bot",
-      "tests": [
-        "apps/web-console/lib/bot-group.test.ts"
       ]
     },
     {
@@ -2935,13 +3270,6 @@
       "title": "群聊回复模式与运行限制说明",
       "tests": [
         "e2e/group-mode-explanations.spec.ts"
-      ]
-    },
-    {
-      "id": "group-mode-instant-selection",
-      "title": "群聊回复方式可以连续切换",
-      "tests": [
-        "e2e/group-mode-instant-selection.spec.ts"
       ]
     },
     {
@@ -3050,19 +3378,6 @@
       ]
     },
     {
-      "id": "lab-startup-request-load",
-      "title": "控制台启动时的请求负担",
-      "tests": [
-        "apps/daemon/test/session-detail-logs.test.ts",
-        "apps/web-console/lib/api.test.ts",
-        "apps/web-console/lib/bot-work-state.test.ts",
-        "apps/web-console/lib/lab-tick.test.ts",
-        "apps/web-console/lib/overview-plan.test.ts",
-        "apps/web-console/lib/poll-timer.test.ts",
-        "apps/web-console/lib/session-activity.test.ts"
-      ]
-    },
-    {
       "id": "lab-startup-timing",
       "title": "Lab 会话显示启动耗时",
       "tests": [
@@ -3083,21 +3398,6 @@
         "e2e/lcu-computer-use.spec.ts",
         "packages/agent-loop/src/runtime/tool-loop.test.ts",
         "packages/core/test/lcu-computer-use.test.js"
-      ]
-    },
-    {
-      "id": "lean-default-skills",
-      "title": "精简默认技能并保留按需发现",
-      "tests": [
-        "packages/core/test/lean-default-skills.test.js"
-      ]
-    },
-    {
-      "id": "literal-tool-identifiers",
-      "title": "保留完整查询标识符并以成功读取作为保存依据",
-      "tests": [
-        "packages/core/test/prompt-variant-settings.test.js",
-        "scripts/test/session-failure-audit.test.mjs"
       ]
     },
     {
@@ -3174,15 +3474,6 @@
       "tests": [
         "e2e/first-batch-reliability.spec.ts",
         "packages/core/test/memory-deletion-suppression.test.js"
-      ]
-    },
-    {
-      "id": "memory-read-source-unavailable",
-      "title": "读不到的记忆来源一轮只说明一次",
-      "tests": [
-        "packages/agent-loop/src/runtime/tool-loop.test.ts",
-        "packages/core/test/memory-read-source-unavailable.test.js",
-        "packages/core/test/source-unavailable-turn-stop.test.js"
       ]
     },
     {
@@ -3311,18 +3602,6 @@
       "tests": [
         "packages/core/test/deferred-tool-load.test.js",
         "packages/core/test/necessary-tool-injection.test.js"
-      ]
-    },
-    {
-      "id": "night-runtime-reliability",
-      "title": "夜间运行可靠性修复",
-      "tests": [
-        "apps/web-console/lib/live-stream-once.test.ts",
-        "apps/web-console/lib/stream-segments.test.ts",
-        "e2e/chat-basics.spec.ts",
-        "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
-        "packages/core/test/skill-manifest-gate.test.js",
-        "scripts/workflows/material-source-isolation.test.mjs"
       ]
     },
     {
@@ -3678,13 +3957,6 @@
       ]
     },
     {
-      "id": "reply-hover-ended-at",
-      "title": "悬停 Bot 回复时显示结束时间",
-      "tests": [
-        "apps/web-console/components/ReplyQuote.test.ts"
-      ]
-    },
-    {
       "id": "request-metric-follows-turn",
       "title": "已发送请求指标随所选轮变化",
       "tests": [
@@ -3698,15 +3970,6 @@
       "tests": [
         "apps/web-console/lib/risk-advisory.test.ts",
         "e2e/risk-advisory.spec.ts"
-      ]
-    },
-    {
-      "id": "room-budgets-default-off",
-      "title": "群预算默认关闭，预算停下时写完的回复照常出现",
-      "tests": [
-        "apps/web-console/components/play-group/room-console.test.ts",
-        "apps/web-console/lib/room-turn-notice.test.ts",
-        "packages/core/test/bot-room-budget-default-off.test.js"
       ]
     },
     {
@@ -3874,15 +4137,6 @@
       ]
     },
     {
-      "id": "session-favorite",
-      "title": "当前会话一键收藏",
-      "tests": [
-        "apps/daemon/test/session-favorite.test.ts",
-        "apps/web-console/components/SessionFavorite.test.ts",
-        "apps/web-console/lib/session-favorite.test.ts"
-      ]
-    },
-    {
       "id": "session-lifecycle-state-consistency",
       "title": "生命周期验证发现的结束原因与部分审批状态一致性修复",
       "tests": [
@@ -3914,13 +4168,6 @@
         "packages/core/test/superbot-factory-setup.test.js",
         "packages/core/test/writer-claim.test.js",
         "scripts/test/session-multiprocess-state-consistency.test.mjs"
-      ]
-    },
-    {
-      "id": "session-recap-model-routing",
-      "title": "会话回顾使用会话配置的模型",
-      "tests": [
-        "apps/daemon/test/session-recap-yield.test.ts"
       ]
     },
     {
@@ -4041,23 +4288,6 @@
       ]
     },
     {
-      "id": "skill-load-recovery",
-      "title": "自建技能与搜索结果可加载",
-      "tests": [
-        "packages/core/test/skill-load-recovery.test.js"
-      ]
-    },
-    {
-      "id": "skill-load-visible",
-      "title": "对话流直接显示加载的技能名称",
-      "tests": [
-        "apps/web-console/components/correction-capture.test.ts",
-        "apps/web-console/lib/session-brief.test.ts",
-        "apps/web-console/lib/skill-load-label.test.ts",
-        "e2e/skill-load-visible.spec.ts"
-      ]
-    },
-    {
       "id": "skill-manifest-boundary",
       "title": "技能能力边界",
       "tests": [
@@ -4121,20 +4351,6 @@
       "title": "启动时校验压缩策略、稳定前缀与重复守卫",
       "tests": [
         "packages/core/test/startup-invariants.test.js"
-      ]
-    },
-    {
-      "id": "steer-completion-coverage",
-      "title": "Bot 完成检查覆盖本次全部插话",
-      "tests": [
-        "packages/core/test/bot-completion-reliability.test.js"
-      ]
-    },
-    {
-      "id": "steer-model-flight",
-      "title": "模型生成期间插话与旧工具启动前转向",
-      "tests": [
-        "packages/core/test/steer-tool-continuity.test.js"
       ]
     },
     {
@@ -4251,15 +4467,6 @@
         "packages/agent-loop/src/recovery/session-loop-guard.test.ts",
         "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
         "packages/core/test/session-loop-guard.test.js"
-      ]
-    },
-    {
-      "id": "tool-search-experiment",
-      "title": "可切换的增强工具检索实验",
-      "tests": [
-        "e2e/tool-exposure.spec.ts",
-        "packages/core/test/tool-search-experiment.test.js",
-        "scripts/test/settings-route-contracts.test.mjs"
       ]
     },
     {
