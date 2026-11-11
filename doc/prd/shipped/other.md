@@ -134,6 +134,11 @@ No new WorkItem table/system. No RAW_AGENT_* flags.
 
 当前项目的cli模式，是否完整？分多个agent去检查下入口、功能、链路、以及新加入的bot模式是否支持在cli模式里使用？如果要能使用，要做什么？分多个agent去快速排查和补齐
 
+## collaboration-quality-gates
+多 Agent 交付必须通过有证据的质量门禁
+
+那就按你建议的顺序，先把 Swarm 和 Orchestrator 的质量门禁补齐，再用真实多 Agent 任务验证完整交付闭环，做完审查、提交并合并。然后帮我建一个excalidraw的架构图的稿子，帮我把项目完整的架构和模块链路都画好
+
 ## command-hardline
 危险命令硬拦截与密钥脱敏
 

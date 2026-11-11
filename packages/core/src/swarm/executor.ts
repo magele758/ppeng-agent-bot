@@ -1,3 +1,4 @@
+import { failedQuality, qualityPassed, type QualityReport } from '../quality/gate.js';
 import { nowIso } from '../id.js';
 import type { SessionRecord } from '../types.js';
 import { SwarmStore, createSwarmId } from './store.js';
@@ -18,6 +19,7 @@ const ACTIVE_RUN = ['pending', 'planning', 'running', 'reviewing'] as const;
 
 export interface SwarmExecutorDeps {
   store: SwarmStore;
+  reviewTask?: (run: SwarmRun, task: SwarmTask, session: SessionRecord) => Promise<QualityReport>;
   listSessions: () => SessionRecord[];
   getSession: (sessionId: string) => SessionRecord | undefined;
   createTeammateSession: (input: {
@@ -61,7 +63,15 @@ export class SwarmExecutor {
       });
   }
 
+  private ticking = false;
+
   async tick(nowMs: number = Date.now()): Promise<void> {
+    if (this.ticking) return;
+    this.ticking = true;
+    try { await this.tickOnce(nowMs); } finally { this.ticking = false; }
+  }
+
+  private async tickOnce(nowMs: number): Promise<void> {
     for (const run of this.deps.store.getTimedOutRuns(nowMs)) {
       this.deps.store.updateRunStatus(run.id, 'failed');
     }
@@ -137,17 +147,15 @@ export class SwarmExecutor {
     const sessions = this.deps.listSessions().filter(
       (s) => (s.metadata as { swarmRunId?: string })?.swarmRunId === run.id
     );
-    // Idle teammates still occupy a slot until their task finishes. Dropping them lets the next tick over-dispatch.
-    // Idle teammates still occupy a slot until their task finishes. Dropping them lets the next tick over-dispatch.
-    let activeCount = sessions.filter(
-      (s) => s.status === 'running' || s.status === 'idle' || s.status === 'waiting_approval'
-    ).length;
 
     for (const task of tasks) {
+      if (!this.isDispatchable(run.id)) return;
       if (task.status === 'in_progress') {
-        this.advanceInProgressTask(run, task, sessions);
+        await this.advanceInProgressTask(run, task, sessions);
       }
     }
+
+    let activeCount = this.deps.store.listTasks(run.id).filter(task => task.status === 'in_progress' || task.status === 'claimed').length;
 
     for (const task of tasks) {
       if (!this.isDispatchable(run.id)) return;
@@ -198,6 +206,7 @@ export class SwarmExecutor {
     const prompt = [
       `Swarm goal: ${run.goal}`,
       `Task: ${task.title}`,
+      'The scheduler collects your final response automatically. No mailbox handoff is required. Finish with the artifact and test summary; do not search for a recipient.',
       task.description ? `Description: ${task.description}` : '',
       task.acceptanceCriteria.length
         ? `Acceptance:\n${task.acceptanceCriteria.map((c) => `- ${c}`).join('\n')}`
@@ -234,7 +243,7 @@ export class SwarmExecutor {
     this.launchTeammate(session.id, run.id);
   }
 
-  private advanceInProgressTask(run: SwarmRun, task: SwarmTask, sessions: SessionRecord[]): void {
+  private async advanceInProgressTask(run: SwarmRun, task: SwarmTask, sessions: SessionRecord[]): Promise<void> {
     const sid = this.sessionIdFromTask(task);
     if (!sid) return;
     const session = sessions.find((s) => s.id === sid) ?? this.deps.getSession(sid);
@@ -259,25 +268,20 @@ export class SwarmExecutor {
     }
 
     if (session.status === 'completed' || this.deps.sessionTeammateFinished(sid)) {
-      // qualityGate is a list of criterion labels; non-empty gate requires completed status
-      const gate = run.qualityGate ?? [];
-      const requiresCompleted = gate.length > 0;
-      const passed = requiresCompleted ? session.status === 'completed' : true;
-      const score = session.status === 'completed' ? 0.85 : 0.7;
-      this.deps.store.updateTask(task.id, { status: passed ? 'done' : 'failed' });
+      let report: QualityReport;
+      try { report = await this.deps.reviewTask?.(run, task, session) ?? failedQuality('Independent quality evaluator missing'); }
+      catch (error) { report = failedQuality(String(error)); }
+      // A cancellation during review must never be overwritten by the verdict.
+      if (!this.isDispatchable(run.id)) return;
+      const expired = Date.now() > Date.parse(run.createdAt) + run.budget.maxDurationMs;
+      if (expired) report = failedQuality('Quality evaluation exceeded the run deadline');
+      const passed = qualityPassed(report);
       this.deps.store.addReview({
-        id: createSwarmId('srev'),
-        swarmRunId: run.id,
-        taskId: task.id,
-        reviewerAgentId: 'evaluator',
-        role: 'evaluator',
-        scores: { correctness: score },
-        passed,
-        feedback: passed
-          ? `Teammate session ${sid} finished (score=${score}${gate.length ? `, gates=${gate.join(',')}` : ''}).`
-          : `Teammate session ${sid} did not meet qualityGate (${gate.join(',') || 'default'}).`,
-        createdAt: nowIso()
+        id: createSwarmId('srev'), swarmRunId: run.id, taskId: task.id,
+        reviewerAgentId: report.sessionId ?? 'quality-gate', role: 'evaluator',
+        scores: {}, passed, feedback: JSON.stringify(report), createdAt: nowIso()
       });
+      this.deps.store.updateTask(task.id, { status: passed ? 'done' : 'failed' });
     }
   }
 }

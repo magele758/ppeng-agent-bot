@@ -117,33 +117,7 @@ export async function runOrchestrationResearch(
   return `research:${task.id}`;
 }
 
-export async function runOrchestrationSubagentStage(
-  host: SpawnHost,
-  run: OrchestrationRun,
-  stage: 'review' | 'test'
-): Promise<string> {
-  const agentId = stage === 'test' ? 'evaluator' : 'reviewer';
-  const spec =
-    builtinAgents.find((a) => a.id === agentId) ??
-    builtinAgents.find((a) => a.id === 'general') ??
-    builtinAgents[0]!;
-  ensureAgent(host.store, spec);
-  const subagent = host.store.createSession({
-    title: `Orchestration ${stage}: ${run.title.slice(0, 60)}`,
-    mode: 'subagent',
-    agentId,
-    background: false,
-    metadata: { orchestrationRunId: run.id, orchestrationStage: stage }
-  });
-  const prompt =
-    stage === 'review'
-      ? `Review this orchestration item.\nTitle: ${run.title}\nSource: ${run.sourceRef}\nTags: ${run.capabilityTags.join(', ')}\nGive a brief pass/fail review.`
-      : `Run a lightweight harness check for:\nTitle: ${run.title}\nSource: ${run.sourceRef}\nReport pass/fail in one short paragraph.`;
-  host.store.appendMessage(subagent.id, 'user', [textPart(prompt)]);
-  await host.runSession(subagent.id);
-  const summary = (getLatestAssistantText(host.store, subagent.id) ?? 'no-output').slice(0, 200);
-  return `${stage}:${subagent.id}:${summary}`;
-}
+export { checkOrchestrationStage as runOrchestrationSubagentStage } from './quality-gates.js';
 
 export interface SubagentOutcome {
   ok: boolean;

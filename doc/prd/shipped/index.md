@@ -292,6 +292,12 @@
 - `cli-bot` 命令行使用机器人
 - `cli-session-permission` 命令行调整会话权限
 
+## collaboration（1）
+
+需求正文见 [other](other.md)。
+
+- `collaboration-quality-gates` 多 Agent 交付必须通过有证据的质量门禁
+
 ## command（1）
 
 需求正文见 [other](other.md)。

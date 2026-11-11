@@ -1331,6 +1331,13 @@
       "file": "acceptance/cli-session-permission.yaml"
     },
     {
+      "id": "collaboration-quality-gates",
+      "title": "多 Agent 交付必须通过有证据的质量门禁",
+      "requirement": "那就按你建议的顺序，先把 Swarm 和 Orchestrator 的质量门禁补齐，再用真实多 Agent 任务验证完整交付闭环，做完审查、提交并合并。然后帮我建一个excalidraw的架构图的稿子，帮我把项目完整的架构和模块链路都画好",
+      "verificationStage": "software",
+      "file": "acceptance/collaboration-quality-gates.yaml"
+    },
+    {
       "id": "command-hardline",
       "title": "危险命令硬拦截与密钥脱敏",
       "requirement": "无论 Agent 处在哪个权限档位（包括 bypass），都不能执行毁灭性的系统命令；\n命令输出里的密钥不能回流给模型。",

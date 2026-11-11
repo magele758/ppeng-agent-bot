@@ -1,3 +1,4 @@
+import { reviewSwarmTask } from './quality-gates.js';
 /**
  * Construct L5 collaborators (self-heal, swarm, orchestration, image ingest).
  */
@@ -83,6 +84,7 @@ export function createRuntimeCollaborators(input: {
   });
   const swarmExecutor = new SwarmExecutor({
     store: input.store.swarm(),
+    reviewTask: (run, task, session) => reviewSwarmTask(input.spawnHost(), run, task, session),
     listSessions: () => input.store.listSessions(),
     getSession: (id) => input.store.getSession(id),
     createTeammateSession: (args) => input.createTeammateSession(args),

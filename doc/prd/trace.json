@@ -2757,6 +2757,13 @@
       ]
     },
     {
+      "id": "collaboration-quality-gates",
+      "title": "多 Agent 交付必须通过有证据的质量门禁",
+      "tests": [
+        "packages/core/test/collaboration-quality-gates.test.js"
+      ]
+    },
+    {
       "id": "command-hardline",
       "title": "危险命令硬拦截与密钥脱敏",
       "tests": [
