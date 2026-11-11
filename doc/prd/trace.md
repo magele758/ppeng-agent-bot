@@ -1838,6 +1838,7 @@ Auto 对话连续执行
 后台任务回执保留系统身份
 
 - `apps/web-console/lib/system-message-kind.test.ts`
+- `e2e/system-message-ui.spec.ts`
 - `packages/core/test/bot-autonomous-lifecycle.test.js`
 
 ### background-job-restart
