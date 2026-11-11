@@ -19,11 +19,20 @@ async function call(rt, routes, method, pattern, body = {}, params = {}) {
 
 test('HTTP global default hot switches outgoing requests and rejects stale selections atomically [AC:global-default-model-clarity#AC-2] [AC:global-default-model-clarity#AC-3] [AC:global-default-model-clarity#AC-6]', async () => {
   const calls = [];
+  const streamedModels = [];
   const server = createServer(async (request, response) => {
     let raw = '';
     for await (const chunk of request) raw += chunk;
     const body = JSON.parse(raw);
     calls.push(body.model);
+    if (body.stream === true) {
+      streamedModels.push(body.model);
+      response.setHeader('content-type', 'text/event-stream');
+      response.write('data: ' + JSON.stringify({ id: 'test-response', choices: [{ delta: { role: 'assistant', content: 'Ready.' }, finish_reason: null }] }) + '\n\n');
+      response.write('data: ' + JSON.stringify({ id: 'test-response', choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 } }) + '\n\n');
+      response.end('data: [DONE]\n\n');
+      return;
+    }
     response.setHeader('content-type', 'application/json');
     response.end(JSON.stringify({ id: 'test-response', choices: [{ message: { role: 'assistant', content: 'Ready.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 3, total_tokens: 13 } }));
   });
@@ -39,9 +48,12 @@ test('HTTP global default hot switches outgoing requests and rejects stale selec
     const run = async (id, expected) => {
       rt.store.appendMessage(id, 'user', [{ type: 'text', text: 'Reply briefly.' }]);
       const before = calls.length;
+      const streamedBefore = streamedModels.length;
       await rt.runSession(id);
       assert.ok(calls.length > before, 'request reached the local HTTP upstream');
       assert.equal(calls.at(-1), expected);
+      assert.ok(streamedModels.length > streamedBefore, 'unobserved session still requests streaming');
+      assert.equal(streamedModels.at(-1), expected);
     };
     await run(sid, 'first');
     for (const invalid of ['disabled', 'deleted']) {
