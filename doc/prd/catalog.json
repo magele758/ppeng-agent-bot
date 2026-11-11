@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 438,
+    "implemented": 439,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2995,6 +2995,13 @@
       "requirement": "For approvals raised by a bot routine, cron, or other unattended wake (not a human sitting in the Lab chat): if nobody answers within 10 minutes, expire the approval as DENY, do not run the tool. Human-present chat approvals keep current behavior. Record the expire reason on the approval. No new env vars; 10 minutes can be a named constant. Surface the state in existing approval inbox if cheap, with i18n zh+en.",
       "verificationStage": "software",
       "file": "acceptance/unattended-approval-expiry.yaml"
+    },
+    {
+      "id": "unattended-stream-observation",
+      "title": "后台运行保持流式观察与复读保护",
+      "requirement": "再查一下上线后的真实运行日志，看看死循环、定时任务不回复、流式输出重复又消失这几个问题有没有复发，有问题继续排查修复。",
+      "verificationStage": "software",
+      "file": "acceptance/unattended-stream-observation.yaml"
     },
     {
       "id": "unified-bot-goal-lifecycle",

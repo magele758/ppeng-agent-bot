@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 438 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 439 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -1085,11 +1085,12 @@
 
 - `turn-stats-end-time` 对话轮次统计显示结束时间
 
-## unattended（1）
+## unattended（2）
 
 需求正文见 [other](other.md)。
 
 - `unattended-approval-expiry` 无人值守审批超时拒绝
+- `unattended-stream-observation` 后台运行保持流式观察与复读保护
 
 ## unified（1）
 

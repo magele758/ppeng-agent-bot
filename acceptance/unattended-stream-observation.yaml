@@ -1,0 +1,19 @@
+id: unattended-stream-observation
+title: 后台运行保持流式观察与复读保护
+status: implemented
+requirement: |
+  再查一下上线后的真实运行日志，看看死循环、定时任务不回复、流式输出重复又消失这几个问题有没有复发，有问题继续排查修复。
+notes: 'assumedApproval: standing-order-2026-10-22；真实运行样本中的短句重复已落库；进一步复现后台开始时无观察网页会绕过流式观察与轮内保护。'
+criteria:
+  - id: AC-1
+    given: 后台任务启动时没有网页观看
+    when: 用户在同一次运行中途打开会话
+    then: 能收到后续流式正文及其保存身份，不重复发起模型调用，正文只保存一次
+  - id: AC-2
+    given: 支持流式的模型执行后台任务且没有网页观看
+    when: 生成退化为持续复读
+    then: 仍由轮内复读保护中断，不因无人观看而绕过保护
+  - id: AC-3
+    given: 已明确关闭流式或模型仅支持非流式
+    when: 后台任务开始执行
+    then: 保留原有非流式执行方式并正确保存答案

@@ -1091,6 +1091,11 @@ Super Bot 独立配好多机软件工厂
 
 For approvals raised by a bot routine, cron, or other unattended wake (not a human sitting in the Lab chat): if nobody answers within 10 minutes, expire the approval as DENY, do not run the tool. Human-present chat approvals keep current behavior. Record the expire reason on the approval. No new env vars; 10 minutes can be a named constant. Surface the state in existing approval inbox if cheap, with i18n zh+en.
 
+## unattended-stream-observation
+后台运行保持流式观察与复读保护
+
+再查一下上线后的真实运行日志，看看死循环、定时任务不回复、流式输出重复又消失这几个问题有没有复发，有问题继续排查修复。
+
 ## unified-bot-goal-lifecycle
 统一 Bot 目标生命周期与归档展示
 
