@@ -3555,6 +3555,15 @@ Secure Form fill-from-Vault
 
 - `packages/core/test/skill-load-recovery.test.js`
 
+### skill-load-visible
+
+对话流直接显示加载的技能名称
+
+- `apps/web-console/components/correction-capture.test.ts`
+- `apps/web-console/lib/session-brief.test.ts`
+- `apps/web-console/lib/skill-load-label.test.ts`
+- `e2e/skill-load-visible.spec.ts`
+
 ### skill-manifest-boundary
 
 技能能力边界

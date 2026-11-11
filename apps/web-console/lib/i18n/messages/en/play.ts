@@ -763,6 +763,7 @@ export const play = {
   },
 
   turns: {
+    loadSkillNamed: 'Load skill: {name}',
     dispatchSubagent: '🤖 Dispatch SubAgent',
     createTeammate: '👥 Create teammate',
     role: 'Role: {role}',

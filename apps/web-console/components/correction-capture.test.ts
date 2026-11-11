@@ -309,3 +309,17 @@ test('省略标题的助手消息仍保留操作按钮 [AC:assistant-label-dedup
   assert.equal(html.includes('>助手'), false);
   assert.ok(html.includes('correction-capture__trigger'));
 });
+
+test('skill names show without expanding parameters in normal and brief chat [AC:skill-load-visible#AC-1] [AC:skill-load-visible#AC-2]',()=>{
+ for(const brief of [true,false]){
+  const call={type:'tool_call',toolCallId:'load-1',name:'load_skill',input:{name:'agent-home-diagnostics'}};
+  const html=renderTurn({m:{id:'r',role:'tool',parts:[{type:'tool_result',toolCallId:'load-1',name:'load_skill',ok:false,content:'not found'}]},toolCallsById:new Map([['load-1',call]]),brief});
+  assert.match(html,/加载技能：agent-home-diagnostics/);
+  assert.match(html,/chat-tool-fold--err/);
+  assert.doesNotMatch(html,/<details[^>]*chat-tool-fold[^>]*\sopen(?:[\s>])/);
+  const stream=renderToStaticMarkup(React.createElement(turns().ChatTurnStreaming,{brief,segments:[{kind:'tool',id:'s',toolCallId:'load-2',name:'load_skill',args:'{"name":"Planning"'}]}));
+  assert.match(stream,/加载技能：Planning/);
+ }
+ const english=renderToStaticMarkup(React.createElement(turns('en').ChatTurnStreaming,{brief:true,segments:[{kind:'tool',id:'s',toolCallId:'load',name:'load_skill',args:'{"name":"Planning"}'}]}));
+ assert.match(english,/Load skill: Planning/);
+});

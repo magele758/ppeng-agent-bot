@@ -1,0 +1,22 @@
+id: skill-load-visible
+title: 对话流直接显示加载的技能名称
+status: implemented
+requirement: |
+  load_skill的时候，我想要在对话流里看到他load的是什么skill？
+  另外，有一个问题，如果之前会话加载过某个skill，这个是放到SubAgent里的，还是主bot里的？用完了会卸载吗？现在bot的模式是SubAgent-router模式，还是一个主bot干到死？
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  技能身份属于关键操作信息，精简模式也显示；普通工具过程仍隐藏，技能正文保持折叠。执行路由与加载生命周期本轮只核对说明，不修改策略。
+criteria:
+  - id: AC-1
+    given: 对话里有技能加载调用或对应结果
+    when: 查看实时输出或历史，包含精简模式
+    then: 不展开工具参数就能看到加载的技能名称，技能正文仍默认折叠
+  - id: AC-2
+    given: 技能参数正在流式到达，或加载返回失败
+    when: 技能名已完整到达但参数对象尚未结束，或查看失败结果
+    then: 仍显示已知技能名，失败状态不被标成成功
+  - id: AC-3
+    given: 普通工具调用或名称缺失的技能调用
+    when: 查看精简或完整对话
+    then: 普通工具仍遵循原有折叠规则，缺失或损坏的技能名安全回退，不影响对话渲染
