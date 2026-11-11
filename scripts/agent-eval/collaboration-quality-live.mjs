@@ -44,7 +44,7 @@ rt.store.createSession = (...args) => {
 };
 rt.store.setDaemonControl('sandbox_settings', { mode: 'direct' });
 rt.store.setDaemonControl('loop_settings', { kernelVariant: 'agent-loop', repeatGuard: 'weak' });
-const title = 'Implement totals.mjs exporting summarize(rows): group {account,cents} by account, sort accounts ascending, sum integer cents including negatives; empty input returns []; reject non-safe-integer cents and unsafe summed totals. Read acceptance.test.mjs, implement only totals.mjs, and run node --test acceptance.test.mjs. Do not edit the acceptance test.';
+const title = 'Implement totals.mjs exporting summarize(rows): group {account,cents} by account, sort accounts ascending, sum integer cents including negatives; empty input returns []; reject non-safe-integer cents and unsafe summed totals. Read acceptance.test.mjs, implement only totals.mjs, and run node --test acceptance.test.mjs. Do not edit the acceptance test. For this reproducible acceptance trial, independent test stages must execute work_evidence with verify_command exactly "node --test acceptance.test.mjs". Do not combine it with ad-hoc probes, Git commands or shell assertions. The host separately verifies fixture integrity and Git baseline; exploratory test proposals may be reported without executing them.';
 const store = rt.store.orchestrator();
 const run = store.createRun({ title, sourceType: 'live-quality-trial', sourceRef: 'acceptance.test.mjs' });
 for (const stage of ['implement', 'review', 'test']) store.createStep({ runId: run.id, stage, executor: stage, status: 'pending' });
@@ -66,12 +66,15 @@ try {
   }
   assert.equal(store.getRun(run.id).status, 'completed', 'Delivery must pass both Swarm and Orchestrator gates');
   assert.equal(hash(readFileSync(dir + '/acceptance.test.mjs', 'utf8')), hash(testSource), 'Acceptance fixture must remain unchanged');
+  const fixtureDiff = spawnSync('git', ['diff', '--exit-code', 'HEAD', '--', 'acceptance.test.mjs'], { cwd: dir, env: sanitizeSpawnEnv(process.env), encoding: 'utf8', timeout: 30000 });
+  assert.equal(fixtureDiff.status, 0, 'Git acceptance baseline must remain unchanged');
   const actual = spawnSync(process.execPath, ['--test', 'acceptance.test.mjs'], { cwd: dir, env: sanitizeSpawnEnv(process.env), encoding: 'utf8', timeout: 30000, maxBuffer: 2_000_000 });
   writeFileSync(dir + '/independent-tests.log', actual.stdout + actual.stderr);
   assert.equal(actual.status, 0, 'Operator independently executes the delivered artifact');
   evidence.outcome = 'pass';
   evidence.testFixtureSha256 = hash(testSource);
   evidence.operatorTestExitCode = actual.status;
+  evidence.operatorFixtureDiffExitCode = fixtureDiff.status;
   console.log('PASS: live implementation, independent review, actual test execution, persisted quality gates, independent operator verification');
 } catch (error) {
   evidence.outcome = 'fail'; evidence.error = String(error); process.exitCode = 1;
