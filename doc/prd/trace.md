@@ -1211,6 +1211,7 @@ Bot 侧栏功能分组折叠与展开
 
 读不到的记忆来源一轮只说明一次
 
+- `packages/agent-loop/src/runtime/tool-loop.test.ts`
 - `packages/core/test/memory-read-source-unavailable.test.js`
 - `packages/core/test/source-unavailable-turn-stop.test.js`
 
@@ -3932,6 +3933,12 @@ Slack Events 入站按线程唤醒例行任务
 - `packages/agent-loop/src/recovery/session-loop-guard.test.ts`
 - `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
 - `packages/core/test/session-loop-guard.test.js`
+
+### unattended-stream-observation
+
+后台运行保持流式观察与复读保护
+
+- `packages/core/test/multi-page-live-session.test.js`
 
 ### unified-bot-goal-lifecycle
 

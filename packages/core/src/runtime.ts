@@ -2080,12 +2080,11 @@ export class RawAgentRuntime {
       const runController = new AbortController();
       this.sessionAbortControllers.set(sessionId, runController);
       const directChunk = options?.onModelStreamChunk;
-      if (directChunk || (this.modelStreamListeners.get(sessionId)?.size ?? 0) > 0) {
-        options = {
-          ...options,
-          onModelStreamChunk: (chunk) => this.deliverModelStreamChunk(sessionId, chunk, directChunk, runController)
-        };
-      }
+      // Background runs must retain stream watchdogs and accept followers that join later.
+      options = {
+        ...options,
+        onModelStreamChunk: (chunk) => this.deliverModelStreamChunk(sessionId, chunk, directChunk, runController)
+      };
       const { signal: callerSignal, ...runOptions } = options ?? {};
       expireDueUnattendedApprovals(this.store);
 

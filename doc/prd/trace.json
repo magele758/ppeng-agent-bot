@@ -1369,6 +1369,7 @@
           "id": "memory-read-source-unavailable",
           "title": "读不到的记忆来源一轮只说明一次",
           "tests": [
+            "packages/agent-loop/src/runtime/tool-loop.test.ts",
             "packages/core/test/memory-read-source-unavailable.test.js",
             "packages/core/test/source-unavailable-turn-stop.test.js"
           ]
@@ -4466,6 +4467,13 @@
         "packages/agent-loop/src/recovery/session-loop-guard.test.ts",
         "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
         "packages/core/test/session-loop-guard.test.js"
+      ]
+    },
+    {
+      "id": "unattended-stream-observation",
+      "title": "后台运行保持流式观察与复读保护",
+      "tests": [
+        "packages/core/test/multi-page-live-session.test.js"
       ]
     },
     {
