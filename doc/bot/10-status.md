@@ -25,6 +25,7 @@
 | `bot-room-speaker-pick` | 00、07。替代旧版未点名依赖群主及小群必须回复的描述 |
 | `superbot-factory-setup` | 00、08 |
 | `room-task-collaboration` | 00、07。临时负责人协作切片，与群子任务专项共同验收 |
+| `room-debate-mode` | 07。群辩论回复方式：多轮交替发言与裁判裁决 |
 | `unified-bot-goal-lifecycle` | 05。统一目标核验与终态历史 |
 | `bots` | 01、02、06、08、09 |
 | `bot-autonomous-execution-coverage` | 01、05 |

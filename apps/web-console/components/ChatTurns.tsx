@@ -20,6 +20,7 @@ import {
 } from '@/lib/chat-utils';
 import { collapseRepeatedLines } from '@/lib/collapse-repeated-lines';
 import { stripLeakedMonologue } from '@/lib/leaked-monologue';
+import { toolDisplayName } from '@/lib/skill-load-label';
 import { briefStreamSegments, showProcessNote, visibleBriefParts } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { parseCronUserPrompt } from '@/lib/cron';
@@ -155,6 +156,11 @@ function ToolIoBlocks({ input, output }: { input?: string; output?: string }) {
   );
 }
 
+function ToolName({name,input}: {name?: string; input?: unknown}) {
+  const {t}=useI18n();
+  return <span className="chat-tool-fold__name">{toolDisplayName(name,input,name=>t('play.turns.loadSkillNamed',{name}))}</span>;
+}
+
 function ToolCallFold({ p }: { p: Extract<MessagePart, { type: 'tool_call' }> }) {
   const { t } = useI18n();
   const isSubagent = p.name === 'spawn_subagent';
@@ -174,7 +180,7 @@ function ToolCallFold({ p }: { p: Extract<MessagePart, { type: 'tool_call' }> })
         ) : (
           <span className="chat-tool-fold__pill chat-tool-fold__pill--call">{t('play.call')}</span>
         )}
-        <span className="chat-tool-fold__name">{p.name ?? 'unknown'}</span>
+        <ToolName name={p.name} input={p.input} />
         {preview ? <span className="chat-tool-fold__preview">{preview}</span> : null}
         {subagentRole ? (
           <span className="chat-tool-fold__pill chat-tool-fold__pill--subagent-role">
@@ -505,6 +511,7 @@ function ToolResultSummaryPillView({
 
 function ToolResultSummary({
   name,
+  input,
   preview,
   confidence,
   isLowConf,
@@ -516,6 +523,7 @@ function ToolResultSummary({
   status
 }: {
   name?: string;
+  input?: unknown;
   preview: string;
   confidence: string | null;
   isLowConf: boolean;
@@ -551,7 +559,7 @@ function ToolResultSummary({
         isTeammate={status.isTeammate}
         ok={status.ok}
       />
-      <span className="chat-tool-fold__name">{name ?? 'unknown'}</span>
+      <ToolName name={name} input={input} />
       {preview ? <span className="chat-tool-fold__preview">{preview}</span> : null}
       {pills.map((pill) => (
         <ToolResultSummaryPillView key={pill.id} pill={pill} t={t} />
@@ -631,6 +639,7 @@ function ToolResultFold
       >
         <ToolResultSummary
           name={p.name}
+          input={call?.input}
           preview={preview}
           confidence={confidence}
           isLowConf={isLowConf}
@@ -1182,7 +1191,7 @@ export function ChatTurnStreaming({
         <details key={seg.id} className="chat-tool-fold chat-tool-fold--call chat-tool-fold--compact">
           <summary className="chat-tool-fold__summary">
             <span className="chat-tool-fold__pill chat-tool-fold__pill--call">{t('play.call')}</span>
-            <span className="chat-tool-fold__name">{seg.name || 'unknown'}</span>
+            <ToolName name={seg.name} input={seg.args} />
             {args && args !== '…' ? <span className="chat-tool-fold__preview">{args.replace(/\s+/g, ' ')}</span> : null}
           </summary>
           <ToolIoBlocks input={args} />

@@ -21,6 +21,12 @@
 bot自己创建的skill是要能加载的，不然生成的skill都没意义了
 而且其他的skill，按道理是要能通过skill-search找回来的啊，这个路径现在是通的吗？
 
+## skill-load-visible
+对话流直接显示加载的技能名称
+
+load_skill的时候，我想要在对话流里看到他load的是什么skill？
+另外，有一个问题，如果之前会话加载过某个skill，这个是放到SubAgent里的，还是主bot里的？用完了会卸载吗？现在bot的模式是SubAgent-router模式，还是一个主bot干到死？
+
 ## skill-manifest-boundary
 技能能力边界
 

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 432,
+    "implemented": 438,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -230,6 +230,13 @@
       "requirement": "然后你结合4090的调教经验，看看系统要新增什么能力，然后通过操作帮我把开发组里的几个bot都给我调教好，跟他们会话的内容，把他们配置好，然后测试下，看看是否能提升质量，结合这个调教过程，帮我优化一下bot的能力和沉淀链路",
       "verificationStage": "software",
       "file": "acceptance/bot-coaching-loop.yaml"
+    },
+    {
+      "id": "bot-coaching-playbook",
+      "title": "项目内置 Bot 调教流程",
+      "requirement": "总结一下经验，生成一个完整的调教文档\n还有这个方法，能内化到我的这个项目里吗？",
+      "verificationStage": "software",
+      "file": "acceptance/bot-coaching-playbook.yaml"
     },
     {
       "id": "bot-completion-reliability",
@@ -1681,6 +1688,13 @@
       "file": "acceptance/global-default-model-row-align.yaml"
     },
     {
+      "id": "goal-checkpoint-no-goal-once",
+      "title": "未分配目标时进度保存只报一次",
+      "requirement": "goal_checkpoint with no goal assigned must return the existing clear error once and must not be retried in the same turn. Do not invent a goal. Do not search logs. Do not weaken security denials.",
+      "verificationStage": "software",
+      "file": "acceptance/goal-checkpoint-no-goal-once.yaml"
+    },
+    {
       "id": "goal-history-toolbar-align",
       "title": "目标历史与标题栏按钮垂直居中",
       "requirement": "聊天标题栏里的「目标历史」没居中对齐。\n选中节点：header.chat-panel-header.chat-panel-header--bot 里的 details.goal-history，data-testid=goal-history，组件 GoalHistory，在 PlayPanel 的 play-toolbar。visible_text=目标历史。bounds 高 32px。附图里「目标历史」和右边那个方框图标不在同一垂直中线，文字/三角看起来偏了。\n只做对齐：\n- 「目标历史」这一项（summary 的三角和文字）在工具条里与相邻按钮垂直居中，左右不要单独上移或下移。\n- 展开三角和「目标历史」四个字彼此垂直居中。\n- 不要改目标历史的数据和展开行为，不要改文案。",
@@ -1926,6 +1940,13 @@
       "file": "acceptance/lean-default-skills.yaml"
     },
     {
+      "id": "literal-tool-identifiers",
+      "title": "保留完整查询标识符并以成功读取作为保存依据",
+      "requirement": "排查修复下这个问题",
+      "verificationStage": "software",
+      "file": "acceptance/literal-tool-identifiers.yaml"
+    },
+    {
       "id": "live-bot-quality",
       "title": "真实 Bot 任务评估与版本准入",
       "requirement": "那就直接落地这套真实模型任务评估和新旧版本对照门禁，先把这次 P0 问题和常见任务做成评估集，用当前配置的 Grok 模型跑一轮基线，做好测试和 review 后提交合并。",
@@ -2113,6 +2134,13 @@
       "requirement": "减少无效工具注入，只注入必要的工具",
       "verificationStage": "software",
       "file": "acceptance/necessary-tool-injection.yaml"
+    },
+    {
+      "id": "night-runtime-reliability",
+      "title": "夜间运行可靠性修复",
+      "requirement": "最新一版很多问题：\n1、输出死循环次数增多\n2、经常定时任务不回复\n3、实时对话流输出有重复，又消失\n你好好查一下今天晚上的运行日志，看看还有什么问题，深度挖掘一下，然后解决一下",
+      "verificationStage": "software",
+      "file": "acceptance/night-runtime-reliability.yaml"
     },
     {
       "id": "no-windows-desktop-pack",
@@ -2458,6 +2486,13 @@
       "file": "acceptance/room-budgets-default-off.yaml"
     },
     {
+      "id": "room-debate-mode",
+      "title": "群聊辩论回复方式",
+      "requirement": "用户想让群里的几只 bot 就一个课题自动进行多轮讨论和辩论。设计好了就做。\n用户在群里选「辩论」方式并发出课题后，参与的 bot 自动按顺序多轮交替发言，后发言者能看到前面所有发言，\n最后由裁判给出总结裁决，全程显示在现有群聊界面里，用户可以随时停止。\n可配置项至少包括：辩论轮数、参与者及其发言顺序、每位参与者的立场（如正方 / 反方，允许自定义文字）、\n裁判由谁担任（可以没有裁判）。给出合理默认值，让用户不配置也能直接开辩。\n长发言不能让对手只看到截断版。总发言数有上限，现有的费用和工具调用上限继续生效，用户暂停或停止能立刻中止辩论，\n进程重启后回合不会重复发言或卡死。其他回复方式的行为保持不变。",
+      "verificationStage": "software",
+      "file": "acceptance/room-debate-mode.yaml"
+    },
+    {
       "id": "room-task-collaboration",
       "title": "群聊临时负责人任务协作模式",
       "requirement": "按你说的方向改吧，先把目标的两套状态和展示统一起来，完成或失败的保留历史但别一直挂底部，再把重复调用检测改成看有没有实际进展。Jev我已经恢复了，不用管了。群聊组织模式，可以按你说的再新增一种模式，我对比看看执行效果。\n\n分多个agent去推进",
@@ -2750,6 +2785,13 @@
       "requirement": "bot自己创建的skill是要能加载的，不然生成的skill都没意义了\n而且其他的skill，按道理是要能通过skill-search找回来的啊，这个路径现在是通的吗？",
       "verificationStage": "software",
       "file": "acceptance/skill-load-recovery.yaml"
+    },
+    {
+      "id": "skill-load-visible",
+      "title": "对话流直接显示加载的技能名称",
+      "requirement": "load_skill的时候，我想要在对话流里看到他load的是什么skill？\n另外，有一个问题，如果之前会话加载过某个skill，这个是放到SubAgent里的，还是主bot里的？用完了会卸载吗？现在bot的模式是SubAgent-router模式，还是一个主bot干到死？",
+      "verificationStage": "software",
+      "file": "acceptance/skill-load-visible.yaml"
     },
     {
       "id": "skill-manifest-boundary",
@@ -3220,6 +3262,11 @@
       "name": "agent-loop",
       "description": "Embeddable agent loop core SDK (@ppeng/agent-loop / @mage-ai-lab/agent-loop) providing turn kernel, model adapters, streaming watchdogs, loop guards, session state, and assembly presets (mini, normal, full, max). Use when: (1) Integrating or embedding the agent loop into an application or service, (2) Developing, modifying, or testing packages/agent-loop, (3) Assembling an agent loop using createAssembledLoop or createMiniAssembledLoop, (4) Managing mid-run steering, step-level control, or event folding via AgentLoopHandle, (5) Adding or configuring loop modules, watchdogs, or model adapters.",
       "path": "skills/agent-loop/SKILL.md"
+    },
+    {
+      "name": "bot-coaching",
+      "description": "根据 Agent Home 的真实对话、配置和 trace 调教指定 Bot。用于纠正执行机器、SOP 遵守、交付收口和经验沉淀问题，执行配置前后对照、回读及行为复测；不代替目标 Bot 开发功能。",
+      "path": "skills/bot-coaching/SKILL.md"
     },
     {
       "name": "login",

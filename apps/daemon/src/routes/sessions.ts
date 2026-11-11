@@ -328,6 +328,7 @@ async function streamRun(
   sessionId: string
 ) {
   sseInit(response);
+  sseSend(response, 'ready', { ok: true, durableAssistantIds: true });
   sseSend(response, 'session', { session: runtime.getSession(sessionId) });
   // Refresh, hot reload, and a dropped socket are not a user stop. The run keeps
   // going so a later visit can follow it, and the finished turn stays in history.
@@ -367,7 +368,7 @@ async function followSessionStream(
   const detachView = runtime.subscribeSessionView(sessionId, (view) => {
     sseSend(response, 'session', view);
   });
-  sseSend(response, 'ready', { ok: true });
+  sseSend(response, 'ready', { ok: true, durableAssistantIds: true });
   const clientGone = new AbortController();
   const onClose = () => {
     if (!response.writableEnded) clientGone.abort();

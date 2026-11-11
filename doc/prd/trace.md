@@ -657,6 +657,14 @@ Bot 会话列表里的多 Bot 群聊
 
 - `apps/web-console/lib/bot-group.test.ts`
 
+### room-debate-mode
+
+群聊辩论回复方式
+
+- `apps/web-console/lib/group-debate.test.ts`
+- `e2e/room-debate-mode.spec.ts`
+- `packages/core/test/bot-room-debate.test.js`
+
 ### room-task-collaboration
 
 群聊临时负责人任务协作模式
@@ -1412,6 +1420,12 @@ Bot 行为契约与有证据的经验沉淀
 - `apps/daemon/test/bot-coaching.test.ts`
 - `packages/core/test/bot-coaching.test.js`
 - `packages/core/test/product-admin-tools.test.js`
+
+### bot-coaching-playbook
+
+项目内置 Bot 调教流程
+
+- `packages/core/test/bot-coaching-playbook.test.js`
 
 ### bot-completion-reliability
 
@@ -2466,6 +2480,12 @@ GitHub 事件不能靠换投递号重放
 
 - `e2e/global-default-model.spec.ts`
 
+### goal-checkpoint-no-goal-once
+
+未分配目标时进度保存只报一次
+
+- `packages/core/test/goal-checkpoint-no-goal-once.test.js`
+
 ### goal-history-toolbar-align
 
 目标历史与标题栏按钮垂直居中
@@ -2704,6 +2724,13 @@ Lab 会话显示启动耗时
 
 - `packages/core/test/lean-default-skills.test.js`
 
+### literal-tool-identifiers
+
+保留完整查询标识符并以成功读取作为保存依据
+
+- `packages/core/test/prompt-variant-settings.test.js`
+- `scripts/test/session-failure-audit.test.mjs`
+
 ### live-bot-quality
 
 真实 Bot 任务评估与版本准入
@@ -2889,6 +2916,17 @@ macOS 应用控制（外层宿主）
 
 - `packages/core/test/deferred-tool-load.test.js`
 - `packages/core/test/necessary-tool-injection.test.js`
+
+### night-runtime-reliability
+
+夜间运行可靠性修复
+
+- `apps/web-console/lib/live-stream-once.test.ts`
+- `apps/web-console/lib/stream-segments.test.ts`
+- `e2e/chat-basics.spec.ts`
+- `packages/agent-loop/src/turn/repeat-guard-kernel.test.ts`
+- `packages/core/test/skill-manifest-gate.test.js`
+- `scripts/workflows/material-source-isolation.test.mjs`
 
 ### no-windows-desktop-pack
 
@@ -3523,6 +3561,15 @@ Secure Form fill-from-Vault
 自建技能与搜索结果可加载
 
 - `packages/core/test/skill-load-recovery.test.js`
+
+### skill-load-visible
+
+对话流直接显示加载的技能名称
+
+- `apps/web-console/components/correction-capture.test.ts`
+- `apps/web-console/lib/session-brief.test.ts`
+- `apps/web-console/lib/skill-load-label.test.ts`
+- `e2e/skill-load-visible.spec.ts`
 
 ### skill-manifest-boundary
 

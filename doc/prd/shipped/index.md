@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 432 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 438 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -78,7 +78,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（137）
+## bot（138）
 
 需求正文见 [bot](bot.md)。
 
@@ -95,6 +95,7 @@
 - `bot-child-task-chip-fill` 子任务芯片有底色
 - `bot-child-task-stream-entry` 主对话流里的子任务入口
 - `bot-coaching-loop` Bot 行为契约与有证据的经验沉淀
+- `bot-coaching-playbook` 项目内置 Bot 调教流程
 - `bot-completion-reliability` 完成验证可追溯与任务收尾可靠性
 - `bot-composer-next-hint` Bot 输入框推荐下一句
 - `bot-concurrent-subagents` Bot 并发工作时派生子代理，并允许子代理复用记忆与互助
@@ -482,10 +483,11 @@
 - `global-default-model-clarity` 全局默认模型配置与群聊模型来源可见
 - `global-default-model-row-align` 全局默认模型行左右对齐
 
-## goal（4）
+## goal（5）
 
 需求正文见 [goal](goal.md)。
 
+- `goal-checkpoint-no-goal-once` 未分配目标时进度保存只报一次
 - `goal-history-toolbar-align` 目标历史与标题栏按钮垂直居中
 - `goal-intake-hot-path` 开轮不再等待目标判定和数据库锁
 - `goal-restart-resume` 重启后从安全检查点继续 Goal
@@ -566,6 +568,12 @@
 需求正文见 [other](other.md)。
 
 - `lean-default-skills` 精简默认技能并保留按需发现
+
+## literal（1）
+
+需求正文见 [other](other.md)。
+
+- `literal-tool-identifiers` 保留完整查询标识符并以成功读取作为保存依据
 
 ## live（1）
 
@@ -673,6 +681,12 @@
 需求正文见 [other](other.md)。
 
 - `necessary-tool-injection` 只把当前任务需要的工具定义交给模型
+
+## night（1）
+
+需求正文见 [other](other.md)。
+
+- `night-runtime-reliability` 夜间运行可靠性修复
 
 ## no（1）
 
@@ -853,11 +867,12 @@
 
 - `risk-advisory-ui` 对话里的运行策略提醒
 
-## room（2）
+## room（3）
 
 需求正文见 [other](other.md)。
 
 - `room-budgets-default-off` 群预算默认关闭，预算停下时写完的回复照常出现
+- `room-debate-mode` 群聊辩论回复方式
 - `room-task-collaboration` 群聊临时负责人任务协作模式
 
 ## rotate（1）
@@ -972,7 +987,7 @@
 
 - `single-host-bot-completion` 单机 Bot 工作收尾与默认入口
 
-## skill（9）
+## skill（10）
 
 需求正文见 [skill](skill.md)。
 
@@ -980,6 +995,7 @@
 - `skill-capture-intent-confirmation` 模型判断技能沉淀并在提炼前请求确认
 - `skill-capture-save` 技能沉淀确认后能把正文存下来
 - `skill-load-recovery` 自建技能与搜索结果可加载
+- `skill-load-visible` 对话流直接显示加载的技能名称
 - `skill-manifest-boundary` 技能能力边界
 - `skill-operation-card-dismissal` 技能管理结果可收起关闭且不干扰对话
 - `skill-operation-confirm-bar` 技能操作确认后收成可关闭的小横条

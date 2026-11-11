@@ -415,6 +415,8 @@ export type ModelStreamChunk =
    * attempt streams the turn again from scratch.
    */
   | { type: 'stream_reset'; reason: StreamResetReason }
+  /** Durable assistant identity; emitted only after its model step commits. */
+  | { type: 'assistant_saved'; messageId: string }
   | { type: 'done'; stopReason: 'end' | 'tool_use' };
 
 export type StreamResetReason = 'retry' | 'fallback';

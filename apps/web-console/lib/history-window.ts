@@ -159,7 +159,7 @@ export function mergeHistoryWindow<T extends { id: string; seq?: number }>(
   return { messages: mergeById(previous, incoming), reset: false };
 }
 
-export type StreamTextPiece = { kind: string; raw?: string };
+export type StreamTextPiece = { kind: string; raw?: string; messageId?: string };
 
 /** Assistant prose that was streamed but is not in the saved transcript yet. */
 export function unpersistedAssistantText(
@@ -167,13 +167,7 @@ export function unpersistedAssistantText(
   segments: ReadonlyArray<StreamTextPiece>
 ): string {
   const saved = currentTurnSavedBodies(messages);
-  const pending: string[] = [];
-  for (const segment of segments) {
-    if (segment.kind !== 'text') continue;
-    const remaining = unsavedHeldText(segment.raw ?? '', saved);
-    if (remaining?.trim()) pending.push(remaining.trim());
-  }
-  return pending.join('\n\n');
+  return segments.map(segment => pendingStreamText(segment, messages, saved)).filter(Boolean).join('\n\n');
 }
 
 function unsavedHeldText(raw: string, saved: readonly string[]): string | null {
@@ -182,7 +176,7 @@ function unsavedHeldText(raw: string, saved: readonly string[]): string | null {
   return unsavedStreamText(raw, saved);
 }
 
-type TranscriptRow = { key?: unknown; role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> };
+type TranscriptRow = { id?: string; key?: unknown; role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> };
 
 /** Steering continues the current execution; only an ordinary user request starts a new one. */
 function startsTranscriptTurn(message: TranscriptRow): boolean {
@@ -225,31 +219,12 @@ function unsavedStreamText(raw: string, saved: readonly string[]): string | null
  * Drop live text that the current turn already saved. Older replies are not rewritten,
  * and the caller's segment objects stay intact so later deltas still append.
  */
-export function omitStreamTextSavedOnTurn<T extends { kind: string; raw?: string; html?: string }>(
+export function omitStreamTextSavedOnTurn<T extends { kind: string; raw?: string; html?: string; messageId?: string }>(
   messages: ReadonlyArray<TranscriptRow>,
   segments: readonly T[]
 ): T[] {
   const saved = currentTurnSavedBodies(messages);
-  if (saved.length === 0) return segments.slice();
-  const out: T[] = [];
-  for (const segment of segments) {
-    if (segment.kind !== 'text') {
-      out.push(segment);
-      continue;
-    }
-    const next = unsavedStreamText(segment.raw ?? '', saved);
-    if (next == null) continue;
-    if (next === segment.raw) {
-      out.push(segment);
-      continue;
-    }
-    out.push({
-      ...segment,
-      raw: next,
-      html: next.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    });
-  }
-  return out;
+  return segments.flatMap(segment => unsavedSegment(segment, messages, saved));
 }
 
 /** True when a live text piece is still the same as a reply already saved on this turn. */
@@ -284,4 +259,30 @@ export function settleFinishedTurn<T extends { id: string; seq?: number; role?: 
     messages: merged.messages,
     heldText: unpersistedAssistantText(merged.messages, input.segments)
   };
+}
+
+function streamIdentitySaved(messages: ReadonlyArray<TranscriptRow>, segment: {messageId?: string}): boolean {
+  return Boolean(segment.messageId) && messages.some(message => message.id === segment.messageId);
+}
+
+function pendingStreamText(segment: StreamTextPiece, messages: ReadonlyArray<TranscriptRow>, saved: readonly string[]): string {
+  if (segment.kind !== 'text' || streamIdentitySaved(messages, segment)) return '';
+  const text = segment.messageId !== undefined ? segment.raw : unsavedHeldText(streamTextRaw(segment), saved);
+  return text ? text.trim() : '';
+}
+
+function unsavedSegment<T extends StreamTextPiece & {html?: string}>(segment: T, messages: ReadonlyArray<TranscriptRow>, saved: readonly string[]): T[] {
+  if (segment.messageId !== undefined) return streamIdentitySaved(messages, segment) ? [] : [segment];
+  if (segment.kind !== 'text') return [segment];
+  return remainingTextSegment(segment, unsavedStreamText(segment.raw ?? '', saved));
+}
+
+function remainingTextSegment<T extends StreamTextPiece & {html?: string}>(segment: T, next: string | null): T[] {
+  if (next == null) return [];
+  if (next === segment.raw) return [segment];
+  return [{...segment,raw:next,html:next.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}];
+}
+
+function streamTextRaw(segment: StreamTextPiece): string {
+  return segment.raw ?? '';
 }

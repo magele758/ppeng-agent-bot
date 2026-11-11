@@ -13,6 +13,8 @@
 - **做完先审查再合并（核心指令）：** 功能或修复做完后先 review。没问题就 commit、开 PR、合并，不要等用户再说「合并 PR」。review 有问题先改到通过再提交。不要 force push，不要跳过 hooks。用户明确说先别提交或先别合并时才停。
 - **`@ppeng/agent-loop` SDK 契约与 Skill 同步（核心指令）**：**凡是修改或升级 `packages/agent-loop`（新增/改动 API 导出、模块分层、组装档位 mini/normal/full/max、TurnKernelHost/IO 契约等），必须同步更新 `skills/agent-loop/SKILL.md`**，确保其他 Coding Agent 随时获得最新的 SDK 开发与调用指引；改动后必须在 `packages/agent-loop` 跑通 `pnpm run test`（vitest）和 `pnpm run build`。
 
+- **Bot 调教流程**：用户要求调教、校准或复盘 Bot 行为时，使用 [`skills/bot-coaching/SKILL.md`](skills/bot-coaching/SKILL.md)，完整操作见 [`doc/bot/BOT_COACHING_PLAYBOOK.md`](doc/bot/BOT_COACHING_PLAYBOOK.md)。先记录基线与第一处偏差，再按当前授权调整、回读和同条件复测；把读取、加载、实际执行、完整交付分开验证。稳定职责进入行为契约，经验按候选、已验证、退役保存，临时限制留在对应任务。调教不自动授权接管业务开发或中断原任务。
+
 ## Learned Workspace Facts
 
 - **手册目录**：专题文档见 [`doc/README.md`](doc/README.md)；项目入口为根目录 `README.md` / `README.zh.md`

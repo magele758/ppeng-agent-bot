@@ -54,3 +54,12 @@ test('快照刷新不会把正在流的内容贴到更早的回复上 [AC:stream
   assert.equal(liveAnswerRepeated(merged.messages, [textSegment(answer)]), false);
   assert.equal(merged.messages.filter((message) => message.id === 'live').length, 1);
 });
+
+test('saved identity hides text reasoning and tools while identical next-shot prose remains [AC:night-runtime-reliability#AC-2]',()=>{
+  const messages=[user('ask','inspect'),assistant('saved','same')];
+  const segments=[{...textSegment('same'),messageId:'saved'},
+    {kind:'reasoning',id:'reason',text:'thinking',messageId:'saved'},
+    {kind:'tool',id:'tool',toolCallId:'c1',name:'read_file',args:'{}',messageId:'saved'},
+    {...textSegment('same'),id:'new',messageId:''}];
+  assert.deepEqual(omitStreamTextSavedOnTurn(messages,segments).map(s=>s.id),['new']);
+});

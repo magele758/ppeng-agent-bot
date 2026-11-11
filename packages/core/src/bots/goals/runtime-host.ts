@@ -696,7 +696,7 @@ function checkpointRecord(args:{summary?:unknown;evidence?:unknown;nextStep?:unk
 export function createGoalCheckpointTool(store:SqliteStateStore):ToolContract {
  return {name:'goal_checkpoint',description:'Save progress for the current assigned goal. kind: progress, waiting, blocked, candidate_completed. Waiting requires source and correlationId of an authorized session, bot_task, team_dag, or swarm run. Completion is independently verified.',inputSchema:{type:'object',properties:{kind:{type:'string',enum:['progress','waiting','blocked','candidate_completed']},summary:{type:'string'},evidence:{type:'array',items:{type:'string'}},nextStep:{type:'string'},wait:{type:'object',properties:{source:{type:'string'},correlationId:{type:'string'},description:{type:'string'},deadline:{type:'number'}}}},required:['kind','summary']},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,args){
   const assigned=assignedCheckpointGoal(store,store.getSession(ctx.session.id)??ctx.session);
-  if(!assigned)return {ok:false,content:'No goal is assigned to this execution'};
+  if(!assigned)return {ok:false,content:'No goal is assigned to this execution',metadata:{retry:false}};
   const kind=checkpointKind(String(args.kind));
   if(!kind)return {ok:false,content:'Invalid checkpoint kind'};
   const live=store.getSession(ctx.session.id)!;
