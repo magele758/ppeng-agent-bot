@@ -1103,3 +1103,70 @@ describe('tool_end outcome and permission', () => {
     });
   });
 });
+
+describe('JSON unavailable source ownership', () => {
+  const unavailable = () => tool('memory_read', vi.fn(async (_context, input) => ({
+    ok: false, content: JSON.stringify({ error_code: 'SOURCE_UNAVAILABLE', ref: input.ref })
+  })));
+  const runContext = (id: string, writer?: string, signal?: AbortSignal): RunContext => ({
+    ...ctx, session: { ...ctx.session, id, activeWriterRunId: writer }, abortSignal: signal
+  });
+
+  it('shares one missing-source stop across child signals, while a new turn can read [AC:memory-read-source-unavailable#AC-1]', async () => {
+    const { linkAbortParent } = await import('./abort-lineage.js');
+    const parent = new AbortController().signal;
+    const left = new AbortController().signal;
+    const right = new AbortController().signal;
+    linkAbortParent(left, parent); linkAbortParent(right, parent);
+    const abortTurn = vi.fn();
+    const h = host({ abortTurn });
+    const read = unavailable();
+    const invoke = (context: RunContext, ref = 'missing') => executeSingleTool(h, [read], call('memory_read', { ref }), context, false, context.session.id);
+    const first = await invoke(runContext('json-signals', 'one', left));
+    expect(JSON.parse(first.content)).toEqual({ error_code: 'SOURCE_UNAVAILABLE', ref: 'missing' });
+    expect((await invoke(runContext('json-signals', 'one', right))).content).toBe('Source unavailable. Stopped this turn. Do not call this tool again.');
+    expect(read.execute).toHaveBeenCalledTimes(1);
+    expect(abortTurn).toHaveBeenCalledWith('json-signals', parent);
+    await invoke(runContext('json-signals', 'one', right), 'another-ref');
+    await invoke(runContext('json-signals', 'two', new AbortController().signal));
+    expect(read.execute).toHaveBeenCalledTimes(3);
+  });
+
+  it('isolates fallback memo by session and writer without a signal [AC:memory-read-source-unavailable#AC-1]', async () => {
+    const read = unavailable();
+    const h = host();
+    const invoke = (context: RunContext) => executeSingleTool(h, [read], call('memory_read', { ref: 'missing' }), context, false, context.session.id);
+    const owner = runContext('json-writer', 'one');
+    await invoke(owner); await invoke(owner);
+    expect(read.execute).toHaveBeenCalledTimes(1);
+    await invoke(runContext('json-writer', 'two'));
+    await invoke(runContext('json-other-session', 'two'));
+    await invoke(runContext('json-no-writer'));
+    await invoke(runContext('json-no-writer'));
+    expect(read.execute).toHaveBeenCalledTimes(4);
+  });
+
+  it('reclaims bounded fallback records after many independent sessions', async () => {
+    const read = unavailable();
+    const h = host();
+    const invoke = (id: string) => executeSingleTool(h, [read], call('memory_read', { ref: 'missing' }), runContext(id, 'writer'), false, id);
+    await invoke('json-old-owner');
+    for (let index = 0; index < 210; index++) await invoke('json-cache-owner-' + index);
+    const before = vi.mocked(read.execute).mock.calls.length;
+    await invoke('json-old-owner');
+    expect(read.execute).toHaveBeenCalledTimes(before + 1);
+  });
+
+  it('does not turn access denials or successful zero values into missing-source stops', async () => {
+    for (const result of [{ ok: false, content: '{"error_code":"ACCESS_DENIED"}' }, { ok: true, content: '{"value":0}' }]) {
+      const execute = vi.fn(async () => result);
+      const read = tool('memory_read', execute);
+      const h = host({ abortTurn: vi.fn() });
+      const context = runContext('json-other-result', 'writer', new AbortController().signal);
+      await executeSingleTool(h, [read], call('memory_read', { ref: 'value' }), context, false, context.session.id);
+      await executeSingleTool(h, [read], call('memory_read', { ref: 'value' }), context, false, context.session.id);
+      expect(execute).toHaveBeenCalledTimes(2);
+      expect(h.abortTurn).not.toHaveBeenCalled();
+    }
+  });
+});

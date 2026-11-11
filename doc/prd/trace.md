@@ -2802,6 +2802,7 @@ macOS 应用控制（外层宿主）
 
 读不到的记忆来源一轮只说明一次
 
+- `packages/agent-loop/src/runtime/tool-loop.test.ts`
 - `packages/core/test/memory-read-source-unavailable.test.js`
 - `packages/core/test/source-unavailable-turn-stop.test.js`
 

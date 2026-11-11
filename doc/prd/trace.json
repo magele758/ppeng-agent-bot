@@ -3180,6 +3180,7 @@
       "id": "memory-read-source-unavailable",
       "title": "读不到的记忆来源一轮只说明一次",
       "tests": [
+        "packages/agent-loop/src/runtime/tool-loop.test.ts",
         "packages/core/test/memory-read-source-unavailable.test.js",
         "packages/core/test/source-unavailable-turn-stop.test.js"
       ]
