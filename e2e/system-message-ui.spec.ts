@@ -19,6 +19,27 @@ const samples = [
   'Unmarked extension output\n'+'additional text '.repeat(100)
 ];
 
+test('background receipts are system cards, including legacy user rows [AC:background-job-notice#AC-2]',async({page,botPair},testInfo)=>{
+  const bot=botPair[0],id=bot.canonicalSessionId;
+  const text='Background job bg_legacy completed.\n(no output)';
+  await page.route(new RegExp(`/api/sessions/${id}(?:\\?|$)`),route=>route.fulfill({json:{
+    session:{id,agentId:bot.id,mode:'chat',status:'idle',metadata:{canonicalBotChat:true}},
+    messages:[
+      {id:'legacy',seq:1,role:'user',key:'background-job:bg_legacy',parts:[{type:'text',text}]},
+      {id:'current',seq:2,role:'system',key:'source:event:background-job:bg_current',parts:[{type:'text',text:'[background-job] bg_current completed; finished_at=2026-11-11T02:39:28Z\n(no output)'}]},
+      {id:'human',seq:3,role:'user',parts:[{type:'text',text}]}
+    ],hasMore:false,nextCursor:null
+  }}));
+  await page.goto('/#/bot');
+  await page.locator(`#sessionListMini [data-bot-id="${bot.id}"] .list-item--session`).click();
+  const cards=page.getByTestId('system-notice-card');
+  await expect(cards).toHaveCount(2);
+  for(const card of await cards.all())await expect(card).toContainText('后台任务状态');
+  await expect(page.locator('.chat-turn--user')).toHaveCount(1);
+  await expect(page.locator('.chat-turn--user')).toContainText(text);
+  await page.screenshot({path:testInfo.outputPath('background-receipts.png'),fullPage:true});
+});
+
 test('all system text has a collapsed, readable fallback and survives mobile and English [AC:system-message-ui#AC-1] [AC:system-message-ui#AC-2] [AC:system-message-ui#AC-4]', async ({ page, botPair }) => {
   const bot=botPair[0], id=bot.canonicalSessionId;
   await page.route(new RegExp(`/api/sessions/${id}(?:\\?|$)`), route => route.fulfill({ json: {
