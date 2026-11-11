@@ -2,7 +2,7 @@
 
 这三样都挂在一只 Bot 上，并且分得清是谁的。普通对话仍可以读写共享的用户记忆。
 
-规格：`bots`、`bot-scoped-skill-sharing`、`bot-detail-skill-management`、`bot-skill-panel-layout`、`bot-routine-main-session`、`bot-gateway-delivery`、`bot-product-p2`、`bot-workspace-interaction-polish`。`bot-routine-lifecycle` 已通过单机软件验收，错过补跑、未知结果和租约恢复遵循同一套持久运行记录。
+规格：`bots`、`bot-scoped-skill-sharing`、`bot-detail-skill-management`、`bot-skill-panel-layout`、`skill-load-recovery`、`lean-default-skills`、`memory-read-source-unavailable`、`bot-turn-ownership`、`bot-routine-main-session`、`bot-routine-create-receipt`、`daydream-unlimited-resume`、`bot-gateway-delivery`、`bot-product-p2`、`bot-workspace-interaction-polish`。`bot-routine-lifecycle` 已通过单机软件验收，错过补跑、未知结果和租约恢复遵循同一套持久运行记录。
 
 ## 记忆
 

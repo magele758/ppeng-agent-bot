@@ -2,7 +2,7 @@
 
 一句话可以变成一件还要继续做的事。Bot 把它记成目标，自己选一种已经授权的做法去推进，并留下证据。人不用先选「任务模式」。
 
-规格：`bot-multi-goal-coordination`、`bot-autonomous-execution-coverage`、`bot-concurrent-subagents`、`bot-task-permission-inheritance`、`bot-fork-retrievable-inheritance`、`bot-goal-result-return`、`bot-product-p0`、`bot-product-p1`、`bot-product-p2`。面板什么时候出现见 [03 工作台](03-workspace.md)。
+规格：`bot-multi-goal-coordination`、`bot-autonomous-execution-coverage`、`bot-concurrent-subagents`、`bot-task-permission-inheritance`、`bot-fork-retrievable-inheritance`、`bot-goal-result-return`、`bot-finish-follow-through`、`goal-checkpoint-no-goal-once`、`bot-goal-context-boundary`、`bot-task-terminal-wait`、`bot-delegation-lookup`、`bot-activity-flow`、`bot-flow-read-projection`、`bot-network-and-schedule-list`、`bot-network-motion`、`bot-network-pan`、`bot-product-p0`、`bot-product-p1`、`bot-product-p2`。面板什么时候出现见 [03 工作台](03-workspace.md)。
 
 ## 三层不要混
 

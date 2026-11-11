@@ -54,7 +54,7 @@ function listSkillFiles(dir) {
   while (stack.length) {
     const current = stack.pop();
     for (const entry of readdirSync(current, { withFileTypes: true })) {
-      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      if (entry.name === 'node_modules' || entry.name === 'agent-tech-digest' || entry.name.startsWith('.')) continue;
       const full = join(current, entry.name);
       if (entry.isDirectory()) stack.push(full);
       else if (entry.isFile() && entry.name === 'SKILL.md') found.push(full);

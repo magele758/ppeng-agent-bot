@@ -1,7 +1,7 @@
 ---
 id: current
 title: 现在已有的功能
-updated: 2026-11-04
+updated: 2026-11-11
 ---
 
 ## 现在能做什么

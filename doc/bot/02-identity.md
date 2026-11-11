@@ -2,7 +2,7 @@
 
 一只 Bot 是名册里的一行，加上一条谁也替不了的固定主对话。同名不能再建第二只。
 
-规格：`bots`、`bot-face-first-creation`、`bot-face-readable-shapes`、`bot-robot-faces`、`bot-create-named-tools`、`bot-chat-header`、`bot-session-row`、`unowned-legacy-bot`、`bot-mock-interview`、`default-super-bot`。
+规格：`bots`、`bot-face-first-creation`、`bot-face-readable-shapes`、`bot-robot-faces`、`bot-create-named-tools`、`bot-chat-header`、`bot-session-row`、`unowned-legacy-bot`、`bot-mock-interview`、`default-super-bot`、`bot-coaching-loop`、`bot-coaching-playbook`。
 
 ## 创建
 
