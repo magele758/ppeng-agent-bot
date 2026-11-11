@@ -280,11 +280,73 @@ test('legacy manifests migrate conservatively within their request and expire on
   assert.deepEqual(store.getSession(session.id).metadata.activeSkillManifests,[]);
 });
 
-test('an inherited ceiling without load history is never silently discarded [AC:night-runtime-reliability#AC-1]', async t=>{
- const {store,session}=sessionFixture(t);
- const {beginSkillTask}=await import('../dist/skills/skill-task-scope.js');
- store.appendMessage(session.id,'user',[{type:'text',text:'child task'}]);
- store.updateSession(session.id,{metadata:{activeSkillManifests:[PLANNING_SKILL_MANIFEST]}});
- beginSkillTask(store,session.id);
- assert.equal(store.getSession(session.id).metadata.activeSkillManifests.length,1);
+test('an unmarked skill ceiling does not bind the first ordinary request [AC:night-runtime-reliability#AC-4]', async t => {
+  const {store, session} = sessionFixture(t);
+  const {beginSkillTask} = await import('../dist/skills/skill-task-scope.js');
+  const {manifestVisibleTools, noteActiveSkillManifest} = await import('../dist/skills/skill-manifest-gate.js');
+  store.appendMessage(session.id, 'user', [{type: 'text', text: 'inspect logs'}]);
+  noteActiveSkillManifest(session.id, PLANNING_SKILL_MANIFEST);
+  store.updateSession(session.id, {metadata: {activeSkillManifests: [PLANNING_SKILL_MANIFEST]}});
+  beginSkillTask(store, session.id);
+  const names = manifestVisibleTools(store.getSession(session.id), [{name: 'bash'}, {name: 'read_file'}]).map(tool => tool.name);
+  assert.deepEqual(names, ['bash', 'read_file']);
+  assert.deepEqual(store.getSession(session.id).metadata.activeSkillManifests, []);
+});
+
+test('a new ordinary request joined to a running reply drops the previous skill ceiling [AC:night-runtime-reliability#AC-5]', async t => {
+  const {RawAgentRuntime} = await import('../dist/runtime.js');
+  const {manifestVisibleTools, persistActiveSkillManifest, resetActiveSkillManifests} = await import('../dist/skills/skill-manifest-gate.js');
+  const dir = mkdtempSync(join(tmpdir(), 'skill-ceiling-join-'));
+  let release = () => {};
+  const gate = new Promise(resolve => { release = resolve; });
+  let entered = () => {};
+  const ready = new Promise(resolve => { entered = resolve; });
+  const runtime = new RawAgentRuntime({
+    repoRoot: dir,
+    stateDir: join(dir, 'state'),
+    modelAdapter: {
+      name: 'hold-skill-ceiling',
+      async summarizeMessages() { return ''; },
+      async runTurn() {
+        entered();
+        await gate;
+        return {stopReason: 'end', assistantParts: [{type: 'text', text: 'done'}]};
+      }
+    }
+  });
+  let running = Promise.resolve();
+  t.after(async () => {
+    release();
+    await running.catch(() => undefined);
+    resetActiveSkillManifests();
+    await runtime.destroy().catch(() => undefined);
+    rmSync(dir, {recursive: true, force: true});
+  });
+  runtime.store.upsertAgent({id: 'general', name: 'General', role: 'assistant', instructions: '', capabilities: []});
+  runtime.store.setDaemonControl('loop_settings', {kernelVariant: 'ppeng', engineEnabled: true});
+  const session = runtime.store.createSession({title: 'running', mode: 'chat', agentId: 'general'});
+  const first = runtime.store.appendMessage(session.id, 'user', [{type: 'text', text: 'plan'}]);
+  running = runtime.runSession(session.id);
+  try {
+    await ready;
+    persistActiveSkillManifest(runtime.store, session.id, PLANNING_SKILL_MANIFEST);
+    const visible = () => manifestVisibleTools(runtime.store.getSession(session.id), [{name: 'bash'}]).map(tool => tool.name);
+    assert.deepEqual(visible(), []);
+    runtime.store.appendMessage(session.id, 'user', [{type: 'text', text: 'inspect logs'}]);
+    void runtime.runSession(session.id);
+    assert.equal(runtime.isSessionRunning(session.id), true);
+    assert.deepEqual(visible(), ['bash']);
+    assert.notEqual(runtime.store.getSession(session.id).metadata.activeSkillManifestTaskId, first.id);
+    persistActiveSkillManifest(runtime.store, session.id, PLANNING_SKILL_MANIFEST);
+    runtime.store.appendMessage(session.id, 'user', [{type: 'text', text: 'keep going'}], {key: 'human-steer:1'});
+    void runtime.runSession(session.id);
+    assert.deepEqual(visible(), []);
+    runtime.store.appendMessage(session.id, 'user', [{type: 'text', text: 'a note'}], {key: 'operator-note:1'});
+    void runtime.runSession(session.id);
+    assert.deepEqual(visible(), []);
+    assert.equal(runtime.isSessionRunning(session.id), true);
+  } finally {
+    release();
+    await running.catch(() => undefined);
+  }
 });
