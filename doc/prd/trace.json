@@ -3894,6 +3894,14 @@
       ]
     },
     {
+      "id": "reasoning-replay-separation",
+      "title": "历史思考不冒充已发布正文",
+      "tests": [
+        "packages/agent-loop/src/model/reasoning-replay.test.ts",
+        "packages/core/test/model-adapters.test.js"
+      ]
+    },
+    {
       "id": "recap-content-only",
       "title": "回顾有内容才展示",
       "tests": [

@@ -101,14 +101,14 @@ function textFromParts(parts: MessagePart[]): string {
     .trim();
 }
 
-/** OpenAI `assistant.content`: concatenate persisted reasoning + visible text (tool_call parts excluded). */
+/** Historical reasoning is not published assistant text; never replay it as content. */
 function assistantOpenAiTextFromParts(parts: MessagePart[]): string {
-  const chunks: string[] = [];
-  for (const part of parts) {
-    if (part.type === 'reasoning') chunks.push(part.text ?? '');
-    if (part.type === 'text') chunks.push(part.text ?? '');
-  }
-  return chunks.join('\n\n').trim();
+  return parts.filter((part) => part.type === 'text').map((part) => part.text).join('\n\n');
+}
+
+function hasPublishedAssistantContent(message: SessionMessage): boolean {
+  return message.role !== 'assistant' || message.parts.some((part) =>
+    part.type === 'tool_call' || (part.type === 'text' && part.text.trim().length > 0));
 }
 
 /** Text + media placeholders for skill matching and summarization. */
@@ -959,7 +959,7 @@ async function buildOpenAiMessages(
   });
   const output: Array<Record<string, unknown>> = [{ role: 'system', content: system.leading }];
 
-  for (const message of messages) {
+  for (const message of messages.filter(hasPublishedAssistantContent)) {
     if (message.role === 'tool') {
       for (const part of message.parts) {
         if (part.type !== 'tool_result') continue;
@@ -1029,9 +1029,8 @@ async function buildOpenAiMessages(
  * `function_call_output` items and `message` content blocks (`input_text` / `input_image`),
  * not `role: tool` or `tool_calls` on assistant messages.
  *
- * Persisted assistant `reasoning` parts are **not** replayed as `type: 'reasoning'` input items
- * (many gateways reject that shape); they are folded into assistant `message` items as
- * `output_text` with a short prefix so multi-turn transcripts stay valid.
+ * Persisted assistant reasoning stays in local history. Only published text and
+ * tool calls are replayed; output-shaped reasoning is neither accepted input nor a reply.
  */
 async function buildResponsesApiInput(
   messages: SessionMessage[],
@@ -1079,41 +1078,16 @@ async function buildResponsesApiInput(
     }
 
     if (message.role === 'assistant') {
-      /**
-       * `/v1/responses` `input` is not documented to accept replaying model `reasoning` items
-       * (`{ type: 'reasoning', summary }` is output-shaped). Fold persisted reasoning into
-       * assistant `message` `output_text` so strict gateways avoid 400 on multi-turn transcripts.
-       */
-      let reasoningBuf = '';
-      const takeReasoningPrefix = (): string => {
-        const r = reasoningBuf.trim();
-        reasoningBuf = '';
-        if (!r) return '';
-        return `[Earlier reasoning]\n${r}\n\n`;
-      };
       for (const part of message.parts) {
-        if (part.type === 'reasoning') {
-          const r = (part.text ?? '').trim();
-          if (r) reasoningBuf += (reasoningBuf ? '\n\n' : '') + r;
-        } else if (part.type === 'text') {
-          const t = (part.text ?? '').trim();
-          const combined = `${takeReasoningPrefix()}${t}`.trim();
-          if (combined) {
+        if (part.type === 'text') {
+          if (part.text.trim()) {
             out.push({
               type: 'message',
               role: 'assistant',
-              content: [{ type: 'output_text', text: combined }]
+              content: [{ type: 'output_text', text: part.text }]
             });
           }
         } else if (part.type === 'tool_call') {
-          const prefix = takeReasoningPrefix().trim();
-          if (prefix) {
-            out.push({
-              type: 'message',
-              role: 'assistant',
-              content: [{ type: 'output_text', text: prefix }]
-            });
-          }
           out.push({
             type: 'function_call',
             call_id: part.toolCallId,
@@ -1122,14 +1096,6 @@ async function buildResponsesApiInput(
             status: 'completed' as const
           });
         }
-      }
-      const tail = takeReasoningPrefix().trim();
-      if (tail) {
-        out.push({
-          type: 'message',
-          role: 'assistant',
-          content: [{ type: 'output_text', text: tail }]
-        });
       }
       continue;
     }

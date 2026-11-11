@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 440 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 441 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -820,6 +820,12 @@
 - `rail-foot-menu` 侧栏底部收成悬停菜单
 - `rail-foot-theme` 侧栏底部主题按钮能切换
 - `rail-settings-icon` 侧栏设置入口使用设置图标
+
+## reasoning（1）
+
+需求正文见 [other](other.md)。
+
+- `reasoning-replay-separation` 历史思考不冒充已发布正文
 
 ## recap（3）
 

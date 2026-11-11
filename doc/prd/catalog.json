@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 440,
+    "implemented": 441,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2400,6 +2400,13 @@
       "requirement": "用户点了左侧栏的设置入口，要求这里用设置按钮/设置图标，不要现在这个太阳。\n#nav-settings 显示设置图标（齿轮或项目里已有的 settings 图标），不要太阳。\n太阳如果是主题切换，它应该留在自己的控件上，不要占设置入口。\n折叠侧栏只显示图标时，设置入口必须是设置图标。展开后的文字「设置」保持 i18n，不要硬编码新的中英文。",
       "verificationStage": "software",
       "file": "acceptance/rail-settings-icon.yaml"
+    },
+    {
+      "id": "reasoning-replay-separation",
+      "title": "历史思考不冒充已发布正文",
+      "requirement": "那把那 15 条已经落库的短段复述也深挖一下，查清是模型复读还是流式拼接的问题，有问题继续修，补回归测试并上线验证。",
+      "verificationStage": "software",
+      "file": "acceptance/reasoning-replay-separation.yaml"
     },
     {
       "id": "recap-content-only",
