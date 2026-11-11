@@ -2484,6 +2484,7 @@ GitHub 事件不能靠换投递号重放
 
 未分配目标时进度保存只报一次
 
+- `packages/agent-loop/src/turn/kernel.test.ts`
 - `packages/core/test/goal-checkpoint-no-goal-once.test.js`
 
 ### goal-history-toolbar-align

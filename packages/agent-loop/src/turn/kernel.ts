@@ -196,6 +196,38 @@ function parkResumedApproval(
   });
 }
 
+function goalCheckpointTerminalReason(
+  results: readonly { name?: string; metadata?: { retry?: unknown; endReason?: unknown } }[]
+): string | undefined {
+  for (const row of results) {
+    if (row.name !== 'goal_checkpoint' || row.metadata?.retry !== false) continue;
+    const endReason = row.metadata.endReason;
+    if (typeof endReason === 'string' && endReason.trim() !== '') return endReason;
+    return 'goal_checkpoint_unassigned';
+  }
+  return undefined;
+}
+
+async function endResumedGoalCheckpoint(
+  host: TurnKernelHost,
+  sessionId: string,
+  results: readonly { name?: string; metadata?: { retry?: unknown; endReason?: unknown } }[],
+  finish?: (record: SessionRecord, reason: string) => Promise<SessionRecord>
+): Promise<SessionRecord | undefined> {
+  const reason = goalCheckpointTerminalReason(results);
+  if (!reason) return undefined;
+  const current = host.store.getSession(sessionId);
+  const idle = host.store.updateSession(sessionId, {
+    status: 'idle',
+    metadata: mergeInterruptMetadata(current?.metadata ?? {}, null),
+  });
+  if (finish) return finish(idle, reason);
+  const outcome = runOutcomeFromEnd({ reason, sessionStatus: 'idle' });
+  return host.store.updateSession(sessionId, {
+    metadata: mergeOutcomeMetadata(idle.metadata ?? {}, outcome),
+  });
+}
+
 async function continueResumedToolWave(input: {
   host: TurnKernelHost;
   sid: string;
@@ -215,6 +247,7 @@ async function continueResumedToolWave(input: {
   ) => Promise<{ allowExternalAiTools: boolean; resolvedTools: TurnKernelHost['tools'] }>;
   emitStep: (ev: AgentStepEvent) => Promise<void>;
   onModelStreamChunk?: (chunk: ModelStreamChunk) => void;
+  finish?: (record: SessionRecord, reason: string) => Promise<SessionRecord>;
 }): Promise<SessionRecord | undefined> {
   const folded = input.host.store.foldMessages(input.sid);
   const picked = await input.pickTurnTools(input.context.session, folded, 0, false);
@@ -271,7 +304,7 @@ async function continueResumedToolWave(input: {
     type: 'tools_done',
     results: results.map((result) => ({ ok: result.ok, content: result.content, name: result.name })),
   });
-  return undefined;
+  return endResumedGoalCheckpoint(input.host, input.sessionId, results, input.finish);
 }
 
 // ============================================================================
@@ -866,6 +899,7 @@ if (resumeFromInterrupt) {
             pickTurnTools,
             emitStep,
             onModelStreamChunk: options?.onModelStreamChunk,
+            finish: finishEnded,
           });
           if (parked) {
             emitKernelReady(startup);
@@ -1966,8 +2000,9 @@ await host.stepTx?.commitStep?.(toolsStep);
 return undefined;
 }
 async function stopUnassignedGoalCheckpoint() {
-if (!results.some((row: { name?: string; metadata?: { retry?: unknown } }) => row.name === 'goal_checkpoint' && row.metadata?.retry === false)) return undefined;
-return kernelTurnSignal('return', await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'goal_checkpoint_unassigned'));
+const reason = goalCheckpointTerminalReason(results);
+if (!reason) return undefined;
+return kernelTurnSignal('return', await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), reason));
 }
 async function __gate80() {
 if (stopAt.size > 0) {

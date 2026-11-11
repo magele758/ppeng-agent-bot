@@ -4,6 +4,8 @@
 未分配目标时进度保存只报一次
 
 goal_checkpoint with no goal assigned must return the existing clear error once and must not be retried in the same turn. Do not invent a goal. Do not search logs. Do not weaken security denials.
+恢复波里如果跑到未分配的进度保存，同一次执行仍不得再次调用进度保存，对话里仍只有一次「No goal is assigned to this execution」，不得新建目标。
+种类无效和未授权的等待必须保持各自原来的失败内容，不得改写成没有目标那句错误，也不得变成成功。同一次执行不得因此把进度保存再调用到轮数上限。
 
 ## goal-history-toolbar-align
 目标历史与标题栏按钮垂直居中
