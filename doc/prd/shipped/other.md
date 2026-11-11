@@ -768,6 +768,11 @@ Run the packages/agent-loop tests and build, plus packages/core bot-work test. R
 太阳如果是主题切换，它应该留在自己的控件上，不要占设置入口。
 折叠侧栏只显示图标时，设置入口必须是设置图标。展开后的文字「设置」保持 i18n，不要硬编码新的中英文。
 
+## reasoning-replay-separation
+历史思考不冒充已发布正文
+
+那把那 15 条已经落库的短段复述也深挖一下，查清是模型复读还是流式拼接的问题，有问题继续修，补回归测试并上线验证。
+
 ## recap-content-only
 回顾有内容才展示
 

@@ -266,7 +266,7 @@ test('OpenAICompatibleAdapter runTurn persists reasoning_* fields on non-stream 
   }
 });
 
-test('OpenAICompatibleAdapter responses input folds assistant reasoning into message output_text', async () => {
+test('OpenAICompatibleAdapter responses input keeps historical reasoning out of visible output_text [AC:reasoning-replay-separation#AC-1]', async () => {
   const originalFetch = globalThis.fetch;
   try {
     let body;
@@ -339,9 +339,9 @@ test('OpenAICompatibleAdapter responses input folds assistant reasoning into mes
     );
     assert.ok(assistantReplay, 'folded assistant turn should be a message item');
     const t = assistantReplay.content.find((c) => c && c.type === 'output_text')?.text ?? '';
-    assert.match(t, /Earlier reasoning/);
-    assert.match(t, /step one/);
-    assert.match(t, /visible/);
+    assert.equal(t, 'visible');
+    assert.ok(!JSON.stringify(body.input).includes('step one'));
+    assert.ok(!JSON.stringify(body.input).includes('Earlier reasoning'));
   } finally {
     globalThis.fetch = originalFetch;
   }

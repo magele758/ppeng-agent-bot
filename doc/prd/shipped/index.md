@@ -821,6 +821,12 @@
 - `rail-foot-theme` 侧栏底部主题按钮能切换
 - `rail-settings-icon` 侧栏设置入口使用设置图标
 
+## reasoning（1）
+
+需求正文见 [other](other.md)。
+
+- `reasoning-replay-separation` 历史思考不冒充已发布正文
+
 ## recap（3）
 
 需求正文见 [other](other.md)。

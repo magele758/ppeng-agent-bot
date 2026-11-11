@@ -2402,6 +2402,13 @@
       "file": "acceptance/rail-settings-icon.yaml"
     },
     {
+      "id": "reasoning-replay-separation",
+      "title": "历史思考不冒充已发布正文",
+      "requirement": "那把那 15 条已经落库的短段复述也深挖一下，查清是模型复读还是流式拼接的问题，有问题继续修，补回归测试并上线验证。",
+      "verificationStage": "software",
+      "file": "acceptance/reasoning-replay-separation.yaml"
+    },
+    {
       "id": "recap-content-only",
       "title": "回顾有内容才展示",
       "requirement": "如果没有回顾，就不要展示，只加一个主动回顾的按钮就行了，另外回顾逻辑给我说一下",

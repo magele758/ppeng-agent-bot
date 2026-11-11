@@ -3428,6 +3428,13 @@ Inbound References/In-Reply-To persist + auto-draft References chain
 
 - `apps/web-console/components/shell/Rail.settings-icon.test.ts`
 
+### reasoning-replay-separation
+
+历史思考不冒充已发布正文
+
+- `packages/agent-loop/src/model/reasoning-replay.test.ts`
+- `packages/core/test/model-adapters.test.js`
+
 ### recap-content-only
 
 回顾有内容才展示

@@ -13,6 +13,10 @@ Bot 模式不在这个包里（它在 daemon / RawAgentRuntime 上）。
 
 ---
 
+### 历史思考与正文分离
+
+Chat Completions 与 Responses 的历史回放只发送 `text` 和工具调用/结果，不把持久化的 `reasoning` 拼入助手 `content` / `output_text`。只有思考而没有正文和工具的旧消息不制造空回复；含工具的消息保持调用与结果配对。原历史、当前响应中的思考、正文和合法重复句均保留，不做按文字相同的去重。Responses 不再生成 `[Earlier reasoning]` 正文前缀。既有 reasoning-only 当前结果的内核提升回退保持不变。
+
 ## 1. 装配档位与分层规范
 
 SDK 提供 4 个组装档位（高档位包含所有低档位模块）：
