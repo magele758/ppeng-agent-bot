@@ -21,7 +21,8 @@ dotenv.config({ path: join(root, '.env') });
 const SIGNAL_EXITS = new Set([129, 130, 143]);
 
 export function stolenPortFailure(output, code) {
-  return code !== 0 && !SIGNAL_EXITS.has(code) && String(output ?? '').includes('EADDRINUSE');
+  if (SIGNAL_EXITS.has(code)) return false;
+  return String(output ?? '').includes('EADDRINUSE');
 }
 
 async function pickAvoiding(pick, preferred, span, banned) {
