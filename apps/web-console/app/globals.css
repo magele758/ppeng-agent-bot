@@ -1931,9 +1931,10 @@ details.trace-row,
 .play-sidebar__tools[hidden] { display: none; }
 .play-sidebar__search { display: flex; align-items: center; min-width: 0; }
 .play-sidebar__search input { min-width: 0; flex: 1; }
-.chat-turn__label .chat-reply-quote__start, .chat-turn__actions .chat-reply-quote__start { min-height: 24px; width: 24px; padding: 3px; border-radius: 6px; color: var(--muted); opacity: 0; }
+.chat-turn__label .chat-reply-quote__start { min-height: 24px; width: 24px; padding: 3px; border-radius: 6px; color: var(--muted); opacity: 0; }
+.chat-turn__actions .chat-reply-quote__start { min-height: 24px; width: 24px; padding: 3px; border-radius: 6px; color: var(--muted); opacity: 1; }
 .chat-turn--assistant .chat-turn__content { position: relative; }
-.chat-turn__actions { position: absolute; top: 0; right: 0; z-index: 2; display: flex; align-items: center; gap: 4px; }
+.chat-turn__actions { position: static; display: flex; align-items: center; gap: 4px; margin-top: 4px; }
 .chat-turn__actions:empty { display: none; }
 .chat-turn .chat-turn__actions .correction-capture__trigger.btn { position: static; }
 .chat-turn__actions > button { background: var(--bg-raised); }
@@ -1995,6 +1996,7 @@ details.trace-row,
 .approval-explanation__raw { font-size: 0.85em; overflow-wrap: anywhere; }
 
 .chat-reply-ended-at { visibility: hidden; order: -1; align-self: center; white-space: pre; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.chat-turn__actions .chat-reply-ended-at { visibility: visible; }
 .chat-turn__label .chat-reply-ended-at { order: 0; margin-inline-start: auto; }
 .chat-turn:hover .chat-reply-ended-at { visibility: visible; background: var(--bg-raised); }
 
@@ -2017,11 +2019,7 @@ details.trace-row,
 .cron-source-field > .cron-source-field { padding-inline-start: .8em; }
 .cron-source-item { margin-block: .55em; }
 
-.chat-reply-run:is(:hover, :focus-within) .chat-turn__actions .chat-reply-ended-at {
-  visibility: visible;
-  background: var(--bg-raised);
-}
-.chat-reply-run:is(:hover, :focus-within) .chat-turn__actions :is(.chat-reply-quote__start, .correction-capture__trigger.btn) {
+.chat-turn__actions :is(.chat-reply-quote__start, .correction-capture__trigger.btn) {
   opacity: 1;
   pointer-events: auto;
 }

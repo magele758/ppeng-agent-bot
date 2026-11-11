@@ -1,12 +1,13 @@
-import type { FeedSlot } from './feed-window';
-import type { ChatMessage } from './types';
-import { replySourceText } from './reply-quote';
-import { visibleBriefParts } from './session-brief';
-import { quietRoutineResult } from './routine-quiet';
-import { parseBotRelayMessage } from './bot-relay-message';
+import type { FeedSlot } from './feed-window.ts';
+import type { ChatMessage } from './types.ts';
+import { replySourceText } from './reply-quote.ts';
+import { visibleBriefParts } from './session-brief.ts';
+import { quietRoutineResult } from './routine-quiet.ts';
+import { parseBotRelayMessage } from './bot-relay-message.ts';
 
 export interface ReplyRun {
   first: number;
+  end: number;
   last: ChatMessage;
   text: string;
 }
@@ -34,9 +35,8 @@ function assistantPart(slot: FeedSlot, messages: ChatMessage[], brief: boolean) 
   if (text.trim()) return { index, text };
 }
 
-/** Keep the original rows and their controls, but give one answer one hover target. */
-export function groupReplySlots(slots: FeedSlot[], messages: ChatMessage[], brief: boolean, botSurface: boolean): FeedSlot[] {
-  if (!botSurface) return slots;
+/** Keep each segment, but attach one action row to the last prose of a whole answer. */
+export function groupReplySlots(slots: FeedSlot[], messages: ChatMessage[], brief: boolean): FeedSlot[] {
   const out: FeedSlot[] = [];
   let run: FeedSlot[] = [];
   let prose: { index: number; text: string }[] = [];
@@ -44,9 +44,10 @@ export function groupReplySlots(slots: FeedSlot[], messages: ChatMessage[], brie
     if (prose.length < 2) out.push(...run);
     else {
       const first = prose[0]!.index;
-      const last = messages[prose[prose.length - 1]!.index]!;
+      const end = prose[prose.length - 1]!.index;
+      const last = messages[end]!;
       out.push({ key: run[0]!.key, kind: 'reply-run', folded: run,
-        replyRun: { first, last, text: prose.map(part => part.text).join('\n\n') } });
+        replyRun: { first, end, last, text: prose.map(part => part.text).join('\n\n') } });
     }
     run = [];
     prose = [];

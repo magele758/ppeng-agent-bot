@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 439,
+    "implemented": 440,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -80,7 +80,7 @@
     {
       "id": "assistant-actions-at-end",
       "title": "助手消息的引用/纠错按钮放在正文末尾",
-      "requirement": "引用与纠错按钮不再放在顶部标题行，保留在正文之后的操作容器，以悬浮方式显示且不占行；\n标题行仅保留角色名及 steer/cron 标签；连续助手消息省略标题后无任何顶部占位。\n其它角色行为不变。",
+      "requirement": "引用与纠错按钮不再放在顶部标题行，跟在已经结束的回复正文末尾，不再悬浮到顶部；\n标题行仅保留角色名及 steer/cron 标签；连续助手消息省略标题后无任何顶部占位。\n其它角色行为不变。",
       "verificationStage": "software",
       "file": "acceptance/assistant-actions-at-end.yaml"
     },
@@ -101,7 +101,7 @@
     {
       "id": "assistant-run-spacing",
       "title": "连续助手消息省略标题后不留大段空白",
-      "requirement": "标题被省略的连续助手消息，标题行不再占高度（操作按钮浮在右上角仍可用），\n相邻助手消息间距收紧到段落级别。",
+      "requirement": "标题被省略的连续助手消息，标题行不再占高度（操作改到这条回复末尾，不再浮在右上角），\n相邻助手消息间距收紧到段落级别。",
       "verificationStage": "software",
       "file": "acceptance/assistant-run-spacing.yaml"
     },
@@ -1473,7 +1473,7 @@
     {
       "id": "correction-capture-hover",
       "title": "纠错转评测改为悬停图标",
-      "requirement": "用户指着助手气泡旁一直显示的按钮「纠错转评测」（button.btn.btn-ghost.btn-sm，组件 CorrectionCapture），说这个太重了。改成 hover 才展示的图标，不要一直展示文字按钮。\n\n要做成：\n- 默认不显示「纠错转评测」文字，也不占一行。\n- 鼠标悬停这条助手回合（气泡或标签行）时，才出现一个小图标。键盘聚焦到这条回合时也能看到，避免只能用鼠标。移开后图标消失。\n- 点图标仍展开原来的表单，保存、字段、出现条件都不变：正在输出的消息、用户消息仍然没有这个入口。\n- 图标要有可访问名称，文案走 i18n，不要硬编码新的中英文。不要改评测保存逻辑。",
+      "requirement": "用户指着助手气泡旁一直显示的按钮「纠错转评测」（button.btn.btn-ghost.btn-sm，组件 CorrectionCapture），说这个太重了。改成 hover 才展示的图标，不要一直展示文字按钮。\n\n要做成：\n- 不显示「纠错转评测」文字，也不占一整行文字按钮。\n- 已经说完的助手回复，末尾直接看到小图标，不靠悬停才出现，移开鼠标后图标仍在。\n- 点图标仍展开原来的表单，保存、字段、出现条件都不变：正在输出的消息、用户消息仍然没有这个入口。\n- 图标要有可访问名称，文案走 i18n，不要硬编码新的中英文。不要改评测保存逻辑。",
       "verificationStage": "software",
       "file": "acceptance/correction-capture-hover.yaml"
     },
@@ -2981,6 +2981,13 @@
       "requirement": "那你用配置来配合，帮我完成这个功能开发吧，搞好了，我去实验下效果",
       "verificationStage": "software",
       "file": "acceptance/tool-search-experiment.yaml"
+    },
+    {
+      "id": "turn-end-actions",
+      "title": "完整回复结束后才在末尾显示操作",
+      "requirement": "对话流里，引用、时间、收藏是 hover 之后出现在消息顶部的。操作别扭。\n改成：这三个操作跟到每次完整会话的末尾，不要再悬在顶部。\n不要给每个流式分段都加。一段完整返回结束之后，只加一次。\n正在流式输出、还没结束的片段不要出现这排操作。\n完整的一条回复结束才出现，位置在该条末尾。\n只动这排操作的出现时机和位置。不要改对话数据、不要改收藏本身的存储逻辑、不要顺手改别的界面。",
+      "verificationStage": "software",
+      "file": "acceptance/turn-end-actions.yaml"
     },
     {
       "id": "turn-stats-end-time",

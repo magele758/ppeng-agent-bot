@@ -4470,6 +4470,16 @@
       ]
     },
     {
+      "id": "turn-end-actions",
+      "title": "完整回复结束后才在末尾显示操作",
+      "tests": [
+        "apps/web-console/components/ReplyQuote.test.ts",
+        "apps/web-console/components/correction-capture.test.ts",
+        "apps/web-console/lib/reply-end-actions.test.ts",
+        "e2e/composer-quote-layout.spec.ts"
+      ]
+    },
+    {
       "id": "unattended-stream-observation",
       "title": "后台运行保持流式观察与复读保护",
       "tests": [
@@ -4561,6 +4571,7 @@
       "id": "whole-reply-hover",
       "title": "同一条 Bot 回复共享悬停操作",
       "tests": [
+        "apps/web-console/lib/reply-end-actions.test.ts",
         "e2e/composer-quote-layout.spec.ts"
       ]
     }

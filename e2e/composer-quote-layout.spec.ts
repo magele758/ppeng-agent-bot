@@ -39,19 +39,16 @@ test('composer items share one center line on desktop and narrow screens [AC:com
 
 test('quote controls float without a blank row and preserve drafts [AC:composer-quote-layout#AC-2] [AC:composer-quote-layout#AC-3]', async ({page}) => {
   await setup(page,[message('m1','第一条简短回复。'),message('m2','第二条简短回复。')]);
-  const turn=page.locator('.chat-turn--assistant').first();
+  const turn=page.locator('.chat-turn--assistant').last();
   const actions=turn.locator('.chat-turn__actions');
-  await expect(actions).toHaveCSS('position','absolute');
-  const content=turn.locator('.chat-turn__content');
-  await turn.evaluate(el => el.getAnimations({ subtree: true }).forEach(animation => animation.finish()));
-  const before=(await content.boundingBox())!;
+  await expect(actions).toHaveCSS('position','static');
   const bubble=(await turn.locator('.chat-bubble').boundingBox())!;
-  expect(before.y+before.height-(bubble.y+bubble.height)).toBeLessThanOrEqual(1);
+  const bar=(await actions.boundingBox())!;
+  expect(bar.y).toBeGreaterThanOrEqual(bubble.y+bubble.height-1);
   await page.locator('#playInput').fill('保留草稿');
-  await turn.hover();
   const quote=turn.getByTestId('reply-quote-start');
   await expect(quote).toHaveCSS('opacity','1');
-  expect((await content.boundingBox())!.height).toBeCloseTo(before.height,1);
+  await expect(page.locator('.chat-turn--assistant').first().getByTestId('reply-quote-start')).toHaveCount(0);
   await quote.click();
   await expect(page.getByTestId('composer-reply-quote')).toBeVisible();
   await expect(page.locator('#playInput')).toHaveValue('保留草稿');
@@ -62,7 +59,7 @@ test('quote controls float without a blank row and preserve drafts [AC:composer-
   await expect(page.getByTestId('composer-reply-quote')).toBeVisible();
 });
 
-test('all parts of a bot reply share the same hover actions [AC:whole-reply-hover#AC-1]', async ({page}) => {
+test('all parts of a bot reply share one action row at the end [AC:whole-reply-hover#AC-1] [AC:turn-end-actions#AC-1] [AC:turn-end-actions#AC-3]', async ({page}) => {
   const endedAt = '2026-11-10T07:50:00Z';
   await setup(page, [
     message('m1', '检查进度', 'user'),
@@ -74,19 +71,19 @@ test('all parts of a bot reply share the same hover actions [AC:whole-reply-hove
   ]);
   const quotes = page.getByTestId('reply-quote-start');
   await expect(quotes).toHaveCount(2);
-  const quote = quotes.first();
-  await page.getByText('已读取配置。', {exact:true}).hover();
+  await expect(page.locator('.chat-turn--assistant', { hasText: '已读取配置。' }).getByTestId('reply-quote-start')).toHaveCount(0);
+  const done = page.locator('.chat-turn--assistant', { hasText: '检查完成。' });
+  const quote = done.getByTestId('reply-quote-start');
   await expect(quote).toHaveCSS('opacity', '1');
-  const bar = quote.locator('..');
-  await expect(bar.locator('time')).toHaveAttribute('datetime', endedAt);
-  const position = await bar.boundingBox();
-  await page.getByText('检查完成。', {exact:true}).hover();
-  await expect(quote).toHaveCSS('opacity', '1');
-  await expect(bar.locator('.correction-capture__trigger')).toHaveCSS('opacity','1');
-  expect(await bar.boundingBox()).toEqual(position);
+  const actions = done.locator('.chat-turn__actions');
+  await expect(actions).toHaveCSS('position', 'static');
+  await expect(actions.locator('time')).toHaveAttribute('datetime', endedAt);
+  const bubble = (await done.locator('.chat-bubble').boundingBox())!;
+  const bar = (await actions.boundingBox())!;
+  expect(bar.y).toBeGreaterThanOrEqual(bubble.y + bubble.height - 1);
+  await expect(actions.locator('.correction-capture__trigger')).toHaveCSS('opacity','1');
   await page.getByText('另一条回复。', {exact:true}).hover();
-  await expect(quote).toHaveCSS('opacity','0');
-  await page.getByText('检查完成。', {exact:true}).hover();
+  await expect(quote).toHaveCSS('opacity','1');
   await quote.click();
   await expect(page.getByTestId('composer-reply-quote')).toContainText('已读取配置。 检查完成。');
 });

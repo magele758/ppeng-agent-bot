@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 439 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 440 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -1079,10 +1079,11 @@
 - `tool-progress-guard` 重复工具调用按实际进展判断
 - `tool-search-experiment` 可切换的增强工具检索实验
 
-## turn（1）
+## turn（2）
 
 需求正文见 [other](other.md)。
 
+- `turn-end-actions` 完整回复结束后才在末尾显示操作
 - `turn-stats-end-time` 对话轮次统计显示结束时间
 
 ## unattended（2）

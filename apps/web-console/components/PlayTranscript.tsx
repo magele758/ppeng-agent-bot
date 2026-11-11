@@ -9,6 +9,7 @@ import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
 import { readMessageSessionId } from '@/lib/goal-update-notice';
 import { omitStreamTextSavedOnTurn } from '@/lib/history-window';
+import { liveReplyHoldIndex } from '@/lib/reply-end-actions';
 import { groupReplySlots } from '@/lib/reply-hover-run';
 import { continuedAssistantIndexes } from '@/lib/assistant-label-run';
 import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
@@ -23,7 +24,7 @@ import { placeChildTaskEntries, type ChildTaskStreamEntry } from '@/lib/bot-chil
 import { ApprovalBanner } from './ApprovalBanner';
 import { BotChildTaskStreamEntry } from './BotChildTaskStreamEntry';
 import { ChatFeedWindow } from './ChatFeedWindow';
-import { ReplyRunContext, ContinuedAssistantContext, ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
+import { ReplyRunContext, ReplyActionHoldContext, ContinuedAssistantContext, ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
 import { SkillOperationCards } from './SkillOperationCards';
 import { SkillCaptureCards } from './SkillCaptureCards';
@@ -62,10 +63,11 @@ export function PlayTranscript(props: {
     <UserMessageActionsContext.Provider value={{ retry: props.chat.retryUserMessage, busy: props.chat.messageRetryBusy }}>
     <SurfaceContextProvider messages={props.chat.displayMessages}>
       <ContinuedAssistantContext.Provider value={continued}>
+      <ReplyActionHoldContext.Provider value={liveReplyHoldIndex(view.messages, props.chat)}>
       <ChatFeedWindow
         layoutKey={props.layoutKey}
         scrollerRef={props.chat.playMessagesRef}
-        slots={groupReplySlots(slots, view.messages, brief, props.botSurface)}
+        slots={groupReplySlots(slots, view.messages, brief)}
         renderSlot={(slot) => renderReplySlot(slot, child => renderTranscriptSlot(child, view, props, brief))}
         stickToBottomRef={props.chat.playStickToBottomRef}
         scrollIntentRef={props.chat.feedScrollIntentRef}
@@ -84,6 +86,7 @@ export function PlayTranscript(props: {
           }}
         /> : null}{props.selectedSessionId ? <SkillOperationCards key={'operations-'+props.selectedSessionId} sessionId={props.selectedSessionId} onLayoutChange={() => { const feed = props.chat.playMessagesRef.current; if (feed && props.chat.playStickToBottomRef.current) feed.scrollTop = feed.scrollHeight; }}/> : null}{props.footer}</>}
       />
+      </ReplyActionHoldContext.Provider>
       </ContinuedAssistantContext.Provider>
     </SurfaceContextProvider>
     </UserMessageActionsContext.Provider>

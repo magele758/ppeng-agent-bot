@@ -1,4 +1,4 @@
-import { stripVisibleClockMarks } from './visible-clock';
+import { stripVisibleClockMarks } from './visible-clock.ts';
 
 const NO_UPDATE = '[NO_UPDATE]';
 const ROUTINE_RESULT = /^\[routine:(.+)\] (\w+)\n([\s\S]*?)\nRun: (.+)$/;

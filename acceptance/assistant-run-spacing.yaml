@@ -2,7 +2,7 @@ id: assistant-run-spacing
 title: 连续助手消息省略标题后不留大段空白
 status: implemented
 requirement: |
-  标题被省略的连续助手消息，标题行不再占高度（操作按钮浮在右上角仍可用），
+  标题被省略的连续助手消息，标题行不再占高度（操作改到这条回复末尾，不再浮在右上角），
   相邻助手消息间距收紧到段落级别。
 criteria:
   - id: AC-1
