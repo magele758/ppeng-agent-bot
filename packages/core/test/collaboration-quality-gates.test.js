@@ -82,6 +82,12 @@ test('checkers inherit workspace and permissions and cannot widen an empty inter
   assert.deepEqual(checker.metadata.allowedTools, ['read_file']);
   assert.equal(checker.metadata.permissionMode, 'ask');
   assert.match(JSON.stringify(db.foldMessages(checker.id)), /totals.mjs/);
+  db.updateSession(parent.id, { metadata: { ...parent.metadata, allowedTools: [] } });
+  assert.equal((await runQualityCheck(host, { ...input, implementation: db.getSession(parent.id) })).passed, true);
+  db.upsertAgent({ id: 'restricted', name: 'restricted', role: 'implementation', instructions: 'test', capabilities: [], allowedTools: ['write_file'] });
+  db.updateSession(parent.id, { agentId: 'restricted' });
+  assert.equal((await runQualityCheck(host, { ...input, implementation: db.getSession(parent.id) })).passed, false);
+  assert.equal(calls, 2, 'Agent-spec permissions also constrain the checker');
 });
 
 test('orchestration exceptions preserve a concurrent external pause [AC:collaboration-quality-gates#AC-3]', async t => {

@@ -177,5 +177,34 @@
     }
   ],
   "scope": "Single isolated local runtime; real configured model; no production deployment or long-term reliability claim.",
-  "authorization": "Trial-only isolated source policy allows work_evidence; production Bot settings and credentials were not modified."
+  "authorization": "Trial-only isolated source policy allows work_evidence; production Bot settings and credentials were not modified.",
+  "negativeControl": {
+    "model": "grok/grok-4.7-build-fast@500k",
+    "outcome": "pass",
+    "startedAt": "2026-11-11T10:20:19.806Z",
+    "finishedAt": "2026-11-11T10:20:32.799Z",
+    "gate": {
+      "passed": false,
+      "summary": "Unresolved failed test execution",
+      "checks": [],
+      "sessionId": "session_616aef64583e4587a266c5527d7de930"
+    },
+    "executions": [
+      {
+        "name": "work_evidence",
+        "id": "call-2e092b7b-b8eb-423d-93d7-35cd6ed93f86-3__rk16__ZtipRjmB0tzKxJep",
+        "ok": false,
+        "verify": {
+          "command": "node --test acceptance.test.mjs",
+          "exit_code": 1,
+          "signal": null,
+          "stdout_clip": "«external source=shell label=node --test acceptance.test.mjs»\n✖ integer cents grouped and sorted (0.962917ms)\n✔ empty input (0.10175ms)\n✖ fractional cents rejected (0.476708ms)\n✖ unsafe integers rejected (0.098208ms)\n✖ overflow rejected (0.069084ms)\nℹ tests 5\nℹ suites 0\nℹ pass 1\nℹ fail 4\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 36.603167\n\n✖ failing tests:\n\ntest at acceptance.test.mjs:4:1\n✖ integer cents grouped and sorted (0.962917ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n  + []\n  - [\n  -   {\n  -     account: 'a',\n  -     cents: 100\n  -   },\n  -   {\n  -     account: 'b',\n  -     cents: 200\n  -   }\n  - ]\n  \n      at TestContext.<anonymous> (file:///Users/penglei/.local/share/agent-home-verification/collaboration-quality-20261111-r3/acceptance.test.mjs:4:55)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.start (node:internal/test_runner/test:1257:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ { account: 'a', cents: 100 }, { account: 'b', cents: 200 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at acceptance.test.mjs:6:1\n✖ fractional cents rejected (0.476708ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file:///Users/penglei/.local/share/agent-home-verification/collaboration-quality-20261111-r3/acceptance.test.mjs:6:48)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)\n      at Test.postRun (node:internal/test_runner/test:1537:19)\n      at Test.run (node:internal/test_runner/test:1462:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at acceptance.test.mjs:7:1\n✖ unsafe integers rejected (0.098208ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file:///Users/penglei/.local/share/agent-home-verification/collaboration-quality-20261111-r3/acceptance.test.mjs:7:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)\n      at Test.postRun (node:internal/test_runner/test:1537:19)\n      at Test.run (node:internal/test_runner/test:1462:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at acceptance.test.mjs:8:1\n✖ overflow rejected (0.069084ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file:///Users/penglei/.local/share/agent-home-verification/collaboration-quality-20261111-r3/acceptance.test.mjs:8:40)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)\n      at Test.postRun (node:internal/test_runner/test:1537:19)\n      at Test.run (node:internal/test_runner/test:1462:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n«end external»",
+          "stderr_clip": "",
+          "sandbox_backend": "direct"
+        }
+      }
+    ],
+    "restoredTestExitCode": 0,
+    "scope": "One intentional artifact mutation in the isolated live-model sample; fixture unchanged; restore in finally."
+  }
 }

@@ -14,6 +14,12 @@ function parseReport(text: string): unknown {
   catch { return undefined; }
 }
 
+function restrictTools(tools: string[], limit: unknown): string[] {
+  // Existing tool resolution treats an empty allowlist as an unset restriction.
+  if (!Array.isArray(limit) || !limit.length) return tools;
+  return tools.filter(name => limit.includes(name));
+}
+
 export async function runQualityCheck(host: SpawnHost, input: {
   stage: 'review' | 'test'; title: string; criteria: string[];
   implementation?: SessionRecord; context: string;
@@ -23,8 +29,8 @@ export async function runQualityCheck(host: SpawnHost, input: {
   const agentId = input.stage === 'test' ? 'evaluator' : 'reviewer';
   ensureAgent(host.store, builtinAgents.find(agent => agent.id === agentId)!);
   const tools = input.stage === 'test' ? ['read_file', 'grep_files', 'list_files', 'work_evidence'] : ['read_file', 'grep_files', 'list_files'];
-  const parentTools = parent.metadata?.allowedTools;
-  const allowedTools = Array.isArray(parentTools) ? tools.filter(name => parentTools.includes(name)) : tools;
+  const agentTools = host.store.getAgent(parent.agentId)?.allowedTools;
+  const allowedTools = restrictTools(restrictTools(tools, agentTools), parent.metadata?.allowedTools);
   if (!allowedTools.length) return failedQuality('Parent permissions allow no inspection tools');
   const checker = host.store.createSession({
     title: `Quality ${input.stage}: ${input.title.slice(0, 80)}`, mode: 'subagent', agentId,
