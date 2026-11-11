@@ -763,6 +763,7 @@ export const play = {
   },
 
   turns: {
+    loadSkillNamed: '加载技能：{name}',
     dispatchSubagent: '🤖 派发 SubAgent',
     createTeammate: '👥 创建协同队友',
     role: '角色: {role}',

@@ -211,3 +211,12 @@ test('刷新后已点开的过程仍展开，没点开的仍收起 [AC:session-b
     globalThis.window = previous;
   }
 });
+
+test('skill identities remain key information while ordinary tool processes stay hidden [AC:skill-load-visible#AC-1] [AC:skill-load-visible#AC-3]',()=>{
+ const call={type:'tool_call',name:'load_skill',input:{name:'Planning'}};
+ const result={type:'tool_result',name:'load_skill',content:'long skill body'};
+ assert.deepEqual(visibleBriefParts([call,result,{type:'tool_result',name:'bash'}]),[call,result]);
+ const rows=rowsForSessionBrief(true,[{key:'skill',kind:'message',messageIndex:0}],[{role:'tool',parts:[result]}]);
+ assert.equal(rows[0]?.type,'slot');
+ assert.deepEqual(briefStreamSegments([{kind:'tool',name:'load_skill'},{kind:'tool',name:'bash'},{kind:'reasoning'}]).segments,[{kind:'tool',name:'load_skill'}]);
+});

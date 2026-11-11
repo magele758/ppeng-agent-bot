@@ -1,3 +1,4 @@
+import { isSkillLoadPart } from './skill-load-label.ts';
 import { preferenceStorage } from './user-preference-storage.ts';
 import { isToolObservationCaption } from './chat-images.ts';
 import { stripLeakedMonologue } from './leaked-monologue.ts';
@@ -74,6 +75,7 @@ export function writeBriefOpen(noteKey: string, open: boolean): boolean {
 }
 export interface BriefPart {
   type: string;
+  name?: string;
   text?: string;
   assetId?: string;
   content?: string;
@@ -92,16 +94,12 @@ function briefTextPart<T extends BriefPart>(part: T): T[] {
 }
 
 export function visibleBriefParts<T extends BriefPart>(parts: readonly T[] | undefined): T[] {
-  return (parts ?? []).flatMap((part) => {
-    if (part.type === 'image') return part.assetId?.trim() ? [part] : [];
-    if (part.type !== 'text') return [];
-    return briefTextPart(part);
-  });
+  return (parts ?? []).flatMap(visibleBriefPart);
 }
 
 export function briefMessageClass(message: BriefMessage | undefined): 'prose' | 'process' | 'noise' {
   if (!message) return 'noise';
-  if (message.role === 'tool') return 'process';
+  if (message.role === 'tool') return briefToolMessageClass(message);
   const parts = message.parts ?? [];
   const raw = parts
     .filter((part) => part.type === 'text')
@@ -164,12 +162,31 @@ export function showProcessNote(brief: boolean, count: number): boolean {
   return !brief && count > 0;
 }
 
-export function briefStreamSegments<T extends { kind: string }>(segments: readonly T[]): { segments: T[]; hidden: T[] } {
+export function briefStreamSegments<T extends { kind: string; name?: string }>(segments: readonly T[]): { segments: T[]; hidden: T[] } {
   const kept: T[] = [];
   const hidden: T[] = [];
   for (const segment of segments) {
-    if (segment.kind === 'text' || segment.kind === 'a2ui') kept.push(segment);
+    if (keepsBriefSegment(segment)) kept.push(segment);
     else hidden.push(segment);
   }
   return { segments: kept, hidden };
+}
+
+function visibleBriefPart<T extends BriefPart>(part: T): T[] {
+  return isSkillLoadPart(part) ? [part] : ordinaryBriefPart(part);
+}
+
+function ordinaryBriefPart<T extends BriefPart>(part: T): T[] {
+  if (part.type === 'image') return part.assetId?.trim() ? [part] : [];
+  if (part.type !== 'text') return [];
+  return briefTextPart(part);
+}
+
+function briefToolMessageClass(message: BriefMessage): 'prose' | 'process' {
+  return message.parts?.some(isSkillLoadPart) ? 'prose' : 'process';
+}
+
+function keepsBriefSegment(segment: {kind: string; name?: string}): boolean {
+  if (segment.kind === 'tool') return segment.name === 'load_skill';
+  return segment.kind === 'text' || segment.kind === 'a2ui';
 }
