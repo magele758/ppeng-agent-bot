@@ -953,24 +953,29 @@ const SOURCE_UNAVAILABLE_TOOLS = new Set(['memory_read', 'history_search', 'hist
 const jsonUnavailableBySignal = new WeakMap<AbortSignal, Set<string>>();
 const jsonUnavailableByWriter = new Map<string, Set<string>>();
 
+function rememberUnavailable<K extends object | string>(
+  map: { get(key: K): Set<string> | undefined; set(key: K, value: Set<string>): void },
+  key: K
+): Set<string> {
+  const existing = map.get(key);
+  if (existing) return existing;
+  const created = new Set<string>();
+  map.set(key, created);
+  return created;
+}
+
+function writerUnavailableSeen(context: RunContext): Set<string> {
+  const key = `${context.session.id}\0${context.session.activeWriterRunId ?? ''}`;
+  const existing = jsonUnavailableByWriter.get(key);
+  if (existing) return existing;
+  if (jsonUnavailableByWriter.size > 200) jsonUnavailableByWriter.clear();
+  return rememberUnavailable(jsonUnavailableByWriter, key);
+}
+
 function jsonUnavailableSeen(context: RunContext): Set<string> {
   const signal = turnAbortSignal(context.abortSignal) ?? context.abortSignal;
-  if (signal) {
-    let seen = jsonUnavailableBySignal.get(signal);
-    if (!seen) {
-      seen = new Set();
-      jsonUnavailableBySignal.set(signal, seen);
-    }
-    return seen;
-  }
-  const key = `${context.session.id}\0${context.session.activeWriterRunId ?? ''}`;
-  let seen = jsonUnavailableByWriter.get(key);
-  if (!seen) {
-    if (jsonUnavailableByWriter.size > 200) jsonUnavailableByWriter.clear();
-    seen = new Set();
-    jsonUnavailableByWriter.set(key, seen);
-  }
-  return seen;
+  if (signal) return rememberUnavailable(jsonUnavailableBySignal, signal);
+  return writerUnavailableSeen(context);
 }
 
 function argumentRef(args: unknown): string | undefined {

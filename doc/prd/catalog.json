@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 439,
+    "implemented": 440,
     "approved": 3,
     "draft": 13,
     "retired": 6
