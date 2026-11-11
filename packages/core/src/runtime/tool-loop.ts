@@ -139,12 +139,58 @@ export interface ToolLoopDeps {
 }
 
 const SOURCE_UNAVAILABLE = 'Source unavailable.';
+const SOURCE_UNAVAILABLE_STOPPED = 'Source unavailable. Stopped this turn. Do not call this tool again.';
 const SOURCE_UNAVAILABLE_TOOLS = new Set(['memory_read', 'history_search', 'history_read']);
 const unavailableBySignal = new WeakMap<AbortSignal, Set<string>>();
 const unavailableByWriter = new Map<string, Set<string>>();
 
 function turnSignal(context: RunContext): AbortSignal | undefined {
   return turnAbortSignal(context.abortSignal) ?? context.abortSignal;
+}
+
+const SOURCE_UNAVAILABLE_CODE = 'SOURCE_UNAVAILABLE';
+
+function argumentRef(args: unknown): string | undefined {
+  if (!args || typeof args !== 'object') return undefined;
+  const ref = (args as { ref?: unknown }).ref;
+  return typeof ref === 'string' && ref.length > 0 ? ref : undefined;
+}
+
+function jsonUnavailableRef(content: string): string | undefined {
+  try {
+    const parsed = JSON.parse(content) as { error_code?: unknown; ref?: unknown };
+    if (parsed.error_code !== SOURCE_UNAVAILABLE_CODE) return undefined;
+    return typeof parsed.ref === 'string' ? parsed.ref : '';
+  } catch {
+    return undefined;
+  }
+}
+
+function jsonUnavailableKey(name: string, ref: string): string {
+  return `json\0${name}\0${ref}`;
+}
+
+/** Same source already returned JSON SOURCE_UNAVAILABLE. Do not execute again. Stop the turn. */
+function repeatedJsonUnavailable(
+  deps: ToolLoopDeps,
+  context: RunContext,
+  name: string,
+  args: unknown
+): { ok: false; content: string } | undefined {
+  if (!SOURCE_UNAVAILABLE_TOOLS.has(name)) return undefined;
+  const ref = argumentRef(args);
+  if (!ref || !unavailableSeen(context).has(jsonUnavailableKey(name, ref))) return undefined;
+  endTurn(deps, context, context.session.id, { reason: 'source_unavailable', tool: name });
+  return { ok: false, content: SOURCE_UNAVAILABLE_STOPPED };
+}
+
+function noteJsonUnavailable(context: RunContext, name: string, args: unknown, content: string): void {
+  if (!SOURCE_UNAVAILABLE_TOOLS.has(name)) return;
+  const fromBody = jsonUnavailableRef(content);
+  if (fromBody === undefined) return;
+  const ref = argumentRef(args) || fromBody;
+  if (!ref) return;
+  unavailableSeen(context).add(jsonUnavailableKey(name, ref));
 }
 
 function unavailableSeen(context: RunContext): Set<string> {
@@ -188,7 +234,7 @@ function finishToolResult(
     const seen = unavailableSeen(context);
     if (seen.has(name)) {
       endTurn(deps, context, context.session.id, { reason: 'source_unavailable', tool: name });
-      return { ...result, ok: false, content: 'Source unavailable. Stopped this turn. Do not call this tool again.' };
+      return { ...result, ok: false, content: SOURCE_UNAVAILABLE_STOPPED };
     }
     seen.add(name);
     return result;
@@ -223,7 +269,13 @@ function withTurnStops(
 ): ToolContract<Record<string, unknown>>[] {
   return tools.map((tool) => ({
     ...tool,
-    execute: async (context, args) => finishToolResult(deps, context, tool.name, await tool.execute(context, args))
+    execute: async (context, args) => {
+      const repeated = repeatedJsonUnavailable(deps, context, tool.name, args);
+      if (repeated) return repeated;
+      const result = finishToolResult(deps, context, tool.name, await tool.execute(context, args));
+      noteJsonUnavailable(context, tool.name, args, result.content);
+      return result;
+    }
   }));
 }
 
@@ -305,6 +357,7 @@ function hostFromDeps(deps: ToolLoopDeps): ToolLoopHost {
       deps.store.updateTask(taskId, patch);
     },
     emitTrace: deps.emitTrace,
+    abortTurn: deps.abortTurn,
     exportToolSpan: ({ sessionId, toolName, ok }) => {
       void maybeExportOtelSpan(process.env, deps.stateDir, sessionId, `tool.${toolName}`, {
         ok: String(ok)

@@ -122,3 +122,92 @@ test('writer run id isolates source-unavailable stops, and a large cache is drop
   assert.equal(sawClear, true);
   assert.equal((await read(context('sess-w', { writer: 'run-a' }), {})).content, STOPPED);
 });
+
+function jsonUnavailable(ref) {
+  return {
+    ok: false,
+    content: JSON.stringify({
+      error: 'Source unavailable.',
+      error_code: 'SOURCE_UNAVAILABLE',
+      ref,
+      retry: false
+    })
+  };
+}
+
+test('second JSON SOURCE_UNAVAILABLE read of the same source does not execute [AC:memory-read-source-unavailable#AC-1]', async () => {
+  let reads = 0;
+  const seen = [];
+  const tool = {
+    name: 'memory_read',
+    description: 'memory_read',
+    inputSchema: { type: 'object' },
+    approvalMode: 'never',
+    sideEffectLevel: 'none',
+    execute: async (_ctx, args) => {
+      reads += 1;
+      seen.push(args.ref);
+      if (args.ref === 'memory:user:denied') {
+        return { ok: false, content: JSON.stringify({ error: 'not authorized', error_code: 'ACCESS_DENIED', ref: args.ref }) };
+      }
+      if (args.ref === 'memory:scratch:page') {
+        return { ok: true, content: JSON.stringify({ ref: args.ref, text: 'page', offset: args.offset ?? 0 }) };
+      }
+      return jsonUnavailable(args.ref);
+    }
+  };
+  const { traces, aborts, exec } = harness([tool]);
+  const signal = new AbortController().signal;
+  const ctx = context('sess-json', { signal, writer: 'run-json' });
+  const read = exec.memory_read;
+
+  const first = await read(ctx, { ref: 'memory:user:missing' });
+  assert.equal(reads, 1);
+  assert.equal(JSON.parse(first.content).error_code, 'SOURCE_UNAVAILABLE');
+  assert.equal(JSON.parse(first.content).surfaced, undefined);
+  assert.equal(aborts.length, 0);
+  assert.equal(traces.length, 0);
+
+  const second = await read(ctx, { ref: 'memory:user:missing' });
+  assert.equal(reads, 1);
+  assert.deepEqual(seen, ['memory:user:missing']);
+  assert.equal(second.ok, false);
+  assert.equal(second.content, STOPPED);
+  assert.deepEqual(aborts, [{ sessionId: 'sess-json', signal }]);
+  assert.equal(traces.length, 1);
+  assert.equal(traces[0].sessionId, 'sess-json');
+  assert.equal(traces[0].event.kind, 'recovery_abort');
+  assert.deepEqual(traces[0].event.payload, {
+    reason: 'source_unavailable',
+    tool: 'memory_read',
+    trigger: 'source_unavailable'
+  });
+
+  const other = await read(ctx, { ref: 'memory:user:other' });
+  assert.equal(reads, 2);
+  assert.equal(JSON.parse(other.content).error_code, 'SOURCE_UNAVAILABLE');
+  assert.equal(JSON.parse(other.content).surfaced, undefined);
+  assert.equal(aborts.length, 1);
+
+  const nextTurn = await read(context('sess-json', { signal: new AbortController().signal, writer: 'run-json' }), { ref: 'memory:user:missing' });
+  assert.equal(reads, 3);
+  assert.equal(JSON.parse(nextTurn.content).error_code, 'SOURCE_UNAVAILABLE');
+  assert.equal(JSON.parse(nextTurn.content).surfaced, undefined);
+  assert.equal(aborts.length, 1);
+
+  const page = await read(ctx, { ref: 'memory:scratch:page', offset: 0 });
+  const nextPage = await read(ctx, { ref: 'memory:scratch:page', offset: 7 });
+  assert.equal(page.ok, true);
+  assert.equal(nextPage.ok, true);
+  assert.equal(reads, 5);
+
+  const denied = await read(ctx, { ref: 'memory:user:denied' });
+  const deniedAgain = await read(ctx, { ref: 'memory:user:denied' });
+  assert.equal(JSON.parse(denied.content).error_code, 'ACCESS_DENIED');
+  assert.equal(JSON.parse(deniedAgain.content).error_code, 'ACCESS_DENIED');
+  assert.equal(denied.content.includes('SOURCE_UNAVAILABLE'), false);
+  assert.equal(deniedAgain.content.includes('SOURCE_UNAVAILABLE'), false);
+  assert.equal(reads, 7);
+  assert.equal(aborts.length, 1);
+  assert.equal(traces.length, 1);
+});
