@@ -47,16 +47,20 @@ async function cube(){
  const snapshot={slot,at:now.toISOString(),...transition(prev,good,down,now),jump:pings.ok?pings.text:'unavailable',service:direct.ok?direct.text:'unavailable'};
  save(file,snapshot);return snapshot;
 }
-const recent=last(learning+'/analytics',/^\d{4}-\d\d-\d\d-creator-analytics\.md$/);
-const radar=last(learning+'/side-hustle-radar',/^\d{4}-\d\d-\d\d-daily\.md$/);
-const draft=learning+'/'+date+'-llm-brief-publish.md';
-const weekly=fs.readdirSync(learning+'/side-hustle-radar').filter(n=>/^\d{4}-\d\d-\d\d-daily\.md$/.test(n)&&Date.parse(date)-Date.parse(n.slice(0,10))<7*86400000&&n.slice(0,10)<=date).sort().map(n=>excerpt(learning+'/side-hustle-radar/'+n,125));
-const metrics=JSON.parse(read(dir+'/metrics-'+date+'.json')||'null');
 const sources=[
- ['内容审稿与发布清单',{day:date,sha256:hash(read(draft)),draft:excerpt(draft,1750),review:excerpt(learning+'/tmp-publish/review-'+date+'-brief.md',1300)}],
- ['副业雷达合并日报',{day:date,today:metrics,analytics:excerpt(learning+'/analytics/'+recent,570),history:excerpt(learning+'/side-hustle-radar/'+radar,850),week:weekly}],
- ['工作晨报与团队复盘',{day:date,status:excerpt(home+'/.agent-hub/STATUS.md',2100),tasks:excerpt(home+'/.agent-hub/tasks.md',750)}],
- ['CubeSandbox 四小时巡检',await cube()]
+ ['内容审稿与发布清单',()=>{
+  const draft=learning+'/'+date+'-llm-brief-publish.md';
+  return {day:date,sha256:hash(read(draft)),draft:excerpt(draft,1750),review:excerpt(learning+'/tmp-publish/review-'+date+'-brief.md',1300)};
+ }],
+ ['副业雷达合并日报',()=>{
+  const recent=last(learning+'/analytics',/^\d{4}-\d\d-\d\d-creator-analytics\.md$/);
+  const radar=last(learning+'/side-hustle-radar',/^\d{4}-\d\d-\d\d-daily\.md$/);
+  const weekly=fs.readdirSync(learning+'/side-hustle-radar').filter(n=>/^\d{4}-\d\d-\d\d-daily\.md$/.test(n)&&Date.parse(date)-Date.parse(n.slice(0,10))<7*86400000&&n.slice(0,10)<=date).sort().map(n=>excerpt(learning+'/side-hustle-radar/'+n,125));
+  const metrics=JSON.parse(read(dir+'/metrics-'+date+'.json')||'null');
+  return {day:date,today:metrics,analytics:excerpt(learning+'/analytics/'+recent,570),history:excerpt(learning+'/side-hustle-radar/'+radar,850),week:weekly};
+ }],
+ ['工作晨报与团队复盘',()=>({day:date,status:excerpt(home+'/.agent-hub/STATUS.md',2100),tasks:excerpt(home+'/.agent-hub/tasks.md',750)})],
+ ['CubeSandbox 四小时巡检',cube]
 ];
 await updateMaterialTargets(sources,supply,(name,error)=>console.error(JSON.stringify({at:now.toISOString(),target:name,error:String(error)})));
 const folder=path.join(dir,'outputs'),feed=last(folder,/^feed-\d{4}-\d\d-\d\d-\d\d\.md$/);

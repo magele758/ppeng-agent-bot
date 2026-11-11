@@ -16,13 +16,14 @@ export function beginSkillTask(store:SqliteStateStore,sessionId:string):void {
 
 function legacyManifestBelongsToRequest(store:SqliteStateStore,sessionId:string,metadata:Record<string,unknown>,seq:number):boolean {
  if(metadata.activeSkillManifestTaskId)return false;
- // Older releases had no scope marker. Keep restrictions when a load occurred
- // after this request; a process restart alone must never widen its permissions.
+ // Older releases had no scope marker. Keep restrictions only when this request
+ // itself loaded the skill after it started. A restart of that request must not
+ // widen permissions. An unmarked ceiling does not bind a later ordinary request.
  const loaded=store.db.prepare(`SELECT seq FROM session_messages,json_each(parts_json) AS part
    WHERE session_id=? AND role='assistant'
    AND json_extract(part.value,'$.type')='tool_call'
    AND json_extract(part.value,'$.name')='load_skill' ORDER BY seq DESC LIMIT 1`).get(sessionId) as {seq:number}|undefined;
- return !loaded || loaded.seq>seq;
+ return Boolean(loaded && loaded.seq>seq);
 }
 
 function resetExpiredManifests(sessionId:string,preserve:boolean):void {
