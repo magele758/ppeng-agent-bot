@@ -13,6 +13,7 @@ import {
 } from './sections/settings/categories/kit/fields';
 import { useSettingsResource } from './sections/settings/categories/kit/settings-store';
 import { useDraftForm } from './sections/settings/categories/kit/useDraftForm';
+import { LangfuseDeliveryStatus, type LangfuseDeliverySnapshot } from './LangfuseDeliveryStatus';
 
 interface LangfuseSettings {
   configured: boolean;
@@ -28,7 +29,7 @@ const EMPTY_FORM = { baseUrl: '', publicKey: '', secretKey: '' };
 
 export function LangfuseSettingsCard() {
   const { t } = useI18n();
-  const r = useSettingsResource<LangfuseSettings>('/api/langfuse/settings');
+  const r = useSettingsResource<LangfuseSettings, { delivery?: LangfuseDeliverySnapshot }>('/api/langfuse/settings');
   const s = r.settings;
   const base = 'settingsEntries.langfuse';
   const label = (path: string) => t(`${base}.${path}` as MessageKey);
@@ -121,6 +122,7 @@ export function LangfuseSettingsCard() {
               </button>
             </SaveBar>
             <p className="muted small">{s.configured ? label('configured') : label('unconfigured')}</p>
+            <LangfuseDeliveryStatus status={r.effective?.delivery} busy={r.busy} onRefresh={r.reload} />
           </>
         </ExperimentRow>
       ) : null}

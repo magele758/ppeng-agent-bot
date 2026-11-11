@@ -94,3 +94,33 @@ describe('streaming/repetition-watchdog', () => {
     });
   });
 });
+
+describe('long stream loops [AC:trace-stream-retention#AC-2]', () => {
+  const sentence = '现在继续检查远端服务的实际运行状态，并且在发现异常后记录完整的现场证据。';
+  const cycle = Array.from({ length: 23 }, (_, i) =>
+    `诊断步骤${i}：正在检查远程服务的真实运行状态以及对应的实际请求证据。`
+  ).join('');
+
+  it('detects long repeated sentences and rotating sentence sets', () => {
+    expect(detectRepetitionLoop(sentence.repeat(100))).not.toBeNull();
+    expect(detectRepetitionLoop(cycle.repeat(8))).not.toBeNull();
+    const guard = new RepetitionStreamGuard();
+    let hit = false;
+    for (const ch of cycle.repeat(15)) {
+      if (guard.push(ch)) { hit = true; break; }
+    }
+    expect(hit).toBe(true);
+  });
+
+  it('allows finite repetitions, varied prose, fenced code and table headers', () => {
+    for (const text of [
+      sentence.repeat(8),
+      cycle.repeat(7),
+      Array.from({ length: 80 }, (_, i) => `第${i}轮检查服务${i * 17}，结果有所变化，因此需要继续验证。`).join('\n'),
+      Array.from({ length: 8 }, () => '```ts\n  result.push({ id: nextId(), value: compute(input) });\n```\n').join(''),
+      '| source | description of current observed status |\n'.repeat(80),
+      ' '.repeat(5000),
+    ]) expect(detectRepetitionLoop(text)).toBeNull();
+    expect(detectRepetitionLoop('ab'.repeat(100))).not.toBeNull();
+  });
+});

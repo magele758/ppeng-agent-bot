@@ -184,7 +184,7 @@ const ERROR_KINDS = new Set([
 
 export type LangfuseFetch = (
   input: string,
-  init?: { method?: string; headers?: Record<string, string>; body?: string }
+  init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal }
 ) => Promise<{
   ok: boolean;
   status: number;
@@ -666,15 +666,66 @@ export function buildLangfuseBatch(
   return batch;
 }
 
+export interface LangfuseDeliveryStatus {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  inFlight: number;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  lastError: string | null;
+}
+
+type LangfusePostResult = { ok: boolean; status?: number; error?: string };
+const LANGFUSE_REQUEST_TIMEOUT_MS = 5000;
+const deliveryStates = new WeakMap<LangfuseSettingsStore, {
+  fingerprint: string;
+  status: LangfuseDeliveryStatus;
+}>();
+
+function deliveryState(store: LangfuseSettingsStore, chain: LangfuseChain | null): LangfuseDeliveryStatus {
+  const fingerprint = createHash('sha256').update(JSON.stringify(chain)).digest('hex');
+  const existing = deliveryStates.get(store);
+  if (existing?.fingerprint === fingerprint) return existing.status;
+  const status: LangfuseDeliveryStatus = {
+    attempted: 0, succeeded: 0, failed: 0, inFlight: 0,
+    lastSuccessAt: null, lastFailureAt: null, lastError: null
+  };
+  deliveryStates.set(store, { fingerprint, status });
+  return status;
+}
+
+/** Current-connection, process-local batch counters. Probes are excluded. */
+export function readLangfuseDelivery(
+  store: LangfuseSettingsStore,
+  env: NodeJS.ProcessEnv = process.env
+): LangfuseDeliveryStatus {
+  return { ...deliveryState(store, resolveLangfuseChain(store, env)) };
+}
+
+function recordDelivery(status: LangfuseDeliveryStatus, result: LangfusePostResult): void {
+  status.inFlight -= 1;
+  if (result.ok) {
+    status.succeeded += 1;
+    status.lastSuccessAt = nowIso();
+    return;
+  }
+  status.failed += 1;
+  status.lastFailureAt = nowIso();
+  status.lastError = result.error ?? 'network';
+}
+
 async function postIngestion(
   chain: LangfuseChain,
   batch: LangfuseBatchEvent[],
-  fetchImpl: LangfuseFetch
-): Promise<{ ok: boolean; status?: number; error?: string }> {
+  fetchImpl: LangfuseFetch,
+  signal: AbortSignal
+): Promise<LangfusePostResult> {
   const url = langfuseIngestionUrl(chain.baseUrl);
   try {
     const res = await fetchImpl(url, {
       method: 'POST',
+      signal,
       headers: {
         Authorization: basicAuthHeader(chain.publicKey, chain.secretKey),
         'Content-Type': 'application/json'
@@ -688,7 +739,7 @@ async function postIngestion(
     try {
       body = await res.json();
     } catch {
-      return { ok: true, status: res.status };
+      return { ok: false, status: res.status, error: 'invalid_response' };
     }
     if (
       body &&
@@ -696,14 +747,31 @@ async function postIngestion(
       Array.isArray((body as { errors?: unknown }).errors) &&
       ((body as { errors: unknown[] }).errors.length > 0)
     ) {
-      return { ok: false, status: res.status, error: 'ingestion errors' };
+      return { ok: false, status: res.status, error: 'ingestion_errors' };
     }
     return { ok: true, status: res.status };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : String(err)
-    };
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+}
+
+async function timedPostIngestion(
+  chain: LangfuseChain,
+  batch: LangfuseBatchEvent[],
+  fetchImpl: LangfuseFetch
+): Promise<LangfusePostResult> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<LangfusePostResult>((resolve) => {
+    timer = setTimeout(() => {
+      resolve({ ok: false, error: 'timeout' });
+      controller.abort();
+    }, LANGFUSE_REQUEST_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([postIngestion(chain, batch, fetchImpl, controller.signal), timeout]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -722,7 +790,10 @@ export async function mirrorTraceToLangfuse(
     if (!chain) return;
     const hinted = modelFromStore(store, sessionId);
     const batch = buildLangfuseBatch(sessionId, event, hinted ? { model: hinted } : undefined);
-    await postIngestion(chain, batch, fetchImpl);
+    const status = deliveryState(store, chain);
+    status.attempted += 1;
+    status.inFlight += 1;
+    recordDelivery(status, await timedPostIngestion(chain, batch, fetchImpl));
   } catch {
     // fail-open
   }
@@ -752,7 +823,7 @@ export async function probeLangfuse(
         ts
       )
     ];
-    return await postIngestion(
+    return await timedPostIngestion(
       {
         baseUrl: chain.baseUrl.trim().replace(/\/+$/, ''),
         publicKey: chain.publicKey,

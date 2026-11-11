@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 442 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 447 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -66,10 +66,11 @@
 - `auto-review-shell-mcp` Auto-review 工具级审批卡（高危 Shell/MCP）
 - `auto-source-continuity` Auto 对话连续执行
 
-## background（1）
+## background（2）
 
 需求正文见 [other](other.md)。
 
+- `background-job-notice` 后台任务回执保留系统身份
 - `background-job-restart` 重启后中断无人执行的后台命令
 
 ## bg（1）
@@ -411,6 +412,12 @@
 - `dev-lab-process-cleanup` 开发启动器退出时完整清理子进程
 - `dev-tailnet-https` 本地启动自动同步 Tailnet HTTPS
 
+## diagnostic（1）
+
+需求正文见 [other](other.md)。
+
+- `diagnostic-safety-scope` 远程诊断与后台通知保持正确权限边界
+
 ## discovery（1）
 
 需求正文见 [other](other.md)。
@@ -561,6 +568,12 @@
 - `lab-registered-machines` Lab Settings → Tools → Registered Machines panel
 - `lab-startup-request-load` 控制台启动时的请求负担
 - `lab-startup-timing` Lab 会话显示启动耗时
+
+## langfuse（1）
+
+需求正文见 [other](other.md)。
+
+- `langfuse-delivery-health` Langfuse 实际上报状态与超时
 
 ## lcu（2）
 
@@ -968,12 +981,13 @@
 - `settings-categories` 设置页「行为 / 安全 / 工具 / 集成」分类易用化
 - `settings-models-onboarding` 设置：模型向导、首次引导、搜索与保存状态
 
-## shared（2）
+## shared（3）
 
 需求正文见 [other](other.md)。
 
 - `shared-chat-header` 会话和群聊统一浮动顶部
 - `shared-info-compact` 共享信息紧凑入口
+- `shared-skill-exact-id` 共享技能精确标识可加载
 
 ## shell（1）
 
@@ -1090,6 +1104,12 @@
 - `tool-observation-thumbnails` 工具观察截图缩略图
 - `tool-progress-guard` 重复工具调用按实际进展判断
 - `tool-search-experiment` 可切换的增强工具检索实验
+
+## trace（1）
+
+需求正文见 [other](other.md)。
+
+- `trace-stream-retention` 恢复路径消息身份与长句复读保护
 
 ## turn（2）
 

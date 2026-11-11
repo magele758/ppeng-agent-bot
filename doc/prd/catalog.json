@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 442,
+    "implemented": 447,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -125,6 +125,13 @@
       "requirement": "auto的权限太低了，一点也不auto，这种怎么都要我审批，简直不能用，导致我只有bypass的能用",
       "verificationStage": "software",
       "file": "acceptance/auto-source-continuity.yaml"
+    },
+    {
+      "id": "background-job-notice",
+      "title": "后台任务回执保留系统身份",
+      "requirement": "这个是什么东西\n那你分多个Agent修复一下问题",
+      "verificationStage": "software",
+      "file": "acceptance/background-job-notice.yaml"
     },
     {
       "id": "background-job-restart",
@@ -1569,6 +1576,13 @@
       "file": "acceptance/dev-tailnet-https.yaml"
     },
     {
+      "id": "diagnostic-safety-scope",
+      "title": "远程诊断与后台通知保持正确权限边界",
+      "requirement": "那你分多个Agent修复一下问题",
+      "verificationStage": "software",
+      "file": "acceptance/diagnostic-safety-scope.yaml"
+    },
+    {
       "id": "discovery-default-on",
       "title": "能力发现总开关默认开启",
       "requirement": "能力发现 / tool_search 的总开关要默认开启。",
@@ -1924,6 +1938,13 @@
       "requirement": "在 Lab 会话里显示启动耗时",
       "verificationStage": "software",
       "file": "acceptance/lab-startup-timing.yaml"
+    },
+    {
+      "id": "langfuse-delivery-health",
+      "title": "Langfuse 实际上报状态与超时",
+      "requirement": "那你分多个Agent修复一下问题",
+      "verificationStage": "software",
+      "file": "acceptance/langfuse-delivery-health.yaml"
     },
     {
       "id": "lcu-app-grant",
@@ -2745,6 +2766,13 @@
       "file": "acceptance/shared-info-compact.yaml"
     },
     {
+      "id": "shared-skill-exact-id",
+      "title": "共享技能精确标识可加载",
+      "requirement": "那你分多个Agent修复一下问题",
+      "verificationStage": "software",
+      "file": "acceptance/shared-skill-exact-id.yaml"
+    },
+    {
       "id": "shell-output-untrusted-fence",
       "title": "命令输出作为不可信内容围栏后再给模型",
       "requirement": "r3-7：bash / bg_run / work_evidence 的命令 stdout/stderr 与网页、MCP、IM 一样用 fenceExternalContent 包裹，模型不得把命令输出当成指令。",
@@ -2995,6 +3023,13 @@
       "requirement": "那你用配置来配合，帮我完成这个功能开发吧，搞好了，我去实验下效果",
       "verificationStage": "software",
       "file": "acceptance/tool-search-experiment.yaml"
+    },
+    {
+      "id": "trace-stream-retention",
+      "title": "恢复路径消息身份与长句复读保护",
+      "requirement": "那你分多个Agent修复一下问题",
+      "verificationStage": "software",
+      "file": "acceptance/trace-stream-retention.yaml"
     },
     {
       "id": "turn-end-actions",

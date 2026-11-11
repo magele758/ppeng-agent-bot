@@ -1,0 +1,19 @@
+id: trace-stream-retention
+title: 恢复路径消息身份与长句复读保护
+status: implemented
+requirement: |
+  那你分多个Agent修复一下问题
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 助手流式回复发生截断续写、重复中止或思考空转中止
+    when: 已生成的回复被保留下来
+    then: 每条保留回复在持久提交后发送自己的消息身份，失败的保存或提交不发送保存通知
+  - id: AC-2
+    given: 模型输出大量相同长句或在少量长句之间持续循环
+    when: 重复占据最近输出的大部分内容
+    then: 保护机制停止异常输出，有限重复、变动正文和合法代码表格不被长句规则误拦
+  - id: AC-3
+    given: 被截断的模型响应包含看似完整的工具调用
+    when: 回复进入恢复流程
+    then: 不执行或持久保留该未确认工具波，并在既有次数上限内使用原输入重试

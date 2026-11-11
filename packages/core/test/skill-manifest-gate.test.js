@@ -350,3 +350,20 @@ test('a new ordinary request joined to a running reply drops the previous skill 
     await running.catch(() => undefined);
   }
 });
+
+test('background receipts do not release a running request ceiling [AC:diagnostic-safety-scope#AC-4]', async t => {
+  const {store,session} = sessionFixture(t);
+  const {beginSkillTask} = await import('../dist/skills/skill-task-scope.js');
+  const {persistActiveSkillManifest} = await import('../dist/skills/skill-manifest-gate.js');
+  store.appendMessage(session.id,'user',[{type:'text',text:'plan'}]);
+  beginSkillTask(store,session.id);
+  persistActiveSkillManifest(store,session.id,PLANNING_SKILL_MANIFEST);
+  for (const key of ['background-job:bg_legacy','source:event:background-job:bg_current']) {
+    store.appendMessage(session.id,'user',[{type:'text',text:'background completed'}],{key});
+    beginSkillTask(store,session.id);
+    assert.equal(store.getSession(session.id).metadata.activeSkillManifests.length,1,key);
+  }
+  store.appendMessage(session.id,'user',[{type:'text',text:'new human request'}]);
+  beginSkillTask(store,session.id);
+  assert.deepEqual(store.getSession(session.id).metadata.activeSkillManifests,[]);
+});

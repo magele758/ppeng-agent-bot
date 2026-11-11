@@ -5,6 +5,8 @@
 import { builtinAgents } from '../builtin-agents.js';
 import { ResearchPipeline } from '../deepresearch/pipeline.js';
 import { NotFoundError } from '../errors.js';
+import { fenceShellOutput } from '../safety/external-content.js';
+import { redactToolContent } from '../sandbox/result-redaction.js';
 import { inheritBotIdentityMetadata } from '../memory/bot-memory-scope.js';
 import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { CommandHardlineDeniedError, matchCommandHardline } from '../sandbox/command-hardline.js';
@@ -25,6 +27,7 @@ import type { SqliteStateStore } from '../storage.js';
 import type { WorkspaceManager } from '../workspaces.js';
 import type {
   BackgroundJobRecord,
+  BackgroundJobStatus,
   RunContext,
   SessionRecord,
   TaskRecord
@@ -383,6 +386,56 @@ export async function spawnTeammateOutcome(
   return withChildSession({ ok: true, content: spawned }, session.id, 'teammateSessionId');
 }
 
+function recordBackgroundReceipt(host: SpawnHost, job: BackgroundJobRecord): void {
+  const output = redactToolContent(job.result ?? '(no output)');
+  const text = `[background-job] ${job.id} ${job.status}; finished_at=${job.updatedAt}\n${fenceShellOutput('background job output', output.slice(0, 4000))}`;
+  host.store.runWithoutWriterScope(() => {
+    const item = host.store.enqueueSteer(job.sessionId, text, {
+      role: 'system', source: 'event', key: `background-job:${job.id}`
+    });
+    // Inbox application preserves this receipt's ID and completion timestamp.
+    host.store.appendMessage(job.sessionId, 'system', [textPart(text)], { key: receiptKey(item, job.id) });
+  });
+}
+
+function receiptKey(item: { key?: string } | undefined, jobId: string): string {
+  return item?.key ?? `source:event:background-job:${jobId}`;
+}
+
+function storedBackgroundJob(
+  host: SpawnHost,
+  job: BackgroundJobRecord,
+  status: BackgroundJobStatus,
+  resultText: string
+): BackgroundJobRecord | undefined {
+  try {
+    return host.store.updateBackgroundJob(job.id, status, resultText) ?? {
+      ...job,
+      status,
+      result: resultText,
+      updatedAt: new Date().toISOString()
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function settleBackgroundJob(
+  host: SpawnHost,
+  job: BackgroundJobRecord,
+  status: BackgroundJobStatus,
+  resultText: string
+): void {
+  if (!host.store.db.isOpen) return;
+  const record = storedBackgroundJob(host, job, status, resultText);
+  if (!record) return;
+  try {
+    recordBackgroundReceipt(host, record);
+  } catch {
+    // The job row is already final. A notice failure must not reject the sandbox promise.
+  }
+}
+
 export async function startBackgroundJob(
   host: SpawnHost,
   sessionId: string,
@@ -446,15 +499,12 @@ export async function startBackgroundJob(
     })
     .then((result) => {
       host.backgroundJobAborts.delete(job.id);
-      if (!host.store.db.isOpen) return;
       const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n') || '(no output)';
-      host.store.updateBackgroundJob(job.id, 'completed', output);
-      host.store.runWithoutWriterScope(() => host.store.enqueueSteer(sessionId, `Background job ${job.id} completed.\n${output.slice(0, 4000)}`, {role:'user',key:`background-job:${job.id}`}));
+      const status = result.code === 0 && !result.signal ? 'completed' : 'error';
+      settleBackgroundJob(host, job, status, `${output}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`);
     }).catch((error) => {
       host.backgroundJobAborts.delete(job.id);
-      if (!host.store.db.isOpen) return;
-      host.store.updateBackgroundJob(job.id, 'error', String(error));
-      host.store.runWithoutWriterScope(() => host.store.enqueueSteer(sessionId, `Background job ${job.id} failed: ${String(error)}`, {role:'user',key:`background-job:${job.id}`}));
+      settleBackgroundJob(host, job, 'error', String(error));
     });
 
   return job;

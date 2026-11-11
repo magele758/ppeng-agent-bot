@@ -17,6 +17,8 @@ import { createKernelHookRegistry } from './hooks.js';
 import { createGoalGateFromMetadata } from '../goal/goal-gate.js';
 import { runSessionKernel } from './kernel.js';
 import { WORKING_LOG_APPENDIX_HEAD } from './prepare-turn-input.js';
+import { ReasoningSpinWatchdog } from '../streaming/reasoning-spin-watchdog.js';
+import { createEventLogStepTx } from '../session/event-log-saga.js';
 
 function agent(): AgentSpec {
   return {
@@ -152,6 +154,168 @@ function createHarness(opts?: {
 
   return { host, store, session, surface, spec, calls, echo, approvals };
 }
+
+describe('saved replies commit identities [AC:trace-stream-retention#AC-1]', () => {
+  function savedHarness(model: () => ModelTurnResult, env: Record<string, string> = {}) {
+    const h = createHarness({ model, host: { maxTurnsPerRun: 12, env } });
+    h.host.modelAdapter = { ...h.host.modelAdapter, name: 'heuristic' };
+    const order: string[] = [];
+    const systemTexts: string[] = [];
+    const append = h.store.appendMessage;
+    h.store.appendMessage = (sid, role, parts, opts) => {
+      if (role === 'system') systemTexts.push(...parts.flatMap(p => p.type === 'text' ? [p.text] : []));
+      return append(sid, role, parts, opts);
+    };
+    let committedSeq = 1;
+    h.host.stepTx = {
+      beginStep: () => { order.push('begin'); },
+      commitStep: async () => {
+        await Promise.resolve();
+        committedSeq = h.store.foldMessages(h.session.id).at(-1)?.seq ?? 1;
+        order.push('commit');
+      },
+      rollbackUncommitted: () => {
+        const last = h.store.foldMessages(h.session.id).at(-1)?.seq ?? committedSeq;
+        if (last > committedSeq) h.store.hideRange?.(h.session.id, committedSeq + 1, last);
+      },
+    };
+    h.host.latestClosedCheckpoint = () => ({
+      id: 'committed', sessionId: h.session.id, seq: committedSeq,
+      turn: 0, label: 'model_done', createdAt: new Date().toISOString(),
+    });
+    const ids: string[] = [];
+    const onModelStreamChunk = (chunk: { type: string; messageId?: string }) => {
+      if (chunk.type !== 'assistant_saved') return;
+      expect(order.at(-1)).toBe('commit');
+      const saved = h.store.foldMessages(h.session.id).find(m => m.id === chunk.messageId);
+      expect(saved?.role).toBe('assistant');
+      ids.push(chunk.messageId!);
+      order.push('saved');
+    };
+    const run = () => runSessionKernel(h.host, h.session.id, { onModelStreamChunk });
+    const assertSaved = () => {
+      const messages = h.store.foldMessages(h.session.id).filter(m => m.role === 'assistant');
+      expect(ids).toEqual(messages.map(m => m.id));
+      expect(new Set(ids).size).toBe(ids.length);
+      return messages;
+    };
+    return { ...h, run, assertSaved, order, ids, systemTexts };
+  }
+
+  it('publishes the normal reply after commit', async () => {
+    const h = savedHarness(() => textResult('answer'));
+    await h.run();
+    expect(h.assertSaved()).toHaveLength(1);
+  });
+
+  it('commits a truncated retained shot before the next shot', async () => {
+    let count = 0;
+    const h = savedHarness(() => count++ === 0
+      ? { ...textResult('partial reply'), truncated: true, finishReason: 'length' }
+      : textResult('continued reply'));
+    await h.run();
+    expect(h.assertSaved()).toHaveLength(2);
+  });
+
+  it('can retain the first truncated reply on an empty surface', async () => {
+    let count = 0;
+    const h = createHarness({ model: () => count++ === 0
+      ? { ...textResult('first partial reply'), truncated: true, finishReason: 'length' }
+      : textResult('continued reply') });
+    const opening = h.store.foldMessages(h.session.id)[0]!;
+    h.surface.hideRange(h.session.id, opening.seq!, opening.seq!);
+    expect(h.store.foldMessages(h.session.id)).toEqual([]);
+    h.host.stepTx = createEventLogStepTx(h.surface);
+    const ids: string[] = [];
+    await runSessionKernel(h.host, h.session.id, { onModelStreamChunk(chunk) {
+      if (chunk.type === 'assistant_saved') ids.push(chunk.messageId);
+    } });
+    const replies = h.store.foldMessages(h.session.id).filter(m => m.role === 'assistant');
+    expect(replies).toHaveLength(2);
+    expect(ids).toEqual(replies.map(m => m.id));
+  });
+
+  it('retries a truncated complete tool request without retaining or executing the unfinished wave [AC:trace-stream-retention#AC-3]', async () => {
+    let count = 0;
+    const h = createHarness({ model: () => count++ === 0
+      ? { ...toolResult('echo', 'truncated-complete-call'), truncated: true, finishReason: 'length' }
+      : textResult('recovered answer') });
+    h.host.stepTx = createEventLogStepTx(h.surface);
+    const ids: string[] = [];
+    await runSessionKernel(h.host, h.session.id, { onModelStreamChunk(chunk) {
+      if (chunk.type === 'assistant_saved') ids.push(chunk.messageId);
+    } });
+    const messages = h.store.foldMessages(h.session.id).filter(m => m.role === 'assistant');
+    expect(messages).toHaveLength(1);
+    expect(messages.flatMap(m => m.parts).some(p => p.type === 'tool_call')).toBe(false);
+    expect(ids).toEqual(messages.map(m => m.id));
+    expect(h.calls.execute).toBe(0);
+  });
+
+  it('bounds retries for repeatedly truncated complete tool requests [AC:trace-stream-retention#AC-3]', async () => {
+    let attempts = 0;
+    const h = createHarness({
+      model: () => {
+        attempts += 1;
+        return { ...toolResult('echo', `truncated-${attempts}`), truncated: true, finishReason: 'length' };
+      },
+      host: { maxTurnsPerRun: 12 },
+    });
+    h.host.stepTx = createEventLogStepTx(h.surface);
+    const ids: string[] = [];
+    await runSessionKernel(h.host, h.session.id, { onModelStreamChunk(chunk) {
+      if (chunk.type === 'assistant_saved') ids.push(chunk.messageId);
+    } });
+    expect(attempts).toBe(3);
+    expect(ids).toEqual([]);
+    expect(h.store.foldMessages(h.session.id).some(m => m.role === 'assistant')).toBe(false);
+    expect(h.calls.execute).toBe(0);
+  });
+
+  it('retains a reasoning-spin terminal shot through rollback', async () => {
+    const spin = vi.spyOn(ReasoningSpinWatchdog.prototype, 'noteParts').mockReturnValue('reasoning spin');
+    try {
+      const h = savedHarness(() => textResult('retained spin response'));
+      await h.run();
+      expect(h.assertSaved()).toHaveLength(1);
+    } finally { spin.mockRestore(); }
+  });
+
+  it('retains the repeat-abort shot through rollback', async () => {
+    const h = savedHarness(() => textResult('same answer'), { RAW_AGENT_RECOVERY_ADVISORY_GRACE_BUDGET: '0' });
+    h.host.evaluateGoalGate = async () => ({ met: false, reason: 'continue' });
+    await h.run();
+    expect(h.assertSaved()).toHaveLength(4);
+    expect(h.systemTexts.some(text => text.includes('Stopped: repeated model output'))).toBe(true);
+  });
+
+  it('retains the critical-strike shot through rollback', async () => {
+    const h = savedHarness(() => textResult('same answer'), { RAW_AGENT_RECOVERY_ADVISORY_GRACE_BUDGET: '2' });
+    h.host.evaluateGoalGate = async () => ({ met: false, reason: 'continue' });
+    await h.run();
+    expect(h.assertSaved()).toHaveLength(5);
+    expect(h.systemTexts.some(text => text.includes('critical strike'))).toBe(true);
+  });
+
+  it('does not publish a saved identity when append fails', async () => {
+    const h = savedHarness(() => ({ ...textResult('partial reply'), truncated: true }));
+    const append = h.store.appendMessage;
+    h.store.appendMessage = (sid, role, parts, opts) => {
+      if (role === 'assistant') throw new Error('append failed');
+      return append(sid, role, parts, opts);
+    };
+    await expect(h.run()).rejects.toThrow('append failed');
+    expect(h.ids).toEqual([]);
+  });
+
+  it('does not publish a retained identity when commit fails', async () => {
+    const h = savedHarness(() => ({ ...textResult('partial reply'), truncated: true }));
+    h.host.stepTx!.commitStep = async () => { throw new Error('commit failed'); };
+    await expect(h.run()).rejects.toThrow('commit failed');
+    expect(h.ids).toEqual([]);
+    expect(h.store.foldMessages(h.session.id).some(m => m.role === 'assistant')).toBe(false);
+  });
+});
 
 describe('runSessionKernel wiring', () => {
   it('completes without optional hooks (compat)', async () => {

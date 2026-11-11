@@ -6,7 +6,8 @@ export function beginSkillTask(store:SqliteStateStore,sessionId:string):void {
  const session=store.getSession(sessionId);
  if(!session)return;
  const request=store.db.prepare(`SELECT id,seq FROM session_messages WHERE session_id=? AND role='user'
-   AND (key IS NULL OR (key NOT LIKE '%steer%' AND key NOT LIKE '%note%')) ORDER BY seq DESC LIMIT 1`).get(sessionId) as {id:string;seq:number}|undefined;
+   AND (key IS NULL OR (key NOT LIKE '%steer%' AND key NOT LIKE '%note%'
+     AND key NOT LIKE 'background-job:%' AND key NOT LIKE 'source:event:background-job:%')) ORDER BY seq DESC LIMIT 1`).get(sessionId) as {id:string;seq:number}|undefined;
  if(!request||session.metadata.activeSkillManifestTaskId===request.id)return;
  const preserve=legacyManifestBelongsToRequest(store,sessionId,session.metadata,request.seq);
  resetExpiredManifests(sessionId,preserve);

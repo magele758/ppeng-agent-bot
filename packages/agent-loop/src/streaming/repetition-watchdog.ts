@@ -74,7 +74,37 @@ function isWhitespaceOnly(s: string): boolean {
  * Detect degenerate repetition in accumulated stream text.
  * @returns a human-readable reason on hit, else null.
  */
+function detectLongRepetition(text: string): string | null {
+  const tail = text.slice(-32768);
+  const prose = tail.replace(/(```|~~~)[\s\S]*?(?:\1|$)/g, '');
+  const units = prose.split(/\r?\n|(?<=[。！？.!?])\s*/u);
+  if (!/[。！？.!?\n]$/.test(prose)) units.pop();
+  if (text.length > tail.length) units.shift();
+  const recent = units.slice(-256);
+  const samples = recent.map((unit) => unit.trim()).filter((unit) =>
+    unit.length >= 20 && !/^[|#>]/.test(unit) && !/[{};]|=>/.test(unit));
+  if (samples.length < 32) return null;
+  const counts = new Map<string, number>();
+  for (const unit of samples) counts.set(unit, (counts.get(unit) ?? 0) + 1);
+  let repeatedChars = 0;
+  for (const [unit, count] of counts) {
+    if (count >= 8) repeatedChars += unit.length * count;
+  }
+  const sampledChars = recent.join('').length;
+  if (repeatedChars < sampledChars * 0.8) return null;
+  return `long sentence/line repetition covers ${Math.round(repeatedChars / sampledChars * 100)}% of the last ${recent.length} units`;
+}
+
 export function detectRepetitionLoop(
+  text: string,
+  config: RepetitionWatchdogConfig = loadRepetitionWatchdogConfig()
+): string | null {
+  const short = detectShortRepetitionLoop(text, config);
+  if (short || text.length < config.minTotalLen) return short;
+  return detectLongRepetition(text);
+}
+
+function detectShortRepetitionLoop(
   text: string,
   config: RepetitionWatchdogConfig = loadRepetitionWatchdogConfig()
 ): string | null {
@@ -142,6 +172,7 @@ export function isRepetitionAbort(err: unknown): err is RepetitionLoopAbortError
 export class RepetitionStreamGuard {
   private acc = '';
   private sinceCheck = 0;
+  private sinceLongCheck = 0;
 
   constructor(
     private readonly config: RepetitionWatchdogConfig = loadRepetitionWatchdogConfig(),
@@ -153,9 +184,14 @@ export class RepetitionStreamGuard {
     if (!delta) return null;
     this.acc += delta;
     this.sinceCheck += delta.length;
+    this.sinceLongCheck += delta.length;
     if (this.sinceCheck < this.checkEveryChars) return null;
     this.sinceCheck = 0;
-    return detectRepetitionLoop(this.acc, this.config);
+    const short = detectShortRepetitionLoop(this.acc, this.config);
+    if (short || this.acc.length < this.config.minTotalLen) return short;
+    if (this.sinceLongCheck < 256) return null;
+    this.sinceLongCheck = 0;
+    return detectLongRepetition(this.acc);
   }
 
   get text(): string {

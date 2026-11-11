@@ -444,6 +444,7 @@ test('bg_run and work_evidence honor the same isolation choice and direct approv
   try {
     const osUp = nativeAvailability().os;
     await startBackgroundJob(host, 's', 'printf hi');
+    await new Promise((resolve) => setImmediate(resolve));
     assert.equal(jobs.length, 1);
     if (osUp) assert.equal(calls[0].isolation, 'os');
     else assert.equal(calls[0].isolation, 'direct');
@@ -462,6 +463,7 @@ test('bg_run and work_evidence honor the same isolation choice and direct approv
     assert.equal(jobs.length, 1);
     rows.pop();
     await startBackgroundJob(host, 's', args.command, { isolation: args.isolation });
+    await new Promise((resolve) => setImmediate(resolve));
     assert.equal(calls.length, 2);
     assert.equal(calls[1].isolation, 'direct');
 

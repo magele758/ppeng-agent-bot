@@ -202,6 +202,7 @@ test('background shell follows saved direct instead of a per-command os choice [
   };
   try {
     await startBackgroundJob(host, 's', 'ssh -V', { isolation: 'os' });
+    await new Promise((resolve) => setImmediate(resolve));
     assert.equal(calls.length, 1);
     assert.equal(calls[0].isolation, 'direct');
   } finally {
