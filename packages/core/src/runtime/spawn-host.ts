@@ -27,6 +27,7 @@ import type { SqliteStateStore } from '../storage.js';
 import type { WorkspaceManager } from '../workspaces.js';
 import type {
   BackgroundJobRecord,
+  BackgroundJobStatus,
   RunContext,
   SessionRecord,
   TaskRecord
@@ -393,8 +394,46 @@ function recordBackgroundReceipt(host: SpawnHost, job: BackgroundJobRecord): voi
       role: 'system', source: 'event', key: `background-job:${job.id}`
     });
     // Inbox application preserves this receipt's ID and completion timestamp.
-    host.store.appendMessage(job.sessionId, 'system', [textPart(text)], { key: item.key });
+    host.store.appendMessage(job.sessionId, 'system', [textPart(text)], { key: receiptKey(item, job.id) });
   });
+}
+
+function receiptKey(item: { key?: string } | undefined, jobId: string): string {
+  return item?.key ?? `source:event:background-job:${jobId}`;
+}
+
+function storedBackgroundJob(
+  host: SpawnHost,
+  job: BackgroundJobRecord,
+  status: BackgroundJobStatus,
+  resultText: string
+): BackgroundJobRecord | undefined {
+  try {
+    return host.store.updateBackgroundJob(job.id, status, resultText) ?? {
+      ...job,
+      status,
+      result: resultText,
+      updatedAt: new Date().toISOString()
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function settleBackgroundJob(
+  host: SpawnHost,
+  job: BackgroundJobRecord,
+  status: BackgroundJobStatus,
+  resultText: string
+): void {
+  if (!host.store.db.isOpen) return;
+  const record = storedBackgroundJob(host, job, status, resultText);
+  if (!record) return;
+  try {
+    recordBackgroundReceipt(host, record);
+  } catch {
+    // The job row is already final. A notice failure must not reject the sandbox promise.
+  }
 }
 
 export async function startBackgroundJob(
@@ -460,16 +499,12 @@ export async function startBackgroundJob(
     })
     .then((result) => {
       host.backgroundJobAborts.delete(job.id);
-      if (!host.store.db.isOpen) return;
       const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n') || '(no output)';
       const status = result.code === 0 && !result.signal ? 'completed' : 'error';
-      const record = host.store.updateBackgroundJob(job.id, status, `${output}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`);
-      recordBackgroundReceipt(host, record);
+      settleBackgroundJob(host, job, status, `${output}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`);
     }).catch((error) => {
       host.backgroundJobAborts.delete(job.id);
-      if (!host.store.db.isOpen) return;
-      const record = host.store.updateBackgroundJob(job.id, 'error', String(error));
-      recordBackgroundReceipt(host, record);
+      settleBackgroundJob(host, job, 'error', String(error));
     });
 
   return job;
