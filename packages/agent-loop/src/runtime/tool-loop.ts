@@ -129,6 +129,8 @@ export interface ToolLoopHost {
   getTask(taskId: string): ToolTaskRecord | undefined;
   updateTask(taskId: string, patch: { artifacts: TaskArtifact[] }): void;
   emitTrace(sessionId: string, event: { kind: string; payload?: Record<string, unknown> }): void;
+  /** Abort this run's controller. A newer writer owns a different signal and is left alone. */
+  abortTurn?(sessionId: string, signal?: AbortSignal): void;
 
   /** Optional lifecycle hooks; omit for environments with no hook runner. */
   runLifecycleHook?(input: {
@@ -991,24 +993,24 @@ function jsonUnavailableKey(name: string, ref: string): string {
   return `json\0${name}\0${ref}`;
 }
 
+const SOURCE_UNAVAILABLE_STOPPED = 'Source unavailable. Stopped this turn. Do not call this tool again.';
+
 function repeatedJsonUnavailable(
+  host: ToolLoopHost,
   context: RunContext,
+  sessionId: string,
   name: string,
   args: unknown
 ): ToolExecutionResult | undefined {
   if (!SOURCE_UNAVAILABLE_TOOLS.has(name)) return undefined;
   const ref = argumentRef(args);
   if (!ref || !jsonUnavailableSeen(context).has(jsonUnavailableKey(name, ref))) return undefined;
-  return {
-    ok: false,
-    content: JSON.stringify({
-      error: 'Source unavailable.',
-      error_code: SOURCE_UNAVAILABLE_CODE,
-      ref,
-      retry: false,
-      surfaced: true
-    })
-  };
+  host.emitTrace(sessionId, {
+    kind: 'recovery_abort',
+    payload: { reason: 'source_unavailable', tool: name, trigger: 'source_unavailable' }
+  });
+  host.abortTurn?.(sessionId, turnAbortSignal(context.abortSignal) ?? context.abortSignal);
+  return { ok: false, content: SOURCE_UNAVAILABLE_STOPPED };
 }
 
 function noteJsonUnavailable(context: RunContext, name: string, args: unknown, content: string): void {
@@ -1021,12 +1023,14 @@ function noteJsonUnavailable(context: RunContext, name: string, args: unknown, c
 }
 
 async function runUnlessJsonSourceRepeated(
+  host: ToolLoopHost,
   context: RunContext,
+  sessionId: string,
   name: string,
   args: unknown,
   run: () => Promise<ToolExecutionResult>
 ): Promise<{ executed: boolean; result: ToolExecutionResult }> {
-  const repeated = repeatedJsonUnavailable(context, name, args);
+  const repeated = repeatedJsonUnavailable(host, context, sessionId, name, args);
   if (repeated) return { executed: false, result: repeated };
   const result = await run();
   noteJsonUnavailable(context, name, args, result.content ?? '');
@@ -1109,7 +1113,7 @@ async function executeScopedTool(
     if (context.abortSignal?.aborted) throw new Error(cancelledBySteer(context) ? 'Tool cancelled by user interjection before dispatch' : 'Session aborted before tool dispatch');
     host.assertSessionWritable?.(sessionId);
     entered = true;
-    const once = await runUnlessJsonSourceRepeated(context, tool.name, execInput, () =>
+    const once = await runUnlessJsonSourceRepeated(host, context, sessionId, tool.name, execInput, () =>
       tool.execute(context, execInput as Record<string, unknown>)
     );
     entered = once.executed;

@@ -171,24 +171,29 @@ test('second JSON SOURCE_UNAVAILABLE read of the same source does not execute [A
   const second = await read(ctx, { ref: 'memory:user:missing' });
   assert.equal(reads, 1);
   assert.deepEqual(seen, ['memory:user:missing']);
-  const secondBody = JSON.parse(second.content);
-  assert.equal(secondBody.error_code, 'SOURCE_UNAVAILABLE');
-  assert.equal(secondBody.ref, 'memory:user:missing');
-  assert.equal(secondBody.surfaced, true);
-  assert.equal(secondBody.retry, false);
-  assert.equal(aborts.length, 0);
-  assert.equal(traces.length, 0);
+  assert.equal(second.ok, false);
+  assert.equal(second.content, STOPPED);
+  assert.deepEqual(aborts, [{ sessionId: 'sess-json', signal }]);
+  assert.equal(traces.length, 1);
+  assert.equal(traces[0].sessionId, 'sess-json');
+  assert.equal(traces[0].event.kind, 'recovery_abort');
+  assert.deepEqual(traces[0].event.payload, {
+    reason: 'source_unavailable',
+    tool: 'memory_read',
+    trigger: 'source_unavailable'
+  });
 
   const other = await read(ctx, { ref: 'memory:user:other' });
   assert.equal(reads, 2);
   assert.equal(JSON.parse(other.content).error_code, 'SOURCE_UNAVAILABLE');
   assert.equal(JSON.parse(other.content).surfaced, undefined);
-  assert.equal(aborts.length, 0);
+  assert.equal(aborts.length, 1);
 
   const nextTurn = await read(context('sess-json', { signal: new AbortController().signal, writer: 'run-json' }), { ref: 'memory:user:missing' });
   assert.equal(reads, 3);
   assert.equal(JSON.parse(nextTurn.content).error_code, 'SOURCE_UNAVAILABLE');
   assert.equal(JSON.parse(nextTurn.content).surfaced, undefined);
+  assert.equal(aborts.length, 1);
 
   const page = await read(ctx, { ref: 'memory:scratch:page', offset: 0 });
   const nextPage = await read(ctx, { ref: 'memory:scratch:page', offset: 7 });
@@ -203,5 +208,6 @@ test('second JSON SOURCE_UNAVAILABLE read of the same source does not execute [A
   assert.equal(denied.content.includes('SOURCE_UNAVAILABLE'), false);
   assert.equal(deniedAgain.content.includes('SOURCE_UNAVAILABLE'), false);
   assert.equal(reads, 7);
-  assert.equal(aborts.length, 0);
+  assert.equal(aborts.length, 1);
+  assert.equal(traces.length, 1);
 });
