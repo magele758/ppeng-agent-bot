@@ -1,0 +1,230 @@
+{
+  "model": {
+    "name": "grok/grok-4.7-build-fast@500k",
+    "source": "Existing local model configuration; credentials excluded"
+  },
+  "outcome": "pass",
+  "startedAt": "2026-11-11T10:47:33.618Z",
+  "finishedAt": "2026-11-11T10:49:30.110Z",
+  "productionSourceSha256": {
+    "packages/core/src/runtime/quality-gates.ts": "bfd7c0a46d19bcf8f54dc9a00a873430c843053f9e3b653eacc3f223a108ae71",
+    "packages/core/src/quality/gate.ts": "3087e0b9ce18721ed4ae9749458cffb84b5769ad93097649d03ac92eebdc2e98",
+    "packages/core/src/swarm/executor.ts": "49f3a3b146498463555a871fb1a2cba996c4abf6fdfa770ba9ec109684cfc7c2",
+    "packages/core/src/orchestrator/engine.ts": "f749e41f45d7c729f11dafd23401eaa13d4b5592a0aeb81885edce2c643b6a9f"
+  },
+  "operatorTestExitCode": 0,
+  "operatorFixtureDiffExitCode": 0,
+  "testFixtureSha256": "110089f07670c947152ea1824b46445593115c1795fb72993bd5b33cfa3c4b80",
+  "orchestrationStatus": "completed",
+  "steps": [
+    {
+      "stage": "implement",
+      "status": "completed",
+      "evidence": "swarm:srun_fc035270846b42989dee99c878a33c2f:completed"
+    },
+    {
+      "stage": "review",
+      "status": "completed",
+      "evidence": "{\"passed\":true,\"summary\":\"Source inspection shows totals.mjs exports summarize(rows): groups {account,cents} with a Map, sorts account keys ascending, and sums safe integer cents including negatives (b: 250+-50=200). summarize([]) returns []. Number.isSafeInteger rejects fractional and non-finite cents (1.5, Infinity) and throws when a running sum leaves the safe-integer range (MAX_SAFE_INTEGER+1). acceptance.test.mjs covers those five cases and imports summarize from ./totals.mjs; this review did not edit it or run tests (test execution is a separate stage; host checks fixture/git baseline). Residual risk: extra guards (non-array rows, empty account) are stricter than the tests but do not conflict with them; an intermediate unsafe sum is rejected even if a later row would bring the total back into range.\",\"checks\":[{\"criterion\":\"Implement totals.mjs exporting summarize(rows): group {account,cents} by account, sort accounts ascending, sum integer cents including negatives; empty input returns []; reject non-safe-integer cents and unsafe summed totals. Read acceptance.test.mjs, implement only totals.mjs, and run node --test acceptance.test.mjs. Do not edit the acceptance test. For this reproducible acceptance trial, independent test stages must execute work_evidence with verify_command exactly \\\"node --test acceptance.test.mjs\\\". Do not combine it with ad-hoc probes, Git commands or shell assertions. The host separately verifies fixture integrity and Git baseline; exploratory test proposals may be reported without executing them.\",\"passed\":true,\"evidence\":[\"call-7040b059-3741-4f53-bf6f-9de11f6e6183-1\",\"call-7040b059-3741-4f53-bf6f-9de11f6e6183-0__rk16__CoAgcaCdbY2XOFs6\"]}],\"sessionId\":\"session_ea6929d38483432abff9aa9c76b12650\"}"
+    },
+    {
+      "stage": "test",
+      "status": "completed",
+      "evidence": "{\"passed\":true,\"summary\":\"node --test acceptance.test.mjs passed 5/5 (exit 0): grouping, ascending sort, negative cents, empty input, non-safe-integer cents, and unsafe summed totals. Git porcelain shows only untracked totals.mjs; acceptance.test.mjs was not edited.\",\"checks\":[{\"criterion\":\"Implement totals.mjs exporting summarize(rows): group {account,cents} by account, sort accounts ascending, sum integer cents including negatives; empty input returns []; reject non-safe-integer cents and unsafe summed totals. Read acceptance.test.mjs, implement only totals.mjs, and run node --test acceptance.test.mjs. Do not edit the acceptance test. For this reproducible acceptance trial, independent test stages must execute work_evidence with verify_command exactly \\\"node --test acceptance.test.mjs\\\". Do not combine it with ad-hoc probes, Git commands or shell assertions. The host separately verifies fixture integrity and Git baseline; exploratory test proposals may be reported without executing them.\",\"passed\":true,\"evidence\":[\"call-4f68c64a-784b-4621-be4b-442d4f0ccfd6-0__rk16__TcdmrNjOacihkmqY\"]}],\"sessionId\":\"session_82cdaab639c145578f3c66dbafbad96f\"}"
+    }
+  ],
+  "swarms": [
+    {
+      "status": "completed",
+      "tasks": [
+        {
+          "status": "done",
+          "title": "Implement totals.mjs exporting summarize(rows): group {account,cents} by account, sort accounts ascending, sum integer cents including negatives; empty input returns []; reject non-safe-integer cents and unsafe summed totals. Read acceptance.test.mjs, implement only totals.mjs, and run node --test acceptance.test.mjs. Do not edit the acceptance test. For this reproducible acceptance trial, independent test stages must execute work_evidence with verify_command exactly \"node --test acceptance.test.mjs\". Do not combine it with ad-hoc probes, Git commands or shell assertions. The host separately verifies fixture integrity and Git baseline; exploratory test proposals may be reported without executing them."
+        }
+      ],
+      "reviews": [
+        {
+          "id": "srev_b5f977aef43e438a831a99ee351d0342",
+          "swarmRunId": "srun_fc035270846b42989dee99c878a33c2f",
+          "taskId": "stask_38d19d0eac8e496a9dc5c7695840a918",
+          "reviewerAgentId": "session_dade99cd7c6f48868f1b82942937a1c3",
+          "role": "evaluator",
+          "scores": {},
+          "passed": true,
+          "feedback": "{\"passed\":true,\"sessionId\":\"session_dade99cd7c6f48868f1b82942937a1c3\",\"summary\":\"{\\\"review\\\":\\\"session_bd21658f28ea43b6a3e90516ba65dd6b\\\",\\\"test\\\":\\\"session_dade99cd7c6f48868f1b82942937a1c3\\\",\\\"reason\\\":\\\"node --test acceptance.test.mjs passed 5/5 (exit 0): grouping, ascending sort, negative cents, empty input, non-safe-integer cents, and unsafe summed totals. Only totals.mjs is untracked; acceptance.test.mjs was not edited.\\\"}\",\"checks\":[{\"criterion\":\"review: Implement totals.mjs exporting summarize(rows): group {account,cents} by account, sort accounts ascending, sum integer cents including negatives; empty input returns []; reject non-safe-integer cents and unsafe summed totals. Read acceptance.test.mjs, implement only totals.mjs, and run node --test acceptance.test.mjs. Do not edit the acceptance test. For this reproducible acceptance trial, independent test stages must execute work_evidence with verify_command exactly \\\"node --test acceptance.test.mjs\\\". Do not combine it with ad-hoc probes, Git commands or shell assertions. The host separately verifies fixture integrity and Git baseline; exploratory test proposals may be reported without executing them.\",\"passed\":true,\"evidence\":[\"call-1de05302-ac74-438c-9f09-5b78a5c01164-0__rk16__HGOd9ZJje77-LxAP\",\"call-1de05302-ac74-438c-9f09-5b78a5c01164-1\",\"call-08eca1f4-b027-45bd-9f72-13441fa98025-2__rk16__gJEmlkwjhMjPoUa9\"]},{\"criterion\":\"test: Implement totals.mjs exporting summarize(rows): group {account,cents} by account, sort accounts ascending, sum integer cents including negatives; empty input returns []; reject non-safe-integer cents and unsafe summed totals. Read acceptance.test.mjs, implement only totals.mjs, and run node --test acceptance.test.mjs. Do not edit the acceptance test. For this reproducible acceptance trial, independent test stages must execute work_evidence with verify_command exactly \\\"node --test acceptance.test.mjs\\\". Do not combine it with ad-hoc probes, Git commands or shell assertions. The host separately verifies fixture integrity and Git baseline; exploratory test proposals may be reported without executing them.\",\"passed\":true,\"evidence\":[\"call-300244ef-0731-4ab6-ac0a-7d95c55a07e8-2\"]}]}",
+          "createdAt": "2026-11-11T10:48:29.866Z"
+        }
+      ]
+    }
+  ],
+  "sessions": [
+    {
+      "id": "session_82cdaab639c145578f3c66dbafbad96f",
+      "stage": "test",
+      "tools": [
+        {
+          "name": "work_evidence",
+          "id": "call-4f68c64a-784b-4621-be4b-442d4f0ccfd6-0__rk16__TcdmrNjOacihkmqY",
+          "ok": true,
+          "verify": {
+            "command": "node --test acceptance.test.mjs",
+            "exit_code": 0,
+            "signal": null,
+            "stdout_clip": "«external source=shell label=node --test acceptance.test.mjs»\n✔ integer cents grouped and sorted (0.59325ms)\n✔ empty input (0.054625ms)\n✔ fractional cents rejected (0.093625ms)\n✔ unsafe integers rejected (0.470417ms)\n✔ overflow rejected (0.083417ms)\nℹ tests 5\nℹ suites 0\nℹ pass 5\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 33.813875\n«end external»",
+            "stderr_clip": "",
+            "sandbox_backend": "direct"
+          }
+        },
+        {
+          "name": "read_file",
+          "id": "call-4f68c64a-784b-4621-be4b-442d4f0ccfd6-1",
+          "ok": true
+        },
+        {
+          "name": "read_file",
+          "id": "call-4f68c64a-784b-4621-be4b-442d4f0ccfd6-2",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": "session_ea6929d38483432abff9aa9c76b12650",
+      "stage": "review",
+      "tools": [
+        {
+          "name": "read_file",
+          "id": "call-7040b059-3741-4f53-bf6f-9de11f6e6183-0__rk16__CoAgcaCdbY2XOFs6",
+          "ok": true
+        },
+        {
+          "name": "read_file",
+          "id": "call-7040b059-3741-4f53-bf6f-9de11f6e6183-1",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "id": "session_dade99cd7c6f48868f1b82942937a1c3",
+      "stage": "test",
+      "tools": [
+        {
+          "name": "read_file",
+          "id": "call-300244ef-0731-4ab6-ac0a-7d95c55a07e8-0__rk16__M57i80wfahTwFxPX",
+          "ok": true
+        },
+        {
+          "name": "read_file",
+          "id": "call-300244ef-0731-4ab6-ac0a-7d95c55a07e8-1",
+          "ok": true
+        },
+        {
+          "name": "work_evidence",
+          "id": "call-300244ef-0731-4ab6-ac0a-7d95c55a07e8-2",
+          "ok": true,
+          "verify": {
+            "command": "node --test acceptance.test.mjs",
+            "exit_code": 0,
+            "signal": null,
+            "stdout_clip": "«external source=shell label=node --test acceptance.test.mjs»\n✔ integer cents grouped and sorted (0.679375ms)\n✔ empty input (0.062ms)\n✔ fractional cents rejected (0.105375ms)\n✔ unsafe integers rejected (0.38225ms)\n✔ overflow rejected (0.053708ms)\nℹ tests 5\nℹ suites 0\nℹ pass 5\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 34.273375\n«end external»",
+            "stderr_clip": "",
+            "sandbox_backend": "direct"
+          }
+        }
+      ]
+    },
+    {
+      "id": "session_bd21658f28ea43b6a3e90516ba65dd6b",
+      "stage": "review",
+      "tools": [
+        {
+          "name": "read_file",
+          "id": "call-1de05302-ac74-438c-9f09-5b78a5c01164-0__rk16__HGOd9ZJje77-LxAP",
+          "ok": true
+        },
+        {
+          "name": "read_file",
+          "id": "call-1de05302-ac74-438c-9f09-5b78a5c01164-1",
+          "ok": true
+        },
+        {
+          "name": "read_file",
+          "id": "call-08eca1f4-b027-45bd-9f72-13441fa98025-2__rk16__gJEmlkwjhMjPoUa9",
+          "ok": true
+        }
+      ]
+    }
+  ],
+  "negativeControl": {
+    "model": "grok/grok-4.7-build-fast@500k",
+    "outcome": "pass",
+    "startedAt": "2026-11-11T10:49:30.611Z",
+    "finishedAt": "2026-11-11T10:49:45.302Z",
+    "gate": {
+      "passed": false,
+      "summary": "Unresolved failed test execution",
+      "checks": [],
+      "sessionId": "session_8ae5815857c94a0a869709c8380ad11a"
+    },
+    "executions": [
+      {
+        "name": "work_evidence",
+        "id": "call-9e0f9279-d76b-4785-b4b8-b6dc9bbf7f05-4__rk16__BIVq4T3UYnmw52j1",
+        "ok": false,
+        "verify": {
+          "command": "node --test acceptance.test.mjs",
+          "exit_code": 1,
+          "signal": null,
+          "stdout_clip": "«external source=shell label=node --test acceptance.test.mjs»\n✖ integer cents grouped and sorted (1.324042ms)\n✔ empty input (0.130042ms)\n✖ fractional cents rejected (0.563625ms)\n✖ unsafe integers rejected (0.104125ms)\n✖ overflow rejected (0.08525ms)\nℹ tests 5\nℹ suites 0\nℹ pass 1\nℹ fail 4\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 41.223458\n\n✖ failing tests:\n\ntest at acceptance.test.mjs:4:1\n✖ integer cents grouped and sorted (1.324042ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n  + actual - expected\n  \n  + []\n  - [\n  -   {\n  -     account: 'a',\n  -     cents: 100\n  -   },\n  -   {\n  -     account: 'b',\n  -     cents: 200\n  -   }\n  - ]\n  \n      at TestContext.<anonymous> (file://<isolated-trial>/acceptance.test.mjs:4:55)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.start (node:internal/test_runner/test:1257:17)\n      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: [],\n    expected: [ { account: 'a', cents: 100 }, { account: 'b', cents: 200 } ],\n    operator: 'deepStrictEqual',\n    diff: 'simple'\n  }\n\ntest at acceptance.test.mjs:6:1\n✖ fractional cents rejected (0.563625ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<isolated-trial>/acceptance.test.mjs:6:48)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)\n      at Test.postRun (node:internal/test_runner/test:1537:19)\n      at Test.run (node:internal/test_runner/test:1462:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at acceptance.test.mjs:7:1\n✖ unsafe integers rejected (0.104125ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<isolated-trial>/acceptance.test.mjs:7:47)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)\n      at Test.postRun (node:internal/test_runner/test:1537:19)\n      at Test.run (node:internal/test_runner/test:1462:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n\ntest at acceptance.test.mjs:8:1\n✖ overflow rejected (0.08525ms)\n  AssertionError [ERR_ASSERTION]: Missing expected exception.\n      at TestContext.<anonymous> (file://<isolated-trial>/acceptance.test.mjs:8:40)\n      at Test.runInAsyncScope (node:async_hooks:226:14)\n      at Test.run (node:internal/test_runner/test:1397:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)\n      at Test.postRun (node:internal/test_runner/test:1537:19)\n      at Test.run (node:internal/test_runner/test:1462:12)\n      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {\n    generatedMessage: false,\n    code: 'ERR_ASSERTION',\n    actual: undefined,\n    expected: undefined,\n    operator: 'throws',\n    diff: 'simple'\n  }\n«end external»",
+          "stderr_clip": "",
+          "sandbox_backend": "direct"
+        }
+      }
+    ],
+    "restoredTestExitCode": 0,
+    "scope": "One intentional artifact mutation in the isolated live-model sample; fixture unchanged; restore in finally."
+  },
+  "engineeringAttempts": [
+    {
+      "id": "collaboration-quality-20261111",
+      "outcome": "interrupted-for-fix",
+      "reason": "teammate searched for a mailbox recipient"
+    },
+    {
+      "id": "collaboration-quality-20261111-r2",
+      "outcome": "interrupted-for-fix",
+      "reason": "gateway-hidden call IDs made the checker search traces"
+    },
+    {
+      "id": "collaboration-quality-20261111-r3",
+      "outcome": "pass",
+      "reason": "earlier positive local-directory sample"
+    },
+    {
+      "id": "collaboration-quality-20261111-final",
+      "outcome": "fail",
+      "reason": "actual passing tests were rejected because valid relative/absolute and auxiliary evidence receipts were not supported"
+    },
+    {
+      "id": "collaboration-quality-20261111-final-r2",
+      "outcome": "fail",
+      "reason": "test command contained git diff in an uninitialized fixture; failure was retained"
+    },
+    {
+      "id": "collaboration-quality-20261111-final-r3",
+      "outcome": "fail",
+      "reason": "test agent authored an invalid assert.throws call, then changed the command; unresolved failed command correctly blocked delivery"
+    },
+    {
+      "id": "collaboration-quality-20261111-final-r4",
+      "outcome": "fail",
+      "reason": "reviewer tried to execute another stage instructions; no valid report; role boundary clarified"
+    },
+    {
+      "id": "collaboration-quality-20261111-final-r5",
+      "outcome": "pass",
+      "reason": "isolated Git baseline, fixed declared acceptance command, final production code"
+    }
+  ],
+  "authorization": "Only the isolated trial grants work_evidence; production Bot settings and credentials were not changed.",
+  "scope": "One real-model positive task and a negative control in an isolated local Git repository, with an immutable declared test command. Attempts changed during engineering and are not a same-condition success-rate benchmark. No production deployment, arbitrary automatic rework or long-term reliability claim."
+}

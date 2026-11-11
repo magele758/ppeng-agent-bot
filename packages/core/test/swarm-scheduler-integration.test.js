@@ -25,6 +25,7 @@ test('Swarm pipeline: dispatch enqueues wake, scheduler runs session, task becom
 
   const executor = new SwarmExecutor({
     store: swarmStore,
+    reviewTask: async () => ({ passed: true, summary: "test evaluator", checks: [{ criterion: "Ship feature", passed: true, evidence: ["fixture-inspection"] }] }),
     listSessions: () => sqlite.listSessions(),
     getSession: (id) => sqlite.getSession(id),
     createTeammateSession: ({ name, role, prompt, background, metadata }) => {

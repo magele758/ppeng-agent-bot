@@ -1,0 +1,624 @@
+[
+  {
+    "panel": "01",
+    "title": "Lab / Desktop / CLI",
+    "sourcePaths": [
+      "apps/web-console",
+      "apps/desktop",
+      "apps/cli"
+    ]
+  },
+  {
+    "panel": "01",
+    "title": "Daemon API",
+    "sourcePaths": [
+      "apps/daemon/src/app.ts",
+      "apps/daemon/src/routes"
+    ]
+  },
+  {
+    "panel": "01",
+    "title": "渠道与接入",
+    "sourcePaths": [
+      "packages/daemon-client",
+      "packages/core/src/channels",
+      "packages/core/src/connectors"
+    ]
+  },
+  {
+    "panel": "01",
+    "title": "Bots / 目标与工作",
+    "sourcePaths": [
+      "packages/core/src/bots",
+      "packages/core/src/cron",
+      "packages/core/src/waits"
+    ]
+  },
+  {
+    "panel": "01",
+    "title": "RawAgentRuntime",
+    "sourcePaths": [
+      "packages/core/src/runtime.ts",
+      "packages/core/src/runtime"
+    ]
+  },
+  {
+    "panel": "01",
+    "title": "控制面与授权",
+    "sourcePaths": [
+      "packages/core/src/auth",
+      "packages/core/src/config",
+      "packages/core/src/approval",
+      "packages/core/src/workspace",
+      "packages/core/src/registered-machines"
+    ]
+  },
+  {
+    "panel": "01",
+    "title": "协作执行",
+    "sourcePaths": [
+      "packages/core/src/swarm",
+      "packages/core/src/teams",
+      "packages/core/src/orchestrator",
+      "packages/core/src/rooms",
+      "packages/core/src/factory"
+    ]
+  },
+  {
+    "panel": "01",
+    "title": "agent-loop SDK",
+    "sourcePaths": [
+      "packages/agent-loop/src/assembly",
+      "packages/agent-loop/src/turn",
+      "packages/agent-loop/src/index.ts"
+    ]
+  },
+  {
+    "panel": "01",
+    "title": "工具与外部系统",
+    "sourcePaths": [
+      "packages/core/src/tools",
+      "packages/core/src/mcp",
+      "packages/core/src/computer-use",
+      "packages/capability-gateway"
+    ]
+  },
+  {
+    "panel": "02",
+    "title": "接收与转向",
+    "sourcePaths": [
+      "packages/agent-loop/src/session/step-inbox.ts",
+      "packages/core/src/agent-inbox"
+    ]
+  },
+  {
+    "panel": "02",
+    "title": "执行权与恢复边界",
+    "sourcePaths": [
+      "packages/agent-loop/src/turn/host.ts",
+      "packages/core/src/session/checkpoint.ts",
+      "packages/core/src/session/durable-recovery.ts"
+    ]
+  },
+  {
+    "panel": "02",
+    "title": "构建模型视图",
+    "sourcePaths": [
+      "packages/core/src/model/prompt-builder.ts",
+      "packages/agent-loop/src/session",
+      "packages/agent-loop/src/turn/prepare-turn-input.ts"
+    ]
+  },
+  {
+    "panel": "02",
+    "title": "轮内/跨轮恢复",
+    "sourcePaths": [
+      "packages/agent-loop/src/streaming",
+      "packages/core/src/streaming",
+      "packages/agent-loop/src/recovery",
+      "packages/core/src/recovery"
+    ]
+  },
+  {
+    "panel": "02",
+    "title": "模型一步",
+    "sourcePaths": [
+      "packages/agent-loop/src/turn",
+      "packages/agent-loop/src/model"
+    ]
+  },
+  {
+    "panel": "02",
+    "title": "模型与路由",
+    "sourcePaths": [
+      "packages/core/src/model",
+      "packages/core/src/runtime/run-profile.ts"
+    ]
+  },
+  {
+    "panel": "02",
+    "title": "工具执行波",
+    "sourcePaths": [
+      "packages/agent-loop/src/runtime",
+      "packages/core/src/runtime/tool-loop.ts",
+      "packages/agent-loop/src/session/compensation.ts"
+    ]
+  },
+  {
+    "panel": "02",
+    "title": "消息与步骤提交",
+    "sourcePaths": [
+      "packages/agent-loop/src/session",
+      "packages/core/src/session",
+      "packages/core/src/stores/session-store.ts"
+    ]
+  },
+  {
+    "panel": "02",
+    "title": "结束与目标收尾",
+    "sourcePaths": [
+      "packages/core/src/bots/goals",
+      "packages/core/src/goal",
+      "packages/agent-loop/src/goal"
+    ]
+  },
+  {
+    "panel": "03",
+    "title": "Goal / Bot Work",
+    "sourcePaths": [
+      "packages/core/src/bots/goals",
+      "packages/core/src/bots/bot-work.ts",
+      "packages/core/src/services"
+    ]
+  },
+  {
+    "panel": "03",
+    "title": "Routine / Scheduler",
+    "sourcePaths": [
+      "packages/core/src/cron",
+      "packages/core/src/services/autonomous-scheduler.ts",
+      "packages/core/src/runtime/scheduler-host.ts"
+    ]
+  },
+  {
+    "panel": "03",
+    "title": "Durable Wait",
+    "sourcePaths": [
+      "packages/core/src/waits",
+      "packages/core/src/bots/bot-work-waits.ts"
+    ]
+  },
+  {
+    "panel": "03",
+    "title": "SubAgent / Teammate",
+    "sourcePaths": [
+      "packages/core/src/runtime/spawn-host.ts",
+      "packages/core/src/session/subagent-contract.ts"
+    ]
+  },
+  {
+    "panel": "03",
+    "title": "Swarm · pipeline",
+    "sourcePaths": [
+      "packages/core/src/swarm",
+      "packages/core/src/runtime/quality-gates.ts",
+      "packages/core/src/quality"
+    ]
+  },
+  {
+    "panel": "03",
+    "title": "Orchestrator",
+    "sourcePaths": [
+      "packages/core/src/orchestrator",
+      "packages/core/src/runtime/collaborators.ts"
+    ]
+  },
+  {
+    "panel": "03",
+    "title": "Team DAG",
+    "sourcePaths": [
+      "packages/core/src/teams"
+    ]
+  },
+  {
+    "panel": "03",
+    "title": "Rooms / Agent Inbox",
+    "sourcePaths": [
+      "packages/core/src/rooms",
+      "packages/core/src/agent-inbox"
+    ]
+  },
+  {
+    "panel": "03",
+    "title": "Factory / 机器协作",
+    "sourcePaths": [
+      "packages/core/src/factory",
+      "packages/core/src/registered-machines"
+    ]
+  },
+  {
+    "panel": "04",
+    "title": "能力发现与路由",
+    "sourcePaths": [
+      "packages/core/src/discovery",
+      "packages/core/src/dyn-tools",
+      "packages/core/src/tools/tool-search.ts"
+    ]
+  },
+  {
+    "panel": "04",
+    "title": "Skills / 扩展",
+    "sourcePaths": [
+      "packages/core/src/skills",
+      "packages/core/src/skill-proposals",
+      "packages/core/src/plugins",
+      "packages/core/src/extensions"
+    ]
+  },
+  {
+    "panel": "04",
+    "title": "MCP / PTC",
+    "sourcePaths": [
+      "packages/core/src/mcp",
+      "packages/core/src/ptc",
+      "packages/agent-loop/src/ptc"
+    ]
+  },
+  {
+    "panel": "04",
+    "title": "工具注册与选择",
+    "sourcePaths": [
+      "packages/core/src/tools/builtin-tools.ts",
+      "packages/core/src/turn/resolve-turn-tools.ts"
+    ]
+  },
+  {
+    "panel": "04",
+    "title": "审批与来源授权",
+    "sourcePaths": [
+      "packages/core/src/approval",
+      "packages/core/src/learning",
+      "packages/core/src/trust",
+      "packages/core/src/safety"
+    ]
+  },
+  {
+    "panel": "04",
+    "title": "执行宿主",
+    "sourcePaths": [
+      "packages/core/src/runtime/tool-loop.ts",
+      "packages/core/src/computer-use",
+      "packages/core/src/external-agents",
+      "packages/core/src/net"
+    ]
+  },
+  {
+    "panel": "04",
+    "title": "命令沙箱",
+    "sourcePaths": [
+      "packages/core/src/sandbox"
+    ]
+  },
+  {
+    "panel": "04",
+    "title": "Secret Vault",
+    "sourcePaths": [
+      "packages/core/src/secrets"
+    ]
+  },
+  {
+    "panel": "04",
+    "title": "回流与审计",
+    "sourcePaths": [
+      "packages/core/src/sandbox/result-redaction.ts",
+      "packages/core/src/artifact",
+      "packages/core/src/observability"
+    ]
+  },
+  {
+    "panel": "05",
+    "title": "输入与摄取",
+    "sourcePaths": [
+      "packages/core/src/ingestion",
+      "packages/core/src/ingestion/attachment-ingest-service.ts",
+      "packages/core/src/services/image-ingest-service.ts"
+    ]
+  },
+  {
+    "panel": "05",
+    "title": "五层记忆",
+    "sourcePaths": [
+      "packages/core/src/memory"
+    ]
+  },
+  {
+    "panel": "05",
+    "title": "检索与知识",
+    "sourcePaths": [
+      "packages/core/src/knowledge",
+      "packages/core/src/evolving",
+      "packages/core/src/tools/history-tools.ts"
+    ]
+  },
+  {
+    "panel": "05",
+    "title": "Working Log / 压缩",
+    "sourcePaths": [
+      "packages/core/src/session/working-log.ts",
+      "packages/core/src/session/micro-compact.ts"
+    ]
+  },
+  {
+    "panel": "05",
+    "title": "Session / Surface",
+    "sourcePaths": [
+      "packages/core/src/storage.ts",
+      "packages/core/src/stores",
+      "packages/agent-loop/src/session"
+    ]
+  },
+  {
+    "panel": "05",
+    "title": "EventLog / Checkpoint",
+    "sourcePaths": [
+      "packages/core/src/session/event-log-saga.ts",
+      "packages/core/src/session/durable-recovery.ts",
+      "packages/agent-loop/src/session/event-log.ts"
+    ]
+  },
+  {
+    "panel": "05",
+    "title": "Artifact / Library Page",
+    "sourcePaths": [
+      "packages/core/src/artifact",
+      "packages/core/src/library"
+    ]
+  },
+  {
+    "panel": "05",
+    "title": "Daydream / Learning",
+    "sourcePaths": [
+      "packages/core/src/daydream",
+      "packages/core/src/learning",
+      "packages/core/src/bots/bot-coaching.ts"
+    ]
+  },
+  {
+    "panel": "05",
+    "title": "A2UI / 领域展示",
+    "sourcePaths": [
+      "packages/core/src/a2ui",
+      "apps/web-console/components/a2ui"
+    ]
+  },
+  {
+    "panel": "06",
+    "title": "Web / Desktop / CLI",
+    "sourcePaths": [
+      "apps/web-console/middleware.ts",
+      "apps/desktop",
+      "packages/daemon-client"
+    ]
+  },
+  {
+    "panel": "06",
+    "title": "Daemon / Runtime",
+    "sourcePaths": [
+      "apps/daemon",
+      "packages/core/src/runtime.ts"
+    ]
+  },
+  {
+    "panel": "06",
+    "title": "执行环境",
+    "sourcePaths": [
+      "packages/core/src/workspace",
+      "packages/core/src/sandbox",
+      "packages/core/src/registered-machines"
+    ]
+  },
+  {
+    "panel": "06",
+    "title": "SQLite + 本地状态目录",
+    "sourcePaths": [
+      "packages/core/src/storage.ts",
+      "packages/core/src/stores"
+    ]
+  },
+  {
+    "panel": "06",
+    "title": "PG / Redis · 局部",
+    "sourcePaths": [
+      "packages/core/src/storage/repository-factory.ts",
+      "packages/core/src/storage/cloud"
+    ]
+  },
+  {
+    "panel": "06",
+    "title": "S3 / 分层资产 · 可选",
+    "sourcePaths": [
+      "packages/core/src/storage/tiered-asset-storage.ts"
+    ]
+  },
+  {
+    "panel": "06",
+    "title": "Docker / Compose",
+    "sourcePaths": [
+      "deploy/docker",
+      "deploy/compose"
+    ]
+  },
+  {
+    "panel": "06",
+    "title": "Helm / K8s · 配置",
+    "sourcePaths": [
+      "deploy/helm",
+      "deploy/k8s"
+    ]
+  },
+  {
+    "panel": "06",
+    "title": "观测与运维",
+    "sourcePaths": [
+      "packages/core/src/observability",
+      "packages/core/src/langfuse",
+      "packages/core/src/doctor",
+      "packages/core/src/stores/trace.ts"
+    ]
+  },
+  {
+    "panel": "07",
+    "title": "api-types / daemon-client",
+    "sourcePaths": [
+      "packages/api-types",
+      "packages/daemon-client"
+    ]
+  },
+  {
+    "panel": "07",
+    "title": "agent-loop SDK",
+    "sourcePaths": [
+      "packages/agent-loop"
+    ]
+  },
+  {
+    "panel": "07",
+    "title": "core 产品宿主",
+    "sourcePaths": [
+      "packages/core/src/exports",
+      "packages/core/src/runtime.ts"
+    ]
+  },
+  {
+    "panel": "07",
+    "title": "Capability Gateway",
+    "sourcePaths": [
+      "packages/capability-gateway"
+    ]
+  },
+  {
+    "panel": "07",
+    "title": "Domain Bundles",
+    "sourcePaths": [
+      "packages/agent-sre",
+      "packages/agent-stock",
+      "packages/agent-homeiot",
+      "packages/agent-erp"
+    ]
+  },
+  {
+    "panel": "07",
+    "title": "连接器 / MCP / 插件",
+    "sourcePaths": [
+      "packages/core/src/connectors",
+      "packages/core/src/mcp",
+      "packages/core/src/plugins",
+      "packages/core/src/extensions"
+    ]
+  },
+  {
+    "panel": "07",
+    "title": "渠道 / App Control",
+    "sourcePaths": [
+      "packages/core/src/channels",
+      "packages/core/src/app-control"
+    ]
+  },
+  {
+    "panel": "07",
+    "title": "外部 Coding Agent",
+    "sourcePaths": [
+      "packages/core/src/external-agents",
+      "packages/core/src/agents"
+    ]
+  },
+  {
+    "panel": "07",
+    "title": "研究与可选增强",
+    "sourcePaths": [
+      "packages/core/src/deepresearch",
+      "packages/core/src/jev",
+      "packages/core/src/hooks",
+      "packages/core/src/evolution"
+    ]
+  },
+  {
+    "panel": "08",
+    "title": "需求 → 验收规格",
+    "sourcePaths": [
+      "acceptance",
+      "skills/acceptance-first"
+    ]
+  },
+  {
+    "panel": "08",
+    "title": "自动化行为测试",
+    "sourcePaths": [
+      "packages/core/test",
+      "packages/agent-loop/src",
+      "apps/daemon/test",
+      "apps/web-console/lib"
+    ]
+  },
+  {
+    "panel": "08",
+    "title": "形式与恢复验证",
+    "sourcePaths": [
+      "scripts/formal",
+      "doc/formal",
+      "packages/core/src/formal"
+    ]
+  },
+  {
+    "panel": "08",
+    "title": "独立代码审查",
+    "sourcePaths": [
+      "skills/verify-tool-call-pairing",
+      "skills/verify-session-restart"
+    ]
+  },
+  {
+    "panel": "08",
+    "title": "真实多 Agent 样本",
+    "sourcePaths": [
+      "scripts/agent-eval/collaboration-quality-live.mjs",
+      "packages/core/src/runtime/quality-gates.ts"
+    ]
+  },
+  {
+    "panel": "08",
+    "title": "长期与现场验证",
+    "sourcePaths": [
+      "scripts/agent-eval",
+      "scripts/release",
+      "deploy"
+    ]
+  },
+  {
+    "panel": "08",
+    "title": "Commit / PR",
+    "sourcePaths": [
+      ".github/pull_request_template.md"
+    ]
+  },
+  {
+    "panel": "08",
+    "title": "CI / 合并门禁",
+    "sourcePaths": [
+      ".github/workflows",
+      "scripts/ci",
+      "scripts/crap",
+      "scripts/acceptance"
+    ]
+  },
+  {
+    "panel": "08",
+    "title": "部署与运行核验",
+    "sourcePaths": [
+      "scripts/release",
+      "scripts/deploy-smoke.mjs",
+      "doc/README.md",
+      "packages/core/src/self-heal"
+    ]
+  }
+]

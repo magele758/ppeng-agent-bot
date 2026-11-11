@@ -1,5 +1,7 @@
 # Documentation index / 文档目录
 
+项目完整模块关系见 [可编辑 Excalidraw 架构图稿](architecture/README.md)（8 个分区、源码索引与运行边界）。
+
 本页为专题检索入口。项目介绍与启动步骤见 [English README](../README.md) / [中文 README](../README.zh.md)；代码约定见 [`AGENTS.md`](../AGENTS.md)。
 
 短期单机补齐、既有规格收尾与延后范围见 [SINGLE_HOST_COMPLETION.md](SINGLE_HOST_COMPLETION.md)。

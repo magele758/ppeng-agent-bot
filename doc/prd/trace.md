@@ -2429,6 +2429,12 @@ CI audit P1/P2 release gate hardening
 
 - `scripts/test/cli-permission.test.mjs`
 
+### collaboration-quality-gates
+
+多 Agent 交付必须通过有证据的质量门禁
+
+- `packages/core/test/collaboration-quality-gates.test.js`
+
 ### command-hardline
 
 危险命令硬拦截与密钥脱敏

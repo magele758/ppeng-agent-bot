@@ -1,3 +1,4 @@
+import { qualityPassed, type QualityReport } from '../quality/gate.js';
 import { nowIso } from '../id.js';
 import { OrchestratorStore } from './store.js';
 import type { OrchestrationRun, OrchestrationStep, OrchestrationStage } from './types.js';
@@ -13,14 +14,22 @@ export interface OrchestrationEngineDeps {
   tickSwarm?: () => Promise<void>;
   getSwarmForOrchestrationRun?: (orchestrationRunId: string) => SwarmRun | undefined;
   runResearch?: (run: OrchestrationRun) => Promise<string>;
-  runReview?: (run: OrchestrationRun) => Promise<string>;
-  runTest?: (run: OrchestrationRun) => Promise<string>;
+  runReview?: (run: OrchestrationRun) => Promise<string | QualityReport>;
+  runTest?: (run: OrchestrationRun) => Promise<string | QualityReport>;
 }
 
 export class OrchestrationEngine {
   constructor(private readonly deps: OrchestrationEngineDeps) {}
 
+  private ticking = false;
+
   async tick(): Promise<void> {
+    if (this.ticking) return;
+    this.ticking = true;
+    try { await this.tickOnce(); } finally { this.ticking = false; }
+  }
+
+  private async tickOnce(): Promise<void> {
     const pending = this.deps.store.listRuns({ status: 'pending', limit: 20 });
     for (const run of pending) {
       this.bootstrapSteps(run);
@@ -35,7 +44,10 @@ export class OrchestrationEngine {
 
     const running = this.deps.store.listRuns({ status: 'running', limit: 20 });
     for (const run of running) {
-      await this.advanceRun(run);
+      try { await this.advanceRun(run); }
+      catch (error) {
+        if (this.deps.store.getRun(run.id)?.status === 'running') this.failRun(run, String(error));
+      }
     }
   }
 
@@ -65,6 +77,10 @@ export class OrchestrationEngine {
 
     const next = steps.find((s) => s.status === 'pending');
     if (!next) {
+      if (steps.some(step => step.status !== 'completed')) {
+        this.failRun(run, 'Unsuccessful orchestration step');
+        return;
+      }
       this.deps.store.updateRunStatus(run.id, 'completed');
       this.deps.store.appendEvent({
         runId: run.id,
@@ -104,15 +120,15 @@ export class OrchestrationEngine {
       return;
     }
 
-    if (next.stage === 'review' && this.deps.runReview) {
-      const artifact = await this.deps.runReview(run);
-      this.completeStep(run, next, artifact);
-      return;
-    }
-
-    if (next.stage === 'test' && this.deps.runTest) {
-      const artifact = await this.deps.runTest(run);
-      this.completeStep(run, next, artifact);
+    if (next.stage === 'review' || next.stage === 'test') {
+      const execute = next.stage === 'review' ? this.deps.runReview : this.deps.runTest;
+      const result = await execute?.(run);
+      if (this.deps.store.getRun(run.id)?.status !== 'running') return;
+      if (!qualityPassed(result)) {
+        this.failRun(run, JSON.stringify(result ?? { summary: 'Quality executor missing' }));
+        return;
+      }
+      this.completeStep(run, next, JSON.stringify(result));
       return;
     }
 
@@ -156,6 +172,13 @@ export class OrchestrationEngine {
         payloadJson: JSON.stringify({ swarmId: swarm.id })
       });
     }
+  }
+
+  private failRun(run: OrchestrationRun, reason: string): void {
+    const step = this.deps.store.listSteps(run.id).find(item => item.status === 'running');
+    if (step) this.deps.store.updateStep(step.id, { status: 'failed', failureType: 'quality_gate_failed', outputArtifact: reason, nextAction: 'Inspect evidence and create a corrected run' });
+    this.deps.store.updateRunStatus(run.id, 'failed');
+    this.deps.store.appendEvent({ runId: run.id, stepId: step?.id, kind: 'run_failed', actor: 'orchestrator', payloadJson: JSON.stringify({ reason }) });
   }
 
   private completeStep(run: OrchestrationRun, step: OrchestrationStep, outputArtifact?: string): void {

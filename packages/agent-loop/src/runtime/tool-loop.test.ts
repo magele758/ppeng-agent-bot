@@ -15,6 +15,7 @@ import {
   type ToolLoopHost,
 } from './tool-loop.js';
 import type { ApprovalRecord, MessagePart, RunContext, SessionRecord, ToolCallPart, ToolContract } from '../types.js';
+import { linkAbortParent } from './abort-lineage.js';
 
 const ctx = { session: { id: 's1', metadata: {} } } as unknown as RunContext;
 
@@ -62,6 +63,48 @@ const call = (name: string, input: Record<string, unknown>, id = `tc-${name}`): 
   toolCallId: id,
   name,
   input,
+});
+
+describe('JSON unavailable source turn scope', () => {
+  const missing = (ref: unknown) => JSON.stringify({ error_code: 'SOURCE_UNAVAILABLE', ref });
+  const context = (id: string, writer: string, signal?: AbortSignal): RunContext => ({
+    ...ctx, session: { ...ctx.session, id, activeWriterRunId: writer }, abortSignal: signal
+  });
+
+  it('surfaces once across child scopes and resets for the next turn [AC:memory-read-source-unavailable#AC-1]', async () => {
+    const root = new AbortController(), firstChild = new AbortController(), secondChild = new AbortController();
+    linkAbortParent(firstChild.signal, root.signal);
+    linkAbortParent(secondChild.signal, root.signal);
+    const abortTurn = vi.fn();
+    const h = host({ abortTurn });
+    const execute = vi.fn(async (_c: RunContext, args: Record<string, unknown>) => ({ ok: false, content: missing(args.ref) }));
+    const tools = [tool('history_read', execute)];
+    const run = (scope: RunContext, ref: string) => executeSingleTool(h, tools, call('history_read', { ref }), scope, false, scope.session.id);
+    const first = await run(context('json-signal', 'writer', firstChild.signal), 'source:one');
+    expect(first.content).toBe(missing('source:one'));
+    expect(abortTurn).not.toHaveBeenCalled();
+    const repeated = await run(context('json-signal', 'writer', secondChild.signal), 'source:one');
+    expect(repeated.content).toBe('Source unavailable. Stopped this turn. Do not call this tool again.');
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(abortTurn).toHaveBeenCalledWith('json-signal', root.signal);
+    expect(h.traces).toContain('recovery_abort');
+    expect((await run(context('json-signal', 'writer', root.signal), 'source:two')).content).toBe(missing('source:two'));
+    expect((await run(context('json-signal', 'writer', new AbortController().signal), 'source:one')).content).toBe(missing('source:one'));
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it('isolates the signal-less fallback by session and writer [AC:memory-read-source-unavailable#AC-1]', async () => {
+    const h = host();
+    const execute = vi.fn(async (_c: RunContext, args: Record<string, unknown>) => ({ ok: false, content: missing(args.ref) }));
+    const tools = [tool('memory_read', execute)];
+    const run = (scope: RunContext) => executeSingleTool(h, tools, call('memory_read', { ref: 'source:fallback' }), scope, false, scope.session.id);
+    expect((await run(context('json-fallback', 'one'))).content).toBe(missing('source:fallback'));
+    expect((await run(context('json-fallback', 'one'))).content).toContain('Stopped this turn');
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect((await run(context('json-fallback', 'two'))).content).toBe(missing('source:fallback'));
+    expect((await run(context('json-other-session', 'one'))).content).toBe(missing('source:fallback'));
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
 });
 
 function captureHost(redactSecrets?: (text: string) => string) {
