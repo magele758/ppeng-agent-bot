@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 437 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 438 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -568,6 +568,12 @@
 需求正文见 [other](other.md)。
 
 - `lean-default-skills` 精简默认技能并保留按需发现
+
+## literal（1）
+
+需求正文见 [other](other.md)。
+
+- `literal-tool-identifiers` 保留完整查询标识符并以成功读取作为保存依据
 
 ## live（1）
 

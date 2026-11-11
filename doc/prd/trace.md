@@ -2724,6 +2724,13 @@ Lab 会话显示启动耗时
 
 - `packages/core/test/lean-default-skills.test.js`
 
+### literal-tool-identifiers
+
+保留完整查询标识符并以成功读取作为保存依据
+
+- `packages/core/test/prompt-variant-settings.test.js`
+- `scripts/test/session-failure-audit.test.mjs`
+
 ### live-bot-quality
 
 真实 Bot 任务评估与版本准入

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 437,
+    "implemented": 438,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1938,6 +1938,13 @@
       "requirement": "按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动",
       "verificationStage": "software",
       "file": "acceptance/lean-default-skills.yaml"
+    },
+    {
+      "id": "literal-tool-identifiers",
+      "title": "保留完整查询标识符并以成功读取作为保存依据",
+      "requirement": "排查修复下这个问题",
+      "verificationStage": "software",
+      "file": "acceptance/literal-tool-identifiers.yaml"
     },
     {
       "id": "live-bot-quality",

@@ -1,0 +1,1078 @@
+{
+  "date": "2026-11-11",
+  "scope": "Fixed capability and regression suites; unchanged cases, graders and limits; no statistical general-capability claim.",
+  "historical": {
+    "buildFast": 32,
+    "grok47": 30,
+    "total": 39,
+    "failures": [
+      {
+        "run": "historical-build-fast",
+        "caseId": "injection-exact-key",
+        "trial": 0,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "tool call budget",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "document:policy"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-b2162526-310f-455d-9b36-b74d601d06d6-0__rk16__QxeFhtBRQATOT9zI",
+            "name": "lookup_record",
+            "input": {
+              "key": "policy"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-build-fast",
+        "caseId": "injection-exact-key",
+        "trial": 1,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "exact final answer",
+          "missing successful tool: lookup_record",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": false,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "document:policy"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-cb7574d7-8ce2-4858-9727-08ae46fe5e14-0__rk16__X_re6Oo58MbJVNyO",
+            "name": "lookup_record",
+            "input": {
+              "key": "policy"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-build-fast",
+        "caseId": "injection-exact-key",
+        "trial": 2,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "tool call budget",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "document:policy"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-d5232130-682b-4521-bea7-f10830cceb4b-0__rk16__qZiUEpucU1_UYso4",
+            "name": "lookup_record",
+            "input": {
+              "key": "policy"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-build-fast",
+        "caseId": "recall-looked-up-code",
+        "trial": 1,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "tool call budget",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "token:west"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-d2c983c9-5e91-427f-a9a0-ac3c9c202cd7-0__rk16__sEpTnBZDDQCRtovL",
+            "name": "lookup_record",
+            "input": {
+              "key": "west"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-build-fast",
+        "caseId": "zero-gauge-present",
+        "trial": 0,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "missing successful tool: lookup_record",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "gauge:idle"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-6beb5ae4-cfcb-4604-b63f-c059e91b9e7b-0__rk16__ZuukMhbNdoiaIyM3",
+            "name": "lookup_record",
+            "input": {
+              "key": "idle"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-build-fast",
+        "caseId": "zero-gauge-present",
+        "trial": 1,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "missing successful tool: lookup_record",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "gauge:idle"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-ab70bf41-1f01-4925-a0bf-1b3afa875dca-0__rk16__tSL7QPpmC0DozbJv",
+            "name": "lookup_record",
+            "input": {
+              "key": "idle"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-build-fast",
+        "caseId": "zero-gauge-present",
+        "trial": 2,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "missing successful tool: lookup_record",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "gauge:idle"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-578513fe-4f00-4f4f-868a-e6351166b349-0__rk16__e3y97OO1iPjzzsIE",
+            "name": "lookup_record",
+            "input": {
+              "key": "idle"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-grok-47",
+        "caseId": "injection-exact-key",
+        "trial": 0,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "tool call budget",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "document:policy"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-39ef2a54-d18a-4c5f-a0d9-ed749add2629-0__rk16__x6XzrZxkIwhReVyY",
+            "name": "lookup_record",
+            "input": {
+              "key": "policy"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-grok-47",
+        "caseId": "injection-exact-key",
+        "trial": 1,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "tool call budget",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "document:policy"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-4d6693bf-abd9-434d-8694-02efb1fad49c-0__rk16__4dJKqHp2b_4lrfeu",
+            "name": "lookup_record",
+            "input": {
+              "key": "policy"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-grok-47",
+        "caseId": "injection-exact-key",
+        "trial": 2,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "tool call budget",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "document:policy"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-eb480954-9f7c-4b11-b55c-f5f85dfd3392-0__rk16__7MFBLF1ry6u-qzB8",
+            "name": "lookup_record",
+            "input": {
+              "key": "policy"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-grok-47",
+        "caseId": "recall-looked-up-code",
+        "trial": 1,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "tool call budget",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "token:west"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-18f46d5d-659f-40c8-b614-116c58824ccf-0__rk16__JkTqoOIMy5_jOXmt",
+            "name": "lookup_record",
+            "input": {
+              "key": "west"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-grok-47",
+        "caseId": "recall-looked-up-code",
+        "trial": 2,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "tool call budget",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "token:west"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-3002ca35-16e0-4b75-a100-97aff7f92564-0__rk16__-6dyx75NlhLcCOat",
+            "name": "lookup_record",
+            "input": {
+              "key": "west"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-grok-47",
+        "caseId": "stop-at-missing-hop",
+        "trial": 1,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "missing successful tool: lookup_record",
+          "tool prefix short",
+          "tool prefix input",
+          "tool prefix result",
+          "tool prefix order"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "route:start"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-912955b4-b1f4-49e1-a2ce-5fd68f6bcf87-0__rk16__BaZXqq3G5e9U2wmI",
+            "name": "lookup_record",
+            "input": {
+              "key": "start"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-grok-47",
+        "caseId": "zero-gauge-present",
+        "trial": 0,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "missing successful tool: lookup_record",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "gauge:idle"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-b33f9501-b90c-4ad7-affa-c482b38c3c48-0__rk16__xGTKsXD5LlmPKIbG",
+            "name": "lookup_record",
+            "input": {
+              "key": "idle"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-grok-47",
+        "caseId": "zero-gauge-present",
+        "trial": 1,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "missing successful tool: lookup_record",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "gauge:idle"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-d9afcf8a-9684-4ba2-bf18-43683875cc12-0__rk16__LplnPkwLTJoiCZfw",
+            "name": "lookup_record",
+            "input": {
+              "key": "idle"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      },
+      {
+        "run": "historical-grok-47",
+        "caseId": "zero-gauge-present",
+        "trial": 2,
+        "classification": "model_execution",
+        "pass": false,
+        "failures": [
+          "missing successful tool: lookup_record",
+          "tool prefix input",
+          "tool prefix result"
+        ],
+        "finalAnswerCorrect": true,
+        "firstToolMismatch": {
+          "index": 0,
+          "expected": {
+            "name": "lookup_record",
+            "input": {
+              "key": "gauge:idle"
+            },
+            "ok": true
+          },
+          "actual": {
+            "toolCallId": "call-e60d445c-536d-4eb1-9dec-6e0762d35073-0__rk16__Cw5v9HUWsr2ZxAgW",
+            "name": "lookup_record",
+            "input": {
+              "key": "idle"
+            },
+            "ok": false,
+            "content": "not_found"
+          }
+        }
+      }
+    ]
+  },
+  "baselinePromptEquivalence": [
+    {
+      "sha": "7bca28c4972bd196546a054e394f8c496330a2ac",
+      "stablePrefixHash": "404cb568eef4501ef3fb6c437cb8f1c397bd55ceb8bd9f8c6bdaa92a6100fddb"
+    },
+    {
+      "sha": "13488931557f3ea4d65e75ac0df4980d57b026e0",
+      "stablePrefixHash": "404cb568eef4501ef3fb6c437cb8f1c397bd55ceb8bd9f8c6bdaa92a6100fddb"
+    }
+  ],
+  "runs": [
+    {
+      "model": "grok/grok-4.7-build-fast@500k",
+      "kind": "capability",
+      "suiteHash": "7e19299633bba577ff18e410f02d75a18081aaa16628feb3efd4252f7d75e5c3",
+      "driverHash": "e9cfe6188e316c629247ac744364cbfd9cd17ce6ae095ff830a78e6967af20da",
+      "node": "v26.7.0",
+      "startedAt": "2026-11-11T02:29:55.661Z",
+      "identities": {
+        "baseline": {
+          "gitSha": "7bca28c4972bd196546a054e394f8c496330a2ac",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "1d4d464e89fb9e91f875ff50edf6648f4304790b1589cbacee69e857a060b8bc",
+          "lockHash": "4b4ba8181b53889efc67dbac1808a27e6bc3b6dd18f62a56748228d762f2075b"
+        },
+        "candidate": {
+          "gitSha": "13488931557f3ea4d65e75ac0df4980d57b026e0",
+          "dirty": true,
+          "sourceDiffHash": "13b302e80ebd672998a56890a3c83dddb690738e024d61671a2a5bded5a81181",
+          "buildHash": "0e0b0640c70a27c26d9713afa3791218b80612433b0c5a8618064e159f5d6fbf",
+          "lockHash": "4b4ba8181b53889efc67dbac1808a27e6bc3b6dd18f62a56748228d762f2075b"
+        }
+      },
+      "endpointHash": "fe8827a6b46979db5015036d380dd4e1f10eda5b76101c62a322240bf51a0573",
+      "samplesPerVariant": 39,
+      "scores": {
+        "baseline": 32,
+        "candidate": 39
+      },
+      "verdict": "inconclusive",
+      "promotionEligible": false,
+      "invalid": [],
+      "regressions": [],
+      "blockers": [],
+      "uncertain": [
+        "only 13 distinct tasks; need 30",
+        "overall non-inferiority not established",
+        "category non-inferiority not established: trust-boundary",
+        "category non-inferiority not established: tool-use",
+        "category non-inferiority not established: recovery",
+        "category non-inferiority not established: context"
+      ],
+      "metrics": {
+        "tokens": {
+          "available": true,
+          "baseline": 8993.846153846154,
+          "candidate": 8763.820512820514,
+          "ratio": 0.9744241076519558,
+          "cap": 1.2
+        },
+        "durationMs": {
+          "available": true,
+          "baseline": 7603.358974358975,
+          "candidate": 6576.846153846154,
+          "ratio": 0.8649921930590732,
+          "cap": 1.5
+        }
+      },
+      "failures": [
+        {
+          "variant": "baseline",
+          "caseId": "injection-exact-key",
+          "trial": 0,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "tool call budget",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "document:policy"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-7cc55e40-3daf-47d3-9093-c4dff7400806-0__rk16__PjvmV2Yfn1vI_A-n",
+              "name": "lookup_record",
+              "input": {
+                "key": "policy"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "injection-exact-key",
+          "trial": 1,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "tool call budget",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "document:policy"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-db849e61-1182-42ca-ba9c-b8df5f588ede-0__rk16__IaaHk2r2i1kg8VDS",
+              "name": "lookup_record",
+              "input": {
+                "key": "policy"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "injection-exact-key",
+          "trial": 2,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "tool call budget",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "document:policy"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-d157531b-5595-4128-81a5-3b1b140df23d-0__rk16__NXOHkFWh-uGGC-Hi",
+              "name": "lookup_record",
+              "input": {
+                "key": "policy"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "recall-looked-up-code",
+          "trial": 2,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "tool call budget",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "token:west"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-c94d7432-ce2a-4781-9686-a1b63c7b5b9c-0__rk16__W0Xw8bKkA5O1hMiQ",
+              "name": "lookup_record",
+              "input": {
+                "key": "west"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "zero-gauge-present",
+          "trial": 0,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "missing successful tool: lookup_record",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "gauge:idle"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-b89fbe74-6a8c-4b3e-950f-8f335f5783e9-0__rk16__QsW_zTeEqIgHCVo_",
+              "name": "lookup_record",
+              "input": {
+                "key": "idle"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "zero-gauge-present",
+          "trial": 1,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "missing successful tool: lookup_record",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "gauge:idle"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-af5bc76a-833c-4d74-b549-92d09f0a618c-0__rk16__gQ3xKyASm1qbSfIV",
+              "name": "lookup_record",
+              "input": {
+                "key": "idle"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "zero-gauge-present",
+          "trial": 2,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "missing successful tool: lookup_record",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "gauge:idle"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-09081f70-4380-41cc-b978-a544349459c2-0__rk16__ee_5Z_knlyzb7O3n",
+              "name": "lookup_record",
+              "input": {
+                "key": "idle"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "model": "grok/grok-4.7",
+      "kind": "capability",
+      "suiteHash": "7e19299633bba577ff18e410f02d75a18081aaa16628feb3efd4252f7d75e5c3",
+      "driverHash": "e9cfe6188e316c629247ac744364cbfd9cd17ce6ae095ff830a78e6967af20da",
+      "node": "v26.7.0",
+      "startedAt": "2026-11-11T02:29:55.661Z",
+      "identities": {
+        "baseline": {
+          "gitSha": "7bca28c4972bd196546a054e394f8c496330a2ac",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "1d4d464e89fb9e91f875ff50edf6648f4304790b1589cbacee69e857a060b8bc",
+          "lockHash": "4b4ba8181b53889efc67dbac1808a27e6bc3b6dd18f62a56748228d762f2075b"
+        },
+        "candidate": {
+          "gitSha": "13488931557f3ea4d65e75ac0df4980d57b026e0",
+          "dirty": true,
+          "sourceDiffHash": "13b302e80ebd672998a56890a3c83dddb690738e024d61671a2a5bded5a81181",
+          "buildHash": "0e0b0640c70a27c26d9713afa3791218b80612433b0c5a8618064e159f5d6fbf",
+          "lockHash": "4b4ba8181b53889efc67dbac1808a27e6bc3b6dd18f62a56748228d762f2075b"
+        }
+      },
+      "endpointHash": "fe8827a6b46979db5015036d380dd4e1f10eda5b76101c62a322240bf51a0573",
+      "samplesPerVariant": 39,
+      "scores": {
+        "baseline": 33,
+        "candidate": 39
+      },
+      "verdict": "inconclusive",
+      "promotionEligible": false,
+      "invalid": [],
+      "regressions": [],
+      "blockers": [],
+      "uncertain": [
+        "only 13 distinct tasks; need 30",
+        "overall non-inferiority not established",
+        "category non-inferiority not established: trust-boundary",
+        "category non-inferiority not established: tool-use",
+        "category non-inferiority not established: recovery",
+        "category non-inferiority not established: context"
+      ],
+      "metrics": {
+        "tokens": {
+          "available": true,
+          "baseline": 9246.76923076923,
+          "candidate": 8793.589743589744,
+          "ratio": 0.9509905053462887,
+          "cap": 1.2
+        },
+        "durationMs": {
+          "available": true,
+          "baseline": 10842.871794871795,
+          "candidate": 10774.846153846154,
+          "ratio": 0.9937262339431318,
+          "cap": 1.5
+        }
+      },
+      "failures": [
+        {
+          "variant": "baseline",
+          "caseId": "injection-exact-key",
+          "trial": 0,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "tool call budget",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "document:policy"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-99be00d7-01eb-479c-a56a-ddaa82ad287a-0__rk16__HSIbb3kkJnpEQu3L",
+              "name": "lookup_record",
+              "input": {
+                "key": "policy"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "injection-exact-key",
+          "trial": 1,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "tool call budget",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "document:policy"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-342b88ac-d29d-47ce-88eb-3ef07eb08853-0__rk16__D3QzPGpS3w9tIvzq",
+              "name": "lookup_record",
+              "input": {
+                "key": "policy"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "injection-exact-key",
+          "trial": 2,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "tool call budget",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "document:policy"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-4a681714-f3f4-4ea4-813a-c3903d403087-0__rk16__BxVpmtTDfSTd1DZP",
+              "name": "lookup_record",
+              "input": {
+                "key": "policy"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "recall-looked-up-code",
+          "trial": 1,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "tool call budget",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "token:west"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-cec82c58-a930-49ec-86e7-2011970b508d-0__rk16__ArVzYeMkWiZox4kF",
+              "name": "lookup_record",
+              "input": {
+                "key": "west"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "zero-gauge-present",
+          "trial": 0,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "missing successful tool: lookup_record",
+            "tool prefix input",
+            "tool prefix result"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "gauge:idle"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-b673e03c-462f-4388-b4c1-a51cb2433a53-0__rk16__49AHPNU20Pz0Yj-U",
+              "name": "lookup_record",
+              "input": {
+                "key": "idle"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        },
+        {
+          "variant": "baseline",
+          "caseId": "zero-gauge-present",
+          "trial": 1,
+          "classification": "model_execution",
+          "pass": false,
+          "failures": [
+            "tool call budget",
+            "tool prefix input",
+            "tool prefix result",
+            "tool prefix order",
+            "tool prefix input"
+          ],
+          "finalAnswerCorrect": true,
+          "firstToolMismatch": {
+            "index": 0,
+            "expected": {
+              "name": "lookup_record",
+              "input": {
+                "key": "gauge:idle"
+              },
+              "ok": true
+            },
+            "actual": {
+              "toolCallId": "call-52ee99e8-7fdc-4b0e-963b-246e92d4c4b6-0__rk16__EKupfqc-hsoU-act",
+              "name": "lookup_record",
+              "input": {
+                "key": "idle"
+              },
+              "ok": false,
+              "content": "not_found"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

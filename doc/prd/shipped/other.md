@@ -426,6 +426,11 @@ Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Compute
 
 按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动
 
+## literal-tool-identifiers
+保留完整查询标识符并以成功读取作为保存依据
+
+排查修复下这个问题
+
 ## live-bot-quality
 真实 Bot 任务评估与版本准入
 
