@@ -24,3 +24,7 @@ test('successful exact lookup passes without oracle changes', () => {
   assert.equal(auditTrial(task, good).classification, 'pass');
   assert.equal(auditTrial(task, good).firstToolMismatch, null);
 });
+test('broken transcript pairing is harness evidence, not model failure [AC:literal-tool-identifiers#AC-3]', () => {
+  const bad = { ...trial, invariantsOk: false, failures: ['transcript invariants', ...trial.failures] };
+  assert.equal(auditTrial(task, bad).classification, 'infrastructure');
+});

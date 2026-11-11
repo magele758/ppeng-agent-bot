@@ -14,7 +14,8 @@ function firstToolMismatch(expected, calls) {
 function classification(trial, grade) {
   const sameLabels = isDeepStrictEqual([...(trial.failures ?? [])].sort(), [...grade.failures].sort());
   if (trial.pass !== grade.pass || !sameLabels) return 'grading_discrepancy';
-  if (trial.infrastructureError || trial.error || grade.failures.includes('tools not offered')) return 'infrastructure';
+  const harnessFailure = grade.failures.some(label => ['tools not offered', 'transcript invariants'].includes(label));
+  if (trial.infrastructureError || trial.error || harnessFailure) return 'infrastructure';
   return grade.pass ? 'pass' : 'model_execution';
 }
 

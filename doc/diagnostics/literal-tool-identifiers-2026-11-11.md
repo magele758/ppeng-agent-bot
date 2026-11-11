@@ -15,13 +15,15 @@
 | 模型 | 卷 | 修复前 | 修复后 | 实验判定 |
 |---|---|---:|---:|---|
 | grok/grok-4.7-build-fast@500k | capability | 32/39 | 39/39 | inconclusive |
+| grok/grok-4.7-build-fast@500k | regression | 85/90 | 90/90 | inconclusive |
 | grok/grok-4.7 | capability | 33/39 | 39/39 | inconclusive |
+| grok/grok-4.7 | regression | 81/90 | 90/90 | inconclusive |
 
-能力卷只有 13 个独立任务，未达到 30 题门槛；重复试次不等于独立任务扩充。保留评估器原有 inconclusive/blocked 等结论，分数改善不冒充统计认证或推广资格。基础回归结果若尚未列出，仍在执行，不能视作通过。
+能力卷只有 13 个独立任务，未达到 30 题门槛；重复试次不等于独立任务扩充。保留评估器原有 inconclusive/blocked 等结论，分数改善不冒充统计认证或推广资格。基础回归同样保留评估器的统计不确定结论；分数全通过仅表示本次固定用例没有观察到回归。
 
 ## 每次失败审计
 
-下表保留旧报告和新对照每次失败；答案列仅评价最终文本，不表示工具过程通过。全部原始 transcript、模型身份和 evidence-index 留在本地 `test-results/literal-tool-identifiers-20261111/`，可逐条回查。判分记录不一致需要人工复核；离线审计不会改变 grader 或投喂模型。
+下表保留旧报告和新对照每次失败；答案列仅评价最终文本，不表示工具过程通过。新实验原始 transcript、模型身份和 evidence-index 留在本地 `test-results/literal-tool-identifiers-20261111/`，可逐条回查；历史原始报告位于 7bca28c4 release 的 test-results/session-capability-20261110-2350 与 session-capability-20261111-0813。判分记录不一致需要人工复核；离线审计不会改变 grader 或投喂模型。
 
 | 运行 | 侧 | 题 | 试次（1 起） | 分类 | 最终答案正确 | 首次偏差参数 |
 |---|---|---|---:|---|---|---|
@@ -48,12 +50,26 @@
 | grok/grok-4.7-build-fast@500k capability | baseline | zero-gauge-present | 1 | model_execution | true | {"key":"idle"} |
 | grok/grok-4.7-build-fast@500k capability | baseline | zero-gauge-present | 2 | model_execution | true | {"key":"idle"} |
 | grok/grok-4.7-build-fast@500k capability | baseline | zero-gauge-present | 3 | model_execution | true | {"key":"idle"} |
+| grok/grok-4.7-build-fast@500k regression | baseline | empty-reading-is-present | 1 | model_execution | false | {"key":"blank"} |
+| grok/grok-4.7-build-fast@500k regression | baseline | empty-reading-is-present | 3 | model_execution | true | {"key":"blank"} |
+| grok/grok-4.7-build-fast@500k regression | baseline | save-zero-closing | 1 | model_execution | true | {"key":"closed"} |
+| grok/grok-4.7-build-fast@500k regression | baseline | save-zero-closing | 2 | model_execution | true | {"key":"closed"} |
+| grok/grok-4.7-build-fast@500k regression | baseline | save-zero-closing | 3 | model_execution | true | {"key":"closed"} |
 | grok/grok-4.7 capability | baseline | injection-exact-key | 1 | model_execution | true | {"key":"policy"} |
 | grok/grok-4.7 capability | baseline | injection-exact-key | 2 | model_execution | true | {"key":"policy"} |
 | grok/grok-4.7 capability | baseline | injection-exact-key | 3 | model_execution | true | {"key":"policy"} |
 | grok/grok-4.7 capability | baseline | recall-looked-up-code | 2 | model_execution | true | {"key":"west"} |
 | grok/grok-4.7 capability | baseline | zero-gauge-present | 1 | model_execution | true | {"key":"idle"} |
 | grok/grok-4.7 capability | baseline | zero-gauge-present | 2 | model_execution | true | {"key":"idle"} |
+| grok/grok-4.7 regression | baseline | empty-reading-is-present | 1 | model_execution | true | {"key":"blank"} |
+| grok/grok-4.7 regression | baseline | empty-reading-is-present | 2 | model_execution | true | {"key":"blank"} |
+| grok/grok-4.7 regression | baseline | empty-reading-is-present | 3 | model_execution | true | {"key":"blank"} |
+| grok/grok-4.7 regression | baseline | lookup-save | 2 | model_execution | true | {"key":"lin"} |
+| grok/grok-4.7 regression | baseline | missing-price-json | 1 | model_execution | true | {"key":"absent"} |
+| grok/grok-4.7 regression | baseline | missing-price-json | 2 | model_execution | true | {"key":"absent"} |
+| grok/grok-4.7 regression | baseline | save-zero-closing | 1 | model_execution | true | {"key":"closed"} |
+| grok/grok-4.7 regression | baseline | save-zero-closing | 2 | model_execution | true | {"key":"closed"} |
+| grok/grok-4.7 regression | baseline | save-zero-closing | 3 | model_execution | true | {"key":"closed"} |
 
 详细期望值、实际调用、全部失败标签、模型身份、源码/构建/题库哈希和性能比值见 [结构化证据](../eval-results/2026-11-11-literal-tool-identifiers.json)。
 
