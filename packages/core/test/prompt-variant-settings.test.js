@@ -88,3 +88,28 @@ test('both variants produce non-empty stable prefix', () => {
   assert.ok(legacy.includes('You are TestBot (assistant).'));
   assert.ok(!legacy.includes('<role>'), 'legacy should not use XML role section');
 });
+
+
+test('literal identifiers in both variants [AC:literal-tool-identifiers#AC-1]', () => {
+  for (const variant of ['legacy', 'anthropic5']) {
+    const store = kvStore();
+    writePromptVariantSettings(store, { variant });
+    const prefix = new PromptBuilder({ store, repoRoot: '/repo' }).buildStablePrefix(makeCtx());
+    assert.ok(prefix.includes('The colon belongs to the key.'));
+    assert.ok(prefix.includes('{"key":"inventory:blue"}'));
+    assert.ok(prefix.includes('Preserve the complete identifier verbatim'));
+    for (const examKey of ['document:policy', 'gauge:idle', 'token:west', 'route:start']) {
+      assert.ok(!prefix.includes(examKey), 'exam answers must not enter the stable prompt');
+    }
+  }
+});
+test('read evidence in both variants [AC:literal-tool-identifiers#AC-2]', () => {
+  for (const variant of ['legacy', 'anthropic5']) {
+    const store = kvStore();
+    writePromptVariantSettings(store, { variant });
+    const prefix = new PromptBuilder({ store, repoRoot: '/repo' }).buildStablePrefix(makeCtx());
+    assert.ok(prefix.includes('A failed lookup is not evidence'));
+    assert.ok(prefix.includes('0, false, and an empty string'));
+    assert.ok(prefix.includes('do not guess a value and save it'));
+  }
+});

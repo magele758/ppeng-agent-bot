@@ -1,0 +1,19 @@
+id: literal-tool-identifiers
+title: 保留完整查询标识符并以成功读取作为保存依据
+status: implemented
+requirement: |
+  排查修复下这个问题
+notes: 'assumedApproval: standing-order-2026-10-22；问题上下文：能力卷中 document:policy、gauge:idle、token:west、route:start 被缩短，且读取失败后猜测零值并保存。保留原卷和严格判分。'
+criteria:
+  - id: AC-1
+    given: 用户要求读取带有命名空间的完整标识符
+    when: 使用任一种系统提示方案发起查询
+    then: 明确要求原样使用完整标识符，包含冒号和前缀，不将其缩短
+  - id: AC-2
+    given: 用户要求先读取数值再保存结果
+    when: 读取失败或返回零值、假值、空字符串
+    then: 明确区分读取失败与成功取得空值，失败不能作为猜测并保存结果的依据
+  - id: AC-3
+    given: 同一套能力卷的实际调用、最终答案和判分记录均已保存
+    when: 审计每次失败
+    then: 分开指出判分记录不一致、运行环境问题与模型执行问题，并保留答案正确但首次调用错误的事实
