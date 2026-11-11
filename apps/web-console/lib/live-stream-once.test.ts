@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeHistoryWindow, omitStreamTextSavedOnTurn, liveAnswerRepeated } from './history-window.ts';
+import { mergeHistoryWindow, omitStreamTextSavedOnTurn, liveAnswerRepeated, unpersistedAssistantText } from './history-window.ts';
 
 const answer = '正在写的这一段助手回复';
 const older = '上一答已经写好了';
@@ -62,4 +62,23 @@ test('saved identity hides text reasoning and tools while identical next-shot pr
     {kind:'tool',id:'tool',toolCallId:'c1',name:'read_file',args:'{}',messageId:'saved'},
     {...textSegment('same'),id:'new',messageId:''}];
   assert.deepEqual(omitStreamTextSavedOnTurn(messages,segments).map(s=>s.id),['new']);
+});
+
+test('盖章后历史还没有这行时，相同正文只显示一次 [AC:night-runtime-reliability#AC-6]', () => {
+  const pending = [user('ask', 'inspect')];
+  const segments = [
+    { ...textSegment('same'), messageId: 'saved' },
+    { ...textSegment('same'), id: 'new', messageId: '' }
+  ];
+  assert.equal(omitStreamTextSavedOnTurn(pending, segments).filter((segment) => segment.kind === 'text').length, 1);
+  const landed = [user('ask', 'inspect'), assistant('saved', 'same')];
+  assert.deepEqual(omitStreamTextSavedOnTurn(landed, segments).map((segment) => segment.id), ['new']);
+});
+
+test('没有身份时，正文相同的未保存新内容仍然可见 [AC:night-runtime-reliability#AC-7]', () => {
+  const messages = [user('ask', 'inspect'), assistant('saved', 'same')];
+  const echo = { kind: 'text' as const, id: 'echo', raw: 'same', html: 'same' };
+  const next = { kind: 'text' as const, id: 'next', raw: 'same', html: 'same' };
+  assert.deepEqual(omitStreamTextSavedOnTurn(messages, [echo, next]).map((segment) => segment.id), ['next']);
+  assert.equal(unpersistedAssistantText(messages, [echo, next]), 'same');
 });

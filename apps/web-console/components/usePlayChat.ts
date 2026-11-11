@@ -1740,6 +1740,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     let lastRetry: RetryProgress | undefined;
     let streamIdentityEnabled = false;
     let turnCheckpoint = streamCheckpoint(segments);
+    let shotSeal = streamCheckpoint(segments);
     let idCounter = 0;
     const nextId = () => `s-${++idCounter}`;
 
@@ -1803,7 +1804,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     };
     const applySseSaved = (event: string, p: SseEventPayload) => {
       streamIdentityEnabled = streamIdentityEnabled || streamSupportsSavedIdentity(event, p);
-      if (!applySavedStreamEvent(event, p, segments)) return;
+      if (!applySavedStreamEvent(event, p, segments, shotSeal)) return;
       streamIdentityEnabled = true;
       turnCheckpoint = streamCheckpoint(segments);
       sync();
@@ -1821,6 +1822,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           retry = undefined;
           lastRetry = undefined;
           sync();
+          shotSeal = streamCheckpoint(segments);
           turnCheckpoint = checkpointAfterModelDone(segments, turnCheckpoint, streamIdentityEnabled);
           modelShotOpenRef.current = false;
           const split = steerSplitRef.current;
@@ -1831,6 +1833,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
         if (event === 'model' && p.type === 'stream_reset') {
           rollbackToCheckpoint(segments, turnCheckpoint);
+          shotSeal = streamCheckpoint(segments);
           sync();
         }
         if (event === 'model' && p.type === 'text_delta') {

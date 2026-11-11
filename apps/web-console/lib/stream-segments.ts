@@ -51,19 +51,64 @@ export function formatStreamToolArgs(args: string): string {
 
 /** Close the model shot by durable identity. New deltas start a new segment. */
 export function markStreamSaved(segments: StreamSegment[], messageId: string): void {
-  for (const segment of segments) {
-    if (!segment.messageId && segment.kind !== 'a2ui') segment.messageId = messageId;
-  }
+  for (const segment of segments) assignSavedId(segment, messageId);
+}
+
+function assignSavedId(segment: StreamSegment, messageId: string): void {
+  if (!segment.messageId && segment.kind !== 'a2ui') segment.messageId = messageId;
 }
 
 export function streamTailCanMerge(segment: StreamSegment | undefined, kind: StreamSegment['kind']): boolean {
   return segment?.kind === kind && !segment.messageId;
 }
 
-export function applySavedStreamEvent(event: string, payload: {type?: string; messageId?: string}, segments: StreamSegment[]): boolean {
+export function applySavedStreamEvent(
+  event: string,
+  payload: {type?: string; messageId?: string},
+  segments: StreamSegment[],
+  seal?: StreamCheckpoint
+): boolean {
   if (event !== 'model' || payload.type !== 'assistant_saved' || !payload.messageId) return false;
-  markStreamSaved(segments, payload.messageId);
+  stampSavedShot(segments, payload.messageId, seal);
   return true;
+}
+
+function stampSavedShot(segments: StreamSegment[], messageId: string, seal?: StreamCheckpoint): void {
+  if (!usableSeal(seal, segments)) {
+    markStreamSaved(segments, messageId);
+    return;
+  }
+  detachUnsealedGrowth(segments, seal as StreamCheckpoint);
+  markWithinSeal(segments, messageId, seal as StreamCheckpoint);
+}
+
+function usableSeal(seal: StreamCheckpoint | undefined, segments: readonly StreamSegment[]): boolean {
+  return Boolean(seal && seal.count > 0 && seal.count <= segments.length);
+}
+
+function detachUnsealedGrowth(segments: StreamSegment[], seal: StreamCheckpoint): void {
+  const live = segments[seal.count - 1];
+  if (!live || !seal.last) return;
+  const extra = textGrowth(live, seal.last);
+  if (!extra) return;
+  segments[seal.count - 1] = copySegment(seal.last);
+  segments.splice(seal.count, 0, extra);
+}
+
+function textGrowth(live: StreamSegment, frozen: StreamSegment): StreamSegment | null {
+  if (live.kind !== 'text' || frozen.kind !== 'text') return null;
+  if (!live.raw.startsWith(frozen.raw) || live.raw.length <= frozen.raw.length) return null;
+  const raw = live.raw.slice(frozen.raw.length);
+  return { kind: 'text', id: `${live.id}-next`, raw, html: escapeStreamHtml(raw), messageId: live.messageId };
+}
+
+function escapeStreamHtml(raw: string): string {
+  return raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function markWithinSeal(segments: StreamSegment[], messageId: string, seal: StreamCheckpoint): void {
+  const limit = seal.count;
+  for (let index = 0; index < limit && index < segments.length; index += 1) assignSavedId(segments[index], messageId);
 }
 
 /** Empty ID means a tracked new shot has not been saved yet. Undefined is legacy. */

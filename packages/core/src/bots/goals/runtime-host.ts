@@ -698,11 +698,11 @@ export function createGoalCheckpointTool(store:SqliteStateStore):ToolContract {
   const assigned=assignedCheckpointGoal(store,store.getSession(ctx.session.id)??ctx.session);
   if(!assigned)return {ok:false,content:'No goal is assigned to this execution',metadata:{retry:false}};
   const kind=checkpointKind(String(args.kind));
-  if(!kind)return {ok:false,content:'Invalid checkpoint kind'};
+  if(!kind)return {ok:false,content:'Invalid checkpoint kind',metadata:{retry:false,endReason:'goal_checkpoint_invalid_kind'}};
   const live=store.getSession(ctx.session.id)!;
   const wait=args.wait as {source?:unknown;correlationId?:unknown}|undefined;
   const authorized=live.metadata.botGoalAuthorizedWaits as Array<{goalId:string;source:string;correlationId:string}>|undefined;
-  if(kind==='waiting'&&!checkpointWaitAuthorized(wait,authorized,assigned.goalId))return {ok:false,content:'Waiting requires an execution reference authorized by goal_dispatch'};
+  if(kind==='waiting'&&!checkpointWaitAuthorized(wait,authorized,assigned.goalId))return {ok:false,content:'Waiting requires an execution reference authorized by goal_dispatch',metadata:{retry:false,endReason:'goal_checkpoint_wait_unauthorized'}};
   store.updateSession(live.id,{metadata:{...live.metadata,botGoalCheckpoint:checkpointRecord(args,kind)}});
   return {ok:true,content:'Checkpoint saved. Completion remains subject to verification.'};
  }};
