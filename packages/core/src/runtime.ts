@@ -2048,6 +2048,7 @@ export class RawAgentRuntime {
       }
       const existing = this.runningSessions.get(sessionId);
       if (existing && !options?.latch) {
+        beginSkillTask(this.store, sessionId);
         this.forkConcurrentBotWork(parked, true);
         const late = options?.onModelStreamChunk;
         if (late) {
