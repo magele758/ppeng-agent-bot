@@ -1,4 +1,6 @@
 import type { SessionMessage } from '../types.js';
+import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
 
 export interface QualityCheck { criterion: string; passed: boolean; evidence: string[] }
 export interface QualityReport { passed: boolean; summary: string; checks: QualityCheck[]; sessionId?: string }
@@ -45,20 +47,32 @@ function unresolvedTestFailure(messages: Pick<SessionMessage, 'parts'>[]): boole
 }
 
 /** Gateways may hide/remap call IDs; resolve human-readable receipts against persisted calls. */
-function evidenceId(reference: string, messages: Pick<SessionMessage, 'parts'>[]): string {
+function evidencePath(root: string, path: string): string {
+  const absolute = resolve(root, path);
+  try { return realpathSync(absolute); } catch { return absolute; }
+}
+
+function evidenceId(reference: string, messages: Pick<SessionMessage, 'parts'>[], workspaceRoot?: string): string {
   const calls = messages.flatMap(message => message.parts).filter(part => part.type === 'tool_call');
   const found = calls.findLast(call => {
     const selector = call.name === 'work_evidence' ? call.input.verify_command
       : call.name === 'grep_files' ? call.input.pattern : call.input.path;
+    if (call.name === 'read_file' && workspaceRoot && typeof selector === 'string' && reference.startsWith('read_file:')) {
+      return evidencePath(workspaceRoot, selector) === evidencePath(workspaceRoot, reference.slice('read_file:'.length));
+    }
     return typeof selector === 'string' && reference === `${call.name}:${selector}`;
   });
   return found?.toolCallId ?? reference;
 }
 
+function isTestEvidence(result: { name: string; content: string } | undefined): boolean {
+  return result?.name === 'work_evidence' && successfulVerification(result.content);
+}
+
 /** Evidence IDs must resolve to this independent checker's actual successful tool results. */
 export function validateQualityReport(input: {
   report: unknown; criteria: string[]; messages: Pick<SessionMessage, 'parts'>[];
-  status: string; stage: 'review' | 'test';
+  status: string; stage: 'review' | 'test'; workspaceRoot?: string;
 }): QualityReport {
   if (!['completed', 'idle'].includes(input.status)) return failedQuality(`Checker unfinished: ${input.status}`);
   if (input.stage === 'test' && unresolvedTestFailure(input.messages)) return failedQuality('Unresolved failed test execution');
@@ -68,13 +82,13 @@ export function validateQualityReport(input: {
   const reported = report.checks.map(check => check.criterion);
   if (reported.length !== criteria.length || new Set(reported).size !== criteria.length || criteria.some(c => !reported.includes(c))) return failedQuality('Quality report does not cover exactly all acceptance criteria');
   const results = new Map(input.messages.flatMap(message => message.parts).filter(part => part.type === 'tool_result').map(part => [part.toolCallId, part]));
-  const checks = report.checks.map(check => ({ ...check, evidence: check.evidence.map(ref => evidenceId(ref, input.messages)) }));
+  const checks = report.checks.map(check => ({ ...check, evidence: check.evidence.map(ref => evidenceId(ref, input.messages, input.workspaceRoot)) }));
   for (const check of checks) {
     for (const id of check.evidence) {
       const result = results.get(id);
       if (!result?.ok) return failedQuality(`Missing or failed evidence: ${id}`);
-      if (input.stage === 'test' && (result.name !== 'work_evidence' || !successfulVerification(result.content))) return failedQuality(`No successful test execution for ${check.criterion}`);
     }
+    if (input.stage === 'test' && !check.evidence.some(id => isTestEvidence(results.get(id)))) return failedQuality(`No successful test execution for ${check.criterion}`);
   }
   return { ...report, checks, passed: qualityPassed(report) };
 }

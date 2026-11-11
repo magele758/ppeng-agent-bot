@@ -24,6 +24,15 @@ test('unsafe integers rejected', () => assert.throws(() => summarize([{account:'
 test('overflow rejected', () => assert.throws(() => summarize([{account:'a',cents:Number.MAX_SAFE_INTEGER},{account:'a',cents:1}])));
 `;
 writeFileSync(dir + '/acceptance.test.mjs', testSource);
+writeFileSync(dir + '/.gitignore', 'state/\nevidence*.json\n*.log\n');
+for (const args of [
+  ['init', '--initial-branch=main'], ['config', 'user.name', 'Agent verification'],
+  ['config', 'user.email', 'verification@localhost'], ['add', 'acceptance.test.mjs', '.gitignore'],
+  ['commit', '-m', 'test: establish immutable delivery acceptance fixture']
+]) {
+  const result = spawnSync('git', args, { cwd: dir, env: sanitizeSpawnEnv(process.env), encoding: 'utf8', timeout: 30000 });
+  assert.equal(result.status, 0, result.stderr || 'Cannot prepare isolated Git fixture');
+}
 const hash = text => createHash('sha256').update(text).digest('hex');
 const rt = new RawAgentRuntime({ repoRoot: dir, stateDir: dir + '/state', modelAdapter: model });
 // This explicit trial authorizes local test execution only in its isolated runtime.

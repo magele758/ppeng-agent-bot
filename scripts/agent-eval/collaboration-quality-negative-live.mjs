@@ -22,7 +22,7 @@ const evidence={model:cfg.selection.name,startedAt:new Date().toISOString(),scop
 const timer=setTimeout(()=>{for(const s of rt.store.listSessions())if(rt.isSessionRunning(s.id))rt.cancelSession(s.id);},300000);
 try{
  writeFileSync(dir+'/totals.mjs','export function summarize() { return []; }\n');
- const gate=await runQualityCheck({store:rt.store,runSession:id=>rt.runSession(id)},{stage:'test',title:'Negative delivery trial',criteria:['Group accounts and sum integer cents; reject unsafe and fractional values. Run node --test acceptance.test.mjs.'],implementation:parent,context:'Artifact totals.mjs and unchanged acceptance.test.mjs. Verify actual behavior, not previous reports.'});
+ const gate=await runQualityCheck({store:rt.store,repoRoot:dir,stateDir:dir+'/state',runSession:id=>rt.runSession(id)},{stage:'test',title:'Negative delivery trial',criteria:['Group accounts and sum integer cents; reject unsafe and fractional values. Run node --test acceptance.test.mjs.'],implementation:parent,context:'Artifact totals.mjs and unchanged acceptance.test.mjs. Verify actual behavior, not previous reports.'});
  const parts=rt.store.foldMessages(gate.sessionId).flatMap(m=>m.parts);
  const executions=parts.filter(p=>p.type==='tool_result'&&p.name==='work_evidence');
  assert.equal(gate.passed,false,'A broken artifact must not pass');

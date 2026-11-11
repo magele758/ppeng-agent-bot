@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
@@ -8,6 +8,7 @@ import { OrchestrationEngine } from '../dist/orchestrator/engine.js';
 import { SwarmExecutor } from '../dist/swarm/executor.js';
 import { validateQualityReport } from '../dist/quality/gate.js';
 import { runQualityCheck } from '../dist/runtime/quality-gates.js';
+import { CloudFolderPersist } from '../dist/workspace/cloud-persist.js';
 
 const good = { passed: true, summary: 'verified', checks: [{ criterion: 'correct output', passed: true, evidence: ['read-1'] }] };
 function fixture(t) {
@@ -51,6 +52,9 @@ test('claims require exact criteria, successful tool evidence and a finished che
   const call = { parts: [{ type: 'tool_call', name: 'read_file', toolCallId: 'read-1', input: { path: 'totals.mjs' } }] };
   assert.deepEqual(validate(receipt, { messages: [call, ...messages] }).checks[0].evidence, ['read-1']);
   assert.equal(validate(receipt).passed, false);
+  const absoluteCall = { parts: [{ ...call.parts[0], input: { path: '/workspace/totals.mjs' } }] };
+  assert.equal(validate(receipt, { messages: [absoluteCall, ...messages], workspaceRoot: '/workspace' }).passed, true);
+  assert.equal(validate(receipt, { messages: [absoluteCall, ...messages], workspaceRoot: '/different-workspace' }).passed, false);
   assert.equal(validate(good, { status: 'waiting_approval' }).passed, false);
   assert.equal(validate(good, { stage: 'test' }).passed, false);
   assert.equal(validate(good, { messages: [{ parts: [{ ...messages[0].parts[0], ok: false }] }] }).passed, false);
@@ -58,6 +62,9 @@ test('claims require exact criteria, successful tool evidence and a finished che
   const passed = { ...good, checks: [{ ...good.checks[0], evidence: ['test-pass'] }] };
   const success = execution('test-pass', 'node --test', 0), failure = execution('test-fail', 'node --test', 1);
   assert.equal(validate(passed, { stage: 'test', messages: [success] }).passed, true);
+  const mixed = { ...passed, checks: [{ ...passed.checks[0], evidence: ['test-pass', 'read_file:totals.mjs'] }] };
+  assert.equal(validate(mixed, { stage: 'test', messages: [success, absoluteCall, ...messages], workspaceRoot: '/workspace' }).passed, true);
+  assert.equal(validate(mixed, { stage: 'test', messages: [success], workspaceRoot: '/workspace' }).passed, false);
   assert.equal(validate(passed, { stage: 'test', messages: [success, failure] }).passed, false);
   assert.equal(validate(passed, { stage: 'test', messages: [failure, success] }).passed, true);
   assert.equal(validate(passed, { stage: 'test', messages: [execution('other-fail', 'other-tests', 1), success] }).passed, false);
@@ -68,7 +75,7 @@ test('checkers inherit workspace and permissions and cannot widen an empty inter
   const db = fixture(t);
   const parent = db.createSession({ title: 'implementation', agentId: 'general', mode: 'task', metadata: { allowedTools: ['write_file'], permissionMode: 'ask', userId: 'alice', tenantId: 'tenant-a' } });
   let calls = 0;
-  const host = { store: db, runSession: async id => { calls++; db.appendMessage(id, 'tool', [{ type: 'tool_result', toolCallId: 'read-1', name: 'read_file', ok: true, content: 'artifact' }]); db.appendMessage(id, 'assistant', [{ type: 'text', text: JSON.stringify(good) }]); } };
+  const host = { store: db, repoRoot: '/workspace', stateDir: '/state', runSession: async id => { calls++; db.appendMessage(id, 'tool', [{ type: 'tool_result', toolCallId: 'read-1', name: 'read_file', ok: true, content: 'artifact' }]); db.appendMessage(id, 'assistant', [{ type: 'text', text: JSON.stringify(good) }]); } };
   const input = { stage: 'review', title: 'correct output', criteria: ['correct output'], implementation: parent, context: 'artifact: totals.mjs' };
   assert.equal((await runQualityCheck(host, input)).passed, false);
   assert.equal(calls, 0);
@@ -96,6 +103,29 @@ test('orchestration exceptions preserve a concurrent external pause [AC:collabor
   const engine = new OrchestrationEngine({ store, runReview: async () => { store.updateRunStatus(run.id, 'blocked'); throw Error('interrupted'); } });
   await engine.tick();
   assert.equal(store.getRun(run.id).status, 'blocked');
+});
+
+test('evidence root lookup does not replace delivered cloud-cache files [AC:collaboration-quality-gates#AC-4]', async t => {
+  const db = fixture(t), dir = mkdtempSync(join(tmpdir(), 'quality-cloud-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const file = join(dir, 'totals.mjs');
+  writeFileSync(file, 'current local delivery');
+  const fromEnv = CloudFolderPersist.fromEnv.bind(CloudFolderPersist);
+  const configured = { RAW_AGENT_S3_ENDPOINT: 'http://127.0.0.1:9', RAW_AGENT_S3_BUCKET: 'test', RAW_AGENT_S3_ACCESS_KEY: 'test', RAW_AGENT_S3_SECRET_KEY: 'test' };
+  t.mock.method(CloudFolderPersist, 'fromEnv', (env = configured) => fromEnv(env));
+  let hydrated = 0;
+  t.mock.method(CloudFolderPersist.prototype, 'hydrate', async () => { hydrated++; writeFileSync(file, 'stale remote artifact'); });
+  const folder = db.cloudFolders().create({ name: 'test', backend: 's3', localPath: dir, s3Prefix: 'test/' });
+  const parent = db.createSession({ title: 'implementation', agentId: 'general', mode: 'task', metadata: { workspaceBinding: { kind: 'cloud_folder', cloudFolderId: folder.id } } });
+  const host = { store: db, repoRoot: dir, stateDir: dir, runSession: async id => {
+    db.appendMessage(id, 'assistant', [{ type: 'tool_call', toolCallId: 'read-1', name: 'read_file', input: { path: file } }]);
+    db.appendMessage(id, 'tool', [{ type: 'tool_result', toolCallId: 'read-1', name: 'read_file', ok: true, content: readFileSync(file, 'utf8') }]);
+    db.appendMessage(id, 'assistant', [{ type: 'text', text: JSON.stringify({ ...good, checks: [{ ...good.checks[0], evidence: ['read_file:totals.mjs'] }] }) }]);
+  } };
+  const report = await runQualityCheck(host, { stage: 'review', title: 'quality', criteria: ['correct output'], implementation: parent, context: 'totals.mjs' });
+  assert.equal(report.passed, true, JSON.stringify(report));
+  assert.equal(hydrated, 0);
+  assert.equal(readFileSync(file, 'utf8'), 'current local delivery');
 });
 test('Swarm gates every task and persists verdicts without repeated reviews [AC:collaboration-quality-gates#AC-1] [AC:collaboration-quality-gates#AC-2]', async t => {
   for (const passed of [true, false]) {

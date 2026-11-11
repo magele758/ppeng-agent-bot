@@ -3,7 +3,7 @@ import { failedQuality, qualityCriteria, validateQualityReport, type QualityRepo
 import type { OrchestrationRun } from '../orchestrator/types.js';
 import type { SwarmRun, SwarmTask } from '../swarm/types.js';
 import type { SessionRecord } from '../types.js';
-import { inheritWorkspaceBinding } from '../workspace/index.js';
+import { inheritWorkspaceBinding, resolveEffectiveWorkspace } from '../workspace/index.js';
 import { inheritBotIdentityMetadata } from '../memory/bot-memory-scope.js';
 import { ensureAgent, getLatestAssistantText, textPart } from './session-facade.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from './spawn-policy.js';
@@ -32,6 +32,12 @@ export async function runQualityCheck(host: SpawnHost, input: {
   const agentTools = host.store.getAgent(parent.agentId)?.allowedTools;
   const allowedTools = restrictTools(restrictTools(tools, agentTools), parent.metadata?.allowedTools);
   if (!allowedTools.length) return failedQuality('Parent permissions allow no inspection tools');
+  const workspace = await resolveEffectiveWorkspace({
+    store: host.store, session: parent, repoRoot: host.repoRoot, stateDir: host.stateDir,
+    isolatedWorkspaceRoot: parent.workspaceId ? host.store.getWorkspace(parent.workspaceId)?.rootPath : undefined,
+    // Resolve evidence paths only; normal execution owns remote hydration.
+    env: {}
+  });
   const checker = host.store.createSession({
     title: `Quality ${input.stage}: ${input.title.slice(0, 80)}`, mode: 'subagent', agentId,
     parentSessionId: parent.id, workspaceId: parent.workspaceId, background: false,
@@ -60,7 +66,7 @@ export async function runQualityCheck(host: SpawnHost, input: {
     const report = validateQualityReport({
       report: parseReport(getLatestAssistantText(host.store, checker.id) ?? ''), criteria,
       messages: host.store.foldMessages(checker.id),
-      status: host.store.getSession(checker.id)?.status ?? 'missing', stage: input.stage
+      status: host.store.getSession(checker.id)?.status ?? 'missing', stage: input.stage, workspaceRoot: workspace.workspaceRoot
     });
     return { ...report, sessionId: checker.id };
   } catch (error) { return { ...failedQuality(String(error)), sessionId: checker.id }; }
