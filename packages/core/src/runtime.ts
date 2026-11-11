@@ -1,6 +1,7 @@
 import { coachingBotId } from './bots/coaching-scope.js';
 import { coachingInstructions } from './bots/bot-coaching.js';
 import { BOT_COMPRESSION_TIMEOUT_MS } from './session/compact-summary-deadline.js';
+import { WriterClaimError } from './session/writer-claim.js';
 import { DaydreamHost } from './runtime/daydream-host.js';
 import { reconcileBypassApprovals } from './runtime/bypass-approvals.js';
 import {createWaitForTool} from './waits/tool.js';
@@ -45,7 +46,7 @@ import { createAppControlTools } from './app-control/tools.js';
 import { readAppControlSettings } from './app-control/settings.js';
 import { createLogger } from './logger.js';
 import { emitAdmitPhase } from './observability/admit-trace.js';
-import { logStartupPhase, setStartupPhaseEmitter, startupTraceDisposition, startupPhaseFromRecord } from './observability/startup-phase.js';
+import { foldStartupPhase, logStartupPhase, resetStartupPhaseFold, setStartupPhaseEmitter } from './observability/startup-phase.js';
 import { NotFoundError, ValidationError } from './errors.js';
 import type { AgentSandbox } from './sandbox/agent-sandbox-types.js';
 import { SelfHealScheduler } from './self-heal/self-heal-scheduler.js';
@@ -221,6 +222,7 @@ import { flushPreparedContextSnapshots,
   sessionFacadeFrom,
   spawnFrom,
   toolLoopDepsFrom,
+  toolsStoppingThisTurn,
   type L5Bindable
 } from './runtime/l5-bindings.js';
 import { autoCompactSession } from './runtime/compact-host.js';
@@ -385,6 +387,8 @@ export class RawAgentRuntime {
   private readonly pendingTraceWrites = new Map<string, Set<Promise<void>>>();
   /** Late subscribers (Lab follow after ask_user) receive chunks from the in-flight run. */
   private readonly modelStreamListeners = new Map<string, Set<(chunk: ModelStreamChunk) => void>>();
+  /** Old model streams already stopped after a newer writer took the session. */
+  private readonly staleModelStreams = new WeakSet<AbortController>();
   private readonly sessionViewListeners = new Map<string, Set<(view: { session: SessionRecord }) => void>>();
   private readonly sessionRunWaiters = new Map<string, Set<(run: Promise<SessionRecord>) => void>>();
   /**
@@ -635,13 +639,13 @@ export class RawAgentRuntime {
     ].map(tool => guardRuntimeCapability(this.store, tool));
     const ptcExec = createPtcExecTool({
       getAuthorizedTools: (context) =>
-        filterToolsForSession({
+        toolsStoppingThisTurn(this.l5(), filterToolsForSession({
           env: process.env,
           tools: toolsWithoutPtc,
           agent: context.agent,
           session: context.session,
           settingsStore: this.store
-        }).tools,
+        }).tools),
       spawnSubagent: (context, spec, signal) =>
         toolServices.spawnSubagent(
           context,
@@ -678,13 +682,13 @@ export class RawAgentRuntime {
         settingsStore: this.store,
         getProcessTools: () => this.tools,
         getAuthorizedTools: (context) =>
-          filterToolsForSession({
+          toolsStoppingThisTurn(this.l5(), filterToolsForSession({
             env: process.env,
             tools: toolsWithoutPtc,
             agent: context.agent,
             session: context.session,
             settingsStore: this.store
-          }).tools,
+          }).tools),
         spawnSubagent: (context, spec, signal) =>
           toolServices.spawnSubagent(context, spec.task, spec.role ?? spec.agent, {
             allowedTools: spec.allowed_tools,
@@ -1868,11 +1872,17 @@ export class RawAgentRuntime {
   private deliverModelStreamChunk(
     sessionId: string,
     chunk: ModelStreamChunk,
-    direct?: (chunk: ModelStreamChunk) => void
+    direct?: (chunk: ModelStreamChunk) => void,
+    owner?: AbortController
   ): void {
     try { this.store.assertCurrentWriter(sessionId); }
-    catch {
-      this.emitTrace(sessionId, { kind: 'stale_writer_rejected', payload: { channel: 'model_stream' } });
+    catch (error) {
+      if (!(error instanceof WriterClaimError)) throw error;
+      if (!owner || !this.staleModelStreams.has(owner)) {
+        this.emitTrace(sessionId, { kind: 'stale_writer_rejected', payload: { channel: 'model_stream' } });
+        if (owner) this.staleModelStreams.add(owner);
+      }
+      owner?.abort();
       return;
     }
     try {
@@ -1997,6 +2007,7 @@ export class RawAgentRuntime {
     }
   ): Promise<SessionRecord> {
     if (this.desktopUpdateSuspended) throw new ValidationError("Desktop update in progress");
+    if (!this.runningSessions.has(sessionId)) resetStartupPhaseFold(sessionId);
     const admitStarted = Date.now();
     this.pendingSessionAdmissions++;
     try {
@@ -2065,16 +2076,18 @@ export class RawAgentRuntime {
       const observeBudget = observeGoalBudget(this.goalRuntimeHost(), sessionId);
       const callerEvent = options?.onEvent;
       options = { ...options, onEvent: async event => { await observeHuman(event); await observeBudget(event); await callerEvent?.(event); } };
+      const runController = new AbortController();
+      this.sessionAbortControllers.set(sessionId, runController);
       const directChunk = options?.onModelStreamChunk;
       if (directChunk || (this.modelStreamListeners.get(sessionId)?.size ?? 0) > 0) {
         options = {
           ...options,
-          onModelStreamChunk: (chunk) => this.deliverModelStreamChunk(sessionId, chunk, directChunk)
+          onModelStreamChunk: (chunk) => this.deliverModelStreamChunk(sessionId, chunk, directChunk, runController)
         };
       }
       const { signal: callerSignal, ...runOptions } = options ?? {};
       expireDueUnattendedApprovals(this.store);
-  
+
       // Kernel selection: `loop_settings.kernelVariant` (Lab UI). Default is
       // `@ppeng/agent-loop` (`agent-loop`). Explicit `ppeng` keeps the local
       // packages/core kernel as a reference path.
@@ -2087,8 +2100,6 @@ export class RawAgentRuntime {
       const kernelVariant = engineOn ? (loopKv?.kernelVariant ?? 'agent-loop') : 'agent-loop';
       const assemblyPreset: LoopPreset = engineOn ? (parseLoopPreset(loopKv?.assemblyPreset) ?? 'max') : 'max';
       this.log.info(`runSession kernel=${kernelVariant} assembly=${assemblyPreset}`);
-      const runController = new AbortController();
-      this.sessionAbortControllers.set(sessionId, runController);
       if (parked?.metadata.canonicalBotChat === true) noteFinishRunStart(this.store, sessionId);
       const unlinkCallerSignal = this.cancelOnAbort(sessionId, callerSignal);
       const coreHost = bindTurnKernelHost(this.l5());
@@ -2244,13 +2255,7 @@ export class RawAgentRuntime {
 
   /** Trace JSONL on disk; optional PG fan-out when `EVENT_BUFFER_PROVIDER=redis_postgres`. */
   private emitTrace(sessionId: string, rawEvent: Omit<TraceEvent, 'ts' | 'sessionId'>): void {
-    if (rawEvent.kind === 'startup_phase' && rawEvent.payload) {
-      const startup = startupPhaseFromRecord(rawEvent.payload);
-      if (startup) {
-        if (startupTraceDisposition(startup) === 'summary') return;
-        logStartupPhase(sessionId, startup);
-      }
-    }
+    if (rawEvent.kind === 'startup_phase' && rawEvent.payload && foldStartupPhase(sessionId, rawEvent.payload)) return;
     if (rawEvent.kind === 'turn_end') {
       const session = this.store.getSession(sessionId);
       const agent = session && this.store.getAgent(session.agentId);

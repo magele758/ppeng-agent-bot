@@ -63,6 +63,7 @@ export type {
 
 // L1: Helpers
 export { createId, envBool, envInt, nowIso } from './helpers.js';
+export { linkAbortParent, turnAbortSignal } from './runtime/abort-lineage.js';
 
 // L1: Session
 export type { SessionBudget, SessionBudgetInput } from './session/index.js';

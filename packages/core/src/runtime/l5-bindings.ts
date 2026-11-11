@@ -116,6 +116,7 @@ import {
   filterValidToolCalls as toolLoopFilterValid,
   processToolResults as toolLoopProcessResults,
   runTurnWithRetries as toolLoopRunTurn,
+  toolsForTurn,
   type ToolLoopDeps
 } from './tool-loop.js';
 import {
@@ -450,6 +451,12 @@ export function toolLoopDepsFrom(rt: L5Bindable): ToolLoopDeps {
         /* index is best-effort; files remain readable */
       }
     },
+    abortTurn: (sessionId, signal) => {
+      const controller = rt.sessionAbortControllers.get(sessionId);
+      if (!controller || controller.signal.aborted) return;
+      if (signal && controller.signal !== signal) return;
+      controller.abort();
+    },
     checkCapabilityPin: (toolName, inputSchema) => {
       if (!resolveDiscoveryEnabled(rt.store, process.env)) {
         return { ok: true };
@@ -466,6 +473,11 @@ export function toolLoopDepsFrom(rt: L5Bindable): ToolLoopDeps {
       return result;
     }
   };
+}
+
+/** Cell tools bypass executeToolCalls. Wrap them so a stop still aborts this turn. */
+export function toolsStoppingThisTurn(rt: L5Bindable, tools: ToolContract<any>[]): ToolContract<any>[] {
+  return toolsForTurn(toolLoopDepsFrom(rt), tools);
 }
 
 export function createRuntimeToolServices(rt: L5Bindable) {
@@ -734,6 +746,22 @@ function fitProductModelRequest(
         kind: event.kind,
         payload: event.payload
       });
+      if (event.kind !== 'request_over_budget' || event.payload?.reason !== 'unresolved' || !session) return;
+      const folding = session;
+      void autoCompactForTurn(compactFrom(rt), {
+        session: folding,
+        agent: input.agent,
+        repoRoot: rt.repoRoot,
+        stateDir: rt.stateDir
+      }, { force: true }).catch((error: unknown) => {
+        rt.emitTrace(input.sessionId!, {
+          kind: 'compact_skipped',
+          payload: {
+            reason: 'summary_failed',
+            message: error instanceof Error ? error.message : String(error)
+          }
+        });
+      });
     },
     summarize: (messages) =>
       adapter.summarizeMessages({
@@ -965,13 +993,13 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
         query,
         materializeDeps: {
           getAuthorizedTools: (ctx) =>
-            filterToolsForSession({
+            toolsForTurn(toolLoopDepsFrom(rt), filterToolsForSession({
               env: process.env,
               tools: catalogTools,
               agent: ctx.agent,
               session: ctx.session,
               settingsStore: rt.store
-            }).tools,
+            }).tools),
           previewAuthorizedTools: filterToolsForSession({
             env: process.env,
             tools: catalogTools,

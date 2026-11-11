@@ -5,6 +5,7 @@
 import { envBool } from '../env.js';
 import type { PromptBuilder } from '../model/prompt-builder.js';
 import { isSkillAllowed } from '../skills/skill-allowlist.js';
+import { loadSkillNameDecision } from '../skills/skill-router.js';
 import type { SkillManifest } from '../skills/skill-manifest.js';
 import { discloseSkillBody, formatDisclosedSkillContent } from '../skills/skill-disclosure.js';
 import type { SkillSpec } from '../types.js';
@@ -84,20 +85,42 @@ export async function resolveSkillLoad(
   sessionId: string
 ): Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string; requiredSkills?: string[] }> {
   const skills = await host.promptBuilder.skillsForSession(sessionId);
+  // A missing allowlist method means every skill, same as an absent allowedSkills list.
+  const allowed = host.promptBuilder.getAllowedSkills?.(sessionId);
   const normalizedName = name.trim().toLowerCase();
   const matches = skills.filter((skill) => {
     const lookupKeys = [skill.name, skill.id, ...(skill.aliases ?? [])];
     return lookupKeys.some((candidate) => candidate.trim().toLowerCase() === normalizedName);
   });
-  const exact = matches.find(s => s.ownerBotId && s.id.toLowerCase() === normalizedName);
-  if (!exact && matches.length > 1) {
+  const allowedMatches = matches.filter((skill) => isSkillAllowed(skill, allowed));
+  if (matches.length > 0 && allowedMatches.length === 0) {
+    const denied = matches[0]!;
+    const allowedDecision = loadSkillNameDecision(name, allowed, denied);
+    void host.emitTrace(sessionId, {
+      kind: 'skill_load',
+      payload: {
+        name,
+        skillId: denied.id,
+        skillName: denied.name,
+        rejected: true,
+        reason: 'not_in_allowed_skills'
+      }
+    });
+    return {
+      error: allowedDecision.ok
+        ? `Skill "${denied.name}" is not enabled for this turn's allowedSkills. Stop. Do not load another name.`
+        : allowedDecision.error
+    };
+  }
+  const exact = allowedMatches.find(s => s.ownerBotId && s.id.toLowerCase() === normalizedName);
+  if (!exact && allowedMatches.length > 1) {
     void host.emitTrace(sessionId, {
       kind: 'skill_load',
       payload: { name, rejected: true, reason: 'ambiguous' }
     });
-    return { error: `Ambiguous skill "${name}". Choose an id: ${matches.map(s => `${s.id} (Bot ${s.ownerBotId ?? 'shared'})`).join(', ')}` };
+    return { error: `Ambiguous skill "${name}". Choose an id: ${allowedMatches.map(s => `${s.id} (Bot ${s.ownerBotId ?? 'shared'})`).join(', ')}` };
   }
-  const found = exact ?? matches[0];
+  const found = exact ?? allowedMatches[0];
   if (!found?.content) {
     void host.emitTrace(sessionId, {
       kind: 'skill_load',
@@ -105,7 +128,8 @@ export async function resolveSkillLoad(
     });
     return { error: `Skill "${name}" not found. Use search_skills for this task, then load an exact id from its hits.` };
   }
-  if (!isSkillAllowed(found, host.promptBuilder.getAllowedSkills(sessionId))) {
+  const allowedDecision = loadSkillNameDecision(name, host.promptBuilder.getAllowedSkills(sessionId), found);
+  if (!allowedDecision.ok) {
     void host.emitTrace(sessionId, {
       kind: 'skill_load',
       payload: {
@@ -116,7 +140,7 @@ export async function resolveSkillLoad(
         reason: 'not_in_allowed_skills'
       }
     });
-    return { error: `Skill "${found.name}" is not enabled for this session.` };
+    return { error: allowedDecision.error };
   }
 
   const disclosure = host.promptBuilder.getSkillDisclosure();
@@ -150,7 +174,6 @@ export async function resolveSkillLoad(
       };
     }
     if (!inSearch) {
-      const suggestions = [...searchNames].slice(0, 3).join(', ');
       void host.emitTrace(sessionId, {
         kind: 'skill_load',
         payload: {
@@ -164,16 +187,15 @@ export async function resolveSkillLoad(
         }
       });
       return {
-        error: `Skill "${found.name}" is not in the latest search_skills results. Strict mode is ON. Use search_skills for this task, then load an exact id from its hits. Suggested: ${suggestions || 'none'}`
+        error: `Skill "${found.name}" is not in the latest search_skills results. Strict mode is ON. Use search_skills for this task, then load an exact id from its hits. Do not load another name.`
       };
     }
   } else if (isStrict && !inShortlist) {
-    const suggestions = routing?.routed.slice(0, 3).map((r) => r.skill.name).join(', ');
     void host.emitTrace(sessionId, {
       kind: 'skill_load',
       payload: { name, skillId: found.id, skillName: found.name, inShortlist: false, rejected: true, reason: 'strict_off_shortlist', confidence: routing?.confidence.level }
     });
-    return { error: `Skill "${found.name}" is not in the current turn's shortlist. Strict mode is ON. Use search_skills for this task, then load an exact id from its hits. Suggested: ${suggestions || 'none'}` };
+    return { error: `Skill "${found.name}" is not in the current turn's shortlist. Strict mode is ON. Use search_skills for this task, then load an exact id from its hits. Do not load another name.` };
   }
 
   const listed =

@@ -79,23 +79,88 @@ export function startupPhaseFromRecord(raw: Record<string, unknown>): StartupPha
   return sanitizeStartupPhase(payload);
 }
 
+/** Above this, every phase is recorded and warned. A ~1s ready stays under it. */
+const SLOW_STARTUP_MS = 50_000;
+
 /** Both kernels include these fast slices in the ready summary. Keep slow slices for live diagnosis. */
 export function startupTraceDisposition(payload: StartupPhasePayload): 'summary' | 'detail' | 'warn' {
-  if (payload.scope !== 'kernel') return 'detail';
-  if (payload.phase === 'ready') return payload.durationMs >= 50_000 ? 'warn' : 'detail';
+  if (payload.durationMs >= SLOW_STARTUP_MS) return 'warn';
+  if (payload.scope !== 'kernel') return 'summary';
+  if (payload.phase === 'ready') return 'detail';
   return payload.durationMs < 1000 ? 'summary' : 'detail';
 }
 
-/** Boot lines only. Per-turn phases stay in the session trace. */
+const pendingOrdinaryPhases = new Map<string, Record<string, number>>();
+const startupReadySent = new Set<string>();
+
+/** A new run must not inherit the previous ready fold. */
+export function resetStartupPhaseFold(sessionId: string): void {
+  pendingOrdinaryPhases.delete(sessionId);
+  startupReadySent.delete(sessionId);
+}
+
+function rememberOrdinaryPhase(sessionId: string, payload: StartupPhasePayload): void {
+  if (!/^[a-z0-9_]+$/.test(payload.phase)) return;
+  const phases = pendingOrdinaryPhases.get(sessionId) ?? {};
+  phases[payload.phase] = Math.max(0, Math.round(payload.durationMs));
+  pendingOrdinaryPhases.set(sessionId, phases);
+}
+
+function mergeOrdinaryPhases(sessionId: string, payload: Record<string, unknown>): void {
+  const extra = pendingOrdinaryPhases.get(sessionId);
+  pendingOrdinaryPhases.delete(sessionId);
+  startupReadySent.add(sessionId);
+  if (!extra) return;
+  const phases: Record<string, number> = {};
+  const existing = payload.phases;
+  if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+    for (const [name, ms] of Object.entries(existing as Record<string, unknown>)) {
+      if (/^[a-z0-9_]+$/.test(name) && typeof ms === 'number' && Number.isFinite(ms)) {
+        phases[name] = Math.max(0, Math.round(ms));
+      }
+    }
+  }
+  for (const [name, ms] of Object.entries(extra)) {
+    if (!(name in phases)) phases[name] = ms;
+  }
+  payload.phases = phases;
+}
+
+/**
+ * Log every phase. Kernel slices already live inside ready.phases, so their
+ * individual lines stay omitted. Other short phases are debug plus one ready
+ * summary. Slow phases and a ~1s ready are not dropped.
+ * Returns true when the individual event must not be appended.
+ */
+export function foldStartupPhase(sessionId: string, payload: Record<string, unknown>): boolean {
+  const startup = startupPhaseFromRecord(payload);
+  if (!startup) return false;
+  logStartupPhase(sessionId, startup);
+  if (startup.scope === 'kernel' && startup.phase === 'ready') {
+    mergeOrdinaryPhases(sessionId, payload);
+    return false;
+  }
+  if (startupTraceDisposition(startup) !== 'summary') return false;
+  if (startup.scope === 'kernel') return true;
+  if (startupReadySent.has(sessionId)) return false;
+  rememberOrdinaryPhase(sessionId, startup);
+  return true;
+}
+
+/** Boot lines only. Ordinary phases under the slow threshold are debug; slow phases warn. */
 export function logStartupPhase(sessionId: string | undefined, payload: StartupPhasePayload): void {
   try {
     const clean = sanitizeStartupPhase(payload);
-    if (startupTraceDisposition(clean) === 'warn') {
+    const disposition = startupTraceDisposition(clean);
+    if (disposition === 'warn') {
       log.warn('bot_startup_slow', { sessionId, ...clean });
       return;
     }
-    if (clean.scope !== 'boot') return;
-    log.info('bot_startup', sessionId ? { sessionId, ...clean } : clean);
+    if (clean.scope === 'boot') {
+      log.info('bot_startup', sessionId ? { sessionId, ...clean } : clean);
+      return;
+    }
+    log.debug('bot_startup', sessionId ? { sessionId, ...clean } : clean);
   } catch {
     /* tracing must not fail startup */
   }

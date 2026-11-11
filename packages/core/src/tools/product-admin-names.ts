@@ -2,6 +2,8 @@
 const EXACT = new Set([
   'bot_list',
   'bot_get',
+  'bot_coaching_get',
+  'bot_coaching_save',
   'bot_create',
   'create_bot',
   'bot_update',

@@ -86,6 +86,18 @@ export function createArtifactTools(): ToolContract<any>[] {
           maxResults: args.maxResults,
           contextChars: args.contextChars
         });
+        if (result.terminal) {
+          return {
+            ok: true,
+            content: JSON.stringify({
+              success: false,
+              terminal: true,
+              gone: true,
+              handle,
+              message: 'Artifact handle is gone. Do not search it again.'
+            })
+          };
+        }
         return { ok: true, content: JSON.stringify({ success: true, ...result }, null, 2) };
       } catch (e) {
         return { ok: false, content: e instanceof Error ? e.message : String(e) };

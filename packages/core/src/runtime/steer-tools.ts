@@ -1,3 +1,4 @@
+import { linkAbortParent } from '@ppeng/agent-loop';
 import type { MessagePart, ModelAdapter, RunContext, SessionMessage } from '../types.js';
 
 type ToolCall = Extract<MessagePart, { type: 'tool_call' }>;
@@ -22,6 +23,7 @@ export function registerSteerToolWave(owner: object, sessionId: string, calls: T
       const entry = wave.entries.find(item => item.call === call)!;
       const signal = context.abortSignal
         ? AbortSignal.any([context.abortSignal, entry.controller.signal]) : entry.controller.signal;
+      if (context.abortSignal) linkAbortParent(signal, context.abortSignal);
       return { context: { ...context, abortSignal: signal }, release: () => { entry.live = false; } };
     },
     close() {

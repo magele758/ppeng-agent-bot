@@ -1,4 +1,3 @@
-import { manifestVisibleTools } from '../skills/skill-manifest-gate.js';
 import type {SqliteStateStore} from '../storage.js';
 import { filterUserVaultTools } from '../secrets/user-vault-settings.js';
 import { runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
@@ -33,7 +32,7 @@ import {
   resolveWebSearchTemplate,
   type WebSettingsReadStore
 } from '../tools/web-settings.js';
-import { readToolExposure, toolGroup } from '../tools/tool-exposure.js';
+import { readToolExposure, toolGroup, toolsExposedForSkillTurn } from '../tools/tool-exposure.js';
 import { readDisclosedToolNames, splitDeferredTools } from '../tools/deferred-disclosure.js';
 import { DYN_META_TOOL_NAMES, SEARCH_DYN_TOOLS_NAME } from '../dyn-tools/types.js';
 import { readDynToolSettings } from '../dyn-tools/settings.js';
@@ -183,7 +182,7 @@ export function authorizeToolsForSession(input: {
   checkpoint(tools,'mode');
   const finalTools=filterWaitTools(input.session,filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore),input.settingsStore);
   checkpoint(finalTools,'policy');
-  const visible = manifestVisibleTools(input.session, finalTools);
+  const visible = toolsExposedForSkillTurn(input.session, finalTools);
   checkpoint(visible, 'skill_manifest');
   return {allowExternalAiTools,tools:visible};
 }
@@ -295,7 +294,7 @@ export function resolveTurnTools(input: {
   const names = new Set(filtered.tools.map((t) => t.name));
   const extras: ToolContract<any>[] = [];
   const dynAllowed = applyAllowlists(
-    manifestVisibleTools(input.session, input.dynTools ?? []),
+    toolsExposedForSkillTurn(input.session, input.dynTools ?? []),
     allowlistsFor(currentToolPolicyAgent(input.agent, input.session, input.settingsStore), input.session)
   );
   for (const tool of dynAllowed) {

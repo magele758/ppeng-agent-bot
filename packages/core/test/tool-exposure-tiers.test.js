@@ -38,6 +38,8 @@ test('exact approved baseline plus room planning and external Agent tools [AC:to
     const { TOOL_GROUPS: groups } = await import('../dist/tools/tool-exposure.js');
     const addedExternalTools = new Set(['external_agent_list', 'external_agent_delegate', 'external_agent_status', 'external_agent_cancel', 'external_agent_input']);
     for (const name of addedExternalTools) assert.equal(groups.find(group => group.tools.includes(name))?.id, 'team');
+    assert.equal(groups.find(group => group.tools.includes('bot_coaching_get'))?.id, 'bot-contact');
+    assert.equal(groups.find(group => group.tools.includes('bot_coaching_save'))?.id, 'bot-config');
     const counts = excludeRoom => [1, 2, 3].map(tier => groups.filter(g => g.tier === tier && !g.extension).reduce((sum, group) => sum + group.tools.filter(name => !excludeRoom || (name !== 'room_route_turn' && !addedExternalTools.has(name))).length, 0));
     assert.deepEqual(counts(true), [51, 24, 69], 'the original classified inventory stays unchanged');
     assert.deepEqual(counts(false), [52, 29, 69]);

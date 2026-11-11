@@ -207,6 +207,12 @@ test('fast kernel timings use the summary and long startup gets a warning [AC:se
   const phase = {scope:'kernel' as const,phase:'pack_turn',durationMs:3};
   assert.equal(startupTraceDisposition(phase),'summary');
   assert.equal(startupTraceDisposition({...phase,durationMs:1200}),'detail');
+  assert.equal(startupTraceDisposition({...phase,phase:'ready',durationMs:1000}),'detail');
   assert.equal(startupTraceDisposition({...phase,phase:'ready',durationMs:50000}),'warn');
-  assert.equal(startupTraceDisposition({...phase,scope:'wake',phase:'queue_wait'}),'detail');
+  assert.equal(startupTraceDisposition({...phase,phase:'ready',durationMs:135000}),'warn');
+  assert.equal(startupTraceDisposition({scope:'prompt',phase:'skill_catalog',durationMs:3}),'summary');
+  assert.equal(startupTraceDisposition({scope:'prompt',phase:'skill_catalog',durationMs:135000}),'warn');
+  assert.equal(startupTraceDisposition({scope:'kernel',phase:'build_system_prompt',durationMs:135000}),'warn');
+  assert.equal(startupTraceDisposition({scope:'wake',phase:'queue_wait',durationMs:3}),'summary');
+  assert.equal(startupTraceDisposition({scope:'wake',phase:'queue_wait',durationMs:111000}),'warn');
 });

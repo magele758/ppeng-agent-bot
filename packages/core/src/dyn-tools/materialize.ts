@@ -3,6 +3,7 @@
  * args are frozen onto isolate hooks — never concatenated into source.
  */
 
+import { linkAbortParent } from '@ppeng/agent-loop';
 import { parseGoalVerifySpec } from '../goal/verify-spec.js';
 import { runGoalVerify } from '../goal/run-verify.js';
 import { readGoalSettings } from '../goal/settings.js';
@@ -82,6 +83,7 @@ export function materializePtcCellTool(
     sideEffectLevel: safety.sideEffectLevel,
     async execute(context, args) {
       const controller = new AbortController();
+      linkAbortParent(controller.signal, context.abortSignal);
       const onAbort = () => controller.abort();
       context.abortSignal?.addEventListener('abort', onAbort, { once: true });
       const persist = deps.createScratchPersist?.(context) ?? createMemoryScratchPersist();

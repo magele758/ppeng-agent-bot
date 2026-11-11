@@ -1,4 +1,5 @@
 import { parseGoalVerifySpec } from '../goal/verify-spec.js';
+import { linkAbortParent } from '../runtime/abort-lineage.js';
 import { readGoalSettings, type GoalSettings } from '../goal/settings.js';
 import type { GoalVerifySpec } from '../goal/types.js';
 import type { RunContext, ToolContract } from '../types.js';
@@ -95,6 +96,7 @@ export function createPtcExecTool(deps: PtcExecToolDependencies): ToolContract<P
       }
       const code = typeof args.code === 'string' ? args.code : '';
       const controller = new AbortController();
+      linkAbortParent(controller.signal, context.abortSignal);
       const onAbort = () => controller.abort();
       context.abortSignal?.addEventListener('abort', onAbort, { once: true });
       const persist = deps.createScratchPersist?.(context) ?? createMemoryScratchPersist();

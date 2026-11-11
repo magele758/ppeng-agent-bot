@@ -64,7 +64,8 @@ import {
   stripAutoReviewFlags,
   type FileApprovalPolicy as LoopFilePolicy,
   type ToolLoopHost,
-  type ToolLoopResult
+  type ToolLoopResult,
+  turnAbortSignal
 } from '@ppeng/agent-loop';
 import {
   getBoundSecretVault,
@@ -133,6 +134,78 @@ export interface ToolLoopDeps {
   onArtifactCreated?: (manifest: PagedArtifactManifest) => void;
   /** Arm the unattended-wake deny timer when a deadline was stored. */
   armUnattendedApproval?: (approval: ApprovalRecord) => void;
+  /** Abort this run's controller. A newer writer owns a different signal and is left alone. */
+  abortTurn?: (sessionId: string, signal?: AbortSignal) => void;
+}
+
+const SOURCE_UNAVAILABLE = 'Source unavailable.';
+const SOURCE_UNAVAILABLE_TOOLS = new Set(['memory_read', 'history_search', 'history_read']);
+const unavailableBySignal = new WeakMap<AbortSignal, Set<string>>();
+const unavailableByWriter = new Map<string, Set<string>>();
+
+function turnSignal(context: RunContext): AbortSignal | undefined {
+  return turnAbortSignal(context.abortSignal) ?? context.abortSignal;
+}
+
+function unavailableSeen(context: RunContext): Set<string> {
+  const signal = turnSignal(context);
+  if (signal) {
+    let seen = unavailableBySignal.get(signal);
+    if (!seen) {
+      seen = new Set();
+      unavailableBySignal.set(signal, seen);
+    }
+    return seen;
+  }
+  const key = `${context.session.id}\0${context.session.activeWriterRunId ?? ''}`;
+  let seen = unavailableByWriter.get(key);
+  if (!seen) {
+    if (unavailableByWriter.size > 200) unavailableByWriter.clear();
+    seen = new Set();
+    unavailableByWriter.set(key, seen);
+  }
+  return seen;
+}
+
+function endTurn(deps: ToolLoopDeps, context: RunContext, sessionId: string, recovery?: { reason: string; tool: string }): void {
+  if (recovery) {
+    deps.emitTrace(sessionId, {
+      kind: 'recovery_abort',
+      payload: { reason: recovery.reason, tool: recovery.tool, trigger: recovery.reason }
+    });
+  }
+  deps.abortTurn?.(sessionId, turnSignal(context));
+}
+
+function finishToolResult(
+  deps: ToolLoopDeps,
+  context: RunContext,
+  name: string,
+  result: { ok: boolean; content: string }
+): { ok: boolean; content: string } {
+  const content = result.content ?? '';
+  if (SOURCE_UNAVAILABLE_TOOLS.has(name) && content === SOURCE_UNAVAILABLE) {
+    const seen = unavailableSeen(context);
+    if (seen.has(name)) {
+      endTurn(deps, context, context.session.id, { reason: 'source_unavailable', tool: name });
+      return { ...result, ok: false, content: 'Source unavailable. Stopped this turn. Do not call this tool again.' };
+    }
+    seen.add(name);
+    return result;
+  }
+  if (content.includes('not in skill manifest allowTools')) {
+    endTurn(deps, context, context.session.id);
+    return { ...result, ok: false, content: 'Stopped: skill manifest rejected this tool. Do not retry it this turn.' };
+  }
+  if (
+    name === 'load_skill' &&
+    result.ok === false &&
+    /allowedSkills|not enabled for this|not in the current turn's shortlist|not in the latest search_skills|Suggested:/.test(content)
+  ) {
+    endTurn(deps, context, context.session.id);
+    return { ...result, ok: false, content: 'Stopped. This load_skill name is outside this turn. Do not load another name.' };
+  }
+  return result;
 }
 
 function wrapSkillManifestTools(
@@ -144,18 +217,62 @@ function wrapSkillManifestTools(
   }));
 }
 
-function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): ToolContract<Record<string, unknown>>[] {
+function withTurnStops(
+  deps: ToolLoopDeps,
+  tools: ToolContract<Record<string, unknown>>[]
+): ToolContract<Record<string, unknown>>[] {
+  return tools.map((tool) => ({
+    ...tool,
+    execute: async (context, args) => finishToolResult(deps, context, tool.name, await tool.execute(context, args))
+  }));
+}
+
+export function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): ToolContract<Record<string, unknown>>[] {
   const tools=wrapSkillManifestTools((turnTools ?? deps.tools) as ToolContract<Record<string, unknown>>[]);
-  if(!deps.governanceStore)return tools;
+  if(!deps.governanceStore)return withTurnStops(deps, tools);
   const ledger=new SourceLedger(deps.governanceStore);
-  return tools.map(tool=>({...tool,execute:async(context,args)=>{
+  return withTurnStops(deps, tools.map(tool=>({...tool,execute:async(context,args)=>{
     ledger.observe(context.session.id);
     const verdict=sourceScopeVerdict(deps.store,ledger,context.session.id,tool,args);
-    if(verdict!=='allowed'&&verdict!=='approved')return {ok:false,content:JSON.stringify({error:'source_scope_denied',tool:tool.name,approval:verdict,reason:scopeDenialReason(context.session,verdict)})};
+    if(verdict!=='allowed'&&verdict!=='approved'){
+      endTurn(deps, context, context.session.id);
+      return {ok:false,content:JSON.stringify({error:'source_scope_denied',tool:tool.name,approval:verdict,terminal:true,reason:`${scopeDenialReason(context.session,verdict)} Do not rewrite the command and run it again.`})};
+    }
     const result=await tool.execute(context,args);
     if(result.content.includes('«external'))ledger.record(context.session.id,{kind:'tool',ref:tool.name+':'+Date.now(),label:tool.name});
     return result;
-  }}));
+  }})));
+}
+
+/** PTC and harvested cells call tool.execute directly. Bind the same turn stops. */
+export function toolsForCellExecution(
+  input: {
+    tools: ToolContract<any>[];
+    store: ToolLoopStore;
+    modelAdapter: ModelAdapter;
+    stateDir: string;
+    emitTrace: ToolLoopDeps['emitTrace'];
+    sessionAbortControllers: Map<string, AbortController>;
+    governanceStore?: SqliteStateStore;
+  },
+  cellTools: ToolContract<any>[]
+): ToolContract<Record<string, unknown>>[] {
+  return toolsForTurn({
+    tools: input.tools,
+    store: input.store,
+    governanceStore: input.governanceStore,
+    envApprovalPolicy: undefined,
+    maxParallelToolCalls: 1,
+    modelAdapter: input.modelAdapter,
+    stateDir: input.stateDir,
+    emitTrace: input.emitTrace,
+    abortTurn(sessionId, signal) {
+      const controller = input.sessionAbortControllers.get(sessionId);
+      if (!controller || controller.signal.aborted) return;
+      if (signal && controller.signal !== signal) return;
+      controller.abort();
+    }
+  }, cellTools);
 }
 
 function adaptFilePolicy(policy: FileApprovalPolicy | undefined): LoopFilePolicy | undefined {
