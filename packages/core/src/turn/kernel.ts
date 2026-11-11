@@ -408,6 +408,38 @@ export function sessionParkedForApproval<T extends { id: string; status: string 
   return store.updateSession(session.id, { status: 'waiting_approval' });
 }
 
+function goalCheckpointTerminalReason(
+  results: readonly { name?: string; metadata?: { retry?: unknown; endReason?: unknown } }[]
+): string | undefined {
+  for (const row of results) {
+    if (row.name !== 'goal_checkpoint' || row.metadata?.retry !== false) continue;
+    const endReason = row.metadata.endReason;
+    if (typeof endReason === 'string' && endReason.trim() !== '') return endReason;
+    return 'goal_checkpoint_unassigned';
+  }
+  return undefined;
+}
+
+async function endResumedGoalCheckpoint(
+  host: TurnKernelHost,
+  sessionId: string,
+  results: readonly { name?: string; metadata?: { retry?: unknown; endReason?: unknown } }[],
+  finish?: (record: SessionRecord, reason: string) => Promise<SessionRecord>
+): Promise<SessionRecord | undefined> {
+  const reason = goalCheckpointTerminalReason(results);
+  if (!reason) return undefined;
+  const current = host.store.getSession(sessionId);
+  const idle = host.store.updateSession(sessionId, {
+    status: 'idle',
+    metadata: mergeInterruptMetadata(current?.metadata ?? {}, null)
+  });
+  if (finish) return finish(idle, reason);
+  const outcome = runOutcomeFromEnd({ reason, sessionStatus: 'idle' });
+  return host.store.updateSession(sessionId, {
+    metadata: mergeOutcomeMetadata(idle.metadata ?? {}, outcome)
+  });
+}
+
 /**
  * Re-check approvals for a resumed tool wave. Returns the parked session when
  * the wave is still waiting; otherwise executes whatever the gate left open.
@@ -426,6 +458,7 @@ export async function continueResumedToolWave(input: {
   session: SessionRecord;
   onModelStreamChunk?: (chunk: ModelStreamChunk) => void;
   emitStep: (ev: AgentStepEvent) => Promise<void>;
+  finish?: (record: SessionRecord, reason: string) => Promise<SessionRecord>;
 }): Promise<SessionRecord | undefined> {
   const { dynHydrated, selectedTools } = await hydrateResolveTurnTools(
     input.host,
@@ -491,7 +524,7 @@ export async function continueResumedToolWave(input: {
     type: 'tools_done',
     results: results.map((result) => ({ ok: result.ok, content: result.content, name: result.name }))
   });
-  return undefined;
+  return endResumedGoalCheckpoint(input.host, input.sessionId, results, input.finish);
 }
 
 interface KernelRunOptions {
@@ -822,7 +855,8 @@ if (remaining.length > 0) {
             writerRunId,
             session,
             onModelStreamChunk: options?.onModelStreamChunk,
-            emitStep
+            emitStep,
+            finish: finishEnded
           });
           if (parked) return kernelTurnSignal('return', parked);
         }
@@ -2144,8 +2178,9 @@ if (__gateSignal) return __gateSignal;
 return stopUnassignedGoalCheckpoint();
 }
 async function stopUnassignedGoalCheckpoint() {
-if (!results.some((row: { name?: string; metadata?: { retry?: unknown } }) => row.name === 'goal_checkpoint' && row.metadata?.retry === false)) return undefined;
-return kernelTurnSignal('return', await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'goal_checkpoint_unassigned'));
+const reason = goalCheckpointTerminalReason(results);
+if (!reason) return undefined;
+return kernelTurnSignal('return', await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), reason));
 }
 async function __gate10() {
 if (loopGuard) {

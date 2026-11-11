@@ -2815,6 +2815,7 @@
       "id": "goal-checkpoint-no-goal-once",
       "title": "未分配目标时进度保存只报一次",
       "tests": [
+        "packages/agent-loop/src/turn/kernel.test.ts",
         "packages/core/test/goal-checkpoint-no-goal-once.test.js"
       ]
     },

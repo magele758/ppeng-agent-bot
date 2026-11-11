@@ -685,6 +685,100 @@ describe('runSessionKernel wiring', () => {
     ]);
   });
 
+  it('does not save progress again after a resumed unassigned goal_checkpoint [AC:goal-checkpoint-no-goal-once#AC-4]', async () => {
+    let modelCalls = 0;
+    const { host, session, store } = createHarness({
+      model: () => {
+        modelCalls += 1;
+        return toolResult('goal_checkpoint', `goal-${modelCalls}`);
+      },
+      host: {
+        maxTurnsPerRun: 4,
+        executeToolCalls: async (toolCalls) => toolCalls.map((call) => ({
+          toolCallId: call.toolCallId,
+          name: call.name,
+          ok: false,
+          content: 'No goal is assigned to this execution',
+          metadata: { retry: false },
+        })),
+      },
+    });
+    host.store.appendMessage(session.id, 'assistant', [
+      {
+        type: 'tool_call',
+        toolCallId: 'resume-goal',
+        name: 'goal_checkpoint',
+        input: { kind: 'progress', summary: 'nothing assigned' },
+      },
+    ]);
+    host.store.updateSession(session.id, {
+      metadata: {
+        ...(store.getSession(session.id)?.metadata ?? {}),
+        interrupt: createWaitingApprovalInterrupt({
+          toolCallIds: ['resume-goal'],
+          approvalIds: [],
+        }),
+      },
+    });
+    const out = await runSessionKernel(host, session.id);
+    expect(modelCalls).toBe(0);
+    expect(out.status).toBe('idle');
+    expect(out.metadata?.outcome).toMatchObject({ kind: 'idle', reason: 'goal_checkpoint_unassigned' });
+    const saved = host.store.foldMessages(session.id).flatMap((message) => message.parts).filter((part) => part.type === 'tool_result');
+    expect(saved).toEqual([
+      expect.objectContaining({
+        toolCallId: 'resume-goal',
+        ok: false,
+        name: 'goal_checkpoint',
+        content: 'No goal is assigned to this execution',
+      }),
+    ]);
+  });
+
+  it('stops an invalid or unauthorized goal_checkpoint without labeling it unassigned [AC:goal-checkpoint-no-goal-once#AC-5]', async () => {
+    const samples = [
+      {
+        content: 'Invalid checkpoint kind',
+        metadata: { retry: false, endReason: 'goal_checkpoint_invalid_kind' },
+        reason: 'goal_checkpoint_invalid_kind',
+      },
+      {
+        content: 'Waiting requires an execution reference authorized by goal_dispatch',
+        metadata: { retry: false, endReason: 'goal_checkpoint_wait_unauthorized' },
+        reason: 'goal_checkpoint_wait_unauthorized',
+      },
+    ];
+    for (const sample of samples) {
+      let modelCalls = 0;
+      const { host, session } = createHarness({
+        model: () => {
+          modelCalls += 1;
+          return toolResult('goal_checkpoint', `goal-${modelCalls}`);
+        },
+        host: {
+          maxTurnsPerRun: 4,
+          executeToolCalls: async (toolCalls) => toolCalls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: false,
+            content: sample.content,
+            metadata: sample.metadata,
+          })),
+        },
+      });
+      const out = await runSessionKernel(host, session.id);
+      const outcome = out.metadata?.outcome as { kind?: string; reason?: string } | undefined;
+      expect(modelCalls).toBe(1);
+      expect(out.status).toBe('idle');
+      expect(outcome).toMatchObject({ kind: 'idle', reason: sample.reason });
+      expect(outcome?.reason).not.toBe('goal_checkpoint_unassigned');
+      const saved = host.store.foldMessages(session.id).flatMap((message) => message.parts).filter((part) => part.type === 'tool_result');
+      expect(saved).toEqual([
+        expect.objectContaining({ ok: false, name: 'goal_checkpoint', content: sample.content }),
+      ]);
+    }
+  });
+
   it('stops after a successful stopAt tool', async () => {
     let modelCalls = 0;
     const { host, session } = createHarness({
