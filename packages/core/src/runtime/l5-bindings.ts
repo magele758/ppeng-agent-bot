@@ -258,7 +258,7 @@ export function bindMemoryAppendixPrompt(rt: Pick<L5Bindable, 'promptBuilder' | 
         query: opts?.query,
         stateDir: opts?.stateDir ?? rt.stateDir
       });
-      const appendix=memory + (sharedContext?.appendix(ctx.session) ?? '');
+      const appendix=memory + (sharedContext?.appendix(ctx.session, opts?.query) ?? '');
       // A nonempty boundary also prevents either kernel's working-log fallback
       // from reintroducing unproven summaries of a departed group's context.
       return appendix || (rt.store && hasRevokedSharedContext(rt.store,ctx.session.id)
@@ -791,26 +791,60 @@ function conversationRequestForInput(rt: L5Bindable, input: Parameters<ModelTurn
   return session.metadata?.botGoalExecutionId && request !== 'format-receipt' ? undefined : { request, text };
 }
 
-function runTurnWithNormalRequestBudget(
+async function deliverPreparedTurn(
   rt: L5Bindable,
-  input: Parameters<ModelTurnCall>[0],
-  onStream: Parameters<ModelTurnCall>[1],
-  deliver: ModelTurnCall
+  fitted: Parameters<ModelTurnCall>[0],
+  onStream: Parameters<ModelTurnCall>[1]
 ): Promise<ModelTurnResult> {
-  return fitProductModelRequest(rt, input).then(async (fitted) => {
-    const conversation = conversationRequestForInput(rt,input);
-    const result = await deliverConversationTurn(conversation?.request, fitted, onStream, deliver, conversation?.text);
-    try { if(fitted.sessionId){
-      const session=rt.store.getSession(fitted.sessionId);
-      if(session){
-        const history=(Array.isArray(session.metadata?.cacheDiagnostics)?session.metadata.cacheDiagnostics:[]) as CacheDiagnostic[];
-        const record=diagnosePrompt(history.at(-1),{system:fitted.systemPrompt,tools:fitted.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.inputSchema})),stable:JSON.stringify({model:session.metadata?.modelOverride??null,messages:fitted.messages.filter(m=>m.role==='system').map(m=>m.parts)})},result.usage?.cachedInputTokens,result.usage?.inputTokens);
-        rt.store.updateSession(session.id,{metadata:{...session.metadata,cacheDiagnostics:[...history.slice(-29),record]}});
-      }
+  const conversation = conversationRequestForInput(rt, fitted);
+  const result = await deliverConversationTurn(
+    conversation?.request, fitted, onStream,
+    (request, stream) => routePreparedTurn(rt, request, stream), conversation?.text
+  );
+  try {
+    const session = fitted.sessionId && rt.store.getSession(fitted.sessionId);
+    if (session) {
+      const previous = session.metadata?.cacheDiagnostics;
+      const history: CacheDiagnostic[] = Array.isArray(previous) ? previous : [];
+      const stable = JSON.stringify({
+        model: session.metadata?.modelOverride ?? null,
+        messages: fitted.messages.filter(message => message.role === 'system').map(message => message.parts)
+      });
+      const record = diagnosePrompt(history.at(-1), {
+        system: fitted.systemPrompt,
+        tools: fitted.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema })),
+        stable
+      }, result.usage?.cachedInputTokens, result.usage?.inputTokens);
+      rt.store.updateSession(session.id, { metadata: { ...session.metadata, cacheDiagnostics: [...history.slice(-29), record] } });
     }
-    } catch { /* Observability must not turn a successful provider response into a retry. */ }
-    return result;
+  } catch { /* Diagnostics are best effort after a successful response. */ }
+  return result;
+}
+
+function routePreparedTurn(rt: L5Bindable, fitted: Parameters<ModelTurnCall>[0], stream: Parameters<ModelTurnCall>[1]) {
+  const session = fitted.sessionId ? rt.store.getSession(fitted.sessionId) : undefined;
+  const route = resolveModelRoute({
+    store: rt.store,
+    session,
+    env: process.env,
+    fallbackAdapter: rt.modelAdapter
   });
+  const chained = runTurnViaFallbackChain(rt, fitted, stream, route.primary, route.primaryRef ?? null);
+  if (chained) return chained;
+  const candidates = route.candidates.map((adapter, i) => ({
+    adapter,
+    label: i === 0 ? 'primary' : `fallback-${i}`
+  }));
+  if (candidates.length <= 1) {
+    const adapter = route.primary ?? (session
+      ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
+      : rt.modelAdapter);
+    return invokeContextModel(rt, adapter, fitted, stream);
+  }
+  const reset = fallbackStream(stream);
+  return withProviderFallback(candidates, (adapter, index) =>
+    invokeContextModel(rt, adapter, fitted, reset.forAttempt(index, adapter), index === 0 ? undefined : { maxRetries: 1 })
+  );
 }
 
 /**
@@ -935,31 +969,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       return imageBufferToDataUrl(rt.store, rt.stateDir, assetId);
     },
     runTurnWithRetries: (input, onStream) =>
-      runTurnWithNormalRequestBudget(rt, input, onStream, (fitted, stream) => {
-        const session = fitted.sessionId ? rt.store.getSession(fitted.sessionId) : undefined;
-        const route = resolveModelRoute({
-          store: rt.store,
-          session,
-          env: process.env,
-          fallbackAdapter: rt.modelAdapter
-        });
-        const chained = runTurnViaFallbackChain(rt, fitted, stream, route.primary, route.primaryRef ?? null);
-        if (chained) return chained;
-        const candidates = route.candidates.map((adapter, i) => ({
-          adapter,
-          label: i === 0 ? 'primary' : `fallback-${i}`
-        }));
-        if (candidates.length <= 1) {
-          const adapter = route.primary ?? (session
-            ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
-            : rt.modelAdapter);
-          return invokeContextModel(rt, adapter, fitted, stream);
-        }
-        const reset = fallbackStream(stream);
-        return withProviderFallback(candidates, (adapter, index) =>
-          invokeContextModel(rt, adapter, fitted, reset.forAttempt(index, adapter), index === 0 ? undefined : { maxRetries: 1 })
-        );
-      }),
+      fitProductModelRequest(rt, input).then(fitted => deliverPreparedTurn(rt, fitted, onStream)),
     waitSteeringChildrenIdle: (sessionId) => waitSteeringChildrenIdle(sessionId),
 
     ensureMcpLoaded: (sessionId) => rt.mcpManager.ensureLoaded(sessionId),
@@ -1373,7 +1383,7 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
     resolveImageDataUrl: host.resolveImageDataUrl,
     resolveModelAdapter: session => observeModelRequests(rt.store, host.resolveModelAdapter?.(session) ?? rt.modelAdapter, rt.cumulativeInputTokensBySession),
     runTurnWithRetries: chainActive || (sessionId && isCanonicalBotChat(rt.store.getSession(sessionId) ?? {}))
-      ? host.runTurnWithRetries
+      ? (fitted, stream) => deliverPreparedTurn(rt, fitted, stream)
       : (input, stream) => {
         const session = input.sessionId ? rt.store.getSession(input.sessionId) : undefined;
         const adapter = session ? host.resolveModelAdapter?.(session) ?? rt.modelAdapter : rt.modelAdapter;

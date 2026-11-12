@@ -3377,6 +3377,13 @@ Consistent approval decisions and cancelled parked work
 
 - `scripts/prd/prd-catalog.test.mjs`
 
+### question-context
+
+按问题选取群聊与共享背景
+
+- `packages/core/test/bot-functional-groups.test.js`
+- `packages/core/test/l5-host-wiring.test.js`
+
 ### quiet-goal-results
 
 目标结果不再默认要求人工核对

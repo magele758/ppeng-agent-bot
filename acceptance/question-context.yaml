@@ -1,0 +1,14 @@
+id: question-context
+title: 按问题选取群聊与共享背景
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: 那把这两个问题修一下：群聊和共享背景按当前问题的相关性带入，来源清单只附加一次。修完用这次请求验证一下。
+criteria:
+  - id: AC-1
+    given: Bot 接触过不同主题的群聊并可读取多项共享事实
+    when: 用户问其中一个具体问题
+    then: 模型收到与问题相关的群聊和共享事实，无关项不进入附录
+  - id: AC-2
+    given: 会话含有需要标明的外部来源
+    when: Bot 向模型发送请求
+    then: 当前来源清单完整且仅出现一次

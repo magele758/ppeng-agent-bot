@@ -3835,6 +3835,14 @@
       ]
     },
     {
+      "id": "question-context",
+      "title": "按问题选取群聊与共享背景",
+      "tests": [
+        "packages/core/test/bot-functional-groups.test.js",
+        "packages/core/test/l5-host-wiring.test.js"
+      ]
+    },
+    {
       "id": "quiet-goal-results",
       "title": "目标结果不再默认要求人工核对",
       "tests": [

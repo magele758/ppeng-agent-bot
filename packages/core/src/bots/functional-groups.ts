@@ -1,3 +1,4 @@
+import { backgroundMatches } from '../memory/question-context.js';
 import { AuthorizationError, NotFoundError, ValidationError } from '../errors.js';
 import { createId, nowIso } from '../id.js';
 import type { SqliteStateStore } from '../storage.js';
@@ -183,8 +184,12 @@ export class BotFunctionalGroupService {
     }
     return result;
   }
-  appendix(session: SessionRecord): string {
-    const entries=this.sharedForSession(session);
+  appendix(session: SessionRecord, query?: string): string {
+    const visible = this.sharedForSession(session);
+    const matches = backgroundMatches(query ?? '');
+    const entries = query === undefined ? visible : Object.fromEntries(
+      Object.entries(visible).filter(([key, value]) => matches(key + ' ' + value))
+    );
     if(Object.keys(entries).length===0)return '';
     const subject=this.subject(session);
     if(subject) {

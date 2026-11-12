@@ -236,3 +236,24 @@ test('a group chat keeps its place in a functional group after reopen and does n
  assert.throws(() => f.groups.moveRoom(f.principal, 'missing-room', null));
  f.store.db.close();
 });
+
+test('model background follows the current question [AC:question-context#AC-1]', async t => {
+  const f = fixture();
+  t.after(() => f.store.db.close());
+  const session = f.store.getSession(f.a.canonicalSessionId);
+  const { recordOwnPost } = await import('../dist/rooms/touched-memory.js');
+  const { compileTurnAppendixAsync } = await import('../dist/session/context-compiler.js');
+  for (const [id, text] of Object.entries({ latency: '启动延迟按首 token 到达时间统计', lunch: '午餐地点定在二楼' })) {
+    recordOwnPost(f.store.db, { roomId: 'dev', botId: f.a.id, turnId: id, message: { id, text } });
+  }
+  f.groups.setShared(f.principal, { scope: 'global' }, { 启动延迟: '看 TTFT 指标', 午餐: '二楼餐厅' });
+  const prompt = bindMemoryAppendixPrompt({ store: f.store, promptBuilder: {
+    buildMemoryAppendixAsync: (ctx, opts) => compileTurnAppendixAsync({ session: ctx.session, store: f.store, query: opts.query })
+  } });
+  const read = query => prompt.buildMemoryAppendix({ session }, { query });
+  const matching = await read('如何评估启动延迟和首 token？');
+  assert.match(matching, /到达时间统计/);
+  assert.match(matching, /TTFT 指标/);
+  assert.doesNotMatch(matching, /午餐|二楼/);
+  assert.doesNotMatch(await read('火星轨道周期'), /explicit-shared-context|Touched room context/);
+});

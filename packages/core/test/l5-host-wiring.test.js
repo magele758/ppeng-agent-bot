@@ -23,8 +23,8 @@ function runtimeWithAdapter(handler) {
     stateDir,
     modelAdapter: {
       name: 'scripted',
-      async runTurn() {
-        return handler();
+      async runTurn(input) {
+        return handler(input);
       },
       async summarizeMessages() {
         return '';
@@ -147,4 +147,24 @@ test('ppeng kernel fans Runtime hooks through latch wrap', async () => {
     rmSync(repoRoot, { recursive: true, force: true });
     rmSync(stateDir, { recursive: true, force: true });
   }
+});
+
+test('canonical bot sends one complete source ledger [AC:question-context#AC-2]', async t => {
+  const calls = [];
+  const { runtime } = runtimeWithAdapter(input => {
+    calls.push(input);
+    return { stopReason: 'end', assistantParts: [{ type: 'text', text: '收到。' }] };
+  });
+  t.after(() => runtime.destroy());
+  const bot = runtime.createBot({ name: 'Ledger test' });
+  const sid = bot.canonicalSessionId;
+  const { SourceLedger } = await import('../dist/learning/sources.js');
+  new SourceLedger(runtime.store).record(sid, { kind: 'event', ref: 'audit-note', label: 'external note' });
+  runtime.store.appendMessage(sid, 'user', [{ type: 'text', text: '解释启动延迟' }]);
+  await runtime.runSession(sid);
+  assert.ok(calls.length);
+  const parts = calls[0].messages.findLast(message => message.role === 'user').parts;
+  const ledgers = parts.filter(part => part.text?.startsWith('[source-ledger]'));
+  assert.equal(ledgers.length, 1);
+  assert.match(ledgers[0].text, /audit-note/);
 });
