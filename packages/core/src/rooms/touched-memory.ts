@@ -41,6 +41,7 @@
  * `record*` / `queryTouchedForPrivateChat` 会自行调用 `ensureTouchedMemorySchema`。
  * 不新增环境变量。
  */
+import { asksForRoomRecap, backgroundMatches } from '../memory/question-context.js';
 import { createHash } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { isSilenceToken } from '../bots/silence.js';
@@ -239,7 +240,11 @@ export function queryTouchedForPrivateChat(db: SqlDb, query: {
 }
 
 /** User-side appendix. Empty when this bot has no touches. Newest items stay when the cap is hit. */
-export function formatTouchedForPrivateChat(records: readonly TouchedRecord[]): string {
+export function formatTouchedForPrivateChat(records: readonly TouchedRecord[], query?: string): string {
+  if (query !== undefined && !asksForRoomRecap(query)) {
+    const matches = backgroundMatches(query);
+    records = records.filter(record => matches(record.body));
+  }
   const unique: TouchedRecord[] = [];
   const seen = new Set<string>();
   for (const record of records) {

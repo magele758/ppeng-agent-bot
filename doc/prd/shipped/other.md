@@ -754,6 +754,11 @@ Run the packages/agent-loop tests and build, plus packages/core bot-work test. R
 
 我想要在readme之外，构建一套产品的prd体系，一个是现有的功能的说明，一个是开发了具体哪些feature，还有未来待开发的功能的特性，然后还有一个这个项目使用的skill也要同步的配套更新，分多个agent去完成这几件事情
 
+## question-context
+按问题选取群聊与共享背景
+
+那把这两个问题修一下：群聊和共享背景按当前问题的相关性带入，来源清单只附加一次。修完用这次请求验证一下。
+
 ## quiet-goal-results
 目标结果不再默认要求人工核对
 

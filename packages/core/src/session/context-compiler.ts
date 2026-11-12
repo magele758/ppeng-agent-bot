@@ -263,7 +263,7 @@ function touchedPrivateChatAppendix(input: CompileTurnAppendixInput): string {
   const botId = botIdOf(input.session);
   const db = touchDatabase(input.store);
   if (!botId || !db) return '';
-  return formatTouchedForPrivateChat(queryTouchedForPrivateChat(db, { botId }));
+  return formatTouchedForPrivateChat(queryTouchedForPrivateChat(db, { botId }), input.query);
 }
 
 function turnMemoryExtras(input: CompileTurnAppendixInput): string {
