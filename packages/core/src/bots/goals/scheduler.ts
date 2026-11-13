@@ -387,6 +387,9 @@ function childEnded(child: SessionRecord): boolean {
  // Subagent turns finish as idle. The outcome is what distinguishes that from a session that has not run.
  return child.status === 'idle' && (outcome?.kind === 'completed' || outcome?.kind === 'idle' || outcome?.kind === 'failed');
 }
+function deliveryReportFields(report:GoalReport):Partial<GoalReport> {
+ return report.criteriaReview ? {criteriaReview:report.criteriaReview,deliveryPlan:report.deliveryPlan,advanced:report.advanced} : {};
+}
 function childSettlement(childId: string, status: string, output: string, judged?: GoalReport): GoalReport {
  if(status==='cancelled')return {kind:'cancelled',summary:output||'Child execution cancelled',evidence:output?[output]:[]};
  if (status === 'unknown') return {kind:'blocked', summary:output || `Child session ${childId} ended unknown; reconcile its effects before retrying`, evidence:output ? [output] : [`session ${childId} unknown`]};
@@ -395,10 +398,11 @@ function childSettlement(childId: string, status: string, output: string, judged
  // No judge, or a judge that threw, leaves the pending completion. Progress would clear the
  // execution and dispatch a new child instead of keeping this result for review.
  if (!judged) return base;
+ if (judged.kind === 'blocked') return judged;
  if (judged.kind !== 'candidate_completed' && judged.kind !== 'progress') return base;
  const evidence = [...(judged.evidence ?? [])];
  for (const item of base.evidence ?? []) if (item && !evidence.includes(item)) evidence.push(item);
- return {...base, kind:judged.kind, summary:judged.summary || base.summary, evidence: evidence.length ? evidence : base.evidence, verified:judged.verified === true, nextStep:judged.nextStep};
+ return {...base, ...deliveryReportFields(judged), kind:judged.kind, summary:judged.summary || base.summary, evidence: evidence.length ? evidence : base.evidence, verified:judged.verified === true, nextStep:judged.nextStep};
 }
 /** A finished child is the execution result. The parent turn staying idle must not keep the goal running. */
 async function settleFinishedChild(host: GoalRuntimeHost, service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): Promise<boolean> {

@@ -2,6 +2,7 @@ import type { GoalStore } from './types.js';
 
 /** How the runtime follows a Bot turn through to the end. Saved from the Lab; no environment variable. */
 export interface BotFinishSettings {
+  deliveryReviewEnabled: boolean;
   /** Attach "continue" and progress follow-ups to the recent unfinished goal of the chat. */
   followupAttachEnabled: boolean;
   /** A goal untouched for longer than this is not picked up by a bare follow-up. */
@@ -21,6 +22,7 @@ export interface BotFinishSettings {
 const KEY = 'bot_finish_settings';
 
 export const DEFAULT_BOT_FINISH_SETTINGS: BotFinishSettings = {
+  deliveryReviewEnabled: false,
   followupAttachEnabled: true,
   followupWindowHours: 24,
   finishCheckEnabled: true,
@@ -36,7 +38,7 @@ const RANGES: Record<'followupWindowHours' | 'maxContinuations' | 'wakeDelayMinu
   wakeDelayMinutes: [1, 720],
   maxWakes: [1, 10],
 };
-const FLAGS = ['followupAttachEnabled', 'finishCheckEnabled', 'wakeEnabled'] as const;
+const FLAGS = ['deliveryReviewEnabled', 'followupAttachEnabled', 'finishCheckEnabled', 'wakeEnabled'] as const;
 
 export function readBotFinishSettings(store: Pick<GoalStore, 'getDaemonControl'>): BotFinishSettings {
   return { ...DEFAULT_BOT_FINISH_SETTINGS, ...store.getDaemonControl<Partial<BotFinishSettings>>(KEY) };

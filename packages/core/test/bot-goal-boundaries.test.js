@@ -208,3 +208,46 @@ test('delegation cancellation keeps capacity until recipient coordinator actuall
  assert.equal(s.get(source.id,g.id).draining,true);assert.throws(()=>s.control(source.id,g.id,'resume'),/draining/);
  live.clear();await tickBotGoals(ticker);assert.equal(s.get(source.id,g.id).draining,false);assert.equal(s.get(source.id,g.id).wait,undefined);assert.equal(s.control(source.id,g.id,'resume').status,'queued');
 });
+
+test('goal review reuses a consumed wait only while the original authorization holds [AC:goal-evidence-review#AC-2] [AC:goal-evidence-review#AC-3]',async t=>{
+ const {DurableWaitStore}=await import('../dist/waits/store.js');
+ const {goalExecutionEvidence}=await import('../dist/bots/goals/execution-evidence.js');
+ const f=fixture(t),goal=f.create(),execution=f.service.claim('b',goal.id,{strategy:'direct'});
+ const child=f.store.createSession({title:'worker',mode:'subagent',agentId:'general',parentSessionId:f.parent.id,
+  metadata:{botId:'b',userId:'owner',outcome:{kind:'completed'}}});
+ f.service.updateExecution('b',execution.id,{sessionId:f.parent.id});
+ const waits=new DurableWaitStore(f.store);
+ const wait=waits.register({kind:'goal',id:goal.id,botId:'b',revision:goal.revision,executionId:execution.id,sessionId:f.parent.id,scopeSessionId:f.parent.id},
+  {source:'session',ref:child.id,condition:{op:'eq',field:'status',value:'completed'}});
+ waits.check(wait.id);assert.equal(waits.consume(wait.id,()=>{}),true);
+ const receipts=()=>goalExecutionEvidence(f.store,goal).flatMap(m=>m.parts).filter(p=>p.type==='tool_result'&&p.name==='goal_wait_receipt');
+ assert.equal(receipts().length,0);
+ f.store.setDaemonControl('bot_finish_settings',{deliveryReviewEnabled:true});
+ assert.deepEqual(JSON.parse(receipts()[0].content),{waitId:wait.id,source:'session',ref:child.id,status:'completed'});
+ f.store.updateSession(child.id,{metadata:{...child.metadata,userId:'different-owner'}});
+ assert.equal(receipts().length,0);
+});
+
+test('normal child settlement preserves an actionable blocker and hot rollback requeues on resume [AC:goal-evidence-review#AC-2] [AC:goal-evidence-review#AC-3]',async t=>{
+ const f=fixture(t),goal=f.create({objective:'Repair timeouts',completionCriteria:['Repair timeout']});
+ const run=async(enabled)=>{
+  f.store.setDaemonControl('bot_finish_settings',{deliveryReviewEnabled:enabled});
+  const ex=f.service.claim('b',goal.id,{strategy:'subagent'});
+  const child=f.store.createSession({title:'evaluation',mode:'subagent',agentId:'general',parentSessionId:f.parent.id,
+   metadata:{botId:'b',userId:'owner',botGoalId:goal.id,botGoalScopeSessionId:f.parent.id,outcome:{kind:'completed'}}});
+  f.service.updateExecution('b',ex.id,{sessionId:f.parent.id,runRef:'session:'+child.id});
+  f.store.appendMessage(child.id,'assistant',[{type:'tool_call',toolCallId:'scan',name:'bash',input:{command:'check'}}]);
+  f.store.appendMessage(child.id,'tool',[{type:'tool_result',name:'bash',toolCallId:'scan',ok:false,content:'Permission denied'}]);
+  f.store.appendMessage(child.id,'assistant',[{type:'text',text:'Scan failed because the file is unreadable.'}]);
+  const judge=async({system,user})=>{
+   assert.equal(system.includes('estimatedRequests'),enabled);
+   const ref=JSON.parse(user).observations.at(-1).ref;
+   return JSON.stringify({met:false,reason:'Permission denied',missing:['Repair timeout'],criteria:[{index:0,status:'blocked',refs:[ref]}],recovery:'Restore read access'});
+  };
+  await tickBotGoals({...f.host,judge});
+  return f.service.get('b',goal.id);
+ };
+ const blocked=await run(true);assert.equal(blocked.status,'blocked');assert.equal(blocked.nextStep,'Restore read access');
+ f.service.control('b',goal.id,'resume');
+ const legacy=await run(false);assert.equal(legacy.status,'running');assert.equal(f.runs.length,1);assert.equal(legacy.nextStep,'Repair timeout');
+});

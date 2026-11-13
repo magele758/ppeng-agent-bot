@@ -1,3 +1,5 @@
+import { repeatedToolWave } from './delivery-review.js';
+import { readBotFinishSettings } from './finish-settings.js';
 import type { KernelHookListener } from '@ppeng/agent-loop';
 import { goalScope, type GoalRuntimeHost } from './runtime-host.js';
 import type { GoalReport } from './types.js';
@@ -104,7 +106,12 @@ function chargeGoalBudget(host: GoalRuntimeHost, sessionId: string): void {
 
 /** Runs after usage persistence, before further tools; never calls a model or polls. */
 export function observeGoalBudget(host:GoalRuntimeHost,sessionId:string):KernelHookListener {
+ const goalSession=Boolean(host.store.getSession(sessionId)?.metadata.botGoalId);
+ const repeated=repeatedToolWave();
  return event => {
+  if(goalSession && readBotFinishSettings(host.store).deliveryReviewEnabled && repeated(event)) {
+   host.store.enqueueSteer(sessionId,'[goal review] This exact operation returned the same result three times. Reuse that observation. If an essential condition is still open, try a different available action or register a wait for external change. Otherwise deliver the result and its limitations.',{role:'system'});
+  }
   if(!['model_done','turn_end'].includes(String(event.type)))return;
   chargeGoalBudget(host, sessionId);
  };

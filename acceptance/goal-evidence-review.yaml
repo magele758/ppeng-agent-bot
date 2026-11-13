@@ -1,0 +1,23 @@
+id: goal-evidence-review
+title: 可回退的目标交付审查
+status: implemented
+requirement: |
+  可以，那就开发一版，做好回退的方案，避免降低Agent的能力
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 报告允许列出失败项，或用户要求修复同一批失败项
+    when: 系统审查相同的扫描结果
+    then: 有证据的报告可以交付，修复目标继续执行并显示下一步和估算
+  - id: AC-2
+    given: 关键证据不可取得且本轮没有可执行的替代方案
+    when: 目标结算
+    then: 保留结果与恢复条件，可恢复执行，不能宣称成功
+  - id: AC-3
+    given: 管理员关闭新版审查或旧模型没有返回结构化审查
+    when: 再次判断目标
+    then: 沿用原先的审查能力和预算上限
+  - id: AC-4
+    given: 同一次执行中重复相同工具操作与结果
+    when: 工具连续未提供新信息
+    then: 提醒复用证据而不取消执行，变化的输入和结果仍可继续

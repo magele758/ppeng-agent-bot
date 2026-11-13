@@ -1,4 +1,5 @@
 export const goals = {
+  stageEstimate: 'Estimated next stage: {cost} USD',
   attention: 'Goal needs your attention', addBudget: 'Add budget to this goal (USD)', addAttempts: 'Add execution attempts', extend: 'Extend this goal’s limits', extendHint: 'Keeps past usage and results. Resume when ready.',
   attemptUsage: 'Attempts {used}/{max}', durableVerification: 'Verified against goal evidence',
   history: 'Goal history', historyEmpty: 'No finished goals yet', historyError: 'Could not load goal history',

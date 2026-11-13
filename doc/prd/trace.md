@@ -2821,6 +2821,13 @@ GitHub 事件不能靠换投递号重放
 
 - `e2e/global-default-model.spec.ts`
 
+### goal-evidence-review
+
+可回退的目标交付审查
+
+- `packages/core/test/bot-completion-reliability.test.js`
+- `packages/core/test/bot-goal-boundaries.test.js`
+
 ### goal-history-toolbar-align
 
 目标历史与标题栏按钮垂直居中

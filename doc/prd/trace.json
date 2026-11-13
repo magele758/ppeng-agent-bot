@@ -3201,6 +3201,14 @@
       ]
     },
     {
+      "id": "goal-evidence-review",
+      "title": "可回退的目标交付审查",
+      "tests": [
+        "packages/core/test/bot-completion-reliability.test.js",
+        "packages/core/test/bot-goal-boundaries.test.js"
+      ]
+    },
+    {
       "id": "goal-history-toolbar-align",
       "title": "目标历史与标题栏按钮垂直居中",
       "tests": [

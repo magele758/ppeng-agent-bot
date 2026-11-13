@@ -5,12 +5,21 @@ import {stableJson} from '../cron/notification-decision.js';
 import {decodeStoredWait} from './terminal-condition.js';
 import {conditionMatches,validateCondition} from './conditions.js';
 import {waitSources} from './sources.js';
-import type {DurableWait,Observation,WaitOwner,WaitSpec} from './types.js';
+import type {DurableWait,Fact,Observation,WaitOwner,WaitSpec} from './types.js';
 export class DurableWaitStore {
  constructor(private store:SqliteStateStore,private clock:()=>number=Date.now){
   store.db.exec('CREATE TABLE IF NOT EXISTS agent_waits(id TEXT PRIMARY KEY,owner_key TEXT NOT NULL,status TEXT NOT NULL,payload TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_agent_wait_owner ON agent_waits(owner_key,status)');
  }
  get(id:string):DurableWait|undefined{const row=this.store.db.prepare('SELECT payload FROM agent_waits WHERE id=?').get(id);return row?decodeStoredWait(String(row.payload)):undefined;}
+ /** Only return terminal receipts still readable by the exact registered owner. */
+ terminalReceipts(owner:WaitOwner):Array<{waitId:string;source:string;ref:string;status:Fact}> {
+  const rows=this.store.db.prepare("SELECT payload FROM agent_waits WHERE owner_key=? AND status='consumed' ORDER BY rowid DESC LIMIT 4").all(stableJson(owner));
+  return rows.flatMap(row=>{
+   const wait=decodeStoredWait(String(row.payload));
+   if(this.observe(wait).availability!=='available'||wait.observation?.availability!=='available')return [];
+   return [{waitId:wait.id,source:wait.spec.source,ref:wait.spec.ref,status:wait.observation.facts.status??null}];
+  });
+ }
  private save(wait:DurableWait):DurableWait{wait.updatedAt=this.clock();this.store.db.prepare('UPDATE agent_waits SET status=?,payload=? WHERE id=?').run(wait.status,JSON.stringify(wait),wait.id);return wait;}
  register(owner:WaitOwner,spec:WaitSpec):DurableWait {
   const adapter=waitSources(this.store).get(spec.source);if(!adapter)throw new Error('Unknown wait source');

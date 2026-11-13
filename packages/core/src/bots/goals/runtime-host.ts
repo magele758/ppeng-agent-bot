@@ -3,6 +3,7 @@ import {hasWaitReceipt} from '../../waits/receipt.js';
 import {DurableWaitStore} from '../../waits/store.js';
 import {DURABLE_WAIT_DEFAULT,parkGoalDurableWait} from '../../waits/default-park.js';
 import { createHash } from 'node:crypto';
+import { DELIVERY_REVIEW_PROMPT, reviewDelivery } from './delivery-review.js';
 import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
 import { evidenceTranscript, goalExecutionEvidence } from './execution-evidence.js';
 import { buildCompletionEvidence, completionReport, COMPLETION_JUDGE_PROMPT, type CompletionEvidence } from './completion-evidence.js';
@@ -518,6 +519,12 @@ function traceCompletionVerdict(host:GoalRuntimeHost,sessionId:string,goal:BotGo
   continuations:goal.attempts,
  }});
 }
+function averageRequestCost(session:SessionRecord|undefined):number|undefined {
+ const usage=session?.metadata.usageTotals as {requests?:number}|undefined;
+ const cost=Number(session?.metadata.usageCostUsd);
+ if(usage?.requests && Number.isFinite(cost) && cost>0)return cost/usage.requests;
+ return undefined;
+}
 type CompletionStage='before_end'|'settle'|'child';
 async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId=goal.sessionId,signal?:AbortSignal,prepared?:CompletionEvidence,stage:CompletionStage='settle'):Promise<GoalReport> {
  const session=host.store.getSession(sessionId);
@@ -530,8 +537,12 @@ async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnTyp
  const timeout=AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS);
  try {
   const packet=prepared??verificationPacket(host,goal,assistant);
-  const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:signal?AbortSignal.any([signal,timeout]):timeout});
-  const verdict=completionReport(JSON.parse(result),packet,goal);
+  const enabled=readBotFinishSettings(host.store).deliveryReviewEnabled;
+  const system=enabled ? COMPLETION_JUDGE_PROMPT + DELIVERY_REVIEW_PROMPT : COMPLETION_JUDGE_PROMPT;
+  const result=await judge({system,user:JSON.stringify(packet),jsonMode:true,signal:signal?AbortSignal.any([signal,timeout]):timeout});
+  const raw:unknown=JSON.parse(result);
+  const verdict=enabled && readBotFinishSettings(host.store).deliveryReviewEnabled
+   ? reviewDelivery(raw,packet,goal,averageRequestCost(session)) : completionReport(raw,packet,goal);
   traceCompletionVerdict(host,sessionId,goal,stage,verdict);
   return verdict;
  }catch(error){
@@ -549,14 +560,14 @@ function reviewCache(host:GoalRuntimeHost):Map<string,CompletionReview> {
 function verificationPacket(host:GoalRuntimeHost,goal:BotGoal,assistant:string):CompletionEvidence {
  return buildCompletionEvidence(goal,goalExecutionEvidence(host.store,goal),assistant);
 }
-function completionFingerprint(packet:CompletionEvidence):string {
- return createHash('sha256').update(JSON.stringify(packet)).digest('hex');
+function completionFingerprint(host:GoalRuntimeHost,packet:CompletionEvidence):string {
+ return createHash('sha256').update(String(readBotFinishSettings(host.store).deliveryReviewEnabled)).update(JSON.stringify(packet)).digest('hex');
 }
 function cachedCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,sessionId:string):GoalReport|undefined {
  const session=host.store.getSession(sessionId);
  const cached=reviewCache(host).get(sessionId);
  if(!cached?.report||cached.executionId!==executionIds(session!.metadata)?.executionId||cached.revision!==goal.revision)return undefined;
- try{return cached.fingerprint===completionFingerprint(verificationPacket(host,goal,assistant))?cached.report:undefined;}catch{return undefined;}
+ try{return cached.fingerprint===completionFingerprint(host,verificationPacket(host,goal,assistant))?cached.report:undefined;}catch{return undefined;}
 }
 function reusableCompletionReview(prior: CompletionReview | undefined, executionId: string, revision: number, packet: CompletionEvidence, fingerprint: string): boolean {
  if(prior?.executionId!==executionId||prior.revision!==revision)return false;
@@ -572,7 +583,7 @@ export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:s
  if(!prior&&cache.size>=512)return undefined;
  const {tail,assistant}=assistantTranscript(evidenceTranscript(host.store,sessionId),ctx.execution.startedAt);
  let packet:CompletionEvidence;try{packet=verificationPacket(host,goal,assistant);}catch{return undefined;}
- const fingerprint=completionFingerprint(packet);
+ const fingerprint=completionFingerprint(host,packet);
  if(reusableCompletionReview(prior,ctx.ids.executionId,goal.revision,packet,fingerprint))return {met:true};
  cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision});
  const report=await verifyCompletion(host,goal,tail,assistant,baseReport(undefined,assistant,goal),sessionId,signal,packet,'before_end');

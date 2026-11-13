@@ -157,3 +157,45 @@ test('retracted owner interjections are absent from durable completion evidence 
  const packet=buildCompletionEvidence(goal,goalExecutionEvidence(rt.store,goal),'Installed');
  assert.deepEqual(packet.userInstructions.map(x=>x.text),['Return address']);assert.ok(first.item.key);
 });
+
+const evaluationPacket = {
+ goal:'Run evaluation and report failures', conditions:['Deliver report'], constraints:[], userInstructions:[],
+ observations:[{ref:'r1',name:'read_file',ok:true,input:'summary',content:'179 attempted; 169 reports; 10 timed out',truncated:false}],
+ finalResponse:'169 reports and 10 timeouts', previousEvidence:[], previousGaps:'', omittedObservations:0
+};
+const evaluationVerdict = {met:false,advanced:true,reason:'Verify or repair timeout',missing:['Timeout'],evidenceRefs:['r1']};
+const evaluationGoal = {objective:evaluationPacket.goal,completionCriteria:evaluationPacket.conditions,resources:[],revision:1};
+
+test('reported failures can close while repairs have a costed next action [AC:goal-evidence-review#AC-1]', async()=>{
+ const {reviewDelivery}=await import('../dist/bots/goals/delivery-review.js');
+ const delivered=reviewDelivery({...evaluationVerdict,met:true,missing:[],criteria:[{index:0,status:'fulfilled',refs:['r1']}]},evaluationPacket,evaluationGoal,0.02);
+ assert.equal(delivered.verified,true);
+ const packet={...evaluationPacket,conditions:['Repair all timeouts']};
+ const proposal={criterion:0,missingFact:'Cause of timeout',action:'Inspect first timeout',impact:'Choose repair',estimatedRequests:2};
+ const review=reviewDelivery({...evaluationVerdict,criteria:[{index:0,status:'open',refs:['r1']}],proposal},packet,{...evaluationGoal,completionCriteria:packet.conditions},0.02);
+ assert.equal(review.kind,'progress');assert.equal(review.deliveryPlan.estimatedUsd,0.04);assert.match(review.nextStep,/Inspect first timeout/);
+ assert.equal(reviewDelivery({...evaluationVerdict,met:true,missing:[],criteria:[{index:0,status:'open',refs:['r1']}]},packet,evaluationGoal).verified,false);
+});
+
+test('blocked deliverable retains recovery condition without claiming success [AC:goal-evidence-review#AC-2]',async()=>{
+ const {reviewDelivery}=await import('../dist/bots/goals/delivery-review.js');
+ const verdict={...evaluationVerdict,criteria:[{index:0,status:'blocked',refs:['r1']}],recovery:'Restore access to missing logs'};
+ const result=reviewDelivery(verdict,evaluationPacket,evaluationGoal);
+ assert.equal(result.kind,'blocked');assert.equal(result.nextStep,verdict.recovery);
+ assert.equal(reviewDelivery({...verdict,criteria:[{index:0,status:'blocked',refs:['fake']}]},evaluationPacket,evaluationGoal).kind,'progress');
+});
+
+test('review defaults to legacy and hot rollback keeps old verdicts usable [AC:goal-evidence-review#AC-3]',async()=>{
+ const {readBotFinishSettings,writeBotFinishSettings}=await import('../dist/bots/goals/finish-settings.js');
+ const {reviewDelivery}=await import('../dist/bots/goals/delivery-review.js');
+ let value;const store={getDaemonControl:()=>value,setDaemonControl:(_,v)=>{value=v;}};
+ assert.equal(readBotFinishSettings(store).deliveryReviewEnabled,false);
+ for(const flag of [true,false])assert.equal(writeBotFinishSettings(store,{deliveryReviewEnabled:flag}).deliveryReviewEnabled,flag);
+ assert.equal(reviewDelivery(evaluationVerdict,evaluationPacket,evaluationGoal).nextStep,'Timeout');
+});
+
+test('identical tool waves advise once without suppressing new work [AC:goal-evidence-review#AC-4]',async()=>{
+ const {repeatedToolWave}=await import('../dist/bots/goals/delivery-review.js');
+ const check=repeatedToolWave(),wave=(path,result)=>{check({type:'model_done',assistant:{parts:[{type:'tool_call',name:'read_file',input:{path}}]}});return check({type:'tools_done',results:[{name:'read_file',ok:true,content:result}]});};
+ assert.deepEqual([wave('a','x'),wave('b','x'),wave('b','x'),wave('b','x'),wave('b','x'),wave('b','changed')],[false,false,false,true,false,false]);
+});
