@@ -1,0 +1,11 @@
+id: goal-review-default
+title: 默认按交付条件审查目标
+status: implemented
+requirement: |
+  现在是默认开启还是默认关闭的？我要默认开启才好直接对比效果
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 新安装或以前仅保存了其他收尾设置
+    when: 查看目标审查配置
+    then: 默认开启按交付条件审查，手动关闭后保留选择

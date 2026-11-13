@@ -34,6 +34,11 @@ goal_checkpoint with no goal assigned must return the existing clear error once 
 如果bot在执行过程中，服务重启了，之前的任务就直接停了，重启之后，也没有继续执行。开发期频繁重启时，已经停在安全检查点上的 Goal 要继续，做了一半且效果未确认的不要重做。
 本切片只处理 Goal 执行。
 
+## goal-review-default
+默认按交付条件审查目标
+
+现在是默认开启还是默认关闭的？我要默认开启才好直接对比效果
+
 ## goal-update-hidden
 目标更新通知不在聊天里展示
 
