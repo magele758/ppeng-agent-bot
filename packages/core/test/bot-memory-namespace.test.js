@@ -618,7 +618,8 @@ test('legacy session_memory backend stays session-bound and never leaks agent id
 test('dreamer keeps bot runs, facts and journals out of the shared user pool', async () => {
   const { dir, store } = tmpStore();
   const am = store.agentMemory();
-  const text = 'user: 我喜欢在周五复盘网关回滚流程\nuser: 请记住我负责支付网关的值班交接';
+  // Identity evidence required after #527 tightened heuristicExtractDialogueFacts (no generic fallback).
+  const text = 'user: 请记住我叫张三，我是软件工程师\nuser: 我的偏好是在周五复盘网关回滚流程';
   const plainRun = await dreamNowForUser({ store: am, userId: 'u1', messagesText: text, stateDir: dir, force: true });
   const botRun = await dreamNowForUser({ store: am, userId: 'u1', messagesText: text, stateDir: dir, force: true, agentId: 'bot-a' });
   const botRun2 = await dreamNowForUser({ store: am, userId: 'u1', messagesText: text, stateDir: dir, force: true, agentId: 'bot-b' });
@@ -635,6 +636,7 @@ test('dreamer keeps bot runs, facts and journals out of the shared user pool', a
   const sharedDream = am.search({ scope: 'user.memory', userId: 'u1', agentUnscoped: true, limit: 50 }).filter((r) => r.source === 'dream');
   const botADream = am.search({ scope: 'user.memory', userId: 'u1', agentId: 'bot-a', limit: 50 }).filter((r) => r.source === 'dream');
   assert.ok(sharedDream.length > 0);
+  assert.ok(sharedDream.every((row) => !row.agentId));
   assert.ok(botADream.length > 0);
   assert.ok(botADream.every((row) => row.agentId === 'bot-a'));
   store.db.close();
