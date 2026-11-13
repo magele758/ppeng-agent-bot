@@ -190,7 +190,7 @@ export function reconcileAllReservations(
   for (const res of reservations) {
     const result = reconcileReservation(res);
     results.push(result);
-    if (!result.ok) {
+    if (result.ok === false) {
       if (result.reason === 'unknown_outcome') hasUnknown = true;
       if (result.reason === 'irreconcilable') hasIrreconcilable = true;
     }
