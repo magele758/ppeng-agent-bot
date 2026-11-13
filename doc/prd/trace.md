@@ -2648,6 +2648,12 @@ Delete library pages and revoke public shares
 - `packages/core/test/durable-page-port.test.js`
 - `packages/core/test/page-tools.test.js`
 
+### delivery-mapping
+
+Kernel handoff states must not map to implement delivery success
+
+- `packages/core/test/trajectory-handoff-delivery-mapping.test.js`
+
 ### delivery-quiet-hours
 
 用户可见外发的全局静默时段

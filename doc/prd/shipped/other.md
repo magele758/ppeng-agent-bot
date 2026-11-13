@@ -257,6 +257,13 @@ Delete library pages and revoke public shares
 Implement the smallest correct cut for r5-5 delete_page (store/port delete + admin DELETE /api/library/pages/:id + tool delete_page; share read 404 after delete).
 Run focused unit + acceptance tests for delete_page (delete then list omits; get/share 404; missing id fails without mis-delete; admin DELETE; public share read-only) with nice and low concurrency.
 
+## delivery-mapping
+Kernel handoff states must not map to implement delivery success
+
+Kernel done is local completion only; never map answered, capped, failed,
+cancelled, timed_out, awaiting_coordinator, or bare kernel done to implement
+delivery success.
+
 ## delivery-quiet-hours
 用户可见外发的全局静默时段
 

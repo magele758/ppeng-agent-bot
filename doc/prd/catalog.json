@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 454,
+    "implemented": 455,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1546,6 +1546,13 @@
       "requirement": "Implement the smallest correct cut for r5-5 delete_page (store/port delete + admin DELETE /api/library/pages/:id + tool delete_page; share read 404 after delete).\nRun focused unit + acceptance tests for delete_page (delete then list omits; get/share 404; missing id fails without mis-delete; admin DELETE; public share read-only) with nice and low concurrency.",
       "verificationStage": "software",
       "file": "acceptance/delete-page.yaml"
+    },
+    {
+      "id": "delivery-mapping",
+      "title": "Kernel handoff states must not map to implement delivery success",
+      "requirement": "Kernel done is local completion only; never map answered, capped, failed,\ncancelled, timed_out, awaiting_coordinator, or bare kernel done to implement\ndelivery success.",
+      "verificationStage": "software",
+      "file": "acceptance/delivery-mapping.yaml"
     },
     {
       "id": "delivery-quiet-hours",
