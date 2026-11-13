@@ -1,0 +1,24 @@
+id: session-obsidian
+title: 将当前会话正文存入 Obsidian
+status: implemented
+requirement: |
+  这个收藏不对吧，我之前想要的是类似 chrome-gemini-plugin那种把某个会话的内容收藏到Obsidian里，研究下现有实现，修复一下这个问题
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 有已打开的 Obsidian 库和包含多轮正文的会话
+    when: 从会话顶栏存入 Obsidian
+    then: 库里出现带标题、会话标识和按时间排列的用户与助手正文的 Markdown 笔记
+  - id: AC-2
+    given: 同一内容已经收藏，或用户编辑过已存的笔记
+    when: 再次保存
+    then: 相同内容不重复创建，已有手工修改不会被覆盖
+  - id: AC-3
+    given: 无法确定目标库或会话没有可保存的正文
+    when: 尝试保存
+    then: 显示原因，不报告已保存
+  - id: AC-4
+    given: 会话内容已存入库
+    when: 打开知识与记忆里的收藏图谱
+    then: 可以按正文涉及的主题分类找到并打开相应笔记

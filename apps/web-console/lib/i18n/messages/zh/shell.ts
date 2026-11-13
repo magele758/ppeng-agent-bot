@@ -25,7 +25,7 @@ export const shell = {
   sub: {
     agents: { agents: 'Agents', bots: 'Bots', teams: 'Teams', skills: '技能' },
     tasks: { flows: '工作流', bots: 'Bot 任务', queue: '任务队列', runs: '编排运行', inbox: '审批与收件箱' },
-    knowledge: { memory: '记忆', pages: '页面', ingestion: '摄取' },
+    knowledge: { collections: '收藏图谱', memory: '记忆', pages: '页面', ingestion: '摄取' },
     ops: { trajectory: '会话轨迹', health: '系统健康' }
   },
   ui: {

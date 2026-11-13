@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 452 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 454 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -418,6 +418,12 @@
 需求正文见 [other](other.md)。
 
 - `diagnostic-safety-scope` 远程诊断与后台通知保持正确权限边界
+
+## dialogue（1）
+
+需求正文见 [other](other.md)。
+
+- `dialogue-identity-evidence` 对话身份记忆只从明确自述生成
 
 ## discovery（1）
 
@@ -966,7 +972,7 @@
 - `secure-form-multi` 对话里的多字段安全表单
 - `secure-form-vault` Secure Form fill-from-Vault
 
-## session（13）
+## session（14）
 
 需求正文见 [session](session.md)。
 
@@ -978,6 +984,7 @@
 - `session-lifecycle-verification` 会话生命周期验证：取消、重试与审批恢复
 - `session-multiprocess-concurrency-verification` 多进程并发验证：写入占用、迟到结果与审批恢复
 - `session-multiprocess-state-consistency` 多进程会话状态一致性修复
+- `session-obsidian` 将当前会话正文存入 Obsidian
 - `session-recap` 会话末尾回顾
 - `session-recap-model-routing` 会话回顾使用会话配置的模型
 - `session-restart-recovery-state-consistency` 重启恢复发现的运行状态、审批衔接与未确认工具结果修复

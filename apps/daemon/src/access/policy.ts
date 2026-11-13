@@ -219,6 +219,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/sessions/bulk-delete', selfFiltered('session')],
     ['POST /api/sessions', owner('bot', sessionCreateRefs)],
     ['GET /api/sessions/team-overview', selfFiltered('session')],
+    ['GET /api/obsidian/notes', ADMIN],
+    ['POST /api/sessions/:id/obsidian', ADMIN],
     ['GET /api/sessions/:id/team', session],
     ['GET /api/sessions/:id/activity', session],
     ['GET /api/sessions/:id/model-view', session],

@@ -51,6 +51,7 @@ import { TrajectoryPanel } from './TrajectoryPanel';
 import { ContextStackPanel } from './ContextStackPanel';
 import { groupAgentsByDomain, sortAgentsById } from '@/lib/sort-utils';
 import { groupSessionsWithFavorites, sessionListEmptyText } from '@/lib/session-favorite';
+import { SaveToObsidian } from './SaveToObsidian';
 import { SessionFavoriteButton, SessionFavoriteFilter, SessionFavoriteMark } from './SessionFavorite';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
@@ -1340,11 +1341,7 @@ export function PlayPanel({
                 >
                   {t('play.trace')}
                 </button></DebugOnly>
-                <SessionFavoriteButton
-                  session={favoriteSessionForHeader(selectedSession, catalogSessions, selectedSessionId)}
-                  onUpdated={onSessionFavorite}
-                  onFailed={(detail) => chat.setPlayStatus({ text: t('play.favorite.failed', { detail }), err: true })}
-                />
+                <SaveToObsidian key={selectedSessionId} id={selectedSessionId} notify={(text,err)=>chat.setPlayStatus({text,err})} />
                 <div className="more-menu" ref={moreMenuRef}>
                   <button
                     type="button"
@@ -1373,6 +1370,11 @@ export function PlayPanel({
                         {renderHeaderDetails()}
                         {headerBotId && <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />}
                       </details>}
+                <SessionFavoriteButton
+                  session={favoriteSessionForHeader(selectedSession, catalogSessions, selectedSessionId)}
+                  onUpdated={onSessionFavorite}
+                  onFailed={(detail) => chat.setPlayStatus({ text: t('play.favorite.failed', { detail }), err: true })}
+                />
                       <SessionBriefToggle compact />
                       <label
                         className="toggle toggle--compact more-menu__item"

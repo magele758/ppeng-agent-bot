@@ -2694,6 +2694,12 @@ Delete library pages and revoke public shares
 - `packages/core/test/default-deny-policy.test.js`
 - `packages/core/test/skill-manifest-gate.test.js`
 
+### dialogue-identity-evidence
+
+对话身份记忆只从明确自述生成
+
+- `packages/core/test/memory-family.test.js`
+
 ### discovery-default-on
 
 能力发现总开关默认开启
@@ -3741,6 +3747,12 @@ Secure Form fill-from-Vault
 - `packages/core/test/superbot-factory-setup.test.js`
 - `packages/core/test/writer-claim.test.js`
 - `scripts/test/session-multiprocess-state-consistency.test.mjs`
+
+### session-obsidian
+
+将当前会话正文存入 Obsidian
+
+- `packages/core/test/session-obsidian.test.js`
 
 ### session-restart-recovery-state-consistency
 

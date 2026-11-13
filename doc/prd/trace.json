@@ -3057,6 +3057,13 @@
       ]
     },
     {
+      "id": "dialogue-identity-evidence",
+      "title": "对话身份记忆只从明确自述生成",
+      "tests": [
+        "packages/core/test/memory-family.test.js"
+      ]
+    },
+    {
       "id": "discovery-default-on",
       "title": "能力发现总开关默认开启",
       "tests": [
@@ -4248,6 +4255,13 @@
         "packages/core/test/superbot-factory-setup.test.js",
         "packages/core/test/writer-claim.test.js",
         "scripts/test/session-multiprocess-state-consistency.test.mjs"
+      ]
+    },
+    {
+      "id": "session-obsidian",
+      "title": "将当前会话正文存入 Obsidian",
+      "tests": [
+        "packages/core/test/session-obsidian.test.js"
       ]
     },
     {

@@ -1,4 +1,18 @@
 export const knowledge = {
+  notes: {
+    subjects: 'Subjects',
+    related: 'Also covered by these notes',
+    loading: 'Loading…',
+    empty: 'Save a conversation to Obsidian to see it by subject here.',
+    failed: 'Could not load saved notes.',
+    ai: 'Artificial intelligence',
+    engineering: 'Software engineering',
+    business: 'Business and economics',
+    arts: 'Arts and humanities',
+    science: 'Science',
+    life: 'Lifestyle and health',
+    other: 'Other'
+  },
   sourceUi: 'UI config',
   sourceDefault: 'Default',
   ingestion: {

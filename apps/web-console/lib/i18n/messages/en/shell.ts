@@ -25,7 +25,7 @@ export const shell = {
   sub: {
     agents: { agents: 'Agents', bots: 'Bots', teams: 'Teams', skills: 'Skills' },
     tasks: { flows: 'Workflows', bots: 'Bot tasks', queue: 'Task queue', runs: 'Runs', inbox: 'Approvals & inbox' },
-    knowledge: { memory: 'Memory', pages: 'Pages', ingestion: 'Ingestion' },
+    knowledge: { collections: 'Saved note graph', memory: 'Memory', pages: 'Pages', ingestion: 'Ingestion' },
     ops: { trajectory: 'Trajectory', health: 'System health' }
   },
   ui: {
