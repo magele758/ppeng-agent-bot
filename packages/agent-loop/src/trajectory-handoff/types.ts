@@ -63,8 +63,59 @@ export type HandoffEvent =
 // ============================================================================
 // Plan objects
 // ============================================================================
+// Plan objects, triggers, and recovery
+// ============================================================================
 
 export type PlanStatus = 'draft' | 'accepted' | 'superseded' | 'failed';
+
+/** Resume policy for failed step recovery (v2.3 §5.1). */
+export type ResumePolicy =
+  | 'skip_if_effect_done'
+  | 'compensate_then_retry'
+  | 'retry_idempotent'
+  | 'replace_with_new_steps'
+  | 'escalate';
+
+/** Verification object binds a trigger to a specific step and verification target. */
+export interface VerificationObject {
+  readonly planVersion: number;
+  readonly stepId: string;
+  readonly verificationKind: 'test' | 'build' | 'check';
+  /** Suite / command / check id, not "any failure". */
+  readonly verificationTarget: string;
+}
+
+/**
+ * Host-computed or model-admitted predicates (v2.3 §4, §5, §6.5).
+ * Host-computed: verification_consecutive_failures with VerificationObject.
+ * Model-admitted (must be host-accepted): assumption_violated, design_unsettled, model_reported.
+ */
+export type HostPredicate =
+  | {
+      kind: 'verification_consecutive_failures';
+      object: VerificationObject;
+      threshold: number; // default 2
+      scope: 'current_role_occupancy';
+    }
+  | { kind: 'assumption_violated'; assumptionId: string; object?: VerificationObject }
+  | { kind: 'design_unsettled'; topicId: string; object?: VerificationObject }
+  | { kind: 'model_reported'; code: string };
+
+/** Replan trigger with human-readable condition and host-executable predicate. */
+export interface ReplanTrigger {
+  readonly id: string;
+  /** Human-readable explanation; host does NOT execute this string. */
+  readonly condition: string;
+  readonly predicate: HostPredicate;
+  readonly action: 'repair_plan';
+}
+
+/** Conditional plan revision (v2.3 §5): concurrent revisions conflict-reject. */
+export interface PlanRevision {
+  /** 0 = no accepted plan yet. */
+  readonly expectedOldVersion: number;
+  readonly newVersion: number;
+}
 
 /** A single step within a plan. */
 export interface PlanStep {
@@ -74,8 +125,9 @@ export interface PlanStep {
 }
 
 /**
- * Immutable plan object.  Mutations create a new version via PlanStore
- * (expectedOldVersion + newVersion).
+ * Immutable plan object (v2.3 §5).
+ * Mutations create a new version via PlanStore (expectedOldVersion + newVersion).
+ * Old plan files without replanTriggers/resumePolicy must remain readable.
  */
 export interface PlanObject {
   readonly planId: string;
@@ -87,8 +139,17 @@ export interface PlanObject {
   readonly createdAt: string;
   /** Free-form rationale stored with the plan for dual-model context. */
   readonly rationale?: string;
+  /**
+   * Structured replan triggers. Missing = kernel uses default host-computed triggers (v2.3 §6.5).
+   * The human-readable condition is documentation; host executes the predicate.
+   */
+  readonly replanTriggers?: readonly ReplanTrigger[];
+  /**
+   * Recovery policy map: stepId → ResumePolicy.
+   * Missing entry = host decides based on step kind and evidence.
+   */
+  readonly resumePolicy?: Readonly<Record<string, ResumePolicy>>;
 }
-
 // ============================================================================
 // Handoff counters
 // ============================================================================

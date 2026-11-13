@@ -11,10 +11,24 @@ export interface PlanStepState {
   error?: string;
 }
 
+/**
+ * Plan state for plan-tools (legacy format).
+ * Extended fields (replanTriggers, resumePolicy) can be added for forward-compat
+ * but are optional; old plan files without them remain readable.
+ */
 export interface PlanState {
   analysis: string;
   steps: PlanStepState[];
   confirmed: boolean;
+  /** Optional v2.3 extension: structured replan triggers. */
+  replanTriggers?: Array<{
+    id: string;
+    condition: string;
+    predicate: unknown; // Opaque; validated by kernel
+    action: 'repair_plan';
+  }>;
+  /** Optional v2.3 extension: recovery policy per step. */
+  resumePolicy?: Record<string, string>;
 }
 
 export type PlanEvent =

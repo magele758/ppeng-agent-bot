@@ -1,17 +1,17 @@
-# Agent 调度器 Loop 规划
+# Agent 调度器与轨迹交接 Loop 规划
+
+**名称辨析：**
+
+本文档描述的「Orchestrator」是指现有的飞轮调度管线（`packages/core/src/orchestrator/`），它管理 `research → implement → review → test` 这样的多阶段工作流。
+
+**轨迹交接（Trajectory Handoff）** 是一个独立的 agent-loop 运行时原语，位于 `packages/agent-loop/src/trajectory-handoff/`。它支持规划层与执行层在单条轨迹中动态双向协作（planner_readonly ⇄ executor_write），不依赖多阶段调度。两者可以组合使用，但不是同一个系统：
+
+- **飞轮 Orchestrator**：多阶段任务管线，跨 research / implement / review / test 阶段调度不同执行器，使用 Swarm 作为 implement 阶段的底层执行单元。
+- **轨迹交接（Trajectory Handoff）**：单轨迹内的角色切换原语，允许规划层（只读）与执行层（可写）在同一会话中来回交接控制权，而不必启动新的子任务或阶段。它可以被普通会话、Swarm Worker 或飞轮 implement 阶段使用。
+
+命名约定：本文保留「Orchestrator」指代飞轮调度管线；「trajectory handoff」或「轨迹交接」指代 agent-loop 原语。**不得将飞轮 Orchestrator 改名。**
 
 ## Implementation status（与代码对齐）
-
-| 能力 | 状态 |
-|------|------|
-| SQLite 表 + `OrchestratorStore` CRUD | 已实现（migration v5，`/api/orchestration/*`） |
-| Evolution 记账 | 可选 `EVOLUTION_USE_ORCHESTRATOR=1` → POST/PATCH run 状态 |
-| `OrchestrationEngine`（step 生成与分派） | 见 `packages/core/src/orchestrator/engine.ts`；`research`→`ResearchPipeline`，`review`/`test`→同步 subagent，`implement`→Swarm 并等同 tick 内 `swarmExecutor.tick()` |
-| Web Console Orchestration 视图 | 见「更多」面板；Swarm 见「会话与任务」 |
-
-下文「规划」章节描述目标形态；已实现部分以代码与上表为准。
-
----
 
 本文定义“当前 Agent 作为调度器”的目标形态：它不只是完成单次会话，而是把来自用户、RSS、trace、告警、issue 的信号映射到能力地图和 8 个飞轮，再选择合适的 CLI-Agent、SubAgent、Teammate、domain tool 或脚本执行。
 
