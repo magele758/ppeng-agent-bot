@@ -39,12 +39,22 @@ export function botModelPinIsStale(
   );
 }
 
-/**
- * Composer selection to adopt after loading a session. A session carrying its own model wins. Without
- * one, switching sessions or lifting a pin resets to null ("follow the default") so a previous chat's
- * model or a stale `modelRef` mirrored from the pin is not sent as an explicit choice; a plain refresh
- * of the same session keeps the user's current pick.
- */
+function composerSessionModelRef(metadata: Record<string, unknown> | undefined): ModelRef | null {
+  if (metadata?.canonicalBotChat === true) return null;
+  return parseSessionModelRef(metadata);
+}
+
+function composerModelWithoutSelection(input: {
+  metadata: Record<string, unknown> | undefined;
+  sameSession: boolean;
+  pinLifted: boolean;
+  current: ModelRef | null;
+}): ModelRef | null {
+  if (input.metadata?.canonicalBotChat === true) return null;
+  return input.sameSession && !input.pinLifted ? input.current : null;
+}
+
+/** Bot chats follow their Bot pin or the current default. Ordinary chats retain their own selection. */
 export function resolveLoadedComposerModelRef(input: {
   metadata: Record<string, unknown> | undefined;
   options: readonly ModelPickerOption[];
@@ -54,11 +64,11 @@ export function resolveLoadedComposerModelRef(input: {
   pinLifted: boolean;
 }): ModelRef | null {
   const pin = parseBotModelOverride(input.metadata);
-  const own = pin ?? parseSessionModelRef(input.metadata);
+  const own = pin ?? composerSessionModelRef(input.metadata);
   if (own && !(input.pinLifted && !pin)) {
     return resolvePickerModelRef(input.options, own, input.catalogDefault);
   }
-  return input.sameSession && !input.pinLifted ? input.current : null;
+  return composerModelWithoutSelection(input);
 }
 
 /** The composer picker is locked by the session's own pin (bot chats and forks alike). */

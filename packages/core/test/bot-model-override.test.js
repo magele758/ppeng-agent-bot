@@ -332,3 +332,32 @@ test('without any override the route is identical to before (session ref / defau
   );
   store.db.close();
 });
+
+test('Bot follow default ignores legacy selection and tracks default changes [AC:bot-follow-default#AC-1]', () => {
+  const store = tempStore();
+  seedCatalog(store);
+  const session = { id: 'legacy', metadata: { canonicalBotChat: true, modelRef: REF_B } };
+  assert.equal(modelOf(resolveModelRoute({ store, session, env: {} }).primary), 'alpha-1');
+  setCatalogDefaultRef(store, REF_B);
+  assert.equal(modelOf(resolveModelRoute({ store, session, env: {} }).primary), 'beta-1');
+  session.metadata.modelOverride = { providerId: 'prov-a', modelId: 'alpha-1' };
+  assert.equal(modelOf(resolveModelRoute({ store, session, env: {} }).primary), 'alpha-1');
+  store.db.close();
+});
+
+test('saving follow default clears legacy model selections on bot chats [AC:bot-follow-default#AC-2]', () => {
+  const store = tempStore();
+  const host = facadeHost(store);
+  const { options } = seedCatalog(store);
+  const bot = createBot(host, { name: 'Follow' });
+  const user = openBot(host, bot.id, { userId: 'follow-user' });
+  for (const id of [bot.canonicalSessionId, user.sessionId]) {
+    const session = store.getSession(id);
+    store.updateSession(id, { metadata: { ...session.metadata, modelRef: REF_B } });
+  }
+  updateBot(host, bot.id, { modelOverride: null }, { modelOptions: options });
+  for (const id of [bot.canonicalSessionId, user.sessionId]) {
+    assert.equal(store.getSession(id).metadata.modelRef, undefined);
+  }
+  store.db.close();
+});

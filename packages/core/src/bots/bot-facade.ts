@@ -392,7 +392,10 @@ export function updateBot(
       const metadata = { ...session.metadata, ...metaPatch };
       if (hasModelOverride) {
         if (modelOverride) metadata[BOT_MODEL_OVERRIDE_META] = modelOverride;
-        else delete metadata[BOT_MODEL_OVERRIDE_META];
+        else {
+          delete metadata[BOT_MODEL_OVERRIDE_META];
+          delete metadata.modelRef;
+        }
       }
       host.store.updateSession(session.id, { metadata });
     }

@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 448 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 449 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -79,7 +79,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（138）
+## bot（139）
 
 需求正文见 [bot](bot.md)。
 
@@ -125,6 +125,7 @@
 - `bot-first-task-dismissal` 首次任务引导可关闭且不干扰已有对话
 - `bot-first-task-new-user` 首次任务引导只给新用户看
 - `bot-flow-read-projection` 工作流只接收展示所需的会话数据
+- `bot-follow-default` Bot 跟随默认模型
 - `bot-followup-cache-prefix` 追问时复用上一轮已缓存的对话前缀
 - `bot-forever-chat` Bot 永久主会话命令
 - `bot-fork-retrievable-inheritance` Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文

@@ -2227,6 +2227,14 @@
       ]
     },
     {
+      "id": "bot-follow-default",
+      "title": "Bot 跟随默认模型",
+      "tests": [
+        "apps/web-console/lib/bot-model.test.ts",
+        "packages/core/test/bot-model-override.test.js"
+      ]
+    },
+    {
       "id": "bot-fork-sessions-in-detail",
       "title": "Bot 子任务会话放进详情菜单",
       "tests": [

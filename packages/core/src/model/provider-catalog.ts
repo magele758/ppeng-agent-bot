@@ -169,6 +169,7 @@ export function parseModelRef(raw: unknown): ModelRef | undefined {
 }
 
 export function modelRefFromSession(session: SessionRecord | undefined): ModelRef | undefined {
+  if (session?.metadata?.canonicalBotChat === true) return undefined;
   return parseModelRef(session?.metadata?.modelRef);
 }
 
