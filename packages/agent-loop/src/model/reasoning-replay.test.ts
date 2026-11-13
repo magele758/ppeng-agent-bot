@@ -98,3 +98,21 @@ it('preserves upstream repeats verbatim and never folds reasoning into visible d
   for (const wire of payloads) expect(wire.messages.find((m: any) => m.role === 'assistant').content).toBe(text);
   expect(messages).toEqual(original);
 });
+
+it('delivers host updates after the tool result in sync and streaming protocols [AC:request-context-events#AC-2]', async () => {
+  for (const protocol of ['chat_completions', 'responses'] as const) {
+    const { adapter, payloads } = capture(protocol);
+    const notice = { ...message('reminder', 'system', [{ type: 'text', text: 'Current time: 10:15' }]), key: 'request-context-notice' };
+    const input = turn([message('u', 'user', [{ type: 'text', text: 'inspect' }]),
+      message('a', 'assistant', [call]), message('t', 'tool', [result]), notice]);
+    await adapter.runTurn(input);
+    await adapter.runTurnStream(input, () => {});
+    for (const wire of payloads) {
+      const items = wire.input ?? wire.messages;
+      expect(items.at(-1).role).toBe('user');
+      expect(JSON.stringify(items.at(-1))).toContain('10:15');
+      expect(items.at(-2).call_id ?? items.at(-2).tool_call_id).toBe('call-1');
+      expect(JSON.stringify(items.slice(0, -1))).not.toContain('10:15');
+    }
+  }
+});

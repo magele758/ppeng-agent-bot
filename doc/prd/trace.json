@@ -4022,6 +4022,14 @@
       ]
     },
     {
+      "id": "request-context-events",
+      "title": "连续工具调用期间的来源和时间",
+      "tests": [
+        "packages/agent-loop/src/model/reasoning-replay.test.ts",
+        "packages/core/test/conversation-clock-request.test.js"
+      ]
+    },
+    {
       "id": "request-metric-follows-turn",
       "title": "已发送请求指标随所选轮变化",
       "tests": [

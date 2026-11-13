@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 450 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 451 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -888,10 +888,11 @@
 
 - `reply-hover-ended-at` 悬停 Bot 回复时显示结束时间
 
-## request（1）
+## request（2）
 
 需求正文见 [other](other.md)。
 
+- `request-context-events` 连续工具调用期间的来源和时间
 - `request-metric-follows-turn` 已发送请求指标随所选轮变化
 
 ## risk（1）

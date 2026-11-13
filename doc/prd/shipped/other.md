@@ -869,6 +869,11 @@ Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk 
 
 这里hover的时候，不仅显示引用，再补一个会话的时间，用yyyy-mm-dd  hh:mm:ss 格式，展示这个会话结束的时间就可以
 
+## request-context-events
+连续工具调用期间的来源和时间
+
+可以，那就开发一版，做好回退的方案，避免降低Agent的能力（你就改动范围先做好要测试验证的功能点，然后做好开发的前后版本的对比）
+
 ## request-metric-follows-turn
 已发送请求指标随所选轮变化
 

@@ -3540,6 +3540,13 @@ microVM 命令不会悄悄改在宿主机上跑
 
 - `apps/web-console/lib/armed-delete.test.ts`
 
+### request-context-events
+
+连续工具调用期间的来源和时间
+
+- `packages/agent-loop/src/model/reasoning-replay.test.ts`
+- `packages/core/test/conversation-clock-request.test.js`
+
 ### request-metric-follows-turn
 
 已发送请求指标随所选轮变化

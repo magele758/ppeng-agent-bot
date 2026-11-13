@@ -10,6 +10,7 @@ export type TraceEventKind =
   /** Command hardline refused a tool call before it ran */
   | 'command_hardline_denied'
   | 'turn_start'
+  | 'request_prefix'
   | 'turn_end'
   /** Model output cut off by a token cap (finish_reason length / max_tokens); content is incomplete */
   | 'turn_truncated'

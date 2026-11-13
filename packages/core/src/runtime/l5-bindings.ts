@@ -1,5 +1,6 @@
 import { botConversationRequest, deliverConversationTurn } from '../bots/conversation-reply.js';
-import {SourceLedger} from '../learning/sources.js';
+import { recordWireShape } from '../session/request-wire-diagnostics.js';
+import { cleanRequestContext, prepareRequestContext } from '../session/request-context-events.js';
 import { restoreTaskContract, type TaskContract } from '../session/task-contract.js';
 import { diagnosePrompt, type CacheDiagnostic } from '../session/cache-diagnostics.js';
 import { usesDurableBotGoals, reviewDirectGoalBeforeEnd, type GoalRuntimeHost } from '../bots/goals/runtime-host.js';
@@ -16,7 +17,7 @@ import { resolveBotWindowBudget } from '../session/history/window.js';
 import { BotFunctionalGroupService } from '../bots/functional-groups.js';
 import { hasRevokedSharedContext } from '../bots/shared-context-isolation.js';
 import { noteHumanModelInput } from '../session/human-continuation.js';
-import { appendClockNotice, resolveConversationTimezone, stampWrittenAt } from '../session/conversation-clock.js';
+import { resolveConversationTimezone, stampWrittenAt } from '../session/conversation-clock.js';
 import { isCanonicalBotChat, shouldRecordContextBudgetSkip } from '../session/bot-compact-policy.js';
 import { estimateMessageTokens } from '../model/token-estimate.js';
 /**
@@ -356,14 +357,16 @@ async function invokeContextModel(
         await waitForBotSummary(rt.store, session.id);
       }
       const refreshed = rt.store.foldMessages(session.id);
-      const changed = refreshed.map(m => m.id).join() !== input.messages.map(m => m.id).join();
+      const changed = refreshed.map(m => m.id).join() !== input.messages.filter(m => m.key !== 'request-context-notice').map(m => m.id).join();
       const result = changed ? { replaced: true } : await autoCompactForTurn(host, context);
       if (result.replaced) {
         compacted = true;
         const prepared = await host.prepareMessagesForModel(session, rt.store.foldMessages(session.id));
         // Preserve turn-local user memory/image parts when the original message survived.
-        const oldById = new Map(messages.filter(message=>message.role==='user').map(message=>[message.id,message]));
-        messages = completionModelView(prepared.map(message => oldById.get(message.id) ?? message));
+        const oldById = new Map(cleanRequestContext(input.messages)
+          .filter(message => message.role === 'user').map(message => [message.id, message]));
+        const clean = prepared.map(message => oldById.get(message.id) ?? message);
+        messages = completionModelView(prepareRequestContext(rt.store, session.id, clean, Date.now(), resolveConversationTimezone(session.metadata)));
       }
     }
     if (estimateMessageTokens(messages) > budget.historyTokens) {
@@ -706,13 +709,23 @@ function fitProductModelRequest(
   const adapter = session
     ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
     : rt.modelAdapter;
-  if(session){const ledger=new SourceLedger(rt.store);ledger.observe(session.id);const appendix=ledger.appendix(session.id);if(appendix){const messages=[...input.messages];const index=messages.findLastIndex(m=>m.role==='user');if(index>=0)messages[index]={...messages[index]!,parts:[...messages[index]!.parts,{type:'text',text:appendix}]};input={...input,messages};}}
   const contract = session?.metadata?.taskContract as TaskContract|undefined;
   if(contract){
     const restored=restoreTaskContract(input.messages,contract);
     input={...input,messages:restored.messages};
     try {rt.store.updateSession(session!.id,{metadata:{...session!.metadata,taskContractAudit:restored.audit}});}catch { /* The contract is still present in this request. */ }
   }
+  const timezone = resolveConversationTimezone(session?.metadata);
+  const now = Date.now();
+  const sourceMessages = input.messages;
+  const withContext = (messages: typeof sourceMessages) => session
+    ? prepareRequestContext(rt.store, session.id, messages, now, timezone)
+    : messages;
+  input = { ...input, messages: withContext(sourceMessages),
+    observeRequestBody: session ? body => {
+      const firstDifference = recordWireShape(rt.store, session.id, body);
+      if (firstDifference) rt.emitTrace(session.id, { kind: 'request_prefix', payload: { firstDifference } });
+    } : undefined };
   let slot: PrepareSlot | undefined;
   if (session) {
     try {
@@ -733,7 +746,6 @@ function fitProductModelRequest(
       /* Replay history must not change the turn or write a summary. */
     }
   }
-  const timezone = resolveConversationTimezone(session?.metadata);
   input = { ...input, messages: stampWrittenAt(input.messages, timezone) };
   return applyNormalSessionRequestBudget(input, {
     session,
@@ -770,7 +782,13 @@ function fitProductModelRequest(
         reason: `compact session ${input.sessionId ?? session?.id ?? ''}`
       })
   }).then(fitted => {
-    fitted.messages = appendClockNotice(fitted.messages, Date.now(), timezone);
+    // A budget fold can discard the anchor or an event used to project current policy.
+    const anchor = sourceMessages.findLast(message => message.role === 'user') ?? sourceMessages.at(-1);
+    const retained = new Set(fitted.messages.map(message => message.id));
+    const droppedNotice = input.messages.some(message => message.key === 'request-context-notice' && !retained.has(message.id));
+    if ((anchor && !retained.has(anchor.id)) || droppedNotice) {
+      fitted.messages = withContext(cleanRequestContext(fitted.messages));
+    }
     if (fitted.sessionId) noteHumanModelInput(rt.store, fitted.sessionId, fitted.messages);
     if (slot && fitted.sessionId && fitted.messages) {
       linkPrepareSlot(rt.store, fitted.sessionId, fitted.messages, slot);
