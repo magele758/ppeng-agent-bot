@@ -1,0 +1,44 @@
+id: delivery-mapping
+title: Kernel handoff states must not map to implement delivery success
+status: implemented
+requirement: |
+  Kernel done is local completion only; never map answered, capped, failed,
+  cancelled, timed_out, awaiting_coordinator, or bare kernel done to implement
+  delivery success.
+criteria:
+  - id: DM-1
+    given: The trajectory-handoff kernel exposes its full state set
+    when: Each state is evaluated as a candidate for implement delivery success
+    then: No handoff state maps to implement delivery success
+  - id: DM-2
+    given: The kernel is in answered, capped, failed, cancelled, or timed_out
+    when: The delivery pipeline classifies the state
+    then: The state is terminal and is never mapped to implement delivery success
+  - id: DM-3
+    given: The kernel is in awaiting_coordinator
+    when: The delivery pipeline classifies the state
+    then: The state is a suspend, not a terminal, and is never mapped to implement delivery success
+  - id: DM-4
+    given: The kernel has reached done
+    when: The delivery pipeline classifies the state
+    then: done is terminal local completion only and does not by itself map to implement delivery success
+  - id: DM-5
+    given: The documented non-delivery states answered, capped, failed, cancelled, timed_out, and awaiting_coordinator
+    when: The kernel state catalog is inspected
+    then: Each of those states is present in ALL_STATES
+  - id: DM-6
+    given: The kernel is in a terminal state
+    when: Any transition is attempted
+    then: The kernel rejects the transition; terminal states have no outgoing edges
+  - id: DM-7
+    given: The kernel is in an active state
+    when: The delivery pipeline classifies the state
+    then: The active state is not mapped to implement delivery success
+  - id: DM-8
+    given: A new kernel session is created
+    when: The initial state is inspected
+    then: The initial state is active planner_readonly and is not mapped to implement delivery success
+  - id: DM-9
+    given: The kernel terminal-state set may grow
+    when: All current terminal states are compared to the known reviewed set
+    then: Every terminal is in the known set and the counts match, so a new terminal cannot be added without an explicit delivery-mapping review

@@ -3005,6 +3005,13 @@
       ]
     },
     {
+      "id": "delivery-mapping",
+      "title": "Kernel handoff states must not map to implement delivery success",
+      "tests": [
+        "packages/core/test/trajectory-handoff-delivery-mapping.test.js"
+      ]
+    },
+    {
       "id": "delivery-quiet-hours",
       "title": "用户可见外发的全局静默时段",
       "tests": [
