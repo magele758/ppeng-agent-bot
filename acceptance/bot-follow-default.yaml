@@ -1,0 +1,15 @@
+id: bot-follow-default
+title: Bot 跟随默认模型
+status: implemented
+requirement: |
+  根本不对，我配置已经是跟随了，他怎么还是用别的模型，有bug，赶紧去修复
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: Bot 对话残留旧模型选择
+    when: Bot 配置为跟随默认模型
+    then: 实际路由跟随最新全局默认模型，固定模型仍保持生效
+  - id: AC-2
+    given: Bot 多个对话保存过模型选择
+    when: 保存跟随默认模型
+    then: 所有 Bot 对话的旧模型选择被清除

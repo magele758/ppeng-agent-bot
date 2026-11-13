@@ -93,3 +93,12 @@ test('composerModelLocked follows the session pin, forks included', () => {
   assert.equal(composerModelLocked(A), true);
   assert.equal(composerModelLocked(null), false);
 });
+
+test('Bot follow default drops legacy composer selection on reload [AC:bot-follow-default#AC-1]', () => {
+  assert.equal(resolveLoadedComposerModelRef({
+    ...base, sameSession: true, metadata: { canonicalBotChat: true, modelRef: A }
+  }), null);
+  assert.deepEqual(resolveLoadedComposerModelRef({
+    ...base, metadata: { canonicalBotChat: true, modelOverride: B, modelRef: A }
+  }), B);
+});

@@ -1964,6 +1964,13 @@ Bot 以高并发同时推进多件工作
 - `apps/web-console/lib/soft-bot-face.test.ts`
 - `packages/core/test/bots.test.js`
 
+### bot-follow-default
+
+Bot 跟随默认模型
+
+- `apps/web-console/lib/bot-model.test.ts`
+- `packages/core/test/bot-model-override.test.js`
+
 ### bot-fork-sessions-in-detail
 
 Bot 子任务会话放进详情菜单
