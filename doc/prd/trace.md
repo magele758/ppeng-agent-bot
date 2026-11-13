@@ -2847,6 +2847,12 @@ GitHub 事件不能靠换投递号重放
 
 - `packages/core/test/goal-restart-resume.test.js`
 
+### goal-review-default
+
+默认按交付条件审查目标
+
+- `packages/core/test/bot-completion-reliability.test.js`
+
 ### goal-update-hidden
 
 目标更新通知不在聊天里展示

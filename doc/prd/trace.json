@@ -3231,6 +3231,13 @@
       ]
     },
     {
+      "id": "goal-review-default",
+      "title": "默认按交付条件审查目标",
+      "tests": [
+        "packages/core/test/bot-completion-reliability.test.js"
+      ]
+    },
+    {
       "id": "goal-update-hidden",
       "title": "目标更新通知不在聊天里展示",
       "tests": [

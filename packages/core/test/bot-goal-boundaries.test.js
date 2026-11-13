@@ -221,6 +221,7 @@ test('goal review reuses a consumed wait only while the original authorization h
   {source:'session',ref:child.id,condition:{op:'eq',field:'status',value:'completed'}});
  waits.check(wait.id);assert.equal(waits.consume(wait.id,()=>{}),true);
  const receipts=()=>goalExecutionEvidence(f.store,goal).flatMap(m=>m.parts).filter(p=>p.type==='tool_result'&&p.name==='goal_wait_receipt');
+ f.store.setDaemonControl('bot_finish_settings',{deliveryReviewEnabled:false});
  assert.equal(receipts().length,0);
  f.store.setDaemonControl('bot_finish_settings',{deliveryReviewEnabled:true});
  assert.deepEqual(JSON.parse(receipts()[0].content),{waitId:wait.id,source:'session',ref:child.id,status:'completed'});

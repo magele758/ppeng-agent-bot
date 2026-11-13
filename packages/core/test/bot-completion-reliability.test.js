@@ -185,12 +185,16 @@ test('blocked deliverable retains recovery condition without claiming success [A
  assert.equal(reviewDelivery({...verdict,criteria:[{index:0,status:'blocked',refs:['fake']}]},evaluationPacket,evaluationGoal).kind,'progress');
 });
 
-test('review defaults to legacy and hot rollback keeps old verdicts usable [AC:goal-evidence-review#AC-3]',async()=>{
+test('review defaults on and hot rollback keeps old verdicts usable [AC:goal-review-default#AC-1] [AC:goal-evidence-review#AC-3]',async()=>{
  const {readBotFinishSettings,writeBotFinishSettings}=await import('../dist/bots/goals/finish-settings.js');
  const {reviewDelivery}=await import('../dist/bots/goals/delivery-review.js');
  let value;const store={getDaemonControl:()=>value,setDaemonControl:(_,v)=>{value=v;}};
- assert.equal(readBotFinishSettings(store).deliveryReviewEnabled,false);
+ assert.equal(readBotFinishSettings(store).deliveryReviewEnabled,true);
+ value={maxContinuations:4};
+ assert.equal(readBotFinishSettings(store).deliveryReviewEnabled,true);
  for(const flag of [true,false])assert.equal(writeBotFinishSettings(store,{deliveryReviewEnabled:flag}).deliveryReviewEnabled,flag);
+ assert.equal(readBotFinishSettings(store).deliveryReviewEnabled,false);
+ assert.equal(readBotFinishSettings(store).maxContinuations,4);
  assert.equal(reviewDelivery(evaluationVerdict,evaluationPacket,evaluationGoal).nextStep,'Timeout');
 });
 

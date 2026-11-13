@@ -84,7 +84,7 @@ export function BotFinishSettingsCard() {
 
 /** Shown as the "default" hint beside each field; the daemon holds the authoritative copy. */
 const DEFAULTS: BotFinishSettings = {
-  deliveryReviewEnabled: false,
+  deliveryReviewEnabled: true,
   followupAttachEnabled: true,
   followupWindowHours: 24,
   finishCheckEnabled: true,

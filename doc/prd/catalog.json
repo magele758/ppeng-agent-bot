@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 451,
+    "implemented": 452,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1749,6 +1749,13 @@
       "requirement": "如果bot在执行过程中，服务重启了，之前的任务就直接停了，重启之后，也没有继续执行。开发期频繁重启时，已经停在安全检查点上的 Goal 要继续，做了一半且效果未确认的不要重做。\n本切片只处理 Goal 执行。",
       "verificationStage": "software",
       "file": "acceptance/goal-restart-resume.yaml"
+    },
+    {
+      "id": "goal-review-default",
+      "title": "默认按交付条件审查目标",
+      "requirement": "现在是默认开启还是默认关闭的？我要默认开启才好直接对比效果",
+      "verificationStage": "software",
+      "file": "acceptance/goal-review-default.yaml"
     },
     {
       "id": "goal-update-hidden",

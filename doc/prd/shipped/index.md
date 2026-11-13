@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 451 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 452 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -497,7 +497,7 @@
 - `global-default-model-clarity` 全局默认模型配置与群聊模型来源可见
 - `global-default-model-row-align` 全局默认模型行左右对齐
 
-## goal（6）
+## goal（7）
 
 需求正文见 [goal](goal.md)。
 
@@ -506,6 +506,7 @@
 - `goal-history-toolbar-align` 目标历史与标题栏按钮垂直居中
 - `goal-intake-hot-path` 开轮不再等待目标判定和数据库锁
 - `goal-restart-resume` 重启后从安全检查点继续 Goal
+- `goal-review-default` 默认按交付条件审查目标
 - `goal-update-hidden` 目标更新通知不在聊天里展示
 
 ## grok（1）

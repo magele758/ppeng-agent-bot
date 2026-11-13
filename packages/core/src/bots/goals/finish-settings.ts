@@ -22,7 +22,7 @@ export interface BotFinishSettings {
 const KEY = 'bot_finish_settings';
 
 export const DEFAULT_BOT_FINISH_SETTINGS: BotFinishSettings = {
-  deliveryReviewEnabled: false,
+  deliveryReviewEnabled: true,
   followupAttachEnabled: true,
   followupWindowHours: 24,
   finishCheckEnabled: true,
