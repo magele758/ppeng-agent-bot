@@ -39,7 +39,7 @@ export function botModelPinIsStale(
   );
 }
 
-function composerSessionModelRef(metadata: Record<string, unknown> | undefined): ModelRef | null {
+function composerSessionModelRef(metadata: Record<string, unknown> | undefined): ModelRef | null | undefined {
   if (metadata?.canonicalBotChat === true) return null;
   return parseSessionModelRef(metadata);
 }
