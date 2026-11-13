@@ -3,7 +3,7 @@ export const knowledge = {
     subjects: 'Subjects',
     related: 'Also covered by these notes',
     loading: 'Loading…',
-    empty: 'Save a conversation to Obsidian to see it by subject here.',
+    empty: 'Save a reply to Obsidian to see it by subject here.',
     failed: 'Could not load saved notes.',
     ai: 'Artificial intelligence',
     engineering: 'Software engineering',

@@ -51,7 +51,6 @@ import { TrajectoryPanel } from './TrajectoryPanel';
 import { ContextStackPanel } from './ContextStackPanel';
 import { groupAgentsByDomain, sortAgentsById } from '@/lib/sort-utils';
 import { groupSessionsWithFavorites, sessionListEmptyText } from '@/lib/session-favorite';
-import { SaveToObsidian } from './SaveToObsidian';
 import { SessionFavoriteButton, SessionFavoriteFilter, SessionFavoriteMark } from './SessionFavorite';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
@@ -1341,7 +1340,6 @@ export function PlayPanel({
                 >
                   {t('play.trace')}
                 </button></DebugOnly>
-                <SaveToObsidian key={selectedSessionId} id={selectedSessionId} notify={(text,err)=>chat.setPlayStatus({text,err})} />
                 <div className="more-menu" ref={moreMenuRef}>
                   <button
                     type="button"

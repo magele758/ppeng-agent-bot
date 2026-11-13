@@ -37,3 +37,14 @@ test('categories connect stored conversations to their subject [AC:session-obsid
   assert.deepEqual(noteTopics('数据库测试 LLM'),['ai','engineering']);
   assert.deepEqual(noteTopics('unclassified'),['other']);
 });
+
+test('selected reply excludes neighboring turns and tools [AC:session-obsidian#AC-5]',async()=>{
+  const { selectedReply } = await import('../../../apps/daemon/dist/session-obsidian.js');
+  const messages = [msg('assistant','first'),msg('tool','private'),msg('assistant','second'),msg('user','next question'),msg('assistant','other')].map((m,i)=>({...m,id:String(i)}));
+  const reply = selectedReply(messages,['0','2']);
+  assert.deepEqual(reply.messages.map(m=>m.id),['0','2']);
+  assert.equal(reply.title,'first');
+  assert.throws(()=>selectedReply(messages,['0','4']));
+  assert.throws(()=>selectedReply(messages,[]));
+  assert.throws(()=>selectedReply(messages,['missing']));
+});

@@ -24,6 +24,7 @@ test('多段回复只在最后一段挂一组操作 [AC:turn-end-actions#AC-1] [
   ];
   const grouped = groupReplySlots(messages.map((_, index) => slot(index)), messages, false);
   const run = grouped.find((item) => item.replyRun);
+  assert.deepEqual(run?.replyRun?.messageIds, ['已读取配置。','检查完成。']);
   assert.equal(run?.replyRun?.end, 3);
   assert.equal(run?.replyRun?.first, 1);
   assert.equal(run?.replyRun?.text, '已读取配置。\n\n检查完成。');
