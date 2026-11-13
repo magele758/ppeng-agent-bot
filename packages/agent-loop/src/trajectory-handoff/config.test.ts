@@ -16,11 +16,12 @@ import { DEFAULT_SESSION_CAP, DEFAULT_TURN_CAP } from './types.js';
 
 describe('parseCapabilityTiers', () => {
   describe('Missing or null config', () => {
-    it('returns default enabled with null models (use pinned session model)', () => {
+    it('returns parseable config with enabled:false and default caps (no explicit switch)', () => {
       const result = parseCapabilityTiers(undefined);
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.resolved.enabled).toBe(true);
+        // Enablement is explicit: missing capabilityTiers must NOT turn handoff on.
+        expect(result.resolved.enabled).toBe(false);
         expect(result.resolved.plannerModel).toBeNull();
         expect(result.resolved.executorModel).toBeNull();
         expect(result.resolved.perSessionCap).toBe(DEFAULT_SESSION_CAP);
@@ -29,11 +30,11 @@ describe('parseCapabilityTiers', () => {
       }
     });
 
-    it('treats null as missing (same as undefined)', () => {
+    it('treats null as missing (same as undefined — handoff off)', () => {
       const result = parseCapabilityTiers(null);
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.resolved.enabled).toBe(true);
+        expect(result.resolved.enabled).toBe(false);
       }
     });
   });
@@ -163,15 +164,27 @@ describe('parseCapabilityTiers', () => {
       }
     });
 
-    it('cap=0 → defaults 3/6 and handoff stays available', () => {
-      const result = parseCapabilityTiers({
+    it('cap=0 → defaults 3/6; enabled unchanged from explicit setting', () => {
+      // Illegal caps use defaults; they do NOT turn handoff off if explicitly on.
+      const withEnabled = parseCapabilityTiers({
+        enabled: true,
         caps: { perSession: 0, perTurn: 0 },
       });
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.resolved.enabled).toBe(true);
-        expect(result.resolved.perSessionCap).toBe(DEFAULT_SESSION_CAP);
-        expect(result.resolved.perTurnCap).toBe(DEFAULT_TURN_CAP);
+      expect(withEnabled.ok).toBe(true);
+      if (withEnabled.ok) {
+        expect(withEnabled.resolved.enabled).toBe(true);
+        expect(withEnabled.resolved.perSessionCap).toBe(DEFAULT_SESSION_CAP);
+        expect(withEnabled.resolved.perTurnCap).toBe(DEFAULT_TURN_CAP);
+      }
+      // Without explicit enabled, caps alone do not turn handoff on.
+      const withoutEnabled = parseCapabilityTiers({
+        caps: { perSession: 0, perTurn: 0 },
+      });
+      expect(withoutEnabled.ok).toBe(true);
+      if (withoutEnabled.ok) {
+        expect(withoutEnabled.resolved.enabled).toBe(false);
+        expect(withoutEnabled.resolved.perSessionCap).toBe(DEFAULT_SESSION_CAP);
+        expect(withoutEnabled.resolved.perTurnCap).toBe(DEFAULT_TURN_CAP);
       }
     });
 
@@ -261,8 +274,17 @@ describe('parseCapabilityTiers', () => {
       expect(result).toBeNull();
     });
 
-    it('returns resolved config when enabled and valid', () => {
+    it('returns null when enabled is not explicitly true (implicit off)', () => {
+      // Object present but no enabled:true — enablement is an explicit policy switch.
       const result = parseCapabilityTiersOrNull({
+        roles: { plannerModel: 'gpt-4' },
+      });
+      expect(result).toBeNull();
+    });
+
+    it('returns resolved config when enabled:true is explicit', () => {
+      const result = parseCapabilityTiersOrNull({
+        enabled: true,
         roles: { plannerModel: 'gpt-4' },
       });
       expect(result).not.toBeNull();
@@ -298,13 +320,14 @@ describe('parseCapabilityTiers', () => {
       }
     });
 
-    it('handles partial config with defaults', () => {
+    it('handles partial config with defaults (enabled is implicit false)', () => {
       const result = parseCapabilityTiers({
         roles: { plannerModel: 'gpt-4' },
       });
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.resolved.enabled).toBe(true);
+        // No explicit enabled:true → handoff stays off for un-upgraded deploys.
+        expect(result.resolved.enabled).toBe(false);
         expect(result.resolved.plannerModel).toBe('gpt-4');
         expect(result.resolved.executorModel).toBeNull();
         expect(result.resolved.perSessionCap).toBe(DEFAULT_SESSION_CAP);

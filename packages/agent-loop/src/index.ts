@@ -729,4 +729,19 @@ export {
   reconcileAllReservations,
   billConservativeRuntime,
 } from './trajectory-handoff/recovery.js';
+export type {
+  ParseConfigResult,
+  ParseConfigError,
+  ParseConfigOutput,
+} from './trajectory-handoff/config.js';
+export {
+  parseCapabilityTiers,
+  parseCapabilityTiersOrNull,
+} from './trajectory-handoff/config.js';
+export type {
+  EffectivePermissions,
+  TrajectoryHandoffAdapter,
+  AdapterContext,
+} from './trajectory-handoff/adapter.js';
+export { createTrajectoryHandoffAdapter, TrajectoryHandoffAdapterImpl } from './trajectory-handoff/adapter.js';
 export type { CompiledContextPack, RecallSources } from './session/context-compiler.js';

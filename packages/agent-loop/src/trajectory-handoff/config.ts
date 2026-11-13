@@ -40,12 +40,14 @@ export type ParseConfigOutput = ParseConfigResult | ParseConfigError;
 export function parseCapabilityTiers(
   raw: unknown,
 ): ParseConfigOutput {
-  // Missing or null → default enabled with pinned session model for both roles.
+  // Missing or null → handoff OFF. Enablement is an explicit policy switch.
+  // Old files without capabilityTiers parse cleanly; missing fields use
+  // defaults that do NOT turn handoff on.
   if (raw === undefined || raw === null) {
     return {
       ok: true,
       resolved: {
-        enabled: true,
+        enabled: false,
         plannerModel: null,
         executorModel: null,
         perSessionCap: DEFAULT_SESSION_CAP,
@@ -117,10 +119,15 @@ export function parseCapabilityTiers(
 
   const inheritModelOverride = Boolean(cfg.inheritModelOverride);
 
+  // Enablement is an explicit policy switch: missing/absent => false.
+  // Illegal caps including 0 => use defaults but do not turn handoff off
+  // if it was explicitly on.
+  const enabled = cfg.enabled === true;
+
   return {
     ok: true,
     resolved: {
-      enabled: true,
+      enabled,
       plannerModel,
       executorModel,
       perSessionCap,
