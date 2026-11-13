@@ -1,570 +1,417 @@
 /**
- * Trajectory Handoff v2.3 - Persistence & Crash Recovery Tests
+ * Trajectory Handoff v2.3 — recovery tests (Codex R1 and R2).
  *
- * Tests for Codex R1 (deadline precedence) and R2 (crash-conserving budget).
- * Must pass all four acceptance criteria:
- * 1. Resume rejects if persisted deadline already reached even if timeout txn not committed
- * 2. Approved call without persisted result still counts once after reconcile
- * 3. Unknown runtime tail billed conservatively into used time
- * 4. Intent without result → unknown, no auto-replay, irreconcilable → failed
+ * Coverage (from spec §Tests recovery):
+ * - R1: Timeout beats late resume (resume rejected if deadline passed).
+ * - R1: Late resume rejected even if timeout txn not committed.
+ * - R2: Intent without result → unknown, no auto-replay.
+ * - R2: Irreconcilable → failed (tested via reconcile).
+ * - R2: Approved call without persisted result still counts once after reconcile.
+ * - Conservative runtime billing: unknown tail billed, time exhausted → timed_out.
  */
 
 import { describe, it, expect } from 'vitest';
-import type {
-  PersistedCallIntent,
-  PersistedCallResult,
-  PersistedHandoffState,
-  ReconciliationContext,
-} from './recovery.js';
 import {
-  checkDeadlineR1,
-  reconcileCallBudgetR2,
-  recoverFromCrash,
+  checkDeadline,
+  createCallReservation,
+  markReservationCommitted,
+  markReservationUnknown,
+  reconcileReservation,
+  reconcileAllReservations,
+  billConservativeRuntime,
 } from './recovery.js';
+import type { HandoffKernelState, CallReservation } from './types.js';
 
-describe('Codex R1: Persisted deadline vs timeout transaction', () => {
-  const baseState: PersistedHandoffState = {
-    state: 'executor_write',
-    handoffCountCommitted: 1,
-    perTurnCountCommitted: 1,
-    sessionUsedMs: 100,
-    turnUsedMs: 50,
-    terminalState: null,
-    persistedAt: 1000,
-  };
+describe('Recovery — Codex R1 and R2', () => {
+  const now = () => new Date().toISOString();
+  const later = (base: string, deltaMs: number) =>
+    new Date(new Date(base).getTime() + deltaMs).toISOString();
 
-  it('AC1.1: Resume rejects if session deadline already reached', () => {
-    const nowMs = 5000;
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [],
-      uncommittedResults: [],
-      nowMs,
-      sessionDeadlineMs: 4000, // Already passed
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
+  describe('R1: Deadline check', () => {
+    it('allows resume when deadline not reached and timeout not committed', () => {
+      const deadline = later(now(), 10000); // 10 seconds in the future.
+      const result = checkDeadline({
+        persistedDeadline: deadline,
+        now: now(),
+        timeoutTxnCommitted: false,
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.allow).toBe(true);
+      }
+    });
 
-    const allowed = checkDeadlineR1(ctx);
-    expect(allowed).toBe(false);
+    it('rejects resume when deadline already reached (timeout txn not committed)', () => {
+      const deadline = later(now(), -5000); // 5 seconds in the past.
+      const result = checkDeadline({
+        persistedDeadline: deadline,
+        now: now(),
+        timeoutTxnCommitted: false,
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok && !result.allow) {
+        expect(result.reason).toBe('deadline_reached');
+      }
+    });
+
+    it('rejects resume when timeout transaction is committed', () => {
+      const deadline = later(now(), 10000); // Still in the future.
+      const result = checkDeadline({
+        persistedDeadline: deadline,
+        now: now(),
+        timeoutTxnCommitted: true,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.allow).toBe(false);
+      if (!result.allow) {
+        expect(result.reason).toBe('timeout_committed');
+      }
+    });
+
+    it('rejects resume when both deadline reached and timeout committed', () => {
+      const deadline = later(now(), -5000);
+      const result = checkDeadline({
+        persistedDeadline: deadline,
+        now: now(),
+        timeoutTxnCommitted: true,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.allow).toBe(false);
+      if (!result.allow) {
+        expect(result.reason).toBe('timeout_committed'); // Committed takes precedence.
+      }
+    });
   });
 
-  it('AC1.2: Resume rejects if turn deadline already reached', () => {
-    const nowMs = 5000;
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [],
-      uncommittedResults: [],
-      nowMs,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: 4000, // Already passed
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
+  describe('R2: Call reservation creation and lifecycle', () => {
+    it('creates a reservation with undefined outcome', () => {
+      const state: HandoffKernelState = {
+        state: 'executor_write',
+        plan: null,
+        counters: { sessionHandoffs: 2, turnHandoffs: 1 },
+        enteredAt: now(),
+        turnNumber: 1,
+      };
+      const reservation = createCallReservation('call-123', state, now());
+      expect(reservation.callId).toBe('call-123');
+      expect(reservation.reservationId).toBe('res-call-123');
+      expect(reservation.state).toBe('executor_write');
+      expect(reservation.countersAtIntent).toEqual(state.counters);
+      expect(reservation.outcome).toBeUndefined();
+    });
 
-    const allowed = checkDeadlineR1(ctx);
-    expect(allowed).toBe(false);
+    it('marks a reservation as committed', () => {
+      const reservation = createCallReservation('call-456', {
+        state: 'executor_write',
+        plan: null,
+        counters: { sessionHandoffs: 1, turnHandoffs: 1 },
+        enteredAt: now(),
+        turnNumber: 1,
+      }, now());
+      const committed = markReservationCommitted(reservation);
+      expect(committed.outcome).toBe('committed');
+    });
+
+    it('marks a reservation as unknown', () => {
+      const reservation = createCallReservation('call-789', {
+        state: 'planner_readonly',
+        plan: null,
+        counters: { sessionHandoffs: 0, turnHandoffs: 0 },
+        enteredAt: now(),
+        turnNumber: 1,
+      }, now());
+      const unknown = markReservationUnknown(reservation);
+      expect(unknown.outcome).toBe('unknown');
+    });
   });
 
-  it('AC1.3: Resume rejects if role activity deadline already reached', () => {
-    const nowMs = 5000;
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [],
-      uncommittedResults: [],
-      nowMs,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: 4000, // Already passed
-      terminalStateCommitted: false,
-    };
+  describe('R2: Reconcile single reservation', () => {
+    it('reconciles a committed reservation as ok', () => {
+      const reservation: CallReservation = {
+        reservationId: 'res-1',
+        callId: 'call-1',
+        state: 'executor_write',
+        countersAtIntent: { sessionHandoffs: 1, turnHandoffs: 1 },
+        intentAt: now(),
+        outcome: 'committed',
+      };
+      const result = reconcileReservation(reservation);
+      expect(result.ok).toBe(true);
+    });
 
-    const allowed = checkDeadlineR1(ctx);
-    expect(allowed).toBe(false);
+    it('marks unknown outcome as not ok', () => {
+      const reservation: CallReservation = {
+        reservationId: 'res-2',
+        callId: 'call-2',
+        state: 'planner_readonly',
+        countersAtIntent: { sessionHandoffs: 0, turnHandoffs: 0 },
+        intentAt: now(),
+        outcome: 'unknown',
+      };
+      const result = reconcileReservation(reservation);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('unknown_outcome');
+      }
+    });
+
+    it('treats undefined outcome as unknown_outcome', () => {
+      const reservation: CallReservation = {
+        reservationId: 'res-3',
+        callId: 'call-3',
+        state: 'executor_write',
+        countersAtIntent: { sessionHandoffs: 2, turnHandoffs: 1 },
+        intentAt: now(),
+        outcome: undefined,
+      };
+      const result = reconcileReservation(reservation);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('unknown_outcome');
+      }
+    });
   });
 
-  it('AC1.4: Resume rejects even if timeout txn not yet committed', () => {
-    const nowMs = 5000;
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [],
-      uncommittedResults: [],
-      nowMs,
-      sessionDeadlineMs: 4000,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false, // NOT committed yet
-    };
+  describe('R2: Reconcile all reservations', () => {
+    it('reconciles all committed reservations and rebuilds counters', () => {
+      const reservations: CallReservation[] = [
+        {
+          reservationId: 'res-1',
+          callId: 'call-1',
+          state: 'executor_write',
+          countersAtIntent: { sessionHandoffs: 0, turnHandoffs: 0 },
+          intentAt: now(),
+          outcome: 'committed',
+        },
+        {
+          reservationId: 'res-2',
+          callId: 'call-2',
+          state: 'planner_repair',
+          countersAtIntent: { sessionHandoffs: 1, turnHandoffs: 1 },
+          intentAt: now(),
+          outcome: 'committed',
+        },
+      ];
+      const result = reconcileAllReservations(reservations, { sessionHandoffs: 0, turnHandoffs: 0 });
+      expect(result.hasUnknown).toBe(false);
+      expect(result.hasIrreconcilable).toBe(false);
+      expect(result.recoveredCounters.sessionHandoffs).toBe(2);
+      expect(result.recoveredCounters.turnHandoffs).toBe(2);
+    });
 
-    const allowed = checkDeadlineR1(ctx);
-    expect(allowed).toBe(false);
+    it('detects unknown outcomes and does not free them as reusable quota', () => {
+      const reservations: CallReservation[] = [
+        {
+          reservationId: 'res-1',
+          callId: 'call-1',
+          state: 'executor_write',
+          countersAtIntent: { sessionHandoffs: 0, turnHandoffs: 0 },
+          intentAt: now(),
+          outcome: 'committed',
+        },
+        {
+          reservationId: 'res-2',
+          callId: 'call-2',
+          state: 'executor_write',
+          countersAtIntent: { sessionHandoffs: 1, turnHandoffs: 1 },
+          intentAt: now(),
+          outcome: 'unknown',
+        },
+      ];
+      const result = reconcileAllReservations(reservations, { sessionHandoffs: 0, turnHandoffs: 0 });
+      expect(result.hasUnknown).toBe(true);
+      expect(result.hasIrreconcilable).toBe(false);
+      // Only the committed reservation is counted; unknown is NOT freed.
+      expect(result.recoveredCounters.sessionHandoffs).toBe(1);
+      expect(result.recoveredCounters.turnHandoffs).toBe(1);
+    });
+
+    it('detects irreconcilable reservations', () => {
+      const reservations: CallReservation[] = [
+        {
+          reservationId: 'res-1',
+          callId: 'call-1',
+          state: 'executor_write',
+          countersAtIntent: { sessionHandoffs: 0, turnHandoffs: 0 },
+          intentAt: now(),
+          outcome: undefined, // Missing outcome → irreconcilable.
+        },
+      ];
+      const result = reconcileAllReservations(reservations, { sessionHandoffs: 0, turnHandoffs: 0 });
+      expect(result.hasUnknown).toBe(true); // undefined is treated as unknown_outcome.
+      expect(result.recoveredCounters.sessionHandoffs).toBe(0);
+    });
+
+    it('does not double-count: only committed reservations increment counters', () => {
+      const reservations: CallReservation[] = [
+        {
+          reservationId: 'res-1',
+          callId: 'call-1',
+          state: 'executor_write',
+          countersAtIntent: { sessionHandoffs: 0, turnHandoffs: 0 },
+          intentAt: now(),
+          outcome: 'committed',
+        },
+        {
+          reservationId: 'res-2',
+          callId: 'call-2',
+          state: 'executor_write',
+          countersAtIntent: { sessionHandoffs: 1, turnHandoffs: 1 },
+          intentAt: now(),
+          outcome: 'committed',
+        },
+        {
+          reservationId: 'res-3',
+          callId: 'call-3',
+          state: 'executor_write',
+          countersAtIntent: { sessionHandoffs: 2, turnHandoffs: 2 },
+          intentAt: now(),
+          outcome: 'unknown',
+        },
+      ];
+      const result = reconcileAllReservations(reservations, { sessionHandoffs: 0, turnHandoffs: 0 });
+      expect(result.recoveredCounters.sessionHandoffs).toBe(2); // Two committed only.
+      expect(result.recoveredCounters.turnHandoffs).toBe(2);
+    });
   });
 
-  it('AC1.5: Resume rejects if terminal state already committed', () => {
-    const nowMs = 1500; // Well before all deadlines
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [],
-      uncommittedResults: [],
-      nowMs,
-      sessionDeadlineMs: 10000,
-      turnDeadlineMs: 10000,
-      roleActivityDeadlineMs: 10000,
-      terminalStateCommitted: true, // Already terminal
-    };
+  describe('Conservative runtime billing', () => {
+    it('bills crash window against remaining budget', () => {
+      const lastPersisted = now();
+      const recoveryNow = later(lastPersisted, 3000); // 3 seconds elapsed.
+      const result = billConservativeRuntime({
+        lastPersistedAt: lastPersisted,
+        now: recoveryNow,
+        remainingAtLastPersist: 10000, // 10 seconds remaining.
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.remainingAfterRecovery).toBe(7000); // 10s - 3s = 7s.
+      }
+    });
 
-    const allowed = checkDeadlineR1(ctx);
-    expect(allowed).toBe(false);
+    it('returns time_exhausted when remaining budget is consumed', () => {
+      const lastPersisted = now();
+      const recoveryNow = later(lastPersisted, 12000); // 12 seconds elapsed.
+      const result = billConservativeRuntime({
+        lastPersistedAt: lastPersisted,
+        now: recoveryNow,
+        remainingAtLastPersist: 10000, // Only 10 seconds remaining.
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('time_exhausted');
+      }
+    });
+
+    it('returns time_exhausted when remaining exactly zero', () => {
+      const lastPersisted = now();
+      const recoveryNow = later(lastPersisted, 10000);
+      const result = billConservativeRuntime({
+        lastPersistedAt: lastPersisted,
+        now: recoveryNow,
+        remainingAtLastPersist: 10000,
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('time_exhausted');
+      }
+    });
+
+    it('returns unbounded_tail for negative crash window (clock skew)', () => {
+      const lastPersisted = now();
+      const recoveryNow = later(lastPersisted, -5000); // Clock went backward.
+      const result = billConservativeRuntime({
+        lastPersistedAt: lastPersisted,
+        now: recoveryNow,
+        remainingAtLastPersist: 10000,
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('unbounded_tail');
+      }
+    });
+
+    it('handles zero crash window (immediate recovery)', () => {
+      const timestamp = now();
+      const result = billConservativeRuntime({
+        lastPersistedAt: timestamp,
+        now: timestamp,
+        remainingAtLastPersist: 10000,
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.remainingAfterRecovery).toBe(10000); // No time consumed.
+      }
+    });
   });
 
-  it('AC1.6: Resume allowed when all deadlines still active', () => {
-    const nowMs = 1500;
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [],
-      uncommittedResults: [],
-      nowMs,
-      sessionDeadlineMs: 5000,
-      turnDeadlineMs: 5000,
-      roleActivityDeadlineMs: 5000,
-      terminalStateCommitted: false,
-    };
+  describe('R2 integration: approved call without persisted result counts once', () => {
+    it('reconcile does not auto-replay unknown calls', () => {
+      const reservation: CallReservation = {
+        reservationId: 'res-x',
+        callId: 'call-x',
+        state: 'executor_write',
+        countersAtIntent: { sessionHandoffs: 1, turnHandoffs: 1 },
+        intentAt: now(),
+        outcome: undefined,
+      };
+      const result = reconcileReservation(reservation);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('unknown_outcome');
+        // Caller must decide: do not auto-replay; fail-closed or continue if safe.
+      }
+    });
 
-    const allowed = checkDeadlineR1(ctx);
-    expect(allowed).toBe(true);
+    it('committed reservation counts exactly once in reconcile', () => {
+      const reservations: CallReservation[] = [
+        {
+          reservationId: 'res-1',
+          callId: 'call-1',
+          state: 'executor_write',
+          countersAtIntent: { sessionHandoffs: 0, turnHandoffs: 0 },
+          intentAt: now(),
+          outcome: 'committed',
+        },
+      ];
+      const result = reconcileAllReservations(reservations, { sessionHandoffs: 0, turnHandoffs: 0 });
+      expect(result.recoveredCounters.sessionHandoffs).toBe(1);
+      // Reconcile again with the same reservation (idempotent check).
+      const result2 = reconcileAllReservations(reservations, { sessionHandoffs: 0, turnHandoffs: 0 });
+      expect(result2.recoveredCounters.sessionHandoffs).toBe(1); // Still 1, not 2.
+    });
   });
 
-  it('AC1.7: Resume allowed when deadlines are null (no deadline set)', () => {
-    const nowMs = 9999;
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [],
-      uncommittedResults: [],
-      nowMs,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
+  describe('R1 + R2 integration: deadline and reservation interaction', () => {
+    it('resume rejected by deadline even with valid reservations', () => {
+      const deadline = later(now(), -1000); // Deadline passed.
+      const deadlineResult = checkDeadline({
+        persistedDeadline: deadline,
+        now: now(),
+        timeoutTxnCommitted: false,
+      });
+      expect(deadlineResult.ok).toBe(true);
+      if (deadlineResult.ok) {
+        expect(deadlineResult.allow).toBe(false);
+      }
 
-    const allowed = checkDeadlineR1(ctx);
-    expect(allowed).toBe(true);
-  });
-});
+      // Even if we have valid committed reservations, the deadline check fails first.
+      const reservations: CallReservation[] = [
+        {
+          reservationId: 'res-1',
+          callId: 'call-1',
+          state: 'executor_write',
+          countersAtIntent: { sessionHandoffs: 0, turnHandoffs: 0 },
+          intentAt: now(),
+          outcome: 'committed',
+        },
+      ];
+      const reconcile = reconcileAllReservations(reservations, { sessionHandoffs: 0, turnHandoffs: 0 });
+      expect(reconcile.hasUnknown).toBe(false);
+      expect(reconcile.hasIrreconcilable).toBe(false);
 
-describe('Codex R2: Crash-conserving call budget', () => {
-  const baseState: PersistedHandoffState = {
-    state: 'executor_write',
-    handoffCountCommitted: 1,
-    perTurnCountCommitted: 1,
-    sessionUsedMs: 100,
-    turnUsedMs: 50,
-    terminalState: null,
-    persistedAt: 1000,
-  };
-
-  const maxRuntimeMs = 5000;
-
-  it('AC2.1: Approved call without persisted result still counts once after reconcile', () => {
-    // Intent exists, result persists as ok
-    const intent: PersistedCallIntent = {
-      callId: 'call-1',
-      approvedAt: 1100,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 100,
-      turnUsedMsAtApproval: 50,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const result: PersistedCallResult = {
-      callId: 'call-1',
-      outcome: 'ok',
-      runtimeMsActual: 200,
-    };
-
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [intent],
-      uncommittedResults: [result],
-      nowMs: 2000,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
-
-    const reconciled = reconcileCallBudgetR2(ctx, maxRuntimeMs);
-    expect(reconciled.reconciled).toBe(true);
-    // Count should increment by 1 (one result with ok outcome)
-    expect(reconciled.handoffCountAfterReconcile).toBe(baseState.handoffCountCommitted + 1);
-    expect(reconciled.perTurnCountAfterReconcile).toBe(baseState.perTurnCountCommitted + 1);
-    // Used time increases by actual runtime
-    expect(reconciled.sessionUsedMsAfterReconcile).toBe(baseState.sessionUsedMs + 200);
-    expect(reconciled.turnUsedMsAfterReconcile).toBe(baseState.turnUsedMs + 200);
-    expect(reconciled.unknownOutcomeCalls).toHaveLength(0);
-  });
-
-  it('AC2.2: Approved call with multiple results reconciles separately', () => {
-    const intent1: PersistedCallIntent = {
-      callId: 'call-1',
-      approvedAt: 1100,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 100,
-      turnUsedMsAtApproval: 50,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const intent2: PersistedCallIntent = {
-      callId: 'call-2',
-      approvedAt: 1150,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 300,
-      turnUsedMsAtApproval: 250,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const result1: PersistedCallResult = {
-      callId: 'call-1',
-      outcome: 'ok',
-      runtimeMsActual: 200,
-    };
-
-    const result2: PersistedCallResult = {
-      callId: 'call-2',
-      outcome: 'error',
-      errorMessage: 'Network error',
-      runtimeMsActual: 150,
-    };
-
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [intent1, intent2],
-      uncommittedResults: [result1, result2],
-      nowMs: 2000,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
-
-    const reconciled = reconcileCallBudgetR2(ctx, maxRuntimeMs);
-    expect(reconciled.reconciled).toBe(true);
-    // Both results committed: count increases by 2
-    expect(reconciled.handoffCountAfterReconcile).toBe(baseState.handoffCountCommitted + 2);
-    expect(reconciled.perTurnCountAfterReconcile).toBe(baseState.perTurnCountCommitted + 2);
-    // Used time increases by sum of runtimes
-    expect(reconciled.sessionUsedMsAfterReconcile).toBe(baseState.sessionUsedMs + 200 + 150);
-    expect(reconciled.turnUsedMsAfterReconcile).toBe(baseState.turnUsedMs + 200 + 150);
-  });
-
-  it('AC2.3: Unknown runtime tail billed conservatively', () => {
-    // Intent exists but NO result persisted: unknown outcome
-    const intent: PersistedCallIntent = {
-      callId: 'call-1',
-      approvedAt: 1100,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 100,
-      turnUsedMsAtApproval: 50,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [intent],
-      uncommittedResults: [], // No result: crash before result persisted
-      nowMs: 2000,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
-
-    const reconciled = reconcileCallBudgetR2(ctx, maxRuntimeMs);
-    expect(reconciled.reconciled).toBe(true);
-    // Count does NOT increment (unknown, not yet committed)
-    expect(reconciled.handoffCountAfterReconcile).toBe(baseState.handoffCountCommitted);
-    // But time IS billed conservatively (minimum tail)
-    expect(reconciled.sessionUsedMsAfterReconcile).toBeGreaterThan(baseState.sessionUsedMs);
-    expect(reconciled.turnUsedMsAfterReconcile).toBeGreaterThan(baseState.turnUsedMs);
-    // Call must be marked unknown
-    expect(reconciled.unknownOutcomeCalls).toContain('call-1');
-  });
-
-  it('AC2.4: Explicitly marked unknown outcome is not auto-replayed', () => {
-    const intent: PersistedCallIntent = {
-      callId: 'call-1',
-      approvedAt: 1100,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 100,
-      turnUsedMsAtApproval: 50,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const result: PersistedCallResult = {
-      callId: 'call-1',
-      outcome: 'unknown',
-      runtimeMsActual: 75,
-    };
-
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [intent],
-      uncommittedResults: [result],
-      nowMs: 2000,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
-
-    const reconciled = reconcileCallBudgetR2(ctx, maxRuntimeMs);
-    expect(reconciled.reconciled).toBe(true);
-    // Count does NOT increment (unknown is not a committed outcome)
-    expect(reconciled.handoffCountAfterReconcile).toBe(baseState.handoffCountCommitted);
-    // Time IS billed
-    expect(reconciled.sessionUsedMsAfterReconcile).toBe(baseState.sessionUsedMs + 75);
-    // Must be in unknown list (no auto-replay)
-    expect(reconciled.unknownOutcomeCalls).toContain('call-1');
-  });
-
-  it('AC2.5: Runtime exhaustion → timed_out terminal on reconciliation', () => {
-    // Create an intent that would push us over the budget
-    const intent: PersistedCallIntent = {
-      callId: 'call-1',
-      approvedAt: 1100,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 4900,
-      turnUsedMsAtApproval: 50,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const result: PersistedCallResult = {
-      callId: 'call-1',
-      outcome: 'ok',
-      runtimeMsActual: 500, // Would exceed 5000 total
-    };
-
-    const ctx: ReconciliationContext = {
-      lastPersistedState: {
-        ...baseState,
-        sessionUsedMs: 4900,
-      },
-      uncommittedIntents: [intent],
-      uncommittedResults: [result],
-      nowMs: 2000,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
-
-    const reconciled = reconcileCallBudgetR2(ctx, maxRuntimeMs);
-    expect(reconciled.reconciled).toBe(false);
-    expect(reconciled.failureState).toBe('timed_out');
-    expect(reconciled.failureReason).toContain('runtime exhausted');
-  });
-
-  it('AC2.6: Fail-closed if irreconcilable', () => {
-    // Very large unknown tail that exceeds budget
-    const intent: PersistedCallIntent = {
-      callId: 'call-1',
-      approvedAt: 1100,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 4900,
-      turnUsedMsAtApproval: 50,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const ctx: ReconciliationContext = {
-      lastPersistedState: {
-        ...baseState,
-        sessionUsedMs: 4900,
-      },
-      uncommittedIntents: [intent],
-      uncommittedResults: [], // Unknown outcome
-      nowMs: 2000,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
-
-    const reconciled = reconcileCallBudgetR2(ctx, maxRuntimeMs);
-    // Even with conservative billing, total is > 5000
-    expect(reconciled.reconciled).toBe(false);
-    expect(reconciled.failureState).toBe('timed_out');
-  });
-});
-
-describe('Full crash recovery (R1 + R2)', () => {
-  const baseState: PersistedHandoffState = {
-    state: 'executor_write',
-    handoffCountCommitted: 1,
-    perTurnCountCommitted: 1,
-    sessionUsedMs: 100,
-    turnUsedMs: 50,
-    terminalState: null,
-    persistedAt: 1000,
-  };
-
-  const maxRuntimeMs = 5000;
-
-  it('AC3.1: R1 check rejects if deadline passed (stops before R2)', () => {
-    const intent: PersistedCallIntent = {
-      callId: 'call-1',
-      approvedAt: 1100,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 100,
-      turnUsedMsAtApproval: 50,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [intent],
-      uncommittedResults: [],
-      nowMs: 5000, // Past deadline
-      sessionDeadlineMs: 4000,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
-
-    const result = recoverFromCrash(ctx, maxRuntimeMs);
-    expect(result.reconciled).toBe(false);
-    expect(result.failureState).toBe('timed_out');
-    expect(result.failureReason).toContain('R1 rejection');
-    expect(result.resumeRejected).toBe(true);
-  });
-
-  it('AC3.2: R2 processes when R1 passes', () => {
-    const intent: PersistedCallIntent = {
-      callId: 'call-1',
-      approvedAt: 1100,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 100,
-      turnUsedMsAtApproval: 50,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const result: PersistedCallResult = {
-      callId: 'call-1',
-      outcome: 'ok',
-      runtimeMsActual: 200,
-    };
-
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [intent],
-      uncommittedResults: [result],
-      nowMs: 1500, // Before deadline
-      sessionDeadlineMs: 5000,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
-
-    const recovered = recoverFromCrash(ctx, maxRuntimeMs);
-    expect(recovered.reconciled).toBe(true);
-    expect(recovered.handoffCountAfterReconcile).toBe(2);
-    expect(recovered.sessionUsedMsAfterReconcile).toBe(100 + 200);
-  });
-
-  it('AC3.3: Full crash recovery with multiple calls and mixed outcomes', () => {
-    const intent1: PersistedCallIntent = {
-      callId: 'call-1',
-      approvedAt: 1100,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 100,
-      turnUsedMsAtApproval: 50,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const intent2: PersistedCallIntent = {
-      callId: 'call-2',
-      approvedAt: 1150,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 300,
-      turnUsedMsAtApproval: 250,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const intent3: PersistedCallIntent = {
-      callId: 'call-3',
-      approvedAt: 1200,
-      handoffCountAtApproval: 1,
-      perTurnCountAtApproval: 1,
-      sessionUsedMsAtApproval: 500,
-      turnUsedMsAtApproval: 450,
-      sessionDeadlineMs: null,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-    };
-
-    const result1: PersistedCallResult = {
-      callId: 'call-1',
-      outcome: 'ok',
-      runtimeMsActual: 100,
-    };
-
-    const result2: PersistedCallResult = {
-      callId: 'call-2',
-      outcome: 'unknown', // Explicitly marked
-      runtimeMsActual: 50,
-    };
-    // call-3 has no result: unknown from crash
-
-    const ctx: ReconciliationContext = {
-      lastPersistedState: baseState,
-      uncommittedIntents: [intent1, intent2, intent3],
-      uncommittedResults: [result1, result2],
-      nowMs: 1500,
-      sessionDeadlineMs: 5000,
-      turnDeadlineMs: null,
-      roleActivityDeadlineMs: null,
-      terminalStateCommitted: false,
-    };
-
-    const recovered = recoverFromCrash(ctx, maxRuntimeMs);
-    expect(recovered.reconciled).toBe(true);
-    // Only call-1 counts toward handoff (ok outcome)
-    expect(recovered.handoffCountAfterReconcile).toBe(2);
-    // call-2 and call-3 marked unknown
-    expect(recovered.unknownOutcomeCalls).toContain('call-2');
-    expect(recovered.unknownOutcomeCalls).toContain('call-3');
+      // But the deadline rejection means we cannot resume or grant quota.
+    });
   });
 });

@@ -677,4 +677,56 @@ export {
   formatCompiledContextPack,
   MEMORY_CONTEXT_APPENDIX_PREFIX,
 } from './session/context-compiler.js';
+
+// L1: Trajectory Handoff v2.3 - Kernel + State Machine + Adapter
+export type {
+  HandoffState,
+  HandoffActiveState,
+  HandoffSuspendState,
+  HandoffTerminalState,
+  HandoffEvent,
+  HandoffKernelState,
+  HandoffCounters,
+  PlanObject,
+  PlanStep,
+  PlanStatus,
+  CapabilityTiersConfig,
+  CapabilityTierRoles,
+  HandoffCapConfig,
+  ResolvedCapabilityTiers,
+  HandoffEventSink,
+  PlanStore,
+  ModelResolver,
+  CoordinatorResumeEvent,
+  CallReservation,
+  ReconcileResult,
+} from './trajectory-handoff/types.js';
+export { DEFAULT_SESSION_CAP, DEFAULT_TURN_CAP } from './trajectory-handoff/types.js';
+export {
+  applyTransition,
+  checkHandoffCap,
+  isTerminal,
+  isSuspended,
+  isActive,
+  createInitialKernelState,
+  resetTurnCounter,
+  listAllTransitions,
+  ALL_STATES,
+  ALL_EVENTS,
+} from './trajectory-handoff/state-machine.js';
+export type {
+  DeadlineCheckInput,
+  DeadlineCheckResult,
+  RuntimeBillingInput,
+  RuntimeBillingResult,
+} from './trajectory-handoff/recovery.js';
+export {
+  checkDeadline,
+  createCallReservation,
+  markReservationCommitted,
+  markReservationUnknown,
+  reconcileReservation,
+  reconcileAllReservations,
+  billConservativeRuntime,
+} from './trajectory-handoff/recovery.js';
 export type { CompiledContextPack, RecallSources } from './session/context-compiler.js';

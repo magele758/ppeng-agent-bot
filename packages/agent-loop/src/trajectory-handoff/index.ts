@@ -1,58 +1,82 @@
 /**
  * Trajectory Handoff v2.3 - Public API
  *
- * Exports all kernel components: state machine, types, adapter, and recovery.
+ * Exports kernel state machine, types, adapter, and recovery components.
  */
 
 // State machine
-export type { StateTransitionError } from './state-machine.js';
 export {
-  transitionHandoff,
-  listHandoffTransitions,
+  applyTransition,
+  checkHandoffCap,
   isTerminal,
   isSuspended,
-  getTerminalStates,
-  leadsToTerminal,
+  isActive,
+  createInitialKernelState,
+  resetTurnCounter,
+  listAllTransitions,
+  ALL_STATES,
+  ALL_EVENTS,
 } from './state-machine.js';
 
 // Type definitions
 export type {
-  HandoffRuntimeState,
+  HandoffState,
+  HandoffActiveState,
+  HandoffSuspendState,
   HandoffTerminalState,
-  HandoffRuntimeNonTerminal,
-  HandoffTransitionEvent,
+  HandoffEvent,
+  HandoffKernelState,
+  HandoffCounters,
   PlanObject,
   PlanStep,
-  CapabilityTier,
+  PlanStatus,
   CapabilityTiersConfig,
-  EffectivePermissions,
-  TrajectoryHandoffKernel,
-  TrajectoryHandoffAdapter,
-  HandoffStateEvent,
-  HandoffCountingContext,
-  CoordinatorRefillDecision,
-  PlanConflictContext,
-  ModelResolutionContext,
-} from './types.js';
-export {
-  isTerminalState,
-  isSuspendState,
+  CapabilityTierRoles,
+  HandoffCapConfig,
+  ResolvedCapabilityTiers,
+  HandoffEventSink,
+  PlanStore,
+  ModelResolver,
+  CoordinatorResumeEvent,
+  CallReservation,
+  ReconcileResult,
 } from './types.js';
 
-// Adapter
-export type { AdapterContext } from './adapter.js';
-export { TrajectoryHandoffAdapterImpl, createTrajectoryHandoffAdapter } from './adapter.js';
+export { DEFAULT_SESSION_CAP, DEFAULT_TURN_CAP } from './types.js';
 
-// Persistence & Crash Recovery (Codex R1/R2)
+
+// State machine transition types
 export type {
-  PersistedCallIntent,
-  PersistedCallResult,
-  PersistedHandoffState,
-  ReconciliationContext,
-  ReconciliationResult,
+  TransitionResult,
+  TransitionOk,
+  TransitionErr,
+  CapCheckResult,
+} from './state-machine.js';
+
+// Config parser
+export type {
+  ParseConfigResult,
+  ParseConfigError,
+  ParseConfigOutput,
+} from './config.js';
+
+export {
+  parseCapabilityTiers,
+  parseCapabilityTiersOrNull,
+} from './config.js';
+// Recovery
+export type {
+  DeadlineCheckInput,
+  DeadlineCheckResult,
+  RuntimeBillingInput,
+  RuntimeBillingResult,
 } from './recovery.js';
 export {
-  checkDeadlineR1,
-  reconcileCallBudgetR2,
-  recoverFromCrash,
+  checkDeadline,
+  createCallReservation,
+  markReservationCommitted,
+  markReservationUnknown,
+  reconcileReservation,
+  reconcileAllReservations,
+  billConservativeRuntime,
 } from './recovery.js';
