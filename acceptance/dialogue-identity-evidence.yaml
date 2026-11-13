@@ -1,0 +1,12 @@
+id: dialogue-identity-evidence
+title: 对话身份记忆只从明确自述生成
+status: implemented
+requirement: |
+  这种错误信息是怎么加入到记忆里的？检查下
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 用户在说部署、服务或确认状态
+    when: 自动提取长期记忆
+    then: 不把状态写成姓名或职业，明确的姓名和职业自述仍能记录

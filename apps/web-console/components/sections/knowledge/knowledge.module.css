@@ -237,3 +237,11 @@
   cursor: not-allowed;
   color: var(--disabled-text, #999);
 }
+
+.noteGraph { display: grid; grid-template-columns: minmax(8rem, 1fr) 3fr; gap: var(--ui-space-4); }
+.noteSubjects { display: flex; align-content: start; align-items: flex-start; flex-wrap: wrap; gap: var(--ui-space-2); }
+.noteSubjects button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--ui-accent); }
+.noteEdges { list-style: none; padding-inline-start: 1rem; border-inline-start: 1px solid var(--ui-border); }
+.noteEdges li { padding-block: var(--ui-space-2); overflow-wrap: anywhere; }
+.noteEdges li::before { content: "─ "; color: var(--ui-text-muted); }
+@media (max-width: 640px) { .noteGraph { grid-template-columns: 1fr; } }

@@ -207,3 +207,12 @@ test('curateTaskEnd rejects chitchat and accepts deep task', async () => {
   assert.ok(rows.some((r) => r.namespace === 'episodic' && r.value.includes('预发')));
   store.db.close();
 });
+
+test('deployment and tool chatter are not biographical evidence [AC:dialogue-identity-evidence#AC-1]', async () => {
+  for (const input of ['我是内网部署的，不会泄漏到外部的','确认技能名字，不要重启已在跑的服务。','叫工具在本会话等确认']) {
+    assert.deepEqual(heuristicExtractDialogueFacts(input), []);
+  }
+  const { extractDialogueFacts } = await import('../dist/memory/memory-dialogue-extract.js');
+  assert.deepEqual(await extractDialogueFacts({userText:'我叫张三',completeText:async()=>'{"facts":[]}'}),[]);
+  assert.deepEqual(heuristicExtractDialogueFacts('请记住我叫张三，我是软件工程师').filter(f=>f.category==='fact').map(f=>f.content),['用户姓名是张三','用户职业/身份：软件工程师']);
+});

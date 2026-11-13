@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 452,
+    "implemented": 454,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1590,6 +1590,13 @@
       "file": "acceptance/diagnostic-safety-scope.yaml"
     },
     {
+      "id": "dialogue-identity-evidence",
+      "title": "对话身份记忆只从明确自述生成",
+      "requirement": "这种错误信息是怎么加入到记忆里的？检查下",
+      "verificationStage": "software",
+      "file": "acceptance/dialogue-identity-evidence.yaml"
+    },
+    {
       "id": "discovery-default-on",
       "title": "能力发现总开关默认开启",
       "requirement": "能力发现 / tool_search 的总开关要默认开启。",
@@ -2736,6 +2743,13 @@
       "requirement": "确认，这 15 条验收标准可以，按项目规范开始实现多进程并发验证，先写失败测试再实现，保留现有重启恢复、生命周期和工具配对验证；发现新的产品缺陷后另提修复验收给我确认。",
       "verificationStage": "software",
       "file": "acceptance/session-multiprocess-state-consistency.yaml"
+    },
+    {
+      "id": "session-obsidian",
+      "title": "将当前会话正文存入 Obsidian",
+      "requirement": "这个收藏不对吧，我之前想要的是类似 chrome-gemini-plugin那种把某个会话的内容收藏到Obsidian里，研究下现有实现，修复一下这个问题",
+      "verificationStage": "software",
+      "file": "acceptance/session-obsidian.yaml"
     },
     {
       "id": "session-recap",

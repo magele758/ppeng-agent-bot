@@ -396,6 +396,13 @@ export const play = {
     actionFailed: '没能更新这个目标'
   },
 
+  obsidian: {
+    save: '存入 Obsidian',
+    saved: '已保存到 {path}',
+    vault: '请在这台运行 Lab 的电脑上打开一个 Obsidian 库，然后重试。',
+    empty: '会话中还没有可保存的对话正文。',
+    failed: '笔记保存失败：{detail}'
+  },
   favorite: {
     save: '收藏',
     saved: '已收藏',

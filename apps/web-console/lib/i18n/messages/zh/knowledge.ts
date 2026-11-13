@@ -1,4 +1,18 @@
 export const knowledge = {
+  notes: {
+    subjects: '主题分类',
+    related: '这些笔记也涉及',
+    loading: '正在加载…',
+    empty: '还没有笔记。在会话顶栏点「存入 Obsidian」，即可在这里按分类找到它。',
+    failed: '无法加载收藏图谱。',
+    ai: '人工智能',
+    engineering: '软件工程',
+    business: '商业与经济',
+    arts: '人文与艺术',
+    science: '自然科学',
+    life: '生活与健康',
+    other: '其他'
+  },
   sourceUi: '界面配置',
   sourceDefault: '默认',
   ingestion: {

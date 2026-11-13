@@ -396,6 +396,13 @@ export const play = {
     actionFailed: 'Could not update this goal'
   },
 
+  obsidian: {
+    save: 'Save to Obsidian',
+    saved: 'Saved to {path}',
+    vault: 'Open one Obsidian vault on the computer running Lab, then retry.',
+    empty: 'This conversation has no text to save yet.',
+    failed: 'Could not save the note: {detail}'
+  },
   favorite: {
     save: 'Save',
     saved: 'Saved',

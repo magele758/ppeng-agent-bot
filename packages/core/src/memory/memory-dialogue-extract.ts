@@ -80,23 +80,15 @@ export function heuristicExtractDialogueFacts(userText: string): DialogueExtract
     facts.push({ category, content: cleaned.slice(0, 400), importance });
   };
 
-  const name =
-    t.match(/(?:我叫|我是|叫我|称呼我)\s*[「"']?([\u4e00-\u9fa5A-Za-z]{1,20})/)?.[1] ??
-    t.match(/名字(?:是|叫)\s*[「"']?([\u4e00-\u9fa5A-Za-z]{1,20})/)?.[1];
+  const name = t.match(/(?:^|[，。！？；、\s]|请记住)(?:我叫|我的名字(?:是|叫)|我的姓名是|请叫我|称呼我为|叫我)\s*[「"']?([\p{Script=Han}]{2,6}|[A-Za-z][A-Za-z -]{0,30})[」"']?(?=$|[，。！？；、,.!\n])/u)?.[1]?.trim();
   if (name) push('fact', `用户姓名是${name}`, 0.85);
 
-  const job = t.match(/(?:我是|职业是|就职于|在)\s*([\u4e00-\u9fa5A-Za-z0-9]{2,20}(?:工程师|设计师|经理|老师|医生|律师|分析师)?)/)?.[1];
-  if (job && job !== name) push('fact', `用户职业/身份：${job}`, 0.75);
+  const job = t.match(/(?:^|[，。！？；、\s]|请记住)(?:我是(?:一名|一个)?|我的职业是)([\p{Script=Han}]{0,8}(?:工程师|设计师|经理|教师|老师|医生|律师|分析师|程序员|学生|研究员))(?=$|[，。！？；、,.!\n])/u)?.[1];
+  if (job) push('fact', `用户职业/身份：${job}`, 0.75);
 
-  const pref = t.match(/(?:偏好|习惯|请|以后请|记住)\s*([^。！？\n]{4,80})/)?.[1];
+  const pref = t.match(/(?:我的偏好是|我偏好|我习惯|以后请)\s*([^。！？\n]{2,80})/)?.[1];
   if (pref) push('preference', `用户偏好：${pref.trim()}`, 0.7);
-
-  const callMe = t.match(/(?:叫我|称呼我为|请叫我)\s*[「"']?([\u4e00-\u9fa5A-Za-z]{1,16})/)?.[1];
-  if (callMe) push('preference', `用户希望被称呼为${callMe}`, 0.8);
-
-  if (facts.length === 0 && SEMANTIC_SIGNAL_RE.test(t) && t.length >= 8 && t.length <= 200) {
-    push('fact', `用户提到：${t.slice(0, 160)}`, 0.55);
-  }
+  if (name && /叫我|称呼我/.test(t)) push('preference', `用户希望被称呼为${name}`, 0.8);
   return facts.slice(0, 5);
 }
 
@@ -129,7 +121,7 @@ export async function extractDialogueFacts(params: {
         user: buildDialogueExtractUserPrompt(params)
       });
       const parsed = parseDialogueExtractJson(text || '');
-      if (parsed.facts.length > 0) return parsed.facts;
+      return parsed.facts;
     } catch {
       /* fail-soft → heuristic */
     }

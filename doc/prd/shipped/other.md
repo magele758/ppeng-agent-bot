@@ -291,6 +291,11 @@ Card reads/writes only through the existing quiet-hours API. i18n zh+en.
 
 那你分多个Agent修复一下问题
 
+## dialogue-identity-evidence
+对话身份记忆只从明确自述生成
+
+这种错误信息是怎么加入到记忆里的？检查下
+
 ## discovery-default-on
 能力发现总开关默认开启
 

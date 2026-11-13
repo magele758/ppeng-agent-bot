@@ -1,6 +1,7 @@
 'use client';
 
 import { IngestionSettingsCard } from '../../IngestionSettingsCard';
+import { SavedNotes } from './SavedNotes';
 import { MemoryPanel } from '../../MemoryPanel';
 import { AdvancedToggle } from '../../ui';
 import { SectionFrame } from '../SectionFrame';
@@ -22,6 +23,8 @@ export function KnowledgeSection({ active }: { active: boolean }) {
                 <MemoryPanel />
               </>
             );
+          case 'collections':
+            return <SavedNotes />;
           case 'pages':
             return <LibraryPagesPanel />;
           case 'ingestion':
