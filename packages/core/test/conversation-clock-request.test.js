@@ -80,3 +80,59 @@ test('product model request uses the session calendar day and does not store the
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('external reads preserve the request prefix, recovery and compacted windows [AC:request-context-events#AC-1] [AC:request-context-events#AC-2] [AC:request-context-events#AC-3]', async t => {
+  const { prepareRequestContext } = await import('../dist/session/request-context-events.js');
+  const { SqliteStateStore } = await import('../dist/storage.js');
+  const { SourceLedger } = await import('../dist/learning/sources.js');
+  const dir = mkdtempSync(join(tmpdir(), 'context-events-'));
+  const path = join(dir, 'test.db');
+  let store = new SqliteStateStore(path);
+  t.after(() => { store.db.close(); rmSync(dir, { recursive: true, force: true }); });
+  const session = store.createSession({ title: 'old session', agentId: 'general', mode: 'chat' });
+  const sid = session.id;
+  const user = store.appendMessage(sid, 'user', [{ type: 'text', text: 'Inspect only' }]);
+  const ledger = () => new SourceLedger(store);
+  ledger().record(sid, { kind: 'event', ref: 'old-source', label: 'old source' });
+  const prepare = (history, time) => prepareRequestContext(store, sid, history, Date.parse(time), 'UTC');
+  const before = prepare([user], '2026-11-13T23:55Z');
+  assert.match(JSON.stringify(before), /old-source/);
+  const call = store.appendMessage(sid, 'assistant', [{ type: 'tool_call', toolCallId: 'one', name: 'read_file', input: {} }]);
+  const result = store.appendMessage(sid, 'tool', [{ type: 'tool_result', toolCallId: 'one', name: 'read_file', content: '«external source=file» evidence', ok: true }]);
+  ledger().record(sid, { kind: 'tool', ref: 'new-tool-source', label: 'file' });
+  const history = [user, call, result];
+  const after = prepare(history, '2026-11-13T23:56Z');
+  assert.deepEqual(after.slice(0, before.length), before);
+  assert.deepEqual(after.slice(before.length), [call, result]);
+  ledger().configure(sid, { allowedEffects: ['network'] });
+  const wake = prepare(history, '2026-11-14T01:00Z');
+  assert.deepEqual(wake.slice(0, after.length), after);
+  assert.match(JSON.stringify(wake.slice(after.length)), /2026-11-14/);
+  assert.match(JSON.stringify(wake.slice(after.length)), /network/);
+  store.db.close(); store = new SqliteStateStore(path);
+  assert.deepEqual(prepare(history, '2026-11-14T01:01Z'), wake);
+  ledger().configure(sid, { allowedEffects: [] });
+  assert.equal(ledger().allowed(sid, 'network', 'external'), false);
+  const summary = { ...user, id: 'fold', role: 'system', key: 'compact-summary', parts: [{ type: 'text', text: 'summary' }] };
+  const compacted = prepare([summary, call, result], '2026-11-14T02:00Z');
+  assert.match(JSON.stringify(compacted), /new-tool-source/);
+  assert.deepEqual(compacted.filter(m => ['assistant','tool'].includes(m.role)), [call, result]);
+  assert.ok(!JSON.stringify(store.foldMessages(sid)).includes('[conversation-clock]'));
+});
+
+test('wire diagnostics distinguish append-only history, rewrites and tool changes without storing content', async () => {
+  const { recordWireShape } = await import('../dist/session/request-wire-diagnostics.js');
+  let saved;
+  const store = { getDaemonControl: () => saved, setDaemonControl: (_key, value) => { saved = value; } };
+  const check = (input, expected, tools = []) => {
+    recordWireShape(store, 'test', { model: 'same', tools, input });
+    assert.equal(saved.firstDifference, expected);
+    assert.ok(!JSON.stringify(saved).includes('private-content'));
+  };
+  check(['private-content'], 'first-request');
+  check(['private-content', 'result'], 'append-only');
+  check(['private-content', 'result'], 'unchanged');
+  check(['changed', 'result'], 'input[0]');
+  check(['changed'], 'shortened');
+  check(['changed'], 'request-settings', ['new-tool']);
+});

@@ -340,6 +340,8 @@ export interface ModelTurnInput {
   resolveMediaDataUrl?: (part: MediaPart, signal?: AbortSignal) => Promise<string | undefined>;
   /** Resolve image asset id to data URL for VL requests (optional). */
   resolveImageDataUrl?: (assetId: string, signal?: AbortSignal) => Promise<string | undefined>;
+  /** Observes the serialized provider body immediately before sending. Must not mutate it. */
+  observeRequestBody?: (body: Readonly<Record<string, unknown>>) => void;
   /** When `RAW_AGENT_DEBUG_LLM_PROMPT` is set, adapters may log sanitized request bodies here. */
   debugLlmContext?: { stateDir: string; sessionId: string };
   /**

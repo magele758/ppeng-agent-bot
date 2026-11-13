@@ -1,0 +1,19 @@
+id: request-context-events
+title: 连续工具调用期间的来源和时间
+status: implemented
+requirement: |
+  可以，那就开发一版，做好回退的方案，避免降低Agent的能力（你就改动范围先做好要测试验证的功能点，然后做好开发的前后版本的对比）
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 旧会话在同一条提问下连续读取外部工具结果
+    when: 再次请求模型
+    then: 先前提问与背景保持稳定，结果保留原有来源标记
+  - id: AC-2
+    given: 等待跨日或来源授权发生变化
+    when: 恢复会话并重试
+    then: 模型看到最新状态且只收到一份同一事件提醒，真人提问及聊天历史保留原样
+  - id: AC-3
+    given: 缩短后的历史丢失了来源背景
+    when: 重新准备模型请求
+    then: 当前窗口恢复所需来源与时间，工具调用和结果保持配对

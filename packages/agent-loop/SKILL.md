@@ -317,3 +317,6 @@ await loop.run(session.id, { onModelStreamChunk: chunk => console.log(chunk) });
 ### Durable streaming identity
 
 After committing a model step the kernel emits `ModelStreamChunk { type: "assistant_saved", messageId }`. Consumers associate the preceding shot with this persisted message ID and start a fresh segment for subsequent deltas, even when text is identical. `done` is an adapter attempt boundary; it is not a persistence acknowledgement.
+
+模型适配器支持宿主构造的请求视图条目（system，key 为 request-context-notice）。OpenAI Chat / Responses 和 Anthropic 将它在原位置编码为 user 侧上下文。宿主保留 system 身份用于真人提问识别和多模态路由；不得从用户正文推断此标记。
+宿主可传 ModelTurnInput.observeRequestBody 同步观察最终请求体；适配器在请求发送前调用，回调只读，不应保存原始内容。

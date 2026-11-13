@@ -163,7 +163,7 @@ function lastUserUtterance(messages: SessionMessage[]): string {
   const texts = message.parts
     .filter((part): part is Extract<MessagePart, { type: 'text' }> => part.type === 'text')
     .map((part) => part.text.trim())
-    .filter((text) => text && !text.includes('[conversation-clock]'));
+    .filter((text) => text && !text.includes('[conversation-clock]') && !text.startsWith('[source-ledger]'));
   return texts.at(-1) ?? '';
 }
 
@@ -938,6 +938,15 @@ function withTurnContext(
   return [{ type: 'text', text: turnContext }, ...content];
 }
 
+/** Host-authored context travels at its historical position without becoming a human turn internally. */
+function isRequestContext(message: SessionMessage): boolean {
+  return message.role === 'system' && message.key === 'request-context-notice';
+}
+
+function observeRequestBody(input: ModelTurnInput, body: Record<string, unknown>): void {
+  try { input.observeRequestBody?.(body); } catch { /* Observation must not interrupt a request. */ }
+}
+
 async function buildOpenAiMessages(
   systemPrompt: string,
   messages: SessionMessage[],
@@ -953,13 +962,17 @@ async function buildOpenAiMessages(
   // sending mid-conversation system roles or mutating the stored history.
   const system = splitChatSystemForCache({
     systemPrompt,
-    notices: messages.filter(message => message.role === 'system').map(message => textFromParts(message.parts)),
+    notices: messages.filter(message => message.role === 'system' && !isRequestContext(message)).map(message => textFromParts(message.parts)),
     cacheStablePrefix,
     hasUserMessage: lastUser !== undefined
   });
   const output: Array<Record<string, unknown>> = [{ role: 'system', content: system.leading }];
 
   for (const message of messages.filter(hasPublishedAssistantContent)) {
+    if (isRequestContext(message)) {
+      output.push({ role: 'user', content: textFromParts(message.parts) });
+      continue;
+    }
     if (message.role === 'tool') {
       for (const part of message.parts) {
         if (part.type !== 'tool_result') continue;
@@ -1058,7 +1071,7 @@ async function buildResponsesApiInput(
       if (text) {
         out.push({
           type: 'message',
-          role: 'system',
+          role: isRequestContext(message) ? 'user' : 'system',
           content: [{ type: 'input_text', text }]
         });
       }
@@ -1126,7 +1139,7 @@ async function buildAnthropicMessages(
   let refusalReminder: string | null = null;
 
   for (const message of messages) {
-    if (message.role === 'system') {
+    if (message.role === 'system' && !isRequestContext(message)) {
       // Extract refusal preservation reminder to fold into Anthropic system payload
       if (message.id === '__refusal_preservation__') {
         refusalReminder = textFromParts(message.parts);
@@ -1455,6 +1468,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         ...reasoningEffortBody('responses', input.reasoningEffort),
         ...(input.promptCacheKey ? { prompt_cache_key: input.promptCacheKey } : {})
       };
+      observeRequestBody(input, payload);
       await maybeLogLlmRequest(this.options.env, input.debugLlmContext, this.name, {
         kind: 'responses',
         ...payload
@@ -1489,6 +1503,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       ...(input.promptCacheKey ? { prompt_cache_key: input.promptCacheKey } : {})
     };
 
+    observeRequestBody(input, payload);
     await maybeLogLlmRequest(this.options.env, input.debugLlmContext, this.name, {
       kind: 'chat.completions',
       ...payload
@@ -1586,6 +1601,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
             ...(input.promptCacheKey ? { prompt_cache_key: input.promptCacheKey } : {})
           };
 
+    observeRequestBody(input, payload);
     await maybeLogLlmRequest(this.options.env, input.debugLlmContext, this.name, {
       kind: this.httpKind === 'responses' ? 'responses.stream' : 'chat.completions.stream',
       ...payload
@@ -2040,6 +2056,7 @@ export class AnthropicMessagesAdapter implements ModelAdapter {
 
     const payload = await this.buildTurnPayload(input);
 
+    observeRequestBody(input, payload);
     await maybeLogLlmRequest(this.options.env, input.debugLlmContext, this.name, {
       kind: 'anthropic.messages',
       ...payload
@@ -2081,6 +2098,7 @@ export class AnthropicMessagesAdapter implements ModelAdapter {
   ): Promise<ModelTurnResult> {
     const payload = { ...(await this.buildTurnPayload(input)), stream: true };
 
+    observeRequestBody(input, payload);
     await maybeLogLlmRequest(this.options.env, input.debugLlmContext, this.name, {
       kind: 'anthropic.messages.stream',
       ...payload

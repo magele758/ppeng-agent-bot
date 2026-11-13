@@ -260,6 +260,8 @@ export class SessionStore {
     };
     this.db.exec('BEGIN');
     try {
+      run("DELETE FROM daemon_control WHERE key = 'request-context:v1:' || ?", sessionId);
+      run("DELETE FROM daemon_control WHERE key = 'request-wire:v1:' || ?", sessionId);
       for (const table of [
         'session_messages',
         'session_inbox',
