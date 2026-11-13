@@ -1,11 +1,12 @@
 import type { FeedSlot } from './feed-window.ts';
 import type { ChatMessage } from './types.ts';
-import { replySourceText } from './reply-quote.ts';
+import { replySourceText, replyMessageId } from './reply-quote.ts';
 import { visibleBriefParts } from './session-brief.ts';
 import { quietRoutineResult } from './routine-quiet.ts';
 import { parseBotRelayMessage } from './bot-relay-message.ts';
 
 export interface ReplyRun {
+  messageIds: string[];
   first: number;
   end: number;
   last: ChatMessage;
@@ -47,7 +48,7 @@ export function groupReplySlots(slots: FeedSlot[], messages: ChatMessage[], brie
       const end = prose[prose.length - 1]!.index;
       const last = messages[end]!;
       out.push({ key: run[0]!.key, kind: 'reply-run', folded: run,
-        replyRun: { first, end, last, text: prose.map(part => part.text).join('\n\n') } });
+        replyRun: { first, end, last, messageIds: prose.map(part => replyMessageId(messages[part.index])), text: prose.map(part => part.text).join('\n\n') } });
     }
     run = [];
     prose = [];

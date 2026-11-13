@@ -3,7 +3,7 @@ export const knowledge = {
     subjects: '主题分类',
     related: '这些笔记也涉及',
     loading: '正在加载…',
-    empty: '还没有笔记。在会话顶栏点「存入 Obsidian」，即可在这里按分类找到它。',
+    empty: '还没有笔记。在回复下点「收藏这条回复」，即可在这里按分类找到它。',
     failed: '无法加载收藏图谱。',
     ai: '人工智能',
     engineering: '软件工程',

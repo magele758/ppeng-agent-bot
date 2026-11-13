@@ -4261,6 +4261,7 @@
       "id": "session-obsidian",
       "title": "将当前会话正文存入 Obsidian",
       "tests": [
+        "apps/web-console/components/correction-capture.test.ts",
         "packages/core/test/session-obsidian.test.js"
       ]
     },

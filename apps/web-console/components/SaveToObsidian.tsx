@@ -11,19 +11,27 @@ function failureKey(error: unknown): MessageKey {
   return 'play.obsidian.failed';
 }
 
-export function SaveToObsidian({id,notify}:{id:string|null;notify:(text:string,failed:boolean)=>void}) {
-  const {t} = useI18n();
+export function SaveToObsidian({id,messageIds}:{id:string;messageIds:string[]}) {
+  const { t } = useI18n();
   const [busy,setBusy] = useState(false);
+  const [receipt,setReceipt] = useState('');
   async function save() {
-    if (!id) return;
     setBusy(true);
+    setReceipt('');
     try {
-      const note = await api('/api/sessions/'+encodeURIComponent(id)+'/obsidian',{method:'POST'}) as {vault:string;file:string};
-      notify(t('play.obsidian.saved',{path:note.vault+'/'+note.file}),false);
+      const note = await api('/api/sessions/'+encodeURIComponent(id)+'/obsidian', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({messageIds})
+      }) as {vault:string;file:string};
+      setReceipt(t('play.obsidian.saved',{path:note.vault+'/'+note.file}));
     } catch (err) {
-      notify(t(failureKey(err),{detail:String(err)}),true);
+      setReceipt(t(failureKey(err),{detail:String(err)}));
     } finally { setBusy(false); }
   }
-  if (!id) return null;
-  return <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={save}>{t('play.obsidian.save')}</button>;
+  return <>
+    <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={save}
+      title={t('play.obsidian.hint')}>{t('play.obsidian.save')}</button>
+    <span role="status">{receipt}</span>
+  </>;
 }

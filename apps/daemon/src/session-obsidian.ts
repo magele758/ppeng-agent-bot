@@ -50,10 +50,27 @@ export function noteBody(messages: SessionMessage[]): string {
   return body;
 }
 
-export async function saveConversation(vault: string, session: Pick<SessionRecord,'id'|'title'|'createdAt'>, messages: SessionMessage[], body = noteBody(messages)): Promise<string> {
+/** Re-read the selected assistant segments in transcript order. A user turn separates answers. */
+export function selectedReply(history: SessionMessage[], ids: unknown) {
+  if (!Array.isArray(ids) || !ids.length) throw new ValidationError('obsidian_reply_required');
+  const wanted = new Set(ids);
+  const messages = history.filter(message => wanted.has(message.id));
+  if (messages.length !== ids.length) throw new ValidationError('obsidian_reply_required');
+  const first = messages[0]!;
+  const last = messages[messages.length-1]!;
+  const span = history.slice(history.indexOf(first),history.indexOf(last)+1);
+  if (span.some(message=>message.role==='user') || messages.some(message=>message.role!=='assistant' || !messageText(message).length)) {
+    throw new ValidationError('obsidian_reply_required');
+  }
+  const text = first.parts.filter(part=>part.type==='text').map(part=>part.text).join(' ').trim();
+  const title = Array.from(text.split('\n')[0]!.trim()).slice(0,64).join('');
+  return {messages,title};
+}
+
+export async function saveConversation(vault: string, session: Pick<SessionRecord,'id'|'title'|'createdAt'>, messages: SessionMessage[], body = noteBody(messages), messageIds?: string[]): Promise<string> {
   const title = session.title || session.id;
   const tags = noteTopics(title+'\n'+body);
-  const content = ['---','title: '+JSON.stringify(title),'session_id: '+JSON.stringify(session.id),'date: '+JSON.stringify(session.createdAt),'tags: [agent-home, '+tags.join(', ')+']','---','','# '+title,'',body,''].join('\n');
+  const content = ['---','title: '+JSON.stringify(title),'session_id: '+JSON.stringify(session.id),...(messageIds ? ['message_ids: '+JSON.stringify(messageIds)] : []),'date: '+JSON.stringify(session.createdAt),'tags: [agent-home, '+tags.join(', ')+']','---','','# '+title,'',body,''].join('\n');
   const hash = createHash('sha256').update(content).digest('hex').slice(0,20);
   const stem = Array.from(title.replace(/[^\p{L}\p{N} _-]/gu,' ').trim()).slice(0,40).join('') || 'Chat';
   const relative = path.join('Agent Home',stem+' - '+hash+'.md');

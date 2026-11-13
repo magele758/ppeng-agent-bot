@@ -322,3 +322,9 @@ test('skill names show without expanding parameters in normal and brief chat [AC
  const english=renderToStaticMarkup(React.createElement(turns('en').ChatTurnStreaming,{brief:true,segments:[{kind:'tool',id:'s',toolCallId:'load',name:'load_skill',args:'{"name":"Planning"}'}]}));
  assert.match(english,/Load skill: Planning/);
 });
+
+test('收藏按钮跟在已保存的回复正文下方 [AC:session-obsidian#AC-1]', () => {
+  assert.match(assistantHtml(), /已经答完。[\s\S]*chat-turn__actions[\s\S]*收藏这条回复/);
+  const user = renderTurn({sessionId:'s',m:{id:'user',role:'user',parts:[{type:'text',text:'提问'}]}},'zh');
+  assert.doesNotMatch(user,/收藏这条回复/);
+});

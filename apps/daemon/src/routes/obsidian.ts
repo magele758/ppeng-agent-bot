@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { type RawAgentRuntime, NotFoundError } from '@ppeng/agent-core';
-import { activeVault, noteBody, noteTopics, saveConversation } from '../session-obsidian.js';
+import { activeVault, noteBody, noteTopics, saveConversation, selectedReply } from '../session-obsidian.js';
 import { json } from '../http-utils.js';
 import { guardSession, listedSessions } from '../session-guard.js';
 import type { RouteSpec } from '../routing.js';
@@ -8,15 +8,17 @@ import type { RouteSpec } from '../routing.js';
 export function obsidianRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   return [{
     method: 'POST', pattern: '/api/sessions/:id/obsidian',
-    handler: async ({requireParam,response,auth}) => {
+    handler: async ({requireParam,response,auth,readBody}) => {
       const id = requireParam('id');
       const session = guardSession(runtime,id,auth);
       if (!session) throw new NotFoundError('Session');
-      const messages = runtime.getSessionMessages(id);
+      const input = await readBody() as {messageIds?: unknown} | null;
+      const {messages,title} = selectedReply(runtime.getSessionMessages(id),input?.messageIds);
+      const messageIds = messages.map(message=>message.id);
       const body = noteBody(messages);
       const vault = await activeVault();
-      const file = await saveConversation(vault,session,messages,body);
-      const note = {id,title:session.title || id,file,vault:path.basename(vault),topics:noteTopics(session.title+'\n'+body)};
+      const file = await saveConversation(vault,{...session,title},messages,body,messageIds);
+      const note = {id,title,messageIds,file,vault:path.basename(vault),topics:noteTopics(title+'\n'+body)};
       runtime.store.setDaemonControl('obsidian-note:'+id+':'+file,note);
       json(response,200,note);
     }

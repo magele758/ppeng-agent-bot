@@ -3752,6 +3752,7 @@ Secure Form fill-from-Vault
 
 将当前会话正文存入 Obsidian
 
+- `apps/web-console/components/correction-capture.test.ts`
 - `packages/core/test/session-obsidian.test.js`
 
 ### session-restart-recovery-state-consistency

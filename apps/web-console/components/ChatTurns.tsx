@@ -60,6 +60,7 @@ import {
   type ReplyQuote,
   type ReplyTo
 } from '@/lib/reply-quote';
+import { SaveToObsidian } from './SaveToObsidian';
 import { assistantActionsHeld } from '@/lib/reply-end-actions';
 import { osSandboxReasonKey, parseOsSandboxReason } from '@/lib/os-sandbox-reason';
 import { parseSpawnBlocked } from '@/lib/spawn-blocked';
@@ -110,7 +111,7 @@ function ReplyActions({ index, ...props }: TurnActionsProps & { index: number })
   if (assistantActionsHeld(props.role, hold, index)) return null;
   if (!run) return <TurnActions {...props} />;
   if (index !== run.end) return null;
-  return <TurnActions {...props} m={run.last} parts={[{ type: 'text', text: run.text }]} />;
+  return <TurnActions {...props} messageIds={run.messageIds} m={run.last} parts={[{ type: 'text', text: run.text }]} />;
 }
 
 function roleLabelText(role: string, t: (key: MessageKey) => string, hidden: boolean, assistantName: string): string {
@@ -937,6 +938,7 @@ function cronBubbleOr(cron: { name: string; body?: string } | null, parts: ChatM
 }
 
 type TurnActionsProps = {
+  messageIds?: string[];
   m: ChatMessage;
   role: string;
   sessionId: string;
@@ -964,7 +966,12 @@ function quoteTarget(p: TurnActionsProps) {
 }
 
 function TurnActions(p: TurnActionsProps) {
-  return <TurnActionButtons correction={correctionTarget(p)} quote={quoteTarget(p)} />;
+  const target = correctionTarget(p);
+  return <>
+    <TurnActionButtons correction={target} quote={quoteTarget(p)} />
+    {target && replySourceText(p.parts).trim() ? <SaveToObsidian key={target.sessionId+target.messageId}
+      id={target.sessionId} messageIds={p.messageIds ?? [target.messageId]} /> : null}
+  </>;
 }
 
 export function ChatTurnFromMessage({

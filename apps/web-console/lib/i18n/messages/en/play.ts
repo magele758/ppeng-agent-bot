@@ -397,7 +397,8 @@ export const play = {
   },
 
   obsidian: {
-    save: 'Save to Obsidian',
+    save: 'Save this reply',
+    hint: 'Save this reply to Obsidian',
     saved: 'Saved to {path}',
     vault: 'Open one Obsidian vault on the computer running Lab, then retry.',
     empty: 'This conversation has no text to save yet.',
