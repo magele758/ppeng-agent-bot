@@ -1,6 +1,10 @@
 export type GoalStatus = 'queued' | 'running' | 'waiting' | 'blocked' | 'paused' | 'pending_review' | 'completed' | 'failed' | 'cancelled';
 export interface GoalWait { source: string; correlationId: string; deadline?: number; description?: string }
+export interface CriterionReview { index:number; status:'fulfilled'|'open'|'blocked'; refs:string[] }
+export interface DeliveryPlan { evidenceKey?:string; criterion:number; missingFact:string; action:string; impact:string; estimatedUsd?:number }
 export interface BotGoal {
+ deliveryPlan?: DeliveryPlan;
+ criteriaReview?: CriterionReview[];
  id: string; botId: string; sessionId: string; title: string; objective: string;
  sourceMessageId?: string; parentGoalId?: string; constraints: string[]; completionCriteria: string[];
  resources: string[]; priority: number; revision: number; status: GoalStatus;
@@ -15,6 +19,8 @@ export interface GoalExecution {
  runRef?: string; sessionId?: string; summary?: string; startedAt: string; endedAt?: string;
 }
 export interface GoalReport {
+ deliveryPlan?: DeliveryPlan;
+ criteriaReview?: CriterionReview[];
  kind: 'progress' | 'waiting' | 'blocked' | 'candidate_completed' | 'failed' | 'cancelled';
  summary: string; evidence?: string[]; verified?: boolean; wait?: GoalWait; costUsd?: number;
  eventId?: string; nextStep?: string; advanced?: boolean; correctionNeeded?: boolean; owner?: string; fence?: number;

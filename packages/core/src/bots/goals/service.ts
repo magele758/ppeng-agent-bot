@@ -111,7 +111,7 @@ export class BotGoalService {
  private amendState(s: GoalSnapshot,g: BotGoal,constraint: string): void {
   if (!constraint.trim()) throw new Error('Constraint required');
   if (terminal.has(g.status)) throw new Error('Cannot amend terminal goal');
-  g.constraints.push(constraint);g.revision++;g.nextStep='Apply updated constraints; reconcile previous actions';
+  delete g.criteriaReview;delete g.deliveryPlan;g.constraints.push(constraint);g.revision++;g.nextStep='Apply updated constraints; reconcile previous actions';
   if (g.activeExecutionId) { g.draining=true;g.blockedReason='Constraints changed; current execution must reconcile at a safe boundary'; }
   else if (g.status !== 'paused' && g.status !== 'pending_review') {g.status='queued';if(g.wait){g.draining=true;g.blockedReason='Constraints changed; previous external execution must stop before applying the new revision';}}this.event(s,'amended',g,constraint);
  }
@@ -237,6 +237,8 @@ export class BotGoalService {
  }
  private recordReportProgress(goal:BotGoal,result:GoalReport):void {
   goal.noProgress=result.kind==='candidate_completed'&&result.verified!==true?0:reportAdvanced(result,goal)?0:goal.noProgress+1;
+  goal.criteriaReview=result.criteriaReview;
+  goal.deliveryPlan=result.deliveryPlan;
   goal.progress=result.summary;goal.nextStep=result.nextStep;goal.blockedReason=undefined;
  }
  private applyReportKind(s:GoalSnapshot,goal:BotGoal,result:GoalReport,execution:GoalExecution):void {

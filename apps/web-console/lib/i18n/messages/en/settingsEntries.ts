@@ -213,6 +213,7 @@ export const settingsEntries = {
         label: 'Times one turn can be told to continue',
         hint: 'A turn that makes no new tool call after being told to continue ends right away.'
       },
+      deliveryReviewEnabled: { label: 'Review goal deliverables', hint: 'Check evidence per condition, flag repeated checks and estimate the next stage. Turn off to restore the previous review.' },
       wakeEnabled: {
         label: 'Come back automatically after a promise to report later',
         hint: 'On by default. When the Bot says it will report once a job finishes but no background job, timer or wait is tracking it, the runtime registers one wake. A new message from you before it is due cancels that wake.'

@@ -112,7 +112,7 @@ function stringList(value: unknown): string[] {
 function needsObservedAction(goal: BotGoal): boolean {
   return goal.resources.length > 0 || /修复|修改|实现|开发|部署|运行|执行|保存|创建|发送|删除|提交|发布|\b(fix|implement|build|deploy|run|execute|save|create|send|delete|commit|publish|refactor)\b/i.test([goal.objective, ...goal.completionCriteria].join('\n'));
 }
-const bookkeeping = new Set(['TodoWrite', 'goal_checkpoint', 'goal_dispatch', 'spawn_subagent', 'bot_delegate', 'bg_run', 'lab_team_plan_start', 'lab_swarm_run_start', 'task_create', 'task_update', 'task_get', 'task_list', 'memory_set', 'record_summary', 'submit_plan']);
+const bookkeeping = new Set(['goal_wait_receipt', 'TodoWrite', 'goal_checkpoint', 'goal_dispatch', 'spawn_subagent', 'bot_delegate', 'bg_run', 'lab_team_plan_start', 'lab_swarm_run_start', 'task_create', 'task_update', 'task_get', 'task_list', 'memory_set', 'record_summary', 'submit_plan']);
 
 export function completionReport(raw: unknown, packet: CompletionEvidence, goal: BotGoal): GoalReport {
   if (!raw || typeof raw !== 'object' || typeof (raw as { met?: unknown }).met !== 'boolean') throw new Error('Invalid completion verdict');

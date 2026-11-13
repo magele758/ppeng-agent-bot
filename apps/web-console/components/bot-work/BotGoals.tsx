@@ -89,6 +89,7 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
           {goal.evidence?.length > 0 && <><dt>{t('goals.evidence')}</dt><dd><ul>{goal.evidence.map((item, index) => <li key={index}>{item}</li>)}</ul></dd></>}
         </dl>
         <p>{t('goals.usage', { cost: (goal.costUsd ?? 0).toFixed(2), budget: goal.budgetUsd ?? 0 })}</p>
+        <GoalEstimate plan={goal.deliveryPlan} />
         {goal.draining && <p>{t('goals.draining')}</p>}
         <div className="bot-goals__actions">{goalActions(goal.status).map(action => <button className="btn btn-sm" key={action} type="button" disabled={busy} onClick={() => void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', { action })}>{t(`goals.${action}`)}</button>)}
         <GoalLimits goal={goal} busy={busy} attention={attention} onAction={body=>mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', body)} /></div>
@@ -101,6 +102,12 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
       </form></details>}
     </div>
   </details>;
+}
+
+function GoalEstimate({ plan }: { plan: BotGoalView['deliveryPlan'] }) {
+  const { t } = useI18n();
+  if (plan?.estimatedUsd === undefined) return null;
+  return <p>{t('goals.stageEstimate', { cost: plan.estimatedUsd.toFixed(3) })}</p>;
 }
 
 function needsGoalAttention(panel: ReturnType<typeof goalsPanelState>): boolean {

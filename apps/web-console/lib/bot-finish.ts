@@ -1,4 +1,5 @@
 export interface BotFinishSettings {
+  deliveryReviewEnabled: boolean;
   followupAttachEnabled: boolean;
   followupWindowHours: number;
   finishCheckEnabled: boolean;

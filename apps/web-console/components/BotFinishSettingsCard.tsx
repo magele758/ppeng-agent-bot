@@ -7,20 +7,21 @@ import { LoadGate, SelectField, StatusLine, ToggleField } from './sections/setti
 import { useSettingsResource, type SettingsResource } from './sections/settings/categories/kit/settings-store';
 
 const PATH = '/api/bot-finish/settings';
-type FlagKey = 'followupAttachEnabled' | 'finishCheckEnabled' | 'wakeEnabled';
+type FlagKey = 'deliveryReviewEnabled' | 'followupAttachEnabled' | 'finishCheckEnabled' | 'wakeEnabled';
 type Resource = SettingsResource<BotFinishSettings, unknown>;
 type Label = (path: string) => string;
 
 function FlagRow({ name, settings, resource, label }: { name: FlagKey; settings: BotFinishSettings; resource: Resource; label: Label }) {
   const { t } = useI18n();
+  const fallback = DEFAULTS[name];
   return (
     <ToggleField
       id={`field-botFinish-${name}`}
       label={label(`fields.${name}.label`)}
       hint={label(`fields.${name}.hint`)}
-      defaultText={t('settingsEntries.common.on')}
-      isDefault={settings[name]}
-      onRestore={() => void resource.save({ [name]: true })}
+      defaultText={t(fallback ? 'settingsEntries.common.on' : 'settingsEntries.common.off')}
+      isDefault={settings[name] === fallback}
+      onRestore={() => void resource.save({ [name]: fallback })}
       checked={settings[name]}
       disabled={resource.busy}
       onChange={(next) => void resource.save({ [name]: next })}
@@ -51,7 +52,7 @@ const NUMBER_ROWS: Array<{ name: BotFinishNumberKey; flag: FlagKey }> = [
   { name: 'wakeDelayMinutes', flag: 'wakeEnabled' },
   { name: 'maxWakes', flag: 'wakeEnabled' }
 ];
-const FLAG_ROWS: FlagKey[] = ['followupAttachEnabled', 'finishCheckEnabled', 'wakeEnabled'];
+const FLAG_ROWS: FlagKey[] = ['deliveryReviewEnabled', 'followupAttachEnabled', 'finishCheckEnabled', 'wakeEnabled'];
 
 function Rows({ settings, defaults, resource, label }: { settings: BotFinishSettings; defaults: BotFinishSettings; resource: Resource; label: Label }) {
   return (
@@ -83,6 +84,7 @@ export function BotFinishSettingsCard() {
 
 /** Shown as the "default" hint beside each field; the daemon holds the authoritative copy. */
 const DEFAULTS: BotFinishSettings = {
+  deliveryReviewEnabled: false,
   followupAttachEnabled: true,
   followupWindowHours: 24,
   finishCheckEnabled: true,

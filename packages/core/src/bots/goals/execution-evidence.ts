@@ -1,3 +1,5 @@
+import { DurableWaitStore } from '../../waits/store.js';
+import { readBotFinishSettings } from './finish-settings.js';
 import type { GoalEvidenceMessage, GoalEvidenceSource } from './completion-evidence.js';
 import type { SqliteStateStore } from '../../storage.js';
 import type { SessionMessage, SessionRecord } from '../../types.js';
@@ -73,11 +75,24 @@ function sourced(messages:SessionMessage[],source:GoalEvidenceSource):GoalEviden
  return messages.map(message=>({...message,goalEvidenceSource:source}));
 }
 
+function terminalEvidence(waits:DurableWaitStore,goal:BotGoal,execution:GoalExecution,owner:SessionRecord):SessionMessage[] {
+ const receipts=waits.terminalReceipts({kind:'goal',id:goal.id,revision:goal.revision,sessionId:owner.id,scopeSessionId:goal.sessionId,botId:goal.botId,executionId:execution.id});
+ return receipts.flatMap(receipt=>{
+  const common={sessionId:owner.id,createdAt:execution.startedAt};
+  const name='goal_wait_receipt',toolCallId=receipt.waitId;
+  return [
+   {...common,id:toolCallId+'-call',role:'assistant',parts:[{type:'tool_call',toolCallId,name,input:{waitId:toolCallId}}]},
+   {...common,id:toolCallId+'-result',role:'tool',parts:[{type:'tool_result',toolCallId,name,ok:true,content:JSON.stringify(receipt)}]}
+  ] satisfies SessionMessage[];
+ });
+}
+
 /** Only server-recorded execution links in the current revision can contribute proof. */
 export function goalExecutionEvidence(store:SqliteStateStore,goal:BotGoal):SessionMessage[] {
  const parent=store.getSession(goal.sessionId);
  if(!parent||parent.metadata.botId!==goal.botId||parent.metadata.canonicalBotChat!==true)return [];
  const executions=new BotGoalService(store,Date.now,parent.id).executions(goal.botId,goal.id);
+ const waits=readBotFinishSettings(store).deliveryReviewEnabled ? new DurableWaitStore(store) : undefined;
  const messages:SessionMessage[]=[];
  for(const execution of executions) {
   if(execution.goalRevision!==goal.revision)continue;
@@ -85,6 +100,7 @@ export function goalExecutionEvidence(store:SqliteStateStore,goal:BotGoal):Sessi
   if(!owner)continue;
   const source:GoalEvidenceSource={kind:'coordinator',goalId:goal.id,revision:goal.revision,executionId:execution.id,botId:goal.botId};
   messages.push(...sourced(ownerEvidence(store,owner,execution),source));
+  if(waits)messages.push(...sourced(terminalEvidence(waits,goal,execution,owner),source));
   const ref=execution.runRef;
   if(ref?.startsWith('session:')&&ref.slice(8)!==owner.id)messages.push(...sourced(childEvidence(store,parent,goal,execution,ref.slice(8)),{...source,kind:'worker'}));
   if(ref?.startsWith('bot_task:'))messages.push(...delegatedEvidence(store,parent,goal,execution,ref.slice(9)));

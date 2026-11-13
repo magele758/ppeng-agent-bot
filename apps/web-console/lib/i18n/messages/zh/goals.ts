@@ -1,4 +1,5 @@
 export const goals = {
+  stageEstimate: '下一阶段估算费用约 {cost} 美元',
   attention: '目标需要你处理', addBudget: '为此目标追加预算（美元）', addAttempts: '追加尝试次数', extend: '增加此目标额度', extendHint: '保留历史用量和结果。准备好后再恢复。',
   attemptUsage: '执行 {used}/{max} 次', durableVerification: '按目标证据核验',
   history: '目标历史', historyEmpty: '暂无已结束的目标', historyError: '无法加载目标历史',
