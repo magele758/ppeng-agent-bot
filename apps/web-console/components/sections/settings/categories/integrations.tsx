@@ -1,9 +1,14 @@
+import { ObsidianSettings } from '../../knowledge/ObsidianSettings';
 import { ExternalAgentConnectionsCard } from '../../../ExternalAgentConnectionsCard';
 import { EventLogSettingsCard } from '../../../EventLogSettingsCard';
 import { ExternalAgentSettingsCard } from '../../../ExternalAgentSettingsCard';
 import type { SettingsEntry } from '../registry';
 
 export const integrationsEntries: SettingsEntry[] = [
+  {
+    id: 'obsidian', category: 'integrations', titleKey: 'knowledge.vault.title',
+    keywordsKey: 'knowledge.vault.help', render: () => <ObsidianSettings />
+  },
   {
     id: 'externalAgents',
     category: 'integrations',
