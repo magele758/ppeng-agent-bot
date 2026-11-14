@@ -79,7 +79,8 @@ import {
   closeOpenToolWave,
 } from '../session/tool-wave-close.js';
 import { rollbackReasonOf } from '../session/step-tx.js';
-import { applyRunProfileToTools } from '../runtime/run-profile.js';
+import { applyRunProfileToTools, trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
+import { prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
 import { defaultWorkspaceRoots } from '../workspace/default-roots.js';
 import type {
   AgentSpec,
@@ -125,6 +126,31 @@ export interface TurnKernelOptions {
 // ============================================================================
 // Internal helpers
 // ============================================================================
+
+function handoffSessionMetadata(session: { metadata?: unknown }): Record<string, unknown> | undefined {
+  const metadata = session.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+  return metadata as Record<string, unknown>;
+}
+
+async function executeGatedToolWave(
+  host: TurnKernelHost,
+  session: { id: string; metadata?: unknown },
+  ...args: Parameters<TurnKernelHost['executeToolCalls']>
+): Promise<Awaited<ReturnType<TurnKernelHost['executeToolCalls']>>> {
+  if (trajectoryHandoffGateFromMetadata(handoffSessionMetadata(session)).enabled) {
+    const prepared = await prepareTrajectoryToolWave(session);
+    if (!prepared.ok) {
+      return args[0].map((call) => ({
+        toolCallId: call.toolCallId,
+        name: call.name,
+        ok: false,
+        content: prepared.reason,
+      }));
+    }
+  }
+  return host.executeToolCalls(...args);
+}
 
 function textPart(text: string): MessagePart {
   return { type: 'text', text };
@@ -274,7 +300,9 @@ async function continueResumedToolWave(input: {
     unmatchedToolCallsFromFold(input.host.store.foldMessages(input.sid), allowIds)
   );
   if (executable.length === 0) return undefined;
-  const results = await input.host.executeToolCalls(
+  const results = await executeGatedToolWave(
+    input.host,
+    input.context.session,
     executable,
     input.context,
     picked.allowExternalAiTools,
@@ -1983,7 +2011,9 @@ if (executable.length === 0) {
       }
 toolsStep = stepInfo(turn, 'tools_done');
 await host.stepTx?.beginStep?.(toolsStep);
-results = await host.executeToolCalls(
+results = await executeGatedToolWave(
+        host,
+        context.session,
         executable,
         context,
         allowExternalAiTools,

@@ -98,15 +98,11 @@ export class TrajectoryHandoffAdapterImpl implements TrajectoryHandoffAdapter {
    * Single entry for all dynamic tools: batch, MCP, Shell, browser, HTTP, subtasks.
    */
   canExecuteTool(): boolean {
+    if (!this.isEnabled()) return false;
     const state = this.context.kernelState;
-
-    // Only executor_write allows tool execution.
-    // planner_readonly: tools are readonly-enforced.
-    // plan_ready: awaiting executor, no tools yet.
-    // planner_repair: planner re-planning, no tools.
-    // awaiting_coordinator: suspended, no tools.
-    // Terminal states: no tools.
-    return state === 'executor_write';
+    // Planner states may run tools that survive the permission intersection.
+    // plan_ready, suspend, and terminals stay closed.
+    return state === 'executor_write' || state === 'planner_readonly' || state === 'planner_repair';
   }
 
   /**
@@ -197,30 +193,12 @@ export class TrajectoryHandoffAdapterImpl implements TrajectoryHandoffAdapter {
    * This must complete before state transition to planner_readonly or planner_repair.
    */
   async drainWrites(): Promise<void> {
-    if (this.inFlightWrites.size === 0) {
-      return; // Nothing to drain.
-    }
-
-    // Try to wait for all writes to complete.
-    // If timeout or error, fail-closed (throw, do not silently proceed).
-    const timeout = 5000; // 5s safety margin.
-    const startTime = Date.now();
-
-    while (this.inFlightWrites.size > 0) {
-      if (Date.now() - startTime > timeout) {
-        throw new Error(
-          `Failed to drain in-flight writes before planner entry. ` +
-          `${this.inFlightWrites.size} writes still pending after ${timeout}ms. ` +
-          `Failing closed to prevent data corruption.`
-        );
-      }
-
-      // Yield to event loop — ES2023-compatible (lib: ES2023 predates Promise.withResolvers).
-      let resolveYield!: () => void;
-      const yield_ = new Promise<void>(r => { resolveYield = r; });
-      setTimeout(resolveYield, 10);
-      await yield_;
-    }
+    if (this.inFlightWrites.size === 0) return;
+    throw new Error(
+      `Failed to drain in-flight writes before planner entry. ` +
+      `${this.inFlightWrites.size} writes still pending. ` +
+      `Failing closed to prevent data corruption.`
+    );
   }
 
   /**

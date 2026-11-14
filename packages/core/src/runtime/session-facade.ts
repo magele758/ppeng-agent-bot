@@ -25,6 +25,7 @@ import { tryCreateDynToolStore } from '../dyn-tools/store.js';
 import { inheritModelOverride } from './spawn-policy.js';
 import { DYN_TOOL_PROMOTE_APPROVAL } from '../dyn-tools/types.js';
 import { applyContextSources, normalizeContextSources } from '../ingestion/context-sources.js';
+import { applySessionEnablement } from '../trajectory-handoff/persist.js';
 import type {
   AgentSpec,
   ApprovalRecord,
@@ -161,7 +162,7 @@ export function createChatSession(
     mode: 'chat',
     agentId: input.agentId?.trim() ? input.agentId.trim() : 'main',
     background: input.background ?? false,
-    metadata: input.metadata
+    metadata: applySessionEnablement(input.metadata)
   });
 
   const ids = input.imageAssetIds?.filter(Boolean) ?? [];
@@ -201,10 +202,10 @@ export function createTaskSession(
     agentId: input.agentId?.trim() ? input.agentId.trim() : 'main',
     taskId: task.id,
     background: input.background ?? true,
-    metadata: {
+    metadata: applySessionEnablement({
       autoRun: true,
       ...(input.metadata ?? {})
-    }
+    })
   });
 
   host.store.updateTask(task.id, { sessionId: session.id });

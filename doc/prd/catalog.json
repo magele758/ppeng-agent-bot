@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 455,
+    "implemented": 456,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -3086,6 +3086,13 @@
       "requirement": "那你分多个Agent修复一下问题",
       "verificationStage": "software",
       "file": "acceptance/trace-stream-retention.yaml"
+    },
+    {
+      "id": "trajectory-handoff-explicit",
+      "title": "Explicit trajectory handoff enablement, tool intersection, and role pin",
+      "requirement": "Trajectory handoff stays off unless the session explicitly enables it.\nExplicit close is persisted and is not reopened by defaults. Tool execution\nuses one permission intersection. An invalid role model falls back only to\nthe pinned session model, then fails closed. Plan publish is conditional.",
+      "verificationStage": "software",
+      "file": "acceptance/trajectory-handoff-explicit.yaml"
     },
     {
       "id": "turn-end-actions",

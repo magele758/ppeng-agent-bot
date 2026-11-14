@@ -28,6 +28,7 @@ import { retryAfterMsOf } from '../model/upstream-error.js';
 import { turnAbortSignal } from './abort-lineage.js';
 import { gateDirtyToolInput } from './dirty-input-gate.js';
 import { buildUnknownToolResultContent } from '../recovery/unknown-tool-result.js';
+import { beginTrajectoryWrite, denyTrajectoryTool, finishTrajectoryWrite } from '../trajectory-handoff/tool-entry.js';
 import {
   loadRepetitionWatchdogConfig,
   RepetitionLoopAbortError,
@@ -1055,6 +1056,19 @@ async function executeScopedTool(
   const admitted = refuseBeforeDispatch(host, tools, toolCall, allowExternalAiTools, sessionId);
   if ('refused' in admitted) return admitted.refused;
   const { tool } = admitted;
+  const denied = denyTrajectoryTool(context.session, tool);
+  if (denied) {
+    return {
+      toolCallId: toolCall.toolCallId,
+      name: tool.name,
+      ok: false,
+      content: denied,
+      problem: toolInfraProblem(tool.name, toolCall.toolCallId, 'TOOL_DISABLED_IN_SESSION', denied, {
+        title: 'Tool not available in session',
+        status: 403,
+      }),
+    };
+  }
 
   host.emitTrace(sessionId, { kind: 'tool_start', payload: { name: tool.name, toolCallId: toolCall.toolCallId } });
 
@@ -1114,6 +1128,7 @@ async function executeScopedTool(
     }
   };
 
+  const trackedWrite = beginTrajectoryWrite(context.session, tool, toolCall.toolCallId);
   try {
     if (context.abortSignal?.aborted) throw new Error(cancelledBySteer(context) ? 'Tool cancelled by user interjection before dispatch' : 'Session aborted before tool dispatch');
     host.assertSessionWritable?.(sessionId);
@@ -1176,6 +1191,8 @@ async function executeScopedTool(
   } catch (error) {
     const failed = await toolExceptionResult(host, tool, toolCall, context, sessionId, execInput, snapshot, completed, exportSpan, error, attemptTrace(entered, startedAt));
     return hookRewrote ? { ...failed, hookRewrote: true } : failed;
+  } finally {
+    if (trackedWrite) finishTrajectoryWrite(context.session.id, toolCall.toolCallId);
   }
 }
 

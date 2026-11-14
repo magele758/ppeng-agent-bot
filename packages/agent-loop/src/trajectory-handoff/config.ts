@@ -37,6 +37,26 @@ export type ParseConfigOutput = ParseConfigResult | ParseConfigError;
  * @returns    A resolved config or an error.  When ok=false, the caller should
  *             ignore tiers and warn; handoff is disabled.
  */
+export type EnablementSource = 'explicit_off' | 'explicit_on' | 'parser_default' | 'auto_policy';
+
+/**
+ * Explicit close wins over a conflicting enabled:true.
+ * A stored parser_default stays parser_default even when enabled is false,
+ * so a later policy must not treat that record as a user opt-out.
+ */
+export function classifyEnablement(raw: unknown): EnablementSource {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'parser_default';
+  const obj = raw as Record<string, unknown>;
+  const tagged = obj.enablementSource;
+  if (tagged === 'explicit_off') return 'explicit_off';
+  if (tagged === 'auto_policy') return 'auto_policy';
+  if (tagged === 'parser_default') return 'parser_default';
+  if (tagged === 'explicit_on') return obj.enabled === false ? 'explicit_off' : 'explicit_on';
+  if (obj.enabled === false) return 'explicit_off';
+  if (obj.enabled === true) return 'explicit_on';
+  return 'parser_default';
+}
+
 export function parseCapabilityTiers(
   raw: unknown,
 ): ParseConfigOutput {
@@ -48,6 +68,7 @@ export function parseCapabilityTiers(
       ok: true,
       resolved: {
         enabled: false,
+        enablementSource: 'parser_default',
         plannerModel: null,
         executorModel: null,
         perSessionCap: DEFAULT_SESSION_CAP,
@@ -57,23 +78,6 @@ export function parseCapabilityTiers(
     };
   }
 
-  // Explicit off wins.
-  if (typeof raw === 'object' && raw !== null && 'enabled' in raw) {
-    const enabledRaw = (raw as Record<string, unknown>).enabled;
-    if (enabledRaw === false) {
-      return {
-        ok: true,
-        resolved: {
-          enabled: false,
-          plannerModel: null,
-          executorModel: null,
-          perSessionCap: DEFAULT_SESSION_CAP,
-          perTurnCap: DEFAULT_TURN_CAP,
-          inheritModelOverride: false,
-        },
-      };
-    }
-  }
 
   // Whole-block type error: not an object or is an array.
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
@@ -119,15 +123,14 @@ export function parseCapabilityTiers(
 
   const inheritModelOverride = Boolean(cfg.inheritModelOverride);
 
-  // Enablement is an explicit policy switch: missing/absent => false.
-  // Illegal caps including 0 => use defaults but do not turn handoff off
-  // if it was explicitly on.
-  const enabled = cfg.enabled === true;
+  const enablementSource = classifyEnablement(cfg);
+  const enabled = enablementSource === 'explicit_on';
 
   return {
     ok: true,
     resolved: {
       enabled,
+      enablementSource,
       plannerModel,
       executorModel,
       perSessionCap,

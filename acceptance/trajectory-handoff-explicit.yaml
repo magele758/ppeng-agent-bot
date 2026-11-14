@@ -1,0 +1,45 @@
+id: trajectory-handoff-explicit
+title: Explicit trajectory handoff enablement, tool intersection, and role pin
+status: implemented
+requirement: |
+  Trajectory handoff stays off unless the session explicitly enables it.
+  Explicit close is persisted and is not reopened by defaults. Tool execution
+  uses one permission intersection. An invalid role model falls back only to
+  the pinned session model, then fails closed. Plan publish is conditional.
+criteria:
+  - id: TH-1
+    given: A session has no capabilityTiers block
+    when: The handoff gate and the tool entry are evaluated
+    then: Handoff stays off and the existing tool path still runs
+  - id: TH-2
+    given: capabilityTiers.enabled is false and role refs are present
+    when: The config is parsed and stored
+    then: The refs and caps are kept and enablementSource is explicit_off
+  - id: TH-3
+    given: A stored explicit close and a later parser-default rewrite
+    when: The tiers are merged
+    then: The close remains and is not turned on
+  - id: TH-4
+    given: Handoff is explicitly on and the current role is planner
+    when: A tool named read_file has bash access
+    then: The tool is denied because the permission token is command, not because of its name
+  - id: TH-5
+    given: Handoff is explicitly on and a write is still in flight
+    when: The kernel enters a planner wave
+    then: The wave is not executed and the denial is fail-closed without waiting
+  - id: TH-6
+    given: The role model does not resolve and the pinned session model does
+    when: The model route is resolved
+    then: The only candidate is the pinned model, not modelOverride or a catalog fallback
+  - id: TH-7
+    given: Neither the role model nor the pinned session model resolves
+    when: The model route is resolved
+    then: The route fails closed and does not call a fallback model
+  - id: TH-8
+    given: An unversioned plan file and two writers
+    when: The second writer commits with a stale expected version
+    then: The file keeps the first committed version
+  - id: TH-9
+    given: A scripted planner to executor handoff
+    when: The context pack is round-tripped
+    then: Plan version, tool pair, completed effect, failure evidence, and the new cursor survive

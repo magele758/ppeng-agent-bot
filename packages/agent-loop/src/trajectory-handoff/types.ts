@@ -190,8 +190,13 @@ export interface HandoffCapConfig {
 }
 
 export interface CapabilityTiersConfig {
-  /** Explicit off has highest priority; ignores all tiers; uses old path. */
+  /** Explicit off has highest priority; ignores applying tiers and uses the old path. */
   readonly enabled?: boolean;
+  /**
+   * Persisted separately from `enabled`. Parser-default false is not an explicit close.
+   * `auto_policy` is stored for a later knife and does not turn handoff on.
+   */
+  readonly enablementSource?: 'explicit_off' | 'explicit_on' | 'parser_default' | 'auto_policy';
   readonly roles?: CapabilityTierRoles;
   readonly caps?: HandoffCapConfig;
   /**
@@ -205,12 +210,14 @@ export interface CapabilityTiersConfig {
 /** Fully-resolved config after defaults and validation.  All fields present. */
 export interface ResolvedCapabilityTiers {
   readonly enabled: boolean;
+  readonly enablementSource: 'explicit_off' | 'explicit_on' | 'parser_default' | 'auto_policy';
   readonly plannerModel: string | null;
   readonly executorModel: string | null;
   readonly perSessionCap: number;
   readonly perTurnCap: number;
   readonly inheritModelOverride: boolean;
 }
+
 
 // ============================================================================
 // Kernel state snapshot

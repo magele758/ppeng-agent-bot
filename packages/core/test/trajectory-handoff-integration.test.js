@@ -105,13 +105,12 @@ test('Kernel state machine enforces terminal state rules', () => {
   // answered is terminal
   const answeredTransition = applyTransition(initialState, 'direct_answer', new Date().toISOString());
   assert.equal(answeredTransition.ok, true);
-  assert.equal(answeredTransition.state.state, 'answered');
+  assert.equal(answeredTransition.next.state, 'answered');
   assert.equal(isTerminal('answered'), true);
-  
-  // Terminal states reject transitions
-  const rejectedTransition = applyTransition(answeredTransition.state, 'submit_plan', new Date().toISOString());
+
+  const rejectedTransition = applyTransition(answeredTransition.next, 'submit_plan', new Date().toISOString());
   assert.equal(rejectedTransition.ok, false);
-  assert.equal(rejectedTransition.reason, 'terminal');
+  assert.match(rejectedTransition.error, /Terminal state/);
 });
 
 test('Kernel state machine counts handoffs correctly', () => {
@@ -128,14 +127,14 @@ test('Kernel state machine counts handoffs correctly', () => {
   // Submit plan: no handoff
   let transition = applyTransition(state, 'submit_plan', new Date().toISOString());
   assert.equal(transition.ok, true);
-  state = transition.state;
+  state = transition.next;
   assert.equal(state.state, 'plan_ready');
   assert.equal(state.counters.sessionHandoffs, 0);
   
   // Activate executor: +1 handoff
   transition = applyTransition(state, 'activate_executor', new Date().toISOString());
   assert.equal(transition.ok, true);
-  state = transition.state;
+  state = transition.next;
   assert.equal(state.state, 'executor_write');
   assert.equal(state.counters.sessionHandoffs, 1);
   assert.equal(state.counters.turnHandoffs, 1);
@@ -143,7 +142,7 @@ test('Kernel state machine counts handoffs correctly', () => {
   // Friction back to planner: +1 handoff
   transition = applyTransition(state, 'friction', new Date().toISOString());
   assert.equal(transition.ok, true);
-  state = transition.state;
+  state = transition.next;
   assert.equal(state.state, 'planner_repair');
   assert.equal(state.counters.sessionHandoffs, 2);
   assert.equal(state.counters.turnHandoffs, 2);

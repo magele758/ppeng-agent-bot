@@ -1139,6 +1139,14 @@ Super Bot 独立配好多机软件工厂
 
 那你分多个Agent修复一下问题
 
+## trajectory-handoff-explicit
+Explicit trajectory handoff enablement, tool intersection, and role pin
+
+Trajectory handoff stays off unless the session explicitly enables it.
+Explicit close is persisted and is not reopened by defaults. Tool execution
+uses one permission intersection. An invalid role model falls back only to
+the pinned session model, then fails closed. Plan publish is conditional.
+
 ## turn-end-actions
 完整回复结束后才在末尾显示操作
 

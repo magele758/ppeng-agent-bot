@@ -1,117 +1,181 @@
 /**
- * Trajectory Handoff v2.3 — role pinning for planner/executor models.
- * 
- * Thin layer atop registry-router to resolve role-specific models.
- * Invalid single-role falls back to pinned session model (not last override).
- * Fallback failure is fail-closed.
+ * Trajectory Handoff v2.3 — one-shot role pinning.
+ * Invalid role model falls back only to the session-pinned original model,
+ * never to modelOverride and never along catalog fallbackRefs.
+ * If that also fails, the result is fail-closed (adapter null).
  */
 
 import type { ModelAdapter } from '../types.js';
-import { resolveModelRoute, type ModelRouteResult } from './registry-router.js';
-import type { ModelProviderCatalog, ModelProvidersStore } from './provider-catalog.js';
+import { handoffRuntimeEnabled } from '@ppeng/agent-loop';
+import {
+  createAdapterFromProvider,
+  findProvider,
+  type ModelProviderCatalog,
+  type ModelProvidersStore,
+} from './provider-catalog.js';
 
 export type HandoffRole = 'planner' | 'executor';
 
 export interface RolePinningContext {
-  /** The role-specific model override (from capabilityTiers). Null/undefined = use pinned. */
+  /** Role model ref (`providerId/modelId`). Null/undefined = use the pin. */
   roleModel: string | null | undefined;
-  /** The original pinned session model (stable fallback). */
+  /** Original pinned session model. Not the latest modelOverride. */
   pinnedSessionModel: string;
-  /** Model catalog. */
   catalog: ModelProviderCatalog;
-  /** Provider store. */
   store: ModelProvidersStore;
-  /** Environment (for credentials check). */
   env?: NodeJS.ProcessEnv;
-  /** Optional runtime/env fallback adapter (used by registry-router). */
+  /** Ignored. Kept so older callers still typecheck. Never used as a fallback. */
   fallbackAdapter?: ModelAdapter;
 }
 
 export interface RolePinResult {
-  /** The resolved adapter, or null if both role model and pinned fallback failed. */
   adapter: ModelAdapter | null;
-  /** Which resolution path was taken. */
   source: 'role_model' | 'pinned_fallback' | 'failed';
-  /** Human-readable reason (for telemetry/logs). */
   reason: string;
 }
 
-/**
- * Resolve the model adapter for a given role.
- * 
- * Resolution order:
- * 1. If roleModel is provided and valid, use it.
- * 2. Otherwise, fall back to pinnedSessionModel.
- * 3. If both fail, return null (fail-closed).
- * 
- * Invalid single-role does NOT cascade to "last override" or other roles.
- * Only the pinned session model is the stable fallback.
- */
-export function resolveRoleModel(
-  role: HandoffRole,
-  context: RolePinningContext
-): RolePinResult {
-  const { roleModel, pinnedSessionModel, catalog, store, env, fallbackAdapter } = context;
+export interface PinnedRoleRequest {
+  role: HandoffRole;
+  roleModel: string | null;
+  pinnedSessionModel: string;
+}
 
-  // Attempt role-specific model if provided
-  if (roleModel && typeof roleModel === 'string' && roleModel.trim() !== '') {
-    try {
-      // Minimal SessionRecord shape for resolveModelRoute
-      const fakeSession = {
-        id: 'temp',
-        metadata: { preferredModel: roleModel }
-      } as unknown as Parameters<typeof resolveModelRoute>[0]['session'];
-      
-      const routeResult: ModelRouteResult = resolveModelRoute({
-        catalog,
-        store,
-        session: fakeSession,
-        env,
-        fallbackAdapter,
-      });
-      
-      if (routeResult.primary) {
-        return {
-          adapter: routeResult.primary,
-          source: 'role_model',
-          reason: `Resolved ${role} role model: ${roleModel}`,
-        };
-      }
-    } catch (err) {
-      // Role model invalid; proceed to fallback
+export interface PinnedRoleResolution {
+  handled: boolean;
+  adapter: ModelAdapter | null;
+  reason: string;
+  rolePinFailed: boolean;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
+}
+
+function parsePinnedRef(
+  model: string,
+  catalog: ModelProviderCatalog
+): { providerId: string; modelId: string } | null {
+  const trimmed = model.trim();
+  if (!trimmed) return null;
+  const slash = trimmed.indexOf('/');
+  if (slash <= 0 || slash === trimmed.length - 1) return null;
+  const providerId = trimmed.slice(0, slash);
+  const modelId = trimmed.slice(slash + 1);
+  const provider = catalog.providers.find((item) => item.id === providerId);
+  if (!provider) return null;
+  if (provider.kind !== 'heuristic' && !provider.models.some((item) => item.id === modelId && item.enabled !== false)) {
+    return null;
+  }
+  return { providerId, modelId };
+}
+
+function adapterFor(
+  model: string,
+  catalog: ModelProviderCatalog,
+  env: NodeJS.ProcessEnv | undefined
+): ModelAdapter | null {
+  const ref = parsePinnedRef(model, catalog);
+  if (!ref) return null;
+  const provider = findProvider(catalog, ref.providerId, env);
+  if (!provider) return null;
+  if (provider.kind !== 'heuristic' && (!provider.apiKey.trim() || !provider.baseUrl.trim())) return null;
+  const adapter = createAdapterFromProvider(provider, ref.modelId);
+  const modelName = `${ref.providerId}/${ref.modelId}`;
+  return {
+    name: adapter.name,
+    modelName,
+    runTurn: (input) => adapter.runTurn(input),
+    summarizeMessages: (input) => adapter.summarizeMessages(input),
+    ...(adapter.runTurnStream ? { runTurnStream: (input, onChunk) => adapter.runTurnStream!(input, onChunk) } : {}),
+    ...(adapter.completeText ? { completeText: (input) => adapter.completeText!(input) } : {}),
+  };
+}
+
+export function resolveRoleModel(role: HandoffRole, context: RolePinningContext): RolePinResult {
+  const env = context.env ?? process.env;
+  if (context.roleModel?.trim()) {
+    const adapter = adapterFor(context.roleModel, context.catalog, env);
+    if (adapter) {
+      return { adapter, source: 'role_model', reason: `role ${role} pinned to ${context.roleModel.trim()}` };
     }
   }
-
-  // Fall back to pinned session model
-  try {
-    const fakeSession = {
-      id: 'temp',
-      metadata: { preferredModel: pinnedSessionModel }
-    } as unknown as Parameters<typeof resolveModelRoute>[0]['session'];
-    
-    const routeResult: ModelRouteResult = resolveModelRoute({
-      catalog,
-      store,
-      session: fakeSession,
-      env,
-      fallbackAdapter,
-    });
-    
-    if (routeResult.primary) {
+  if (context.pinnedSessionModel.trim()) {
+    const adapter = adapterFor(context.pinnedSessionModel, context.catalog, env);
+    if (adapter) {
       return {
-        adapter: routeResult.primary,
+        adapter,
         source: 'pinned_fallback',
-        reason: `${role} role model invalid or missing; using pinned session model: ${pinnedSessionModel}`,
+        reason: `role ${role} model invalid; using pinned session model ${context.pinnedSessionModel.trim()}`,
       };
     }
-  } catch (err) {
-    // Pinned model also failed
   }
-
-  // Both failed: fail-closed
   return {
     adapter: null,
     source: 'failed',
-    reason: `Both ${role} role model and pinned session model failed to resolve`,
+    reason: `role ${role} model and pinned session model both failed to resolve; failing closed`,
+  };
+}
+
+function pinnedOriginal(metadata: Record<string, unknown>): string {
+  const pinned = metadata.pinnedSessionModel;
+  if (typeof pinned === 'string' && pinned.trim()) return pinned.trim();
+  const ref = asRecord(metadata.modelRef);
+  if (typeof ref?.providerId === 'string' && typeof ref.modelId === 'string' && ref.providerId && ref.modelId) {
+    return `${ref.providerId}/${ref.modelId}`;
+  }
+  return '';
+}
+
+function roleModelOf(tiers: Record<string, unknown>, role: HandoffRole): string | null {
+  const roles = asRecord(tiers.roles);
+  const fromRoles = role === 'planner' ? roles?.plannerModel : roles?.executorModel;
+  if (typeof fromRoles === 'string' && fromRoles.trim()) return fromRoles.trim();
+  const product = asRecord(tiers[role]);
+  if (typeof product?.model === 'string' && product.model.trim()) return product.model.trim();
+  return null;
+}
+
+/** Null unless this session explicitly enabled handoff and named a role. */
+export function handoffRoleRequest(session: { metadata?: unknown } | undefined): PinnedRoleRequest | null {
+  const metadata = asRecord(session?.metadata);
+  if (!handoffRuntimeEnabled(metadata)) return null;
+  const role = metadata?.handoffRole;
+  if (role !== 'planner' && role !== 'executor') return null;
+  const tiers = asRecord(metadata?.capabilityTiers) ?? {};
+  return { role, roleModel: roleModelOf(tiers, role), pinnedSessionModel: pinnedOriginal(metadata ?? {}) };
+}
+
+export function resolvePinnedRoleAdapter(input: {
+  session: { metadata?: unknown } | undefined;
+  catalog: ModelProviderCatalog;
+  env?: NodeJS.ProcessEnv;
+}): PinnedRoleResolution {
+  const request = handoffRoleRequest(input.session);
+  if (!request) return { handled: false, adapter: null, reason: '', rolePinFailed: false };
+  const resolved = resolveRoleModel(request.role, {
+    roleModel: request.roleModel,
+    pinnedSessionModel: request.pinnedSessionModel,
+    catalog: input.catalog,
+    store: { getDaemonControl: () => undefined, setDaemonControl: () => undefined },
+    env: input.env,
+  });
+  if (!resolved.adapter) {
+    return { handled: true, adapter: null, reason: resolved.reason, rolePinFailed: true };
+  }
+  return { handled: true, adapter: resolved.adapter, reason: resolved.reason, rolePinFailed: false };
+}
+
+export function failClosedRoleAdapter(reason: string): ModelAdapter {
+  const fail = async () => {
+    throw new Error(`trajectory handoff role pin failed closed: ${reason}`);
+  };
+  return {
+    name: 'handoff-fail-closed',
+    modelName: 'handoff-fail-closed',
+    runTurn: fail,
+    summarizeMessages: async () => {
+      throw new Error(reason);
+    },
   };
 }

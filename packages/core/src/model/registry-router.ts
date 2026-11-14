@@ -4,6 +4,7 @@
  */
 
 import type { ModelAdapter, SessionRecord } from '../types.js';
+import { failClosedRoleAdapter, resolvePinnedRoleAdapter } from './role-pinning.js';
 import {
   HEURISTIC_PROVIDER_ID,
   createAdapterFromProvider,
@@ -33,6 +34,8 @@ export interface ModelRouteResult {
   candidates: ModelAdapter[];
   decisions: RouteDecision[];
   thinkingMode: ThinkingMode;
+  /** Set when an explicit handoff role could not be pinned. Candidates are not catalog fallbacks. */
+  rolePinFailed?: boolean;
 }
 
 const RETRYABLE_STATUS = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
@@ -196,6 +199,26 @@ export function resolveModelRoute(input: {
 }): ModelRouteResult {
   const catalog = readModelCatalog(input.store);
   const env = input.env ?? process.env;
+  const pinned = resolvePinnedRoleAdapter({ session: input.session, catalog, env });
+  if (pinned.handled) {
+    const thinkingMode = sessionThinkingMode(input.session, catalog);
+    if (pinned.rolePinFailed || !pinned.adapter) {
+      const adapter = failClosedRoleAdapter(pinned.reason);
+      return {
+        primary: adapter,
+        candidates: [adapter],
+        decisions: [{ type: 'fallback', message: pinned.reason, data: { failClosed: true, rolePinFailed: true } }],
+        thinkingMode,
+        rolePinFailed: true,
+      };
+    }
+    return {
+      primary: pinned.adapter,
+      candidates: [pinned.adapter],
+      decisions: [{ type: 'preferred', message: pinned.reason, data: { rolePinned: true } }],
+      thinkingMode,
+    };
+  }
   const { refs, thinkingMode, decisions } = resolveRouteCandidates({
     catalog,
     session: input.session,

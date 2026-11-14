@@ -1,3 +1,4 @@
+import { commitPlanRevision } from '@ppeng/agent-loop';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { RunContext, ToolContract } from '../types.js';
@@ -5,6 +6,7 @@ import type { RunContext, ToolContract } from '../types.js';
 export type PlanStepStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
 
 export interface PlanStepState {
+  id?: string;
   title: string;
   status: PlanStepStatus;
   result?: string;
@@ -29,6 +31,9 @@ export interface PlanState {
   }>;
   /** Optional v2.3 extension: recovery policy per step. */
   resumePolicy?: Record<string, string>;
+  version?: number;
+  planId?: string;
+  appliedEffects?: Array<{ stepId: string; dedupeId: string; attemptId: string; sideEffect?: boolean }>;
 }
 
 export type PlanEvent =
@@ -129,7 +134,12 @@ function clonePlan(state: PlanState): PlanState {
   return {
     analysis: state.analysis,
     confirmed: state.confirmed,
-    steps: state.steps.map((s) => ({ ...s }))
+    steps: state.steps.map((s) => ({ ...s })),
+    ...(state.replanTriggers ? { replanTriggers: state.replanTriggers.map((trigger) => ({ ...trigger })) } : {}),
+    ...(state.resumePolicy ? { resumePolicy: { ...state.resumePolicy } } : {}),
+    ...(state.version != null ? { version: state.version } : {}),
+    ...(state.planId ? { planId: state.planId } : {}),
+    ...(state.appliedEffects ? { appliedEffects: state.appliedEffects.map((effect) => ({ ...effect })) } : {}),
   };
 }
 
@@ -152,6 +162,25 @@ export async function savePlanState(stateDir: string, sessionId: string, state: 
   const file = planStatePath(stateDir, sessionId);
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, JSON.stringify(state, null, 2), 'utf8');
+}
+
+/** Writes only when expectedOldVersion matches the file. A missing file is version 0. */
+export async function commitVersionedPlan(
+  stateDir: string,
+  sessionId: string,
+  next: PlanState,
+  versions: { expectedOldVersion: number; newVersion: number }
+): Promise<{ ok: true; plan: PlanState } | { ok: false; conflict: true; currentVersion: number }> {
+  const current = await loadPlanState(stateDir, sessionId);
+  const committed = commitPlanRevision({
+    current,
+    expectedOldVersion: versions.expectedOldVersion,
+    newVersion: versions.newVersion,
+    next,
+  });
+  if (!committed.ok) return { ok: false, conflict: true, currentVersion: committed.currentVersion };
+  await savePlanState(stateDir, sessionId, committed.plan);
+  return { ok: true, plan: committed.plan };
 }
 
 function formatPlan(state: PlanState): string {

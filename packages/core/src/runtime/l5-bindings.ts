@@ -42,10 +42,11 @@ import { artifactIndexFromManifest } from '../artifact/durable-artifact-port.js'
 import { envInt } from '../env.js';
 import { checkToolBindingPin, markBindingNeedsReverify } from '../discovery/cbom.js';
 import { resolveDiscoveryEnabled } from '../discovery/settings.js';
-import { resolveSessionModelAdapter, type ModelRef } from '../model/provider-catalog.js';
+import { readModelCatalog, resolveSessionModelAdapter, type ModelRef } from '../model/provider-catalog.js';
 import { applyThinkingEffortToTurn } from '../model/thinking-effort-settings.js';
 import { planModelFallback, rememberServedBy, runWithFallbackChain } from '../model/fallback-chain.js';
 import { resolveModelRoute, withProviderFallback } from '../model/registry-router.js';
+import { resolvePinnedRoleAdapter } from '../model/role-pinning.js';
 import { waitSteeringChildrenIdle } from '../session/steering-subagent.js';
 import { runCaseGovernance } from '../evolving/case-governance.js';
 import { scheduleBackgroundCaseReview } from '../evolving/index.js';
@@ -841,12 +842,26 @@ async function deliverPreparedTurn(
 
 function routePreparedTurn(rt: L5Bindable, fitted: Parameters<ModelTurnCall>[0], stream: Parameters<ModelTurnCall>[1]) {
   const session = fitted.sessionId ? rt.store.getSession(fitted.sessionId) : undefined;
+  if (session) {
+    const pinned = resolvePinnedRoleAdapter({
+      session,
+      catalog: readModelCatalog(rt.store),
+      env: process.env,
+    });
+    if (pinned.handled) {
+      if (!pinned.adapter) throw new Error(pinned.reason || 'trajectory handoff role pin failed closed');
+      return invokeContextModel(rt, pinned.adapter, fitted, stream);
+    }
+  }
   const route = resolveModelRoute({
     store: rt.store,
     session,
     env: process.env,
     fallbackAdapter: rt.modelAdapter
   });
+  if (route.rolePinFailed) {
+    throw new Error(route.decisions[0]?.message ?? 'trajectory handoff role pin failed closed');
+  }
   const chained = runTurnViaFallbackChain(rt, fitted, stream, route.primary, route.primaryRef ?? null);
   if (chained) return chained;
   const candidates = route.candidates.map((adapter, i) => ({
@@ -915,6 +930,19 @@ function jevToolGateForCalls(
   });
 }
 
+function resolveL5TurnModel(rt: L5Bindable, session: SessionRecord | undefined): ModelAdapter {
+  const pinned = resolvePinnedRoleAdapter({
+    session,
+    catalog: readModelCatalog(rt.store),
+    env: process.env,
+  });
+  if (pinned.handled) {
+    if (!pinned.adapter) throw new Error(pinned.reason || 'trajectory handoff role pin failed closed');
+    return pinned.adapter;
+  }
+  return resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter);
+}
+
 export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
   return {
     store: rt.store,
@@ -923,8 +951,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
     tools: rt.tools,
     ...(rt.syncConnectorTools ? { syncConnectorTools: () => rt.syncConnectorTools!() } : {}),
     modelAdapter: rt.modelAdapter,
-    resolveModelAdapter: (session) =>
-      resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter),
+    resolveModelAdapter: (session) => resolveL5TurnModel(rt, session),
     promptBuilder: bindMemoryAppendixPrompt(rt),
     mcpManager: rt.mcpManager,
     extensionRegistry: rt.extensionRegistry,

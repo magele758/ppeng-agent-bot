@@ -20,6 +20,7 @@ import { normalizeOpenAiCompatibleBaseUrl } from './list-models.js';
 import { createLogger } from '../logger.js';
 import { withImageCompatibility } from './image-compatibility.js';
 import type { ModelAdapter, SessionRecord } from '../types.js';
+import { normalizeStoredCapabilityTiers, type PersistedCapabilityTiers } from '../trajectory-handoff/persist.js';
 
 const log = createLogger('model-override');
 
@@ -68,6 +69,7 @@ export interface ModelProviderCatalog {
   updatedAt: string;
   fallbackRefs?: ModelRef[];
   thinkingMode?: CatalogThinkingMode;
+  capabilityTiers?: PersistedCapabilityTiers;
 }
 
 export interface ModelProviderPatch {
@@ -401,12 +403,14 @@ export function normalizeCatalog(raw: Partial<ModelProviderCatalog> | null | und
     raw.thinkingMode === 'on' || raw.thinkingMode === 'off' || raw.thinkingMode === 'auto'
       ? raw.thinkingMode
       : undefined;
+  const capabilityTiers = normalizeStoredCapabilityTiers(raw.capabilityTiers);
   return {
     providers,
     defaultRef,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt,
     ...(fallbackRefs && fallbackRefs.length > 0 ? { fallbackRefs } : {}),
-    ...(thinkingMode ? { thinkingMode } : {})
+    ...(thinkingMode ? { thinkingMode } : {}),
+    ...(capabilityTiers ? { capabilityTiers } : {}),
   };
 }
 
@@ -762,7 +766,8 @@ export function publicCatalogPayload(store: ModelProvidersStore, env: NodeJS.Pro
       defaultRef,
       updatedAt: catalog.updatedAt,
       fallbackRefs: catalog.fallbackRefs,
-      thinkingMode: catalog.thinkingMode
+      thinkingMode: catalog.thinkingMode,
+      ...(catalog.capabilityTiers ? { capabilityTiers: catalog.capabilityTiers } : {}),
     },
     options,
     persisted,
