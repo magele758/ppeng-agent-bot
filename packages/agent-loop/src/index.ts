@@ -744,6 +744,7 @@ export type { EnablementSource } from './trajectory-handoff/config.js';
 export {
   checkHandoffEnabled,
   distinguishEnablementSource,
+  handoffAutoEligible,
   handoffRuntimeEnabled,
 } from './trajectory-handoff/host-integration.js';
 export {

@@ -1,7 +1,7 @@
 /**
- * Explicit-on session handoff on the turn kernel path.
- * Publish and friction come from host metadata, not tool names.
- * Counted edges consult the session's capability caps before they increment.
+ * Explicit-on sessions enter the handoff machine at turn start.
+ * Auto-policy task sessions do the same on a user turn while session budget remains.
+ * Chat auto stays out until a controlled tool enters planner_readonly.
  */
 import type { ToolExecResult, TurnKernelHost } from '../turn/host.js';
 import { trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
@@ -112,6 +112,13 @@ function capsOf(metadata: JsonMap | undefined): { session: number; turn: number 
   const parsed = parseCapabilityTiers(metadata?.capabilityTiers);
   if (!parsed.ok) return { session: DEFAULT_SESSION_CAP, turn: DEFAULT_TURN_CAP };
   return { session: parsed.resolved.perSessionCap, turn: parsed.resolved.perTurnCap };
+}
+
+function sessionHandoffsOf(metadata: JsonMap | undefined): number {
+  const kernel = readKernel(metadata);
+  if (kernel) return kernel.counters.sessionHandoffs;
+  const raw = metadata?.handoffSessionCount;
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
 }
 
 interface EffectRow {
@@ -306,6 +313,37 @@ export function closePlannerDirectAnswer(
   return countersPatch(answered.next);
 }
 
+/** Enter planner_readonly for auto policy. Preserves the session handoff count. */
+export async function enterAutoPlannerReadonly(
+  host: HostSlice,
+  sessionId: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const session = host.store.getSession(sessionId);
+  if (!session) return { ok: false, reason: 'session missing' };
+  const metadata = asRecord(session.metadata);
+  if (metadata?.handoffSuspended === 'session_cap') {
+    return { ok: false, reason: 'session handoff cap exhausted' };
+  }
+  const prepared = await prepareTrajectoryToolWave({
+    id: sessionId,
+    metadata: { ...(metadata ?? {}), handoffState: 'planner_readonly', handoffEntering: 'planner_readonly' },
+  });
+  if (!prepared.ok) return prepared;
+  const initial = createInitialKernelState({ now: new Date().toISOString(), turnNumber: 1 });
+  const kernel: HandoffKernelState = {
+    ...initial,
+    counters: { sessionHandoffs: sessionHandoffsOf(metadata), turnHandoffs: 0 },
+  };
+  const parsed = parseCapabilityTiers(metadata?.capabilityTiers);
+  host.mergeSessionMetadata(sessionId, {
+    ...countersPatch(kernel),
+    handoffRole: 'planner',
+    handoffWorkTurn: true,
+    ...(!parsed.ok ? { handoffTierWarning: parsed.warning } : {}),
+  });
+  return { ok: true };
+}
+
 /** Enter or resume the occupancy and stamp handoffRole before the model call. */
 export async function prepareExplicitSessionHandoff(
   host: HostSlice,
@@ -316,7 +354,15 @@ export async function prepareExplicitSessionHandoff(
   if (!session) return;
   const metadata = asRecord(session.metadata);
   if (metadata?.handoffSuspended === 'session_cap') return;
-  if (!trajectoryHandoffGateFromMetadata(metadata).enabled) return;
+  const gate = trajectoryHandoffGateFromMetadata(metadata);
+  if (gate.path === 'auto_eligible') {
+    const remaining = capsOf(metadata).session - sessionHandoffsOf(metadata);
+    if (session.mode === 'task' && options?.userTurn === true && remaining > 0) {
+      await enterAutoPlannerReadonly(host, sessionId);
+    }
+    return;
+  }
+  if (gate.path !== 'in_machine') return;
   const now = new Date().toISOString();
   let kernel = readKernel(metadata);
   if (kernel && isTerminal(kernel.state)) {

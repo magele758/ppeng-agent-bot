@@ -5,9 +5,11 @@
  * Production stays off unless the session explicitly enables handoff.
  */
 
+import { parseCapabilityTiers } from './config.js';
 import { createTrajectoryHandoffAdapter } from './adapter.js';
-import type { HandoffState } from './types.js';
+import { DEFAULT_SESSION_CAP, type HandoffState } from './types.js';
 import { trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
+import type { ToolExecResult } from '../turn/host.js';
 
 export type HandoffPerm = 'read' | 'write' | 'command' | 'delegate' | 'external';
 
@@ -160,4 +162,72 @@ export async function prepareTrajectoryToolWave(
     return { ok: false, reason: error instanceof Error ? error.message : String(error) };
   }
   return { ok: false, reason: `in-flight writes still pending: ${pending.size}` };
+}
+
+const PLANNING_REQUIRED = 'Planning required before this side-effect tool can run.';
+
+function sessionHandoffCount(metadata: Record<string, unknown> | undefined): number {
+  const counters = asRecord(asRecord(metadata?.handoffKernel)?.counters);
+  if (typeof counters?.sessionHandoffs === 'number' && Number.isFinite(counters.sessionHandoffs)) {
+    return counters.sessionHandoffs;
+  }
+  if (typeof metadata?.handoffSessionCount === 'number' && Number.isFinite(metadata.handoffSessionCount)) {
+    return metadata.handoffSessionCount;
+  }
+  return 0;
+}
+
+function configuredSessionCap(metadata: Record<string, unknown> | undefined): number {
+  const parsed = parseCapabilityTiers(metadata?.capabilityTiers);
+  if (!parsed.ok) return DEFAULT_SESSION_CAP;
+  return parsed.resolved.perSessionCap;
+}
+
+/** Unsandboxed bash/shell/browser/http/mcp stay controlled even if tagged read. */
+function mistaggedControlled(name: string): boolean {
+  const normalized = name.toLowerCase();
+  if (normalized.includes('sandbox')) return false;
+  return /(?:^|[^a-z0-9])(?:bash|shell|browser|https?|mcp)(?:[^a-z0-9]|$)/.test(normalized);
+}
+
+/**
+ * Auto-eligible wave: pure reads run. A controlled call under the session cap
+ * enters planner_readonly and is denied. An exhausted session budget stays on
+ * the old path and does not clear counters.
+ */
+export async function executeAutoEligibleToolWave(input: {
+  session: { id: string; metadata?: unknown };
+  calls: ReadonlyArray<{ toolCallId: string; name: string; input: Record<string, unknown> }>;
+  tools: ReadonlyArray<{ name: string; access?: string; sideEffectLevel?: string }>;
+  execute: (
+    calls: Array<{ toolCallId: string; name: string; input: Record<string, unknown> }>,
+  ) => Promise<ToolExecResult[]>;
+  enterPlanner: () => Promise<{ ok: true } | { ok: false; reason: string }>;
+}): Promise<ToolExecResult[]> {
+  const metadata = asRecord(input.session.metadata);
+  const catalog = new Map(input.tools.map((tool) => [tool.name, tool]));
+  const reads: Array<{ toolCallId: string; name: string; input: Record<string, unknown> }> = [];
+  const controlled: Array<{ toolCallId: string; name: string; input: Record<string, unknown> }> = [];
+  for (const call of input.calls) {
+    const tool = catalog.get(call.name) ?? { name: call.name };
+    if (trajectoryToolPermission(tool) === 'read' && !mistaggedControlled(tool.name)) reads.push(call);
+    else controlled.push(call);
+  }
+  if (controlled.length === 0 || sessionHandoffCount(metadata) >= configuredSessionCap(metadata)) {
+    return input.execute([...input.calls]);
+  }
+  const entered = await input.enterPlanner();
+  const denial = entered.ok ? PLANNING_REQUIRED : entered.reason;
+  const ran = reads.length === 0 ? [] : await input.execute(reads);
+  const byId = new Map<string, ToolExecResult>();
+  for (const result of ran) byId.set(result.toolCallId, result);
+  for (const call of controlled) {
+    byId.set(call.toolCallId, { toolCallId: call.toolCallId, name: call.name, ok: false, content: denial });
+  }
+  return input.calls.map((call) => byId.get(call.toolCallId) ?? {
+    toolCallId: call.toolCallId,
+    name: call.name,
+    ok: false,
+    content: 'missing tool result',
+  });
 }

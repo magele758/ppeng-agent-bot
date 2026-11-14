@@ -165,7 +165,7 @@ export function createChatSession(
     mode: 'chat',
     agentId: input.agentId?.trim() ? input.agentId.trim() : 'main',
     background: input.background ?? false,
-    metadata: applySessionEnablement(inherited ? { ...input.metadata, capabilityTiers: inherited } : input.metadata)
+    metadata: applySessionEnablement(inherited ? { ...input.metadata, capabilityTiers: inherited } : input.metadata, { persistAutoPolicy: true })
   });
 
   const ids = input.imageAssetIds?.filter(Boolean) ?? [];
@@ -216,7 +216,7 @@ export function createTaskSession(
     metadata: applySessionEnablement({
       autoRun: true,
       ...(input.metadata ?? {})
-    })
+    }, { persistAutoPolicy: true })
   });
 
   host.store.updateTask(task.id, { sessionId: session.id });

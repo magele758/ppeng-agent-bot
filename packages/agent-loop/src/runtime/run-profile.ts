@@ -1,5 +1,5 @@
 import type { EnablementSource } from '../trajectory-handoff/config.js';
-import { distinguishEnablementSource, handoffRuntimeEnabled } from '../trajectory-handoff/host-integration.js';
+import { distinguishEnablementSource, handoffRuntimePath } from '../trajectory-handoff/host-integration.js';
 
 /**
  * Generic 8-value TaskMode / RunProfile (HOW) × skill_scope (WHAT).
@@ -480,13 +480,16 @@ export function visibleToolNames(
   return applyRunProfileToTools(assembled, profile, assembled).map((t) => t.name);
 }
 
-/** Explicit handoff gate. Missing tiers stay off. Called by the turn kernel. */
+/** Three-path handoff gate. enabled is true only on the in_machine path. */
 export function trajectoryHandoffGateFromMetadata(metadata: Record<string, unknown> | undefined): {
   enabled: boolean;
   enablementSource: EnablementSource;
+  path: 'mechanism_off' | 'auto_eligible' | 'in_machine';
 } {
+  const path = handoffRuntimePath(metadata);
   return {
-    enabled: handoffRuntimeEnabled(metadata),
+    enabled: path === 'in_machine',
     enablementSource: distinguishEnablementSource(metadata),
+    path,
   };
 }

@@ -80,8 +80,8 @@ import {
 } from '../session/tool-wave-close.js';
 import { rollbackReasonOf } from '../session/step-tx.js';
 import { applyRunProfileToTools, trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
-import { denyTrajectoryTool, prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
-import { advanceExplicitHandoffAfterTools, closePlannerDirectAnswer, handoffContextMessage, prepareExplicitSessionHandoff } from '../trajectory-handoff/session-turn.js';
+import { denyTrajectoryTool, executeAutoEligibleToolWave, prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
+import { advanceExplicitHandoffAfterTools, closePlannerDirectAnswer, enterAutoPlannerReadonly, handoffContextMessage, prepareExplicitSessionHandoff } from '../trajectory-handoff/session-turn.js';
 import { defaultWorkspaceRoots } from '../workspace/default-roots.js';
 import type {
   AgentSpec,
@@ -141,8 +141,19 @@ async function executeGatedToolWave(
   ...args: Parameters<TurnKernelHost['executeToolCalls']>
 ): Promise<Awaited<ReturnType<TurnKernelHost['executeToolCalls']>>> {
   const live = host.store.getSession(session.id) ?? session;
-  if (!trajectoryHandoffGateFromMetadata(handoffSessionMetadata(live)).enabled) {
+  const gate = trajectoryHandoffGateFromMetadata(handoffSessionMetadata(live));
+  if (gate.path === 'mechanism_off') {
     return host.executeToolCalls(...args);
+  }
+  if (gate.path === 'auto_eligible') {
+    const turnTools = args[4];
+    return executeAutoEligibleToolWave({
+      session: live,
+      calls: args[0],
+      tools: turnTools ?? host.tools,
+      execute: (calls) => host.executeToolCalls(calls, args[1], args[2], args[3], turnTools),
+      enterPlanner: () => enterAutoPlannerReadonly(host, live.id),
+    });
   }
   const prepared = await prepareTrajectoryToolWave(live);
   if (!prepared.ok) {

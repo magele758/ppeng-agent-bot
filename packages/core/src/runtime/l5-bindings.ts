@@ -46,7 +46,7 @@ import { readModelCatalog, resolveSessionModelAdapter, type ModelRef } from '../
 import { applyThinkingEffortToTurn } from '../model/thinking-effort-settings.js';
 import { planModelFallback, rememberServedBy, runWithFallbackChain } from '../model/fallback-chain.js';
 import { resolveModelRoute, withProviderFallback } from '../model/registry-router.js';
-import { resolvePinnedRoleAdapter, selectOriginalModelPin } from '../model/role-pinning.js';
+import { handoffOriginalPinDue, resolvePinnedRoleAdapter, selectOriginalModelPin } from '../model/role-pinning.js';
 import { waitSteeringChildrenIdle } from '../session/steering-subagent.js';
 import { runCaseGovernance } from '../evolving/case-governance.js';
 import { scheduleBackgroundCaseReview } from '../evolving/index.js';
@@ -81,7 +81,6 @@ import { tryGoalStore } from '../goal/goal-store.js';
 import {
   createKernelHookRegistry,
   createStreamResetTracker,
-  handoffRuntimeEnabled,
   recoveryPolicyEnabled,
   reasoningSpinWatchdogEnabled,
   registerKernelHooks
@@ -844,7 +843,7 @@ function routePreparedTurn(rt: L5Bindable, fitted: Parameters<ModelTurnCall>[0],
   let session = fitted.sessionId ? rt.store.getSession(fitted.sessionId) : undefined;
   if (session) {
     const existingPin = typeof session.metadata?.pinnedSessionModel === 'string' ? session.metadata.pinnedSessionModel.trim() : '';
-    if (handoffRuntimeEnabled(session.metadata) && !existingPin) {
+    if (!existingPin && handoffOriginalPinDue(session)) {
       const pin = selectOriginalModelPin({
         catalog: readModelCatalog(rt.store),
         metadata: session.metadata,
