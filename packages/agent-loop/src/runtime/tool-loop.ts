@@ -1143,6 +1143,29 @@ async function dispatchAdmittedScopedTool(
   }
 }
 
+
+/** Keep in-memory skill-manifest ceilings when execution re-reads the stored session. */
+function sessionWithStoredSkillManifests(
+  stored: RunContext['session'],
+  live: RunContext['session']
+): RunContext['session'] {
+  const extra = Array.isArray(live.metadata?.activeSkillManifests) ? live.metadata.activeSkillManifests : [];
+  if (extra.length === 0) return stored;
+  const current = Array.isArray(stored.metadata?.activeSkillManifests) ? stored.metadata.activeSkillManifests : [];
+  const seen = new Set<string>();
+  const merged: unknown[] = [];
+  for (const item of [...current, ...extra]) {
+    const key = JSON.stringify(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(item);
+  }
+  return {
+    ...stored,
+    metadata: { ...(stored.metadata ?? {}), activeSkillManifests: merged }
+  };
+}
+
 async function executeScopedTool(
   host: ToolLoopHost,
   tools: ToolContract<Record<string, unknown>>[],
@@ -1224,7 +1247,8 @@ async function executeScopedTool(
       }),
     };
   }
-  const liveContext = fresh === context.session ? context : { ...context, session: fresh };
+  const liveContext =
+    fresh === context.session ? context : { ...context, session: sessionWithStoredSkillManifests(fresh, context.session) };
 
   return dispatchAdmittedScopedTool(
     host,
