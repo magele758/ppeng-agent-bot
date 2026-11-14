@@ -1,9 +1,15 @@
 import { failedQuality, qualityPassed, type QualityReport } from '../quality/gate.js';
 import { nowIso } from '../id.js';
 import type { SessionRecord } from '../types.js';
+import {
+  admitSwarmHandoff,
+  admittedSwarmWorkerMetadata,
+  deliveryEvidenceFromReview,
+  evaluateSwarmDelivery,
+  type TrustedSwarmHostContext,
+} from '../trajectory-handoff/swarm-entry.js';
 import { SwarmStore, createSwarmId } from './store.js';
 import type { SwarmRole, SwarmRun, SwarmTask, SwarmTaskStatus } from './types.js';
-
 const ROLE_AGENT: Record<SwarmRole, string> = {
   planner: 'planner',
   researcher: 'researcher',
@@ -16,6 +22,13 @@ const ROLE_AGENT: Record<SwarmRole, string> = {
 
 const TERMINAL_TASK: SwarmTaskStatus[] = ['done', 'failed'];
 const ACTIVE_RUN = ['pending', 'planning', 'running', 'reviewing'] as const;
+
+const ACTIVE_HANDOFF_STATE: Record<string, true> = {
+  planner_readonly: true,
+  plan_ready: true,
+  executor_write: true,
+  planner_repair: true,
+};
 
 export interface SwarmExecutorDeps {
   store: SwarmStore;
@@ -35,12 +48,29 @@ export interface SwarmExecutorDeps {
   enqueueSchedulerWake: (sessionId: string, reason: string) => void;
   /** True when teammate session has produced work (not merely created idle). */
   sessionTeammateFinished: (sessionId: string) => boolean;
+  /** Host-only. Missing callback keeps the handoff entry closed. */
+  trustedHandoff?: (run: SwarmRun) => TrustedSwarmHostContext | null;
+  /** Explicit switch. Anything other than true leaves the entry closed. */
+  swarmHandoffEntryEnabled?: boolean;
+  /** Explicit off wins over the entry switch. */
+  swarmHandoffExplicitOff?: boolean;
 }
 
 export class SwarmExecutor {
   private readonly launching = new Set<string>();
+  private swarmHandoffEntryEnabled: boolean;
+  private entryExplicitOff: boolean;
 
-  constructor(private readonly deps: SwarmExecutorDeps) {}
+  constructor(private readonly deps: SwarmExecutorDeps) {
+    this.swarmHandoffEntryEnabled = deps.swarmHandoffEntryEnabled === true;
+    this.entryExplicitOff = deps.swarmHandoffExplicitOff === true;
+  }
+
+  /** Close or reopen the approved independent-swarm entry without rebuilding the host. */
+  setSwarmHandoffEntryEnabled(enabled: boolean): void {
+    this.swarmHandoffEntryEnabled = enabled === true;
+    this.entryExplicitOff = enabled !== true;
+  }
 
   private launchTeammate(sessionId: string, runId: string): void {
     if (this.launching.has(sessionId)) return;
@@ -222,11 +252,7 @@ export class SwarmExecutor {
         role: task.requiredRole,
         prompt,
         background: true,
-        metadata: {
-          swarmRunId: run.id,
-          swarmTaskId: task.id,
-          autoRun: true
-        }
+        metadata: this.teammateMetadata(run, task)
       });
     } catch {
       this.deps.store.updateTask(task.id, { status: 'failed' });
@@ -275,7 +301,7 @@ export class SwarmExecutor {
       if (!this.isDispatchable(run.id)) return;
       const expired = Date.now() > Date.parse(run.createdAt) + run.budget.maxDurationMs;
       if (expired) report = failedQuality('Quality evaluation exceeded the run deadline');
-      const passed = qualityPassed(report);
+      const passed = this.deliveryAccepted(session, report);
       this.deps.store.addReview({
         id: createSwarmId('srev'), swarmRunId: run.id, taskId: task.id,
         reviewerAgentId: report.sessionId ?? 'quality-gate', role: 'evaluator',
@@ -283,5 +309,46 @@ export class SwarmExecutor {
       });
       this.deps.store.updateTask(task.id, { status: passed ? 'done' : 'failed' });
     }
+  }
+
+  private admit(run: SwarmRun) {
+    const trusted = this.deps.trustedHandoff?.(run) ?? null;
+    if (!trusted) return admitSwarmHandoff({ trusted: null, workerMetadata: null });
+    const explicitOff = this.entryExplicitOff || trusted.explicitOff === true;
+    return admitSwarmHandoff({
+      trusted: {
+        ...trusted,
+        explicitOff,
+        entryEnabled: explicitOff
+          ? false
+          : this.swarmHandoffEntryEnabled === true && trusted.entryEnabled !== false,
+      },
+      workerMetadata: null,
+    });
+  }
+
+  private teammateMetadata(run: SwarmRun, task: SwarmTask): Record<string, unknown> {
+    const admission = this.admit(run);
+    return {
+      swarmRunId: run.id,
+      swarmTaskId: task.id,
+      autoRun: true,
+      ...(admission.open ? admittedSwarmWorkerMetadata(nowIso()) : {}),
+    };
+  }
+
+  private deliveryAccepted(session: SessionRecord, report: QualityReport): boolean {
+    const handoffState = session.metadata?.handoffState;
+    if (typeof handoffState !== 'string' || handoffState.length === 0) return qualityPassed(report);
+    const evidence = deliveryEvidenceFromReview(report);
+    // Active handoff still finishes through the existing gate. A kernel claim
+    // of done/non-success, or any offered handoff evidence, cannot skip #516.
+    if (ACTIVE_HANDOFF_STATE[handoffState] === true && evidence == null) return qualityPassed(report);
+    return evaluateSwarmDelivery({
+      report,
+      kernelState: handoffState,
+      evidence,
+      gateInvoked: true,
+    }).success;
   }
 }

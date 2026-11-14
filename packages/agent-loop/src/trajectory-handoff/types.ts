@@ -58,7 +58,10 @@ export type HandoffEvent =
   | 'cancel'                 // → cancelled
   | 'timeout'                // → timed_out
   // shared planner_readonly/plan_ready/executor_write/planner_repair/awaiting_coordinator
-  | 'escalate';              // → awaiting_coordinator (shared-scope / general escalate)
+  | 'escalate'               // → awaiting_coordinator (shared-scope / general escalate)
+  | 'shared_scope_escalated' // → awaiting_coordinator; host voids old local remainder
+  | 'local_capped_escalated' // → awaiting_coordinator; local quota already exhausted
+  | 'coordinator_rejected';  // awaiting_coordinator → failed, or capped when the host says so
 
 // ============================================================================
 // Plan objects
@@ -269,17 +272,26 @@ export interface ModelResolver {
 }
 
 /**
- * Reserved refill / coordinator event interface.
- * Swarm host entry stays closed; tests drive this directly.
+ * Coordinator instruction for one suspended hang.
+ * Entry eligibility is not read from this object. The swarm executor admits
+ * only a trusted independent_swarm context; a worker cannot mint that by
+ * filling these fields.
+ * planId and planVersion are omitted when the coordinator has no legal plan.
  */
 export interface CoordinatorResumeEvent {
-  /** The plan version the coordinator has accepted and is granting quota for. */
-  readonly planVersion: number;
-  /** Local quota units granted by the coordinator for this resume. */
+  readonly refillId: string;
+  readonly runId: string;
+  readonly workerId: string;
+  readonly dedupeId: string;
+  /** New attempt created for this resume. Must differ from hangAttemptId. */
+  readonly attemptId: string;
+  /** Attempt that is still suspended in awaiting_coordinator. */
+  readonly hangAttemptId: string;
+  readonly planId?: string;
+  readonly planVersion?: number;
   readonly grantedQuota: number;
-  /** ISO-8601 deadline for the awaiting_coordinator wait window. */
   readonly waitDeadline: string;
-  /** True when coordinator_resumed should count 1 against the newly granted quota. */
+  /** True only when entering executor_write should consume one local grant unit. */
   readonly countAgainstGrantedQuota: boolean;
 }
 

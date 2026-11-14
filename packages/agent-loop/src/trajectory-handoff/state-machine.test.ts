@@ -389,6 +389,40 @@ describe('HandoffStateMachine', () => {
     });
   });
 
+  describe('knife 3 coordinator edges', () => {
+    const awaiting = (): HandoffKernelState => ({
+      state: 'awaiting_coordinator',
+      plan: null,
+      counters: { sessionHandoffs: 2, turnHandoffs: 1 },
+      enteredAt: now(),
+      turnNumber: 1,
+    });
+
+    it('escalates into awaiting_coordinator without counting or terminating', () => {
+      for (const event of ['shared_scope_escalated', 'local_capped_escalated'] as const) {
+        for (const from of ['planner_readonly', 'plan_ready', 'executor_write', 'planner_repair', 'awaiting_coordinator'] as const) {
+          const result = applyTransition({ ...awaiting(), state: from }, event, now());
+          expect(result.ok).toBe(true);
+          if (!result.ok) continue;
+          expect(result.next.state).toBe('awaiting_coordinator');
+          expect(result.counted).toBe(false);
+          expect(result.next.counters).toEqual({ sessionHandoffs: 2, turnHandoffs: 1 });
+          expect(isTerminal(result.next.state)).toBe(false);
+          expect(isSuspended(result.next.state)).toBe(true);
+        }
+      }
+    });
+
+    it('rejects to failed unless the host explicitly caps', () => {
+      const failed = applyTransition(awaiting(), 'coordinator_rejected', now());
+      const capped = applyTransition(awaiting(), 'coordinator_rejected', now(), undefined, { rejection: 'capped' });
+      expect(failed.ok && failed.next.state).toBe('failed');
+      expect(capped.ok && capped.next.state).toBe('capped');
+      if (failed.ok) expect(failed.counted).toBe(false);
+      if (capped.ok) expect(isTerminal(capped.next.state)).toBe(true);
+    });
+  });
+
   describe('Comprehensive edge coverage', () => {
     it('covers all enumerated transitions without errors', () => {
       const transitions = listAllTransitions();
