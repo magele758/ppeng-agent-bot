@@ -1,4 +1,16 @@
 export const knowledge = {
+  vault: {
+    title: 'Obsidian save location',
+    help: 'Enter the Obsidian vault root on the computer running Lab. Clear and save to restore automatic detection.',
+    path: 'Vault path',
+    auto: 'Detect the active vault',
+    destination: 'Current destination',
+    save: 'Save path',
+    missing: 'No vault detected',
+    saved: 'Save location updated',
+    invalid: 'Enter an absolute vault path containing a .obsidian folder.',
+    failed: 'Could not read or save Obsidian settings.'
+  },
   notes: {
     subjects: 'Subjects',
     related: 'Also covered by these notes',

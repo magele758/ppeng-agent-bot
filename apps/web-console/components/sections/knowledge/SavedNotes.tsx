@@ -18,6 +18,11 @@ function byTopic(notes: Note[]) {
 
 export function SavedNotes() {
   const {t} = useI18n();
+  return <><a href="#/settings/integrations">{t('knowledge.vault.title')}</a><NoteGraph /></>;
+}
+
+function NoteGraph() {
+  const {t} = useI18n();
   const [notes,setNotes] = useState<Note[]>();
   const [selected,setSelected] = useState<string | null>(null);
   const [failed,setFailed] = useState(false);

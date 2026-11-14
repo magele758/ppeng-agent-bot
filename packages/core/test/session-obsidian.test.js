@@ -48,3 +48,20 @@ test('selected reply excludes neighboring turns and tools [AC:session-obsidian#A
   assert.throws(()=>selectedReply(messages,[]));
   assert.throws(()=>selectedReply(messages,['missing']));
 });
+
+test('vault setting persists until cleared and rejects invalid replacements [AC:session-obsidian#AC-6]', async t => {
+  const { resolveVault, configureVault } = await import('../../../apps/daemon/dist/obsidian-settings.js');
+  const state = new Map();
+  const store = {getDaemonControl:key=>state.get(key), setDaemonControl:(key,value)=>state.set(key,value), deleteDaemonControl:key=>state.delete(key)};
+  const directory = await mkdtemp(path.join(tmpdir(),'vault-setting-'));
+  t.after(()=>rm(directory,{recursive:true,force:true}));
+  await mkdir(path.join(directory,'.obsidian'));
+  const auto = async()=>'/auto';
+  await configureVault(store,directory);
+  const chosen = await resolveVault(store,auto);
+  assert.equal(path.basename(chosen),path.basename(directory));
+  await assert.rejects(configureVault(store,path.join(directory,'missing')));
+  assert.equal(await resolveVault(store,auto),chosen);
+  await configureVault(store,'');
+  assert.equal(await resolveVault(store,auto),'/auto');
+});

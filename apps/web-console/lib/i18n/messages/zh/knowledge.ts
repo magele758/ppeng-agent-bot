@@ -1,4 +1,16 @@
 export const knowledge = {
+  vault: {
+    title: 'Obsidian 保存位置',
+    help: '填写运行 Lab 的电脑上的 Obsidian 库根目录。留空并保存可恢复自动识别。',
+    path: '库路径',
+    auto: '自动识别当前库',
+    destination: '当前收藏写入目录',
+    save: '保存路径',
+    missing: '尚未找到 Obsidian 库',
+    saved: '保存位置已更新',
+    invalid: '请填写包含 .obsidian 文件夹的库根目录绝对路径。',
+    failed: '无法读取或保存 Obsidian 设置。'
+  },
   notes: {
     subjects: '主题分类',
     related: '这些笔记也涉及',
