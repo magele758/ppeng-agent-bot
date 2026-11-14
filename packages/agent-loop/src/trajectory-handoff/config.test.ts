@@ -40,7 +40,7 @@ describe('parseCapabilityTiers', () => {
   });
 
   describe('Explicit off wins', () => {
-    it('enabled: false disables handoff regardless of other fields', () => {
+    it('enabled: false disables handoff regardless of other fields [AC:trajectory-handoff-explicit#TH-2]', () => {
       const result = parseCapabilityTiers({
         enabled: false,
         roles: { plannerModel: 'gpt-4', executorModel: 'gpt-4' },
@@ -49,6 +49,11 @@ describe('parseCapabilityTiers', () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.resolved.enabled).toBe(false);
+        expect(result.resolved.enablementSource).toBe('explicit_off');
+        expect(result.resolved.plannerModel).toBe('gpt-4');
+        expect(result.resolved.executorModel).toBe('gpt-4');
+        expect(result.resolved.perSessionCap).toBe(10);
+        expect(result.resolved.perTurnCap).toBe(5);
       }
     });
 
@@ -311,6 +316,7 @@ describe('parseCapabilityTiers', () => {
       if (result.ok) {
         expect(result.resolved).toEqual({
           enabled: true,
+          enablementSource: 'explicit_on',
           plannerModel: 'claude-3-opus',
           executorModel: 'claude-3-sonnet',
           perSessionCap: 8,

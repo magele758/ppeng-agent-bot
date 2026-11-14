@@ -385,6 +385,7 @@ export {
   resolveOrchestrationEngine,
   resolveRunProfile,
   runProfileFromSession,
+  trajectoryHandoffGateFromMetadata,
   sealTaskRunModePatch,
   SKILL_SCOPES,
   TASK_MODES,
@@ -737,7 +738,37 @@ export type {
 export {
   parseCapabilityTiers,
   parseCapabilityTiersOrNull,
+  classifyEnablement,
 } from './trajectory-handoff/config.js';
+export type { EnablementSource } from './trajectory-handoff/config.js';
+export {
+  checkHandoffEnabled,
+  distinguishEnablementSource,
+  handoffRuntimeEnabled,
+} from './trajectory-handoff/host-integration.js';
+export {
+  acceptedPlanVersion,
+  commitPlanRevision,
+  resolveResumeCursor,
+  roundTripHandoffContext,
+  scriptDualModelHandoff,
+} from './trajectory-handoff/plan-commit.js';
+export type {
+  AppliedEffectRecord,
+  HandoffContextPack,
+  ResumePolicyName,
+  ResumeStep,
+} from './trajectory-handoff/plan-commit.js';
+export {
+  beginTrajectoryWrite,
+  denyTrajectoryTool,
+  finishTrajectoryWrite,
+  noteTrajectoryWrite,
+  trajectoryWritesPending,
+  prepareTrajectoryToolWave,
+  trajectoryToolPermission,
+} from './trajectory-handoff/tool-entry.js';
+export type { HandoffPerm } from './trajectory-handoff/tool-entry.js';
 export type {
   EffectivePermissions,
   TrajectoryHandoffAdapter,

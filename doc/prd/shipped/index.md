@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 455 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 456 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -1128,6 +1128,12 @@
 需求正文见 [other](other.md)。
 
 - `trace-stream-retention` 恢复路径消息身份与长句复读保护
+
+## trajectory（1）
+
+需求正文见 [other](other.md)。
+
+- `trajectory-handoff-explicit` Explicit trajectory handoff enablement, tool intersection, and role pin
 
 ## turn（2）
 

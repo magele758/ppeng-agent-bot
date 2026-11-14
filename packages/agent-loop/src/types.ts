@@ -300,6 +300,11 @@ export interface ToolContract<Args extends Record<string, unknown> = Record<stri
   /** Side effect cannot be undone; wave failure records carryover instead. */
   irreversible?: boolean;
   /**
+   * Host-owned plan mutation. Allowed in an active planner or executor
+   * occupancy. Not a generic file write, and a read-only host phase still denies it.
+   */
+  planStore?: { readonly kind: 'plan_state' };
+  /**
    * Explicit PTC namespace classification. Unmarked tools are never injected
    * into a generated workflow cell, even when their generic side-effect level
    * happens to be `none`.

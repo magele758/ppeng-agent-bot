@@ -1,3 +1,6 @@
+import type { EnablementSource } from '../trajectory-handoff/config.js';
+import { distinguishEnablementSource, handoffRuntimeEnabled } from '../trajectory-handoff/host-integration.js';
+
 /**
  * Generic 8-value TaskMode / RunProfile (HOW) × skill_scope (WHAT).
  * Assembly uses this repo's tool names only — no host-native overlay,
@@ -475,4 +478,15 @@ export function visibleToolNames(
 ): string[] {
   const assembled = assembledNames.map((name) => ({ name }));
   return applyRunProfileToTools(assembled, profile, assembled).map((t) => t.name);
+}
+
+/** Explicit handoff gate. Missing tiers stay off. Called by the turn kernel. */
+export function trajectoryHandoffGateFromMetadata(metadata: Record<string, unknown> | undefined): {
+  enabled: boolean;
+  enablementSource: EnablementSource;
+} {
+  return {
+    enabled: handoffRuntimeEnabled(metadata),
+    enablementSource: distinguishEnablementSource(metadata),
+  };
 }

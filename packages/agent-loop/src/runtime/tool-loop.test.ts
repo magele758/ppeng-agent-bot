@@ -1213,3 +1213,58 @@ describe('JSON unavailable source ownership', () => {
     }
   });
 });
+
+describe('trajectory handoff tool authority', () => {
+  it('does not run a write when the stored session leaves executor during the snapshot', async () => {
+    let stored: SessionRecord = {
+      id: 's1',
+      metadata: {
+        capabilityTiers: { enabled: true },
+        handoffState: 'executor_write',
+        handoffRole: 'executor',
+      },
+    } as unknown as SessionRecord;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let waiting = false;
+    let ran = false;
+    const write = tool('write_file', async () => {
+      ran = true;
+      return { ok: true, content: 'wrote' };
+    }, { sideEffectLevel: 'workspace' });
+    const h = host({
+      readSession: () => stored,
+      runLifecycleHook: async () => {
+        stored = {
+          ...stored,
+          metadata: {
+            ...stored.metadata,
+            handoffState: 'planner_readonly',
+            handoffRole: 'planner',
+          },
+        };
+        waiting = true;
+        await gate;
+        return {};
+      },
+    });
+    const pending = executeToolCalls(
+      h,
+      [write],
+      [call('write_file', { path: 'a.txt' })],
+      { session: { id: 's1', metadata: { capabilityTiers: { enabled: true }, handoffState: 'executor_write', handoffRole: 'executor' } } } as unknown as RunContext,
+      false,
+      's1',
+      1,
+    );
+    for (let i = 0; i < 20 && !waiting; i += 1) await Promise.resolve();
+    expect(waiting).toBe(true);
+    release();
+    const results = await pending;
+    expect(ran).toBe(false);
+    expect(results[0]?.ok).toBe(false);
+    expect(results[0]?.content).toContain('Role: false');
+  });
+});

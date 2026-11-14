@@ -122,7 +122,15 @@ export function modelProviderRoutes(runtime: RawAgentRuntime): RouteSpec[] {
             if (ref) fallbackRefs.push(ref);
           }
         }
-        patchCatalogRouting(runtime.store, { thinkingMode, fallbackRefs });
+        const routingPatch: {
+          thinkingMode: typeof thinkingMode;
+          fallbackRefs: typeof fallbackRefs;
+          capabilityTiers?: unknown;
+        } = { thinkingMode, fallbackRefs };
+        if (Object.prototype.hasOwnProperty.call(body, 'capabilityTiers')) {
+          routingPatch.capabilityTiers = body.capabilityTiers;
+        }
+        patchCatalogRouting(runtime.store, routingPatch);
         json(response, 200, publicCatalogPayload(runtime.store, process.env));
       }
     },

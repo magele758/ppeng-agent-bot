@@ -31,6 +31,7 @@ export {
   TASK_RUN_MODE_BOUND_KEY,
   TEAMS_TOOLS,
   taskModeFromMetadata,
+  trajectoryHandoffGateFromMetadata,
   visibleToolNames,
   skillScopeFromMetadata,
 } from '@ppeng/agent-loop';

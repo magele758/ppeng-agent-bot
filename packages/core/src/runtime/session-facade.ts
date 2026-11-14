@@ -25,6 +25,9 @@ import { tryCreateDynToolStore } from '../dyn-tools/store.js';
 import { inheritModelOverride } from './spawn-policy.js';
 import { DYN_TOOL_PROMOTE_APPROVAL } from '../dyn-tools/types.js';
 import { applyContextSources, normalizeContextSources } from '../ingestion/context-sources.js';
+import { applySessionEnablement } from '../trajectory-handoff/persist.js';
+import { classifyEnablement } from '@ppeng/agent-loop';
+import { readModelCatalog } from '../model/provider-catalog.js';
 import type {
   AgentSpec,
   ApprovalRecord,
@@ -156,12 +159,13 @@ export function createChatSession(
     metadata?: Record<string, unknown>;
   }
 ): SessionRecord {
+  const inherited = input.metadata?.capabilityTiers == null ? explicitCatalogTiers(host.store) : undefined;
   const session = host.store.createSession({
     title: input.title ?? 'Chat Session',
     mode: 'chat',
     agentId: input.agentId?.trim() ? input.agentId.trim() : 'main',
     background: input.background ?? false,
-    metadata: input.metadata
+    metadata: applySessionEnablement(inherited ? { ...input.metadata, capabilityTiers: inherited } : input.metadata)
   });
 
   const ids = input.imageAssetIds?.filter(Boolean) ?? [];
@@ -172,6 +176,14 @@ export function createChatSession(
   }
 
   return session;
+}
+
+function explicitCatalogTiers(store: SqliteStateStore): Record<string, unknown> | undefined {
+  const tiers = readModelCatalog(store).capabilityTiers;
+  if (!tiers) return undefined;
+  const source = classifyEnablement(tiers);
+  if (source !== 'explicit_on' && source !== 'explicit_off') return undefined;
+  return { ...tiers };
 }
 
 export function createTaskSession(
@@ -201,10 +213,10 @@ export function createTaskSession(
     agentId: input.agentId?.trim() ? input.agentId.trim() : 'main',
     taskId: task.id,
     background: input.background ?? true,
-    metadata: {
+    metadata: applySessionEnablement({
       autoRun: true,
       ...(input.metadata ?? {})
-    }
+    })
   });
 
   host.store.updateTask(task.id, { sessionId: session.id });

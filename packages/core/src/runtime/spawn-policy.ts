@@ -44,6 +44,31 @@ export function inheritModelOverride(
   return pinned ? { modelOverride: pinned } : {};
 }
 
+/** Copies an explicit handoff ceiling. Parser-default and auto-policy tiers do not propagate. */
+export function handoffChildCeiling(metadata: Record<string, unknown> | undefined): Record<string, unknown> {
+  if (!metadata) return {};
+  const tiers = metadata.capabilityTiers;
+  if (!tiers || typeof tiers !== 'object' || Array.isArray(tiers)) return {};
+  const record = tiers as Record<string, unknown>;
+  if (record.enabled !== true) return {};
+  if (record.enablementSource === 'parser_default' || record.enablementSource === 'auto_policy') return {};
+  const ceiling: Record<string, unknown> = { capabilityTiers: tiers };
+  for (const key of ['handoffState', 'handoffRole', 'hostPhase'] as const) {
+    if (typeof metadata[key] === 'string') ceiling[key] = metadata[key];
+  }
+  if (Array.isArray(metadata.originalPerms)) ceiling.originalPerms = metadata.originalPerms;
+  if (metadata.handoffKernel && typeof metadata.handoffKernel === 'object') ceiling.handoffKernel = metadata.handoffKernel;
+  return ceiling;
+}
+
+/** A planner child must not inherit the parent's current model pin. */
+export function childModelInheritance(
+  metadata: Record<string, unknown> | undefined
+): { modelOverride?: SessionModelOverride } {
+  if (handoffChildCeiling(metadata).handoffRole === 'planner') return {};
+  return inheritModelOverride(metadata);
+}
+
 /**
  * Teammates from non-Bot parents keep today's behavior (no inherited mode). A
  * Bot parent passes its effective mode down like subagents, so

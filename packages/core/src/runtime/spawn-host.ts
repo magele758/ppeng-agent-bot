@@ -37,9 +37,10 @@ import { inheritWorkspaceBinding, resolveEffectiveWorkspace, workspaceBindingFro
 import type { OrchestrationRun } from '../orchestrator/types.js';
 import {
   botTeammatePermission,
+  childModelInheritance,
   childPermissionMode,
+  handoffChildCeiling,
   inheritBotAllowlists,
-  inheritModelOverride,
   copyScratchOnSpawn
 } from './spawn-policy.js';
 import {
@@ -241,28 +242,30 @@ export async function spawnSubagentOutcome(
   if (opts?.allowedTools?.length) {
     childMeta.allowedTools = opts.allowedTools;
   }
+  const liveParent = host.store.getSession(context.session.id) ?? context.session;
   Object.assign(
     childMeta,
-    inheritBotAllowlists(context.session.metadata, {
+    inheritBotAllowlists(liveParent.metadata, {
       agentAllowedTools: host.store.getAgent(agentId)?.allowedTools,
       requestedTools: opts?.allowedTools
     })
   );
-  Object.assign(childMeta, inheritModelOverride(context.session.metadata));
-  if (opts?.model) {
+  Object.assign(childMeta, childModelInheritance(liveParent.metadata));
+  const plannerChild = handoffChildCeiling(liveParent.metadata).handoffRole === 'planner';
+  if (opts?.model && !plannerChild) {
     childMeta.modelOverride = opts.model;
   }
+  Object.assign(childMeta, handoffChildCeiling(liveParent.metadata));
   if (opts?.minConfidence != null) {
     childMeta.minConfidence = opts.minConfidence;
   }
 
-  const inheritedMode = childPermissionMode(context.session.metadata);
+  const inheritedMode = childPermissionMode(liveParent.metadata);
   if (inheritedMode) {
     childMeta.permissionMode = inheritedMode;
   }
-  Object.assign(childMeta, inheritForkRetrievalMetadata(context.session.metadata));
-  Object.assign(childMeta, inheritBotIdentityMetadata(context.session, host.store));
-  const liveParent = host.store.getSession(context.session.id) ?? context.session;
+  Object.assign(childMeta, inheritForkRetrievalMetadata(liveParent.metadata));
+  Object.assign(childMeta, inheritBotIdentityMetadata(liveParent, host.store));
   Object.assign(childMeta, inheritedExecutionMetadata(liveParent.metadata, liveParent.id));
 
   const subagent = host.store.createSession({
@@ -351,7 +354,8 @@ export async function spawnTeammateOutcome(
     background: true,
     metadata: {
       ...inheritWorkspaceBinding(context.session.metadata),
-      ...inheritModelOverride(context.session.metadata),
+      ...childModelInheritance(context.session.metadata),
+      ...handoffChildCeiling(context.session.metadata),
       ...botTeammatePermission(context.session.metadata),
       ...inheritBotAllowlists(context.session.metadata, {
         agentAllowedTools: host.store.getAgent(input.name)?.allowedTools

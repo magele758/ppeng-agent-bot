@@ -79,12 +79,15 @@ import {
   closeOpenToolWave,
 } from '../session/tool-wave-close.js';
 import { rollbackReasonOf } from '../session/step-tx.js';
-import { applyRunProfileToTools } from '../runtime/run-profile.js';
+import { applyRunProfileToTools, trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
+import { denyTrajectoryTool, prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
+import { advanceExplicitHandoffAfterTools, closePlannerDirectAnswer, handoffContextMessage, prepareExplicitSessionHandoff } from '../trajectory-handoff/session-turn.js';
 import { defaultWorkspaceRoots } from '../workspace/default-roots.js';
 import type {
   AgentSpec,
   MessagePart,
   ModelStreamChunk,
+  ModelTurnInput,
   ModelTurnResult,
   RunContext,
   SessionMessage,
@@ -126,8 +129,85 @@ export interface TurnKernelOptions {
 // Internal helpers
 // ============================================================================
 
+function handoffSessionMetadata(session: { metadata?: unknown }): Record<string, unknown> | undefined {
+  const metadata = session.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return undefined;
+  return metadata as Record<string, unknown>;
+}
+
+async function executeGatedToolWave(
+  host: TurnKernelHost,
+  session: { id: string; metadata?: unknown },
+  ...args: Parameters<TurnKernelHost['executeToolCalls']>
+): Promise<Awaited<ReturnType<TurnKernelHost['executeToolCalls']>>> {
+  const live = host.store.getSession(session.id) ?? session;
+  if (!trajectoryHandoffGateFromMetadata(handoffSessionMetadata(live)).enabled) {
+    return host.executeToolCalls(...args);
+  }
+  const prepared = await prepareTrajectoryToolWave(live);
+  if (!prepared.ok) {
+    return args[0].map((call) => ({
+      toolCallId: call.toolCallId,
+      name: call.name,
+      ok: false,
+      content: prepared.reason,
+    }));
+  }
+  const calls = args[0];
+  const turnTools = args[4];
+  const catalog = new Map<string, { name: string; access?: string; sideEffectLevel?: string }>();
+  for (const tool of turnTools ?? host.tools) catalog.set(tool.name, tool);
+  const denied: Array<{ toolCallId: string; name: string; ok: false; content: string }> = [];
+  const allowed: typeof calls = [];
+  for (const call of calls) {
+    const reason = denyTrajectoryTool(live, catalog.get(call.name) ?? { name: call.name });
+    if (reason) denied.push({ toolCallId: call.toolCallId, name: call.name, ok: false, content: reason });
+    else allowed.push(call);
+  }
+  const ran = allowed.length === 0 ? [] : await host.executeToolCalls(allowed, args[1], args[2], args[3], turnTools);
+  const byId = new Map<string, (typeof ran)[number]>();
+  for (const result of [...denied, ...ran]) byId.set(result.toolCallId, result);
+  return calls.map((call) => byId.get(call.toolCallId) ?? {
+    toolCallId: call.toolCallId,
+    name: call.name,
+    ok: false,
+    content: 'missing tool result',
+  });
+}
+
+function recordExplicitHandoff(
+  host: TurnKernelHost,
+  sessionId: string,
+  results: readonly { toolCallId: string; name: string; ok: boolean; content: string; metadata?: Record<string, unknown> }[],
+): void {
+  const session = host.store.getSession(sessionId);
+  const patch = advanceExplicitHandoffAfterTools(handoffSessionMetadata(session ?? {}), results, sessionId);
+  if (patch) host.mergeSessionMetadata(sessionId, patch);
+}
+
 function textPart(text: string): MessagePart {
   return { type: 'text', text };
+}
+
+function foldHandoffContext(host: TurnKernelHost, sessionId: string, turnInput: ModelTurnInput): ModelTurnInput {
+  const text = handoffContextMessage(host.store.getSession(sessionId)?.metadata);
+  if (!text) return turnInput;
+  const message: SessionMessage = {
+    id: 'handoff-context-' + sessionId,
+    sessionId,
+    role: 'system',
+    parts: [textPart(text)],
+    createdAt: new Date(0).toISOString(),
+  };
+  return { ...turnInput, messages: [...turnInput.messages, message] };
+}
+
+function closePlannerAnswer(host: TurnKernelHost, sessionId: string, parts: readonly MessagePart[]): void {
+  if (parts.some((part) => part.type === 'tool_call')) return;
+  const answer = parts.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n');
+  if (!answer) return;
+  const patch = closePlannerDirectAnswer(host.store.getSession(sessionId)?.metadata, answer);
+  if (patch) host.mergeSessionMetadata(sessionId, patch);
 }
 
 function isContextOverflowError(err: unknown): boolean {
@@ -274,7 +354,9 @@ async function continueResumedToolWave(input: {
     unmatchedToolCallsFromFold(input.host.store.foldMessages(input.sid), allowIds)
   );
   if (executable.length === 0) return undefined;
-  const results = await input.host.executeToolCalls(
+  const results = await executeGatedToolWave(
+    input.host,
+    input.context.session,
     executable,
     input.context,
     picked.allowExternalAiTools,
@@ -289,6 +371,7 @@ async function continueResumedToolWave(input: {
     input.sessionId,
     input.onModelStreamChunk
   );
+  recordExplicitHandoff(input.host, input.sid, results);
   if (toolWaveHeldForApproval(results)) {
     return parkResumedApproval(input.host, input.sid, input.remaining, input.writerRunId, input.interrupt);
   }
@@ -1067,6 +1150,8 @@ return undefined;
 async () => {
 async function __gate133() {
 
+await prepareExplicitSessionHandoff(host, sid, { userTurn: turn === 0 });
+turnInput = foldHandoffContext(host, sid, turnInput);
 turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
 return undefined;
 }
@@ -1102,6 +1187,8 @@ return undefined;
 }
 async function __gate135() {
 try {
+            await prepareExplicitSessionHandoff(host, sid, { userTurn: false });
+            turnInput = foldHandoffContext(host, sid, turnInput);
             turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
           } catch (retryError) {
             const reason =
@@ -1160,6 +1247,8 @@ packedRetry = loopConfig.overflowReprepare
                     }),
               };
 turnInput = { ...turnInput, messages: packedRetry.messages };
+await prepareExplicitSessionHandoff(host, sid, { userTurn: false });
+turnInput = foldHandoffContext(host, sid, turnInput);
 turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
 return undefined;
 }
@@ -1745,8 +1834,9 @@ return undefined;
 return undefined;
 }
 async function __gate97() {
-let stopPhase: any;
-let stopHook: any;
+closePlannerAnswer(host, sid, turnResult.assistantParts);
+let stopPhase: 'subagent_stop' | 'stop';
+let stopHook: { block?: boolean; systemMessage?: string; message?: string } | undefined;
 let goal: any;
 let steeredNow: any;
 async function __gate90() {
@@ -1878,6 +1968,7 @@ return undefined;
 }
 async function __gate100() {
 if (toolCalls.length === 0) {
+        closePlannerAnswer(host, sid, turnResult.assistantParts);
         return kernelTurnSignal('continue');
       }
 if (signal.aborted) {
@@ -1983,7 +2074,9 @@ if (executable.length === 0) {
       }
 toolsStep = stepInfo(turn, 'tools_done');
 await host.stepTx?.beginStep?.(toolsStep);
-results = await host.executeToolCalls(
+results = await executeGatedToolWave(
+        host,
+        context.session,
         executable,
         context,
         allowExternalAiTools,
@@ -1998,6 +2091,7 @@ host.processToolResults(
         sid,
         options?.onModelStreamChunk
       );
+recordExplicitHandoff(host, sid, results);
 if (toolWaveHeldForApproval(results)) {
         return kernelTurnSignal('return', await parkForApproval());
       }

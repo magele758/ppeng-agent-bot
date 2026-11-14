@@ -11,7 +11,7 @@ export const MUTATIONS = {
   },
   approval: {
     file: 'packages/agent-loop/src/turn/kernel.ts',
-    from: 'const results = await input.host.executeToolCalls(',
-    to: 'await input.host.executeToolCalls(executable, input.context, picked.allowExternalAiTools, input.sessionId, picked.resolvedTools);\n  const results = await input.host.executeToolCalls(',
+    from: 'if (executable.length === 0) return undefined;\n  const results = await executeGatedToolWave(',
+    to: 'if (executable.length === 0) return undefined;\n  await executeGatedToolWave(\n    input.host,\n    input.context.session,\n    executable,\n    input.context,\n    picked.allowExternalAiTools,\n    input.sessionId,\n    picked.resolvedTools\n  );\n  const results = await executeGatedToolWave(',
   },
 };

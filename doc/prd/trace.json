@@ -4588,6 +4588,17 @@
       ]
     },
     {
+      "id": "trajectory-handoff-explicit",
+      "title": "Explicit trajectory handoff enablement, tool intersection, and role pin",
+      "tests": [
+        "packages/agent-loop/src/trajectory-handoff/config.test.ts",
+        "packages/agent-loop/src/trajectory-handoff/plan-commit.test.ts",
+        "packages/agent-loop/src/trajectory-handoff/tool-entry.test.ts",
+        "packages/agent-loop/src/turn/kernel-handoff.test.ts",
+        "packages/core/test/trajectory-handoff-explicit.test.js"
+      ]
+    },
+    {
       "id": "turn-end-actions",
       "title": "完整回复结束后才在末尾显示操作",
       "tests": [

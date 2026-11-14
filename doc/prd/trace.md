@@ -4037,6 +4037,16 @@ Slack Events 入站按线程唤醒例行任务
 - `packages/agent-loop/src/turn/kernel.test.ts`
 - `packages/core/test/bot-startup-kernel.test.ts`
 
+### trajectory-handoff-explicit
+
+Explicit trajectory handoff enablement, tool intersection, and role pin
+
+- `packages/agent-loop/src/trajectory-handoff/config.test.ts`
+- `packages/agent-loop/src/trajectory-handoff/plan-commit.test.ts`
+- `packages/agent-loop/src/trajectory-handoff/tool-entry.test.ts`
+- `packages/agent-loop/src/turn/kernel-handoff.test.ts`
+- `packages/core/test/trajectory-handoff-explicit.test.js`
+
 ### turn-end-actions
 
 完整回复结束后才在末尾显示操作
