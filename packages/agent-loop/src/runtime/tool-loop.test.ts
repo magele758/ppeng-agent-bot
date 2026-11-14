@@ -1223,8 +1223,11 @@ describe('trajectory handoff tool authority', () => {
         handoffState: 'executor_write',
         handoffRole: 'executor',
       },
-    } as SessionRecord;
-    const gate = Promise.withResolvers<void>();
+    } as unknown as SessionRecord;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     let waiting = false;
     let ran = false;
     const write = tool('write_file', async () => {
@@ -1243,7 +1246,7 @@ describe('trajectory handoff tool authority', () => {
           },
         };
         waiting = true;
-        await gate.promise;
+        await gate;
         return {};
       },
     });
@@ -1251,14 +1254,14 @@ describe('trajectory handoff tool authority', () => {
       h,
       [write],
       [call('write_file', { path: 'a.txt' })],
-      { session: { id: 's1', metadata: { capabilityTiers: { enabled: true }, handoffState: 'executor_write', handoffRole: 'executor' } } } as RunContext,
+      { session: { id: 's1', metadata: { capabilityTiers: { enabled: true }, handoffState: 'executor_write', handoffRole: 'executor' } } } as unknown as RunContext,
       false,
       's1',
       1,
     );
     for (let i = 0; i < 20 && !waiting; i += 1) await Promise.resolve();
     expect(waiting).toBe(true);
-    gate.resolve();
+    release();
     const results = await pending;
     expect(ran).toBe(false);
     expect(results[0]?.ok).toBe(false);

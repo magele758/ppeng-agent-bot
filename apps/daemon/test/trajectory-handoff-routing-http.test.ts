@@ -51,11 +51,8 @@ test('routing save keeps an explicit close and new chats copy it without a manua
       response.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
     });
   });
-  const listening = Promise.withResolvers<void>();
-  const closed = Promise.withResolvers<void>();
   try {
-    server.listen(0, '127.0.0.1', listening.resolve);
-    await listening.promise;
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
     assert.ok(address && typeof address === 'object');
     const url = `http://127.0.0.1:${address.port}/api/model-providers/routing`;
@@ -91,8 +88,7 @@ test('routing save keeps an explicit close and new chats copy it without a manua
     assert.equal(supplied.metadata?.capabilityTiers?.roles?.plannerModel, 'other/model');
   } finally {
     server.closeAllConnections();
-    server.close(() => closed.resolve());
-    await closed.promise;
+    await new Promise<void>(resolve => server.close(() => resolve()));
     runtime.store.db.close();
     rmSync(dir, { recursive: true, force: true });
   }
