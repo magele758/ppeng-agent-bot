@@ -747,6 +747,34 @@ export {
   handoffAutoEligible,
   handoffRuntimeEnabled,
 } from './trajectory-handoff/host-integration.js';
+export type {
+  HangIdentity,
+  RefillRequest,
+  GrantRefusalReason,
+  GrantDecision,
+} from './trajectory-handoff/parent-ledger.js';
+export {
+  GRANT_DECISION_ORDER,
+  describeDecisionOrder,
+  InMemoryParentBudgetLedger,
+} from './trajectory-handoff/parent-ledger.js';
+export type { LocalGrant, ResumeTarget, ApplyGrantResult } from './trajectory-handoff/swarm-resume.js';
+export {
+  legalPlanVersion,
+  usableLocalUnits,
+  installGrantedQuota,
+  voidLeftoverLocalGrant,
+  classifyCoordinatorInstruction,
+  assessSingleWorkerRecovery,
+  escalateWorker,
+  rejectCoordinator,
+  coordinatorSuspension,
+  applySuccessfulGrant,
+  consumeLocalUnit,
+  coordinatorEventIdentity,
+  applyCoordinatorResumeEvent,
+  resumeAfterRoleBudgetExhausted,
+} from './trajectory-handoff/swarm-resume.js';
 export {
   acceptedPlanVersion,
   commitPlanRevision,
