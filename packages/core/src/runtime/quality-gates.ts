@@ -20,6 +20,19 @@ function restrictTools(tools: string[], limit: unknown): string[] {
   return tools.filter(name => limit.includes(name));
 }
 
+
+function flywheelReviewPhaseMetadata(parentMetadata: Record<string, unknown> | undefined): Record<string, unknown> {
+  const inherited: Record<string, unknown> = { hostPhase: 'review' };
+  const alreadyEnabled = parentMetadata?.handoffEnablement || parentMetadata?.capabilityTiers || parentMetadata?.handoffState;
+  if (alreadyEnabled) {
+    inherited.handoffEnablement = parentMetadata?.handoffEnablement ?? { source: 'explicit_on' };
+    inherited.capabilityTiers = parentMetadata?.capabilityTiers ?? { enablementSource: 'explicit_on', enabled: true };
+    if (parentMetadata?.handoffState) inherited.handoffState = parentMetadata.handoffState;
+    if (parentMetadata?.handoffKernel) inherited.handoffKernel = parentMetadata.handoffKernel;
+  }
+  return inherited;
+}
+
 export async function runQualityCheck(host: SpawnHost, input: {
   stage: 'review' | 'test'; title: string; criteria: string[];
   implementation?: SessionRecord; context: string;
@@ -45,7 +58,8 @@ export async function runQualityCheck(host: SpawnHost, input: {
       userId: parent.metadata?.userId, tenantId: parent.metadata?.tenantId,
       ...inheritWorkspaceBinding(parent.metadata), ...inheritBotIdentityMetadata(parent, host.store),
       ...inheritModelOverride(parent.metadata), ...inheritBotAllowlists(parent.metadata),
-      permissionMode: childPermissionMode(parent.metadata), allowedTools, qualityStage: input.stage
+      permissionMode: childPermissionMode(parent.metadata), allowedTools, qualityStage: input.stage,
+      ...(input.stage === 'review' ? flywheelReviewPhaseMetadata(parent.metadata) : {})
     }
   });
   const criteria = qualityCriteria(input.criteria);

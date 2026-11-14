@@ -8,7 +8,14 @@ import type { Logger } from '../logger.js';
 import { SocialScheduleService } from '../services/social-schedule-service.js';
 import { AutonomousScheduler } from '../services/autonomous-scheduler.js';
 import { SwarmExecutor } from '../swarm/executor.js';
-import { readSwarmHandoffEntrySwitch, SWARM_HANDOFF_ENTRY_CONTROL_KEY, trustedContextForSwarmRun } from '../trajectory-handoff/swarm-entry.js';
+import {
+  FLYWHEEL_HANDOFF_ENTRY_CONTROL_KEY,
+  flywheelInFlightShouldCancel,
+  readFlywheelHandoffEntrySwitch,
+  readSwarmHandoffEntrySwitch,
+  SWARM_HANDOFF_ENTRY_CONTROL_KEY,
+  trustedContextForSwarmRun,
+} from '../trajectory-handoff/swarm-entry.js';
 import { TeamDagExecutor } from '../teams/executor.js';
 import { readTeamsDagSettings } from '../teams/settings.js';
 import type { WorkspaceManager } from '../workspaces.js';
@@ -25,6 +32,17 @@ import {
   runOrchestrationSubagentStage,
   type SpawnHost
 } from './spawn-host.js';
+
+function implementQualityReportFromReviews(store: SqliteStateStore, swarmId: string): unknown | null {
+  const reviews = store.swarm().listReviews(swarmId);
+  if (!reviews.length) return null;
+  const latest = reviews[reviews.length - 1]!;
+  try {
+    return JSON.parse(latest.feedback);
+  } catch {
+    return null;
+  }
+}
 
 export function createRuntimeCollaborators(input: {
   store: SqliteStateStore;
@@ -84,6 +102,7 @@ export function createRuntimeCollaborators(input: {
     log: input.log
   });
   const swarmEntry = readSwarmHandoffEntrySwitch(input.store.getDaemonControl(SWARM_HANDOFF_ENTRY_CONTROL_KEY));
+  const flywheelEntry = readFlywheelHandoffEntrySwitch(input.store.getDaemonControl(FLYWHEEL_HANDOFF_ENTRY_CONTROL_KEY));
   const swarmExecutor = new SwarmExecutor({
     store: input.store.swarm(),
     reviewTask: (run, task, session) => reviewSwarmTask(input.spawnHost(), run, task, session),
@@ -93,9 +112,11 @@ export function createRuntimeCollaborators(input: {
     runSession: (sid) => input.runSession(sid),
     enqueueSchedulerWake: (sid, reason) => input.store.enqueueSchedulerWake(sid, reason),
     sessionTeammateFinished: (sid) => sessionTeammateFinished(input.store, sid),
-    trustedHandoff: (run) => trustedContextForSwarmRun(run, swarmEntry.enabled, swarmEntry.explicitOff),
+    trustedHandoff: (run) => trustedContextForSwarmRun(run, swarmEntry.enabled, swarmEntry.explicitOff, flywheelEntry),
     swarmHandoffEntryEnabled: swarmEntry.enabled,
     swarmHandoffExplicitOff: swarmEntry.explicitOff,
+    flywheelHandoffEntryEnabled: flywheelEntry.enabled,
+    flywheelHandoffExplicitOff: flywheelEntry.explicitOff,
   });
   const teamDagExecutor = new TeamDagExecutor({
     store: input.store.teams(),
@@ -153,6 +174,10 @@ export function createRuntimeCollaborators(input: {
         .swarm()
         .listRuns({ limit: 100 })
         .find((r) => r.orchestrationRunId === orchestrationRunId),
+    getImplementQualityReport: (_run, swarm) => implementQualityReportFromReviews(input.store, swarm.id),
+    shouldCancelInFlightFlywheel: () => flywheelInFlightShouldCancel(
+      input.store.getDaemonControl(FLYWHEEL_HANDOFF_ENTRY_CONTROL_KEY)
+    ),
     runResearch: (run) => runOrchestrationResearch(input.spawnHost(), run),
     runReview: (run) => runOrchestrationSubagentStage(input.spawnHost(), run, 'review'),
     runTest: (run) => runOrchestrationSubagentStage(input.spawnHost(), run, 'test')
