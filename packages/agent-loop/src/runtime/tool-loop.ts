@@ -1045,89 +1045,18 @@ async function runUnlessJsonSourceRepeated(
   return { executed: true, result };
 }
 
-async function executeScopedTool(
+async function dispatchAdmittedScopedTool(
   host: ToolLoopHost,
-  tools: ToolContract<Record<string, unknown>>[],
+  tool: ToolContract<Record<string, unknown>>,
   toolCall: ToolCallPart,
-  context: RunContext,
-  allowExternalAiTools: boolean,
+  liveContext: RunContext,
   sessionId: string,
   completed: CompletedWaveItem[] | undefined,
-  approvalFor: (key: string) => ApprovalRecord | undefined
+  hookRewrote: boolean,
+  execInput: unknown,
+  snapshot: Awaited<ReturnType<typeof captureToolSnapshot>>,
+  fresh: SessionRecord
 ): Promise<ToolLoopResult> {
-  const admitted = refuseBeforeDispatch(host, tools, toolCall, allowExternalAiTools, sessionId);
-  if ('refused' in admitted) return admitted.refused;
-  const { tool } = admitted;
-  const denied = denyTrajectoryTool(context.session, tool);
-  if (denied) {
-    return {
-      toolCallId: toolCall.toolCallId,
-      name: tool.name,
-      ok: false,
-      content: denied,
-      problem: toolInfraProblem(tool.name, toolCall.toolCallId, 'TOOL_DISABLED_IN_SESSION', denied, {
-        title: 'Tool not available in session',
-        status: 403,
-      }),
-    };
-  }
-
-  host.emitTrace(sessionId, { kind: 'tool_start', payload: { name: tool.name, toolCallId: toolCall.toolCallId } });
-
-  let pre: {
-    permissionDecision?: string;
-    message?: string;
-    systemMessage?: string;
-    input?: unknown;
-  } = {};
-  if (host.runLifecycleHook) {
-    const read = await readPreToolUse(host, tool, toolCall, sessionId);
-    if (read.failed) return read.failed;
-    pre = read.pre;
-  }
-
-  const hookRewrote = pre.input !== undefined && stableJson(pre.input) !== stableJson(toolCall.input);
-
-  if (pre.permissionDecision === 'block') {
-    return {
-      toolCallId: toolCall.toolCallId,
-      name: tool.name,
-      ok: false,
-      content: pre.message ?? pre.systemMessage ?? 'blocked by pre_tool_use hook',
-      problem: toolInfraProblem(
-        tool.name,
-        toolCall.toolCallId,
-        'PRE_TOOL_USE_BLOCKED',
-        pre.message ?? 'blocked by pre_tool_use hook',
-        { title: 'Tool blocked by hook', status: 403 }
-      ),
-      ...(hookRewrote ? { hookRewrote: true } : {}),
-    };
-  }
-
-  if (pre.permissionDecision === 'ask') {
-    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message, approvalFor, resolvePermissionMode(context.session.metadata, host.env), hookRewrote);
-    if (asked) return asked;
-  }
-
-  const execInput = pre.input !== undefined ? pre.input : toolCall.input;
-  const snapshot = await captureToolSnapshot(tool, context, execInput);
-  const fresh = host.readSession?.(sessionId) ?? context.session;
-  const deniedNow = denyTrajectoryTool(fresh, tool);
-  if (deniedNow) {
-    return {
-      toolCallId: toolCall.toolCallId,
-      name: tool.name,
-      ok: false,
-      content: deniedNow,
-      problem: toolInfraProblem(tool.name, toolCall.toolCallId, 'TOOL_DISABLED_IN_SESSION', deniedNow, {
-        title: 'Tool not available in session',
-        status: 403,
-      }),
-    };
-  }
-  const liveContext = fresh === context.session ? context : { ...context, session: fresh };
-
   const startedAt = Date.now();
   let entered = false;
   const exportSpan = (ok: boolean) => {
@@ -1212,6 +1141,103 @@ async function executeScopedTool(
   } finally {
     if (trackedWrite) finishTrajectoryWrite(fresh.id, toolCall.toolCallId);
   }
+}
+
+async function executeScopedTool(
+  host: ToolLoopHost,
+  tools: ToolContract<Record<string, unknown>>[],
+  toolCall: ToolCallPart,
+  context: RunContext,
+  allowExternalAiTools: boolean,
+  sessionId: string,
+  completed: CompletedWaveItem[] | undefined,
+  approvalFor: (key: string) => ApprovalRecord | undefined
+): Promise<ToolLoopResult> {
+  const admitted = refuseBeforeDispatch(host, tools, toolCall, allowExternalAiTools, sessionId);
+  if ('refused' in admitted) return admitted.refused;
+  const { tool } = admitted;
+  const denied = denyTrajectoryTool(context.session, tool);
+  if (denied) {
+    return {
+      toolCallId: toolCall.toolCallId,
+      name: tool.name,
+      ok: false,
+      content: denied,
+      problem: toolInfraProblem(tool.name, toolCall.toolCallId, 'TOOL_DISABLED_IN_SESSION', denied, {
+        title: 'Tool not available in session',
+        status: 403,
+      }),
+    };
+  }
+
+  host.emitTrace(sessionId, { kind: 'tool_start', payload: { name: tool.name, toolCallId: toolCall.toolCallId } });
+
+  let pre: {
+    permissionDecision?: string;
+    message?: string;
+    systemMessage?: string;
+    input?: unknown;
+  } = {};
+  if (host.runLifecycleHook) {
+    const read = await readPreToolUse(host, tool, toolCall, sessionId);
+    if (read.failed) return read.failed;
+    pre = read.pre;
+  }
+
+  const hookRewrote = pre.input !== undefined && stableJson(pre.input) !== stableJson(toolCall.input);
+
+  if (pre.permissionDecision === 'block') {
+    return {
+      toolCallId: toolCall.toolCallId,
+      name: tool.name,
+      ok: false,
+      content: pre.message ?? pre.systemMessage ?? 'blocked by pre_tool_use hook',
+      problem: toolInfraProblem(
+        tool.name,
+        toolCall.toolCallId,
+        'PRE_TOOL_USE_BLOCKED',
+        pre.message ?? 'blocked by pre_tool_use hook',
+        { title: 'Tool blocked by hook', status: 403 }
+      ),
+      ...(hookRewrote ? { hookRewrote: true } : {}),
+    };
+  }
+
+  if (pre.permissionDecision === 'ask') {
+    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message, approvalFor, resolvePermissionMode(context.session.metadata, host.env), hookRewrote);
+    if (asked) return asked;
+  }
+
+  const execInput = pre.input !== undefined ? pre.input : toolCall.input;
+  const snapshot = await captureToolSnapshot(tool, context, execInput);
+  const fresh = host.readSession?.(sessionId) ?? context.session;
+  const deniedNow = denyTrajectoryTool(fresh, tool);
+  if (deniedNow) {
+    return {
+      toolCallId: toolCall.toolCallId,
+      name: tool.name,
+      ok: false,
+      content: deniedNow,
+      problem: toolInfraProblem(tool.name, toolCall.toolCallId, 'TOOL_DISABLED_IN_SESSION', deniedNow, {
+        title: 'Tool not available in session',
+        status: 403,
+      }),
+    };
+  }
+  const liveContext = fresh === context.session ? context : { ...context, session: fresh };
+
+  return dispatchAdmittedScopedTool(
+    host,
+    tool,
+    toolCall,
+    liveContext,
+    sessionId,
+    completed,
+    hookRewrote,
+    execInput,
+    snapshot,
+    fresh
+  );
 }
 
 async function toolExceptionResult(
