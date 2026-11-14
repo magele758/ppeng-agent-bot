@@ -8,6 +8,7 @@ import type { Logger } from '../logger.js';
 import { SocialScheduleService } from '../services/social-schedule-service.js';
 import { AutonomousScheduler } from '../services/autonomous-scheduler.js';
 import { SwarmExecutor } from '../swarm/executor.js';
+import { readSwarmHandoffEntrySwitch, SWARM_HANDOFF_ENTRY_CONTROL_KEY, trustedContextForSwarmRun } from '../trajectory-handoff/swarm-entry.js';
 import { TeamDagExecutor } from '../teams/executor.js';
 import { readTeamsDagSettings } from '../teams/settings.js';
 import type { WorkspaceManager } from '../workspaces.js';
@@ -82,6 +83,7 @@ export function createRuntimeCollaborators(input: {
       (session.metadata as { selfHealControlled?: boolean }).selfHealControlled === true,
     log: input.log
   });
+  const swarmEntry = readSwarmHandoffEntrySwitch(input.store.getDaemonControl(SWARM_HANDOFF_ENTRY_CONTROL_KEY));
   const swarmExecutor = new SwarmExecutor({
     store: input.store.swarm(),
     reviewTask: (run, task, session) => reviewSwarmTask(input.spawnHost(), run, task, session),
@@ -90,7 +92,10 @@ export function createRuntimeCollaborators(input: {
     createTeammateSession: (args) => input.createTeammateSession(args),
     runSession: (sid) => input.runSession(sid),
     enqueueSchedulerWake: (sid, reason) => input.store.enqueueSchedulerWake(sid, reason),
-    sessionTeammateFinished: (sid) => sessionTeammateFinished(input.store, sid)
+    sessionTeammateFinished: (sid) => sessionTeammateFinished(input.store, sid),
+    trustedHandoff: (run) => trustedContextForSwarmRun(run, swarmEntry.enabled, swarmEntry.explicitOff),
+    swarmHandoffEntryEnabled: swarmEntry.enabled,
+    swarmHandoffExplicitOff: swarmEntry.explicitOff,
   });
   const teamDagExecutor = new TeamDagExecutor({
     store: input.store.teams(),

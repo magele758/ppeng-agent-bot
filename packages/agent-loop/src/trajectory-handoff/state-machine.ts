@@ -27,7 +27,6 @@ import type {
   HandoffEvent,
   HandoffKernelState,
   HandoffCounters,
-  CoordinatorResumeEvent,
 } from './types.js';
 import { DEFAULT_SESSION_CAP, DEFAULT_TURN_CAP } from './types.js';
 
@@ -45,6 +44,8 @@ const TRANSITIONS: Partial<Record<HandoffState, Partial<Record<HandoffEvent, Han
     submit_plan:     'plan_ready',
     escalate_no_plan:'awaiting_coordinator',
     escalate:        'awaiting_coordinator',
+    shared_scope_escalated: 'awaiting_coordinator',
+    local_capped_escalated: 'awaiting_coordinator',
     fail:            'failed',
     cancel:          'cancelled',
     timeout:         'timed_out',
@@ -55,6 +56,8 @@ const TRANSITIONS: Partial<Record<HandoffState, Partial<Record<HandoffEvent, Han
     budget_insufficient: 'awaiting_coordinator',
     cap_exceeded:      'capped',
     escalate:          'awaiting_coordinator',
+    shared_scope_escalated: 'awaiting_coordinator',
+    local_capped_escalated: 'awaiting_coordinator',
     fail:              'failed',
     cancel:            'cancelled',
     timeout:           'timed_out',
@@ -64,6 +67,8 @@ const TRANSITIONS: Partial<Record<HandoffState, Partial<Record<HandoffEvent, Han
     friction:          'planner_repair',
     coordinator_resumed:'awaiting_coordinator',  // executor → awaiting when re-escalating
     escalate:          'awaiting_coordinator',
+    shared_scope_escalated: 'awaiting_coordinator',
+    local_capped_escalated: 'awaiting_coordinator',
     cap_exceeded:      'capped',
     fail:              'failed',
     cancel:            'cancelled',
@@ -72,6 +77,8 @@ const TRANSITIONS: Partial<Record<HandoffState, Partial<Record<HandoffEvent, Han
   planner_repair: {
     activate_executor: 'executor_write',
     escalate:          'awaiting_coordinator',
+    shared_scope_escalated: 'awaiting_coordinator',
+    local_capped_escalated: 'awaiting_coordinator',
     cap_exceeded:      'capped',
     fail:              'failed',
     cancel:            'cancelled',
@@ -81,7 +88,10 @@ const TRANSITIONS: Partial<Record<HandoffState, Partial<Record<HandoffEvent, Han
     coordinator_resumed: 'executor_write',
     coordinator_no_plan: 'planner_readonly',
     coordinator_repair:  'planner_repair',
+    coordinator_rejected:'failed',
     escalate:            'awaiting_coordinator',
+    shared_scope_escalated: 'awaiting_coordinator',
+    local_capped_escalated: 'awaiting_coordinator',
     cap_exceeded:        'capped',
     fail:                'failed',
     cancel:              'cancelled',
@@ -193,6 +203,7 @@ export function applyTransition(
   event: HandoffEvent,
   now: string,
   newTurnNumber?: number,
+  options?: { readonly rejection?: 'failed' | 'capped' },
 ): TransitionResult {
   const { state: from } = state;
 
@@ -207,7 +218,12 @@ export function applyTransition(
     };
   }
 
-  const toState = (TRANSITIONS[from] as Partial<Record<HandoffEvent, HandoffState>> | undefined)?.[event];
+  const row = (TRANSITIONS[from] as Partial<Record<HandoffEvent, HandoffState>> | undefined);
+  let toState = row?.[event];
+  // The table's rejected edge is failed. capped is the same edge with an explicit host outcome.
+  if (toState === 'failed' && event === 'coordinator_rejected' && options?.rejection === 'capped') {
+    toState = 'capped';
+  }
   if (!toState) {
     return {
       ok: false,
@@ -314,6 +330,9 @@ export const ALL_EVENTS: readonly HandoffEvent[] = [
   'cancel',
   'timeout',
   'escalate',
+  'shared_scope_escalated',
+  'local_capped_escalated',
+  'coordinator_rejected',
 ];
 
 /**

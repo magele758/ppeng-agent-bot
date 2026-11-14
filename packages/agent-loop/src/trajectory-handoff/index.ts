@@ -80,3 +80,31 @@ export {
   reconcileAllReservations,
   billConservativeRuntime,
 } from './recovery.js';
+export type {
+  HangIdentity,
+  RefillRequest,
+  GrantRefusalReason,
+  GrantDecision,
+} from './parent-ledger.js';
+export {
+  GRANT_DECISION_ORDER,
+  describeDecisionOrder,
+  InMemoryParentBudgetLedger,
+} from './parent-ledger.js';
+export type { LocalGrant, ResumeTarget, ApplyGrantResult } from './swarm-resume.js';
+export {
+  legalPlanVersion,
+  usableLocalUnits,
+  installGrantedQuota,
+  voidLeftoverLocalGrant,
+  classifyCoordinatorInstruction,
+  assessSingleWorkerRecovery,
+  escalateWorker,
+  rejectCoordinator,
+  coordinatorSuspension,
+  applySuccessfulGrant,
+  consumeLocalUnit,
+  coordinatorEventIdentity,
+  applyCoordinatorResumeEvent,
+  resumeAfterRoleBudgetExhausted,
+} from './swarm-resume.js';

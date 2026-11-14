@@ -9,7 +9,7 @@
  *
  * Reserved interfaces (PlanStore, EventSink, CoordinatorResumeEvent) are defined
  * in types.ts; this file depends on them without reimplementing.
- * Swarm HOST ENTRY stays closed; tests may drive reserved interfaces directly.
+ * Swarm host entry is not admitted here. Only trusted host context can open it.
  */
 
 import type {
