@@ -37,9 +37,10 @@ import { inheritWorkspaceBinding, resolveEffectiveWorkspace, workspaceBindingFro
 import type { OrchestrationRun } from '../orchestrator/types.js';
 import {
   botTeammatePermission,
+  childModelInheritance,
   childPermissionMode,
+  handoffChildCeiling,
   inheritBotAllowlists,
-  inheritModelOverride,
   copyScratchOnSpawn
 } from './spawn-policy.js';
 import {
@@ -248,10 +249,12 @@ export async function spawnSubagentOutcome(
       requestedTools: opts?.allowedTools
     })
   );
-  Object.assign(childMeta, inheritModelOverride(context.session.metadata));
-  if (opts?.model) {
+  Object.assign(childMeta, childModelInheritance(context.session.metadata));
+  const plannerChild = handoffChildCeiling(context.session.metadata).handoffRole === 'planner';
+  if (opts?.model && !plannerChild) {
     childMeta.modelOverride = opts.model;
   }
+  Object.assign(childMeta, handoffChildCeiling(context.session.metadata));
   if (opts?.minConfidence != null) {
     childMeta.minConfidence = opts.minConfidence;
   }
@@ -351,7 +354,8 @@ export async function spawnTeammateOutcome(
     background: true,
     metadata: {
       ...inheritWorkspaceBinding(context.session.metadata),
-      ...inheritModelOverride(context.session.metadata),
+      ...childModelInheritance(context.session.metadata),
+      ...handoffChildCeiling(context.session.metadata),
       ...botTeammatePermission(context.session.metadata),
       ...inheritBotAllowlists(context.session.metadata, {
         agentAllowedTools: host.store.getAgent(input.name)?.allowedTools

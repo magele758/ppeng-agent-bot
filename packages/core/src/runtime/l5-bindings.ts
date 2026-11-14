@@ -386,9 +386,8 @@ export function compactFrom(rt: L5Bindable): CompactHost {
     store: rt.store,
     stateDir: rt.stateDir,
     modelAdapter: rt.modelAdapter,
-    resolveModelAdapter: (session) =>
-      resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter),
-    resolveContextAdapter: (session) => activeAdapters(rt).get(session.id) ?? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter),
+    resolveModelAdapter: (session) => resolveL5TurnModel(rt, session),
+    resolveContextAdapter: (session) => activeAdapters(rt).get(session.id) ?? resolveL5TurnModel(rt, session),
     extensionRegistry: rt.extensionRegistry,
     turnShapeBySession: rt.turnShapeBySession,
     emitTrace: (sessionId, event) => rt.emitTrace(sessionId, event),

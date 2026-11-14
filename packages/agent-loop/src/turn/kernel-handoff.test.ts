@@ -5,6 +5,12 @@ import type { TurnKernelHost, TurnKernelStore } from './host.js';
 import { runSessionKernel } from './kernel.js';
 import { noteTrajectoryWrite } from '../trajectory-handoff/tool-entry.js';
 
+
+function metaField(value: unknown, key: string): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !(key in value)) return undefined;
+  const record = value as Record<string, unknown>;
+  return record[key];
+}
 function textResult(text: string): ModelTurnResult {
   return { stopReason: 'end', assistantParts: [{ type: 'text', text }] };
 }
@@ -109,5 +115,141 @@ describe('kernel trajectory handoff gate', () => {
     const { host, session, calls } = harness();
     await runSessionKernel(host, session.id);
     expect(calls.execute).toBeGreaterThanOrEqual(1);
+  });
+
+  it('switches planner to executor on the same session and keeps one context pack', async () => {
+    const seen: string[] = [];
+    const { host, store, session } = harness({
+      capabilityTiers: {
+        enabled: true,
+        roles: { plannerModel: 'planner/model', executorModel: 'executor/model' },
+      },
+    });
+    host.tools = [...host.tools, {
+      name: 'submit_plan',
+      description: 'submit',
+      inputSchema: {},
+      approvalMode: 'never',
+      sideEffectLevel: 'none',
+      execute: async () => ({ ok: true, content: 'plan' }),
+    }];
+    host.runTurnWithRetries = async (input) => {
+      const live = store.getSession(input.sessionId!)!;
+      seen.push(String(live.metadata?.handoffRole ?? 'missing'));
+      return host.modelAdapter.runTurn(input);
+    };
+    host.modelAdapter.runTurn = async () => {
+      if (seen.length === 1) {
+        return {
+          stopReason: 'tool_use',
+          assistantParts: [{ type: 'tool_call', toolCallId: 'plan-1', name: 'submit_plan', input: {} }],
+        };
+      }
+      return textResult('done');
+    };
+    host.executeToolCalls = async (toolCalls) => toolCalls.map((item) => ({
+      toolCallId: item.toolCallId,
+      name: item.name,
+      ok: true,
+      content: 'plan accepted',
+      metadata: { planVersion: 2, handoffPlanAccepted: true },
+    }));
+    await runSessionKernel(host, session.id);
+    expect(seen).toEqual(['planner', 'executor']);
+    const after = store.getSession(session.id)!;
+    expect(after.id).toBe(session.id);
+    expect(metaField(metaField(after.metadata?.handoffKernel, 'counters'), 'sessionHandoffs')).toBe(1);
+    const pack = after.metadata?.handoffContext;
+    expect(metaField(pack, 'planVersion')).toBe(2);
+    expect(metaField(pack, 'fromModel')).toBe('planner/model');
+    expect(metaField(pack, 'toModel')).toBe('executor/model');
+    expect(Array.isArray(metaField(pack, 'toolPairs'))).toBe(true);
+    expect(metaField(pack, 'completedEffects')).toEqual([]);
+  });
+
+  it('keeps the same pack shape when both roles name one model', async () => {
+    const { host, store, session } = harness({
+      capabilityTiers: { enabled: true, roles: { plannerModel: 'same/model', executorModel: 'same/model' } },
+    });
+    host.tools = [...host.tools, {
+      name: 'submit_plan',
+      description: 'submit',
+      inputSchema: {},
+      approvalMode: 'never',
+      sideEffectLevel: 'none',
+      execute: async () => ({ ok: true, content: 'plan' }),
+    }];
+    host.runTurnWithRetries = (input) => host.modelAdapter.runTurn(input);
+    host.modelAdapter.runTurn = async () => ({
+      stopReason: 'tool_use',
+      assistantParts: [{ type: 'tool_call', toolCallId: 'plan-1', name: 'submit_plan', input: {} }],
+    });
+    let turns = 0;
+    const original = host.modelAdapter.runTurn.bind(host.modelAdapter);
+    host.modelAdapter.runTurn = async (input) => {
+      turns += 1;
+      if (turns > 1) return textResult('done');
+      return original(input);
+    };
+    host.executeToolCalls = async (toolCalls) => toolCalls.map((item) => ({
+      toolCallId: item.toolCallId,
+      name: item.name,
+      ok: true,
+      content: 'ok',
+      metadata: { planVersion: 1, handoffPlanAccepted: true },
+    }));
+    await runSessionKernel(host, session.id);
+    const pack = store.getSession(session.id)?.metadata?.handoffContext;
+    expect(metaField(pack, 'fromModel')).toBe('same/model');
+    expect(metaField(pack, 'toModel')).toBe('same/model');
+    expect(metaField(pack, 'planVersion')).toBe(1);
+    expect(Array.isArray(metaField(pack, 'toolPairs'))).toBe(true);
+    expect(Array.isArray(metaField(pack, 'completedEffects'))).toBe(true);
+  });
+
+  it('planner denies write, command, and delegate calls inside the kernel wave', async () => {
+    const received: string[][] = [];
+    const { host, session } = harness({
+      capabilityTiers: { enabled: true },
+      handoffState: 'planner_readonly',
+      originalPerms: ['read', 'write', 'command', 'delegate'],
+    });
+    const tool = (name: string, access: 'read' | 'edit' | 'bash' | 'delegate'): ToolContract => ({
+      name,
+      description: name,
+      inputSchema: {},
+      approvalMode: 'never',
+      sideEffectLevel: access === 'read' ? 'none' : 'workspace',
+      access,
+      execute: async () => ({ ok: true, content: name }),
+    });
+    host.tools = [
+      tool('read_file', 'read'),
+      tool('write_file', 'edit'),
+      tool('bash', 'bash'),
+      tool('spawn_subagent', 'delegate'),
+    ];
+    host.modelAdapter.runTurn = async () => ({
+      stopReason: 'tool_use',
+      assistantParts: host.tools.map((item, index) => ({
+        type: 'tool_call' as const,
+        toolCallId: `c${index}`,
+        name: item.name,
+        input: {},
+      })),
+    });
+    let waves = 0;
+    const scripted = host.modelAdapter.runTurn.bind(host.modelAdapter);
+    host.modelAdapter.runTurn = async (input) => {
+      waves += 1;
+      if (waves > 1) return textResult('done');
+      return scripted(input);
+    };
+    host.executeToolCalls = async (toolCalls) => {
+      received.push(toolCalls.map((item) => item.name));
+      return toolCalls.map((item) => ({ toolCallId: item.toolCallId, name: item.name, ok: true, content: 'ok' }));
+    };
+    await runSessionKernel(host, session.id);
+    expect(received[0]).toEqual(['read_file']);
   });
 });

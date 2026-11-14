@@ -7,9 +7,10 @@ import { moduleIdsForPreset } from './presets.js';
 import type { AssembledLoop, AssembledLoopIo, CreateAssembledLoopInput } from './io.js';
 import { createDefaultMemoryStore } from './store-adapter.js';
 import { defaultPrepareView } from '../turn/default-view.js';
-import type { TurnKernelHost, TurnKernelPrompt, TurnKernelStore } from '../turn/host.js';
+import type { ToolExecResult, TurnKernelHost, TurnKernelPrompt, TurnKernelStore } from '../turn/host.js';
 import { resolveLoopConfig } from '../turn/config.js';
 import { runSessionKernel, type TurnKernelOptions } from '../turn/kernel.js';
+import { denyTrajectoryTool } from '../trajectory-handoff/tool-entry.js';
 import type { MessagePart, ModelAdapter, RunContext, ToolContract } from '../types.js';
 
 export function defaultMiniPrompt(systemPrompt?: string): TurnKernelPrompt {
@@ -73,16 +74,16 @@ async function executeToolsSimple(
   turnTools?: ToolContract<Record<string, unknown>>[]
 ) {
   const pool = turnTools ?? tools;
-  const results: import('../turn/host.js').ToolExecResult[] = [];
+  const results: ToolExecResult[] = [];
   for (const tc of toolCalls) {
-    const tool = pool.find((t) => t.name === tc.name);
+    const tool = pool.find((item) => item.name === tc.name);
+    const denied = denyTrajectoryTool(context.session, tool ?? { name: tc.name });
+    if (denied) {
+      results.push({ toolCallId: tc.toolCallId, name: tc.name, ok: false, content: denied });
+      continue;
+    }
     if (!tool) {
-      results.push({
-        toolCallId: tc.toolCallId,
-        name: tc.name,
-        ok: false,
-        content: `Unknown tool ${tc.name}`,
-      });
+      results.push({ toolCallId: tc.toolCallId, name: tc.name, ok: false, content: `Unknown tool ${tc.name}` });
       continue;
     }
     if (tool.isExternal && !allowExternalAiTools) {

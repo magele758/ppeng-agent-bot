@@ -80,7 +80,8 @@ import {
 } from '../session/tool-wave-close.js';
 import { rollbackReasonOf } from '../session/step-tx.js';
 import { applyRunProfileToTools, trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
-import { prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
+import { denyTrajectoryTool, prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
+import { advanceExplicitHandoffAfterTools, prepareExplicitSessionHandoff } from '../trajectory-handoff/session-turn.js';
 import { defaultWorkspaceRoots } from '../workspace/default-roots.js';
 import type {
   AgentSpec,
@@ -138,18 +139,49 @@ async function executeGatedToolWave(
   session: { id: string; metadata?: unknown },
   ...args: Parameters<TurnKernelHost['executeToolCalls']>
 ): Promise<Awaited<ReturnType<TurnKernelHost['executeToolCalls']>>> {
-  if (trajectoryHandoffGateFromMetadata(handoffSessionMetadata(session)).enabled) {
-    const prepared = await prepareTrajectoryToolWave(session);
-    if (!prepared.ok) {
-      return args[0].map((call) => ({
-        toolCallId: call.toolCallId,
-        name: call.name,
-        ok: false,
-        content: prepared.reason,
-      }));
-    }
+  const live = host.store.getSession(session.id) ?? session;
+  if (!trajectoryHandoffGateFromMetadata(handoffSessionMetadata(live)).enabled) {
+    return host.executeToolCalls(...args);
   }
-  return host.executeToolCalls(...args);
+  const prepared = await prepareTrajectoryToolWave(live);
+  if (!prepared.ok) {
+    return args[0].map((call) => ({
+      toolCallId: call.toolCallId,
+      name: call.name,
+      ok: false,
+      content: prepared.reason,
+    }));
+  }
+  const calls = args[0];
+  const turnTools = args[4];
+  const catalog = new Map<string, { name: string; access?: string; sideEffectLevel?: string }>();
+  for (const tool of turnTools ?? host.tools) catalog.set(tool.name, tool);
+  const denied: Array<{ toolCallId: string; name: string; ok: false; content: string }> = [];
+  const allowed: typeof calls = [];
+  for (const call of calls) {
+    const reason = denyTrajectoryTool(live, catalog.get(call.name) ?? { name: call.name });
+    if (reason) denied.push({ toolCallId: call.toolCallId, name: call.name, ok: false, content: reason });
+    else allowed.push(call);
+  }
+  const ran = allowed.length === 0 ? [] : await host.executeToolCalls(allowed, args[1], args[2], args[3], turnTools);
+  const byId = new Map<string, (typeof ran)[number]>();
+  for (const result of [...denied, ...ran]) byId.set(result.toolCallId, result);
+  return calls.map((call) => byId.get(call.toolCallId) ?? {
+    toolCallId: call.toolCallId,
+    name: call.name,
+    ok: false,
+    content: 'missing tool result',
+  });
+}
+
+function recordExplicitHandoff(
+  host: TurnKernelHost,
+  sessionId: string,
+  results: readonly { toolCallId: string; name: string; ok: boolean; content: string; metadata?: Record<string, unknown> }[],
+): void {
+  const session = host.store.getSession(sessionId);
+  const patch = advanceExplicitHandoffAfterTools(handoffSessionMetadata(session ?? {}), results);
+  if (patch) host.mergeSessionMetadata(sessionId, patch);
 }
 
 function textPart(text: string): MessagePart {
@@ -317,6 +349,7 @@ async function continueResumedToolWave(input: {
     input.sessionId,
     input.onModelStreamChunk
   );
+  recordExplicitHandoff(input.host, input.sid, results);
   if (toolWaveHeldForApproval(results)) {
     return parkResumedApproval(input.host, input.sid, input.remaining, input.writerRunId, input.interrupt);
   }
@@ -1095,6 +1128,7 @@ return undefined;
 async () => {
 async function __gate133() {
 
+await prepareExplicitSessionHandoff(host, sid);
 turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
 return undefined;
 }
@@ -1130,6 +1164,7 @@ return undefined;
 }
 async function __gate135() {
 try {
+            await prepareExplicitSessionHandoff(host, sid);
             turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
           } catch (retryError) {
             const reason =
@@ -1188,6 +1223,7 @@ packedRetry = loopConfig.overflowReprepare
                     }),
               };
 turnInput = { ...turnInput, messages: packedRetry.messages };
+await prepareExplicitSessionHandoff(host, sid);
 turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
 return undefined;
 }
@@ -2028,6 +2064,7 @@ host.processToolResults(
         sid,
         options?.onModelStreamChunk
       );
+recordExplicitHandoff(host, sid, results);
 if (toolWaveHeldForApproval(results)) {
         return kernelTurnSignal('return', await parkForApproval());
       }

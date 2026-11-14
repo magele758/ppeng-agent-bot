@@ -1,4 +1,5 @@
 import type { RunContext, ToolContract, ToolExecutionResult } from '../types.js';
+import { denyTrajectoryTool } from '../trajectory-handoff/tool-entry.js';
 
 const JS_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const RESERVED = new Set([
@@ -122,6 +123,8 @@ function readonlyToolHook(
         })
       };
     }
+    const denied = denyTrajectoryTool(context.session, tool);
+    if (denied) return { ok: false, content: denied };
     const result = await tool.execute(context, args);
     onToolCall?.(tool.name, result);
     return result;
