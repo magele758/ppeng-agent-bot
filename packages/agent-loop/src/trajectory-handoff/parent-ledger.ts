@@ -116,6 +116,44 @@ function nonEmpty(value: string): boolean {
   return typeof value === 'string' && value.length > 0;
 }
 
+
+function requireLegalIdentity(request: RefillRequest): void {
+  if (
+    !nonEmpty(request.refillId) ||
+    !nonEmpty(request.parentRunId) ||
+    !nonEmpty(request.workerId) ||
+    !nonEmpty(request.hangAttemptId)
+  ) {
+    throw new Error('illegal refill identity');
+  }
+}
+
+function requireLegalCaps(request: RefillRequest): void {
+  if (
+    !Number.isInteger(request.sessionCap) ||
+    !Number.isInteger(request.turnCap) ||
+    request.sessionCap < 1 ||
+    request.turnCap < 1 ||
+    request.sessionCap > DEFAULT_SESSION_CAP ||
+    request.turnCap > DEFAULT_TURN_CAP
+  ) {
+    throw new Error('handoff caps cannot be raised or non-positive');
+  }
+}
+
+function requireLegalCounters(request: RefillRequest): void {
+  if (
+    !Number.isInteger(request.sessionHandoffs) ||
+    !Number.isInteger(request.turnHandoffs) ||
+    request.sessionHandoffs < 0 ||
+    request.turnHandoffs < 0 ||
+    !Number.isInteger(request.workerOriginalLocalCap) ||
+    request.workerOriginalLocalCap < 0
+  ) {
+    throw new Error('illegal handoff counters');
+  }
+}
+
 export class InMemoryParentBudgetLedger {
   private readonly parents = new Map<string, number>();
   private readonly byRefill = new Map<string, Stored>();
@@ -167,105 +205,73 @@ export class InMemoryParentBudgetLedger {
     return run;
   }
 
-  private decide(request: RefillRequest): GrantDecision {
-    if (
-      !nonEmpty(request.refillId) ||
-      !nonEmpty(request.parentRunId) ||
-      !nonEmpty(request.workerId) ||
-      !nonEmpty(request.hangAttemptId)
-    ) {
-      throw new Error('illegal refill identity');
-    }
-    if (
-      !Number.isInteger(request.sessionCap) ||
-      !Number.isInteger(request.turnCap) ||
-      request.sessionCap < 1 ||
-      request.turnCap < 1 ||
-      request.sessionCap > DEFAULT_SESSION_CAP ||
-      request.turnCap > DEFAULT_TURN_CAP
-    ) {
-      throw new Error('handoff caps cannot be raised or non-positive');
-    }
-    if (
-      !Number.isInteger(request.sessionHandoffs) ||
-      !Number.isInteger(request.turnHandoffs) ||
-      request.sessionHandoffs < 0 ||
-      request.turnHandoffs < 0 ||
-      !Number.isInteger(request.workerOriginalLocalCap) ||
-      request.workerOriginalLocalCap < 0
-    ) {
-      throw new Error('illegal handoff counters');
-    }
 
-    const refuse = (reason: GrantRefusalReason): GrantDecision => {
-      const decision: GrantDecision = { ok: false, kind: 'refused', refillId: request.refillId, reason };
-      if (REFILL_TERMINAL[reason] === true && !this.byRefill.has(request.refillId)) {
-        this.byRefill.set(request.refillId, { decision, decidesHang: HANG_DECIDING[reason] === true });
-      }
-      if (HANG_DECIDING[reason] === true && !this.byHang.has(hangKey(request))) {
-        this.byHang.set(hangKey(request), decision);
-      }
-      return decision;
-    };
+  private recordRefusal(request: RefillRequest, reason: GrantRefusalReason): GrantDecision {
+    const decision: GrantDecision = { ok: false, kind: 'refused', refillId: request.refillId, reason };
+    if (REFILL_TERMINAL[reason] === true && !this.byRefill.has(request.refillId)) {
+      this.byRefill.set(request.refillId, { decision, decidesHang: HANG_DECIDING[reason] === true });
+    }
+    if (HANG_DECIDING[reason] === true && !this.byHang.has(hangKey(request))) {
+      this.byHang.set(hangKey(request), decision);
+    }
+    return decision;
+  }
 
+  private refuseIfDeadlineOrState(request: RefillRequest): GrantDecision | null {
     const deadlineMs = Date.parse(request.waitDeadline);
     const nowMs = Date.parse(request.now);
-    if (!Number.isFinite(deadlineMs) || !Number.isFinite(nowMs)) return refuse('deadline_reached');
+    if (!Number.isFinite(deadlineMs) || !Number.isFinite(nowMs)) return this.recordRefusal(request, 'deadline_reached');
     const deadline = checkDeadline({
       persistedDeadline: request.waitDeadline,
       now: request.now,
       timeoutTxnCommitted: request.timeoutTxnCommitted === true,
     });
-    if (!deadline.allow) return refuse(deadline.reason);
+    if (!deadline.allow) return this.recordRefusal(request, deadline.reason);
+    if (request.stillAwaitingCoordinator !== true) return this.recordRefusal(request, 'not_awaiting_coordinator');
+    return null;
+  }
 
-    if (request.stillAwaitingCoordinator !== true) return refuse('not_awaiting_coordinator');
-
+  private replayIfKnown(request: RefillRequest): GrantDecision | null {
     const prior = this.byRefill.get(request.refillId);
-    if (prior?.decision.ok) {
-      const same =
-        prior.decision.hang.parentRunId === request.parentRunId &&
-        prior.decision.hang.workerId === request.workerId &&
-        prior.decision.hang.hangAttemptId === request.hangAttemptId;
-      if (!same) {
-        return { ok: false, kind: 'refused', refillId: request.refillId, reason: 'refill_id_terminal_failure' };
-      }
-      return {
-        ok: true,
-        kind: 'idempotent_replay',
-        refillId: request.refillId,
-        hang: prior.decision.hang,
-        grantedUnits: prior.decision.grantedUnits,
-        parentRemaining: prior.decision.parentRemaining,
-      };
-    }
-    if (prior && !prior.decision.ok) {
+    if (!prior) return null;
+    if (!prior.decision.ok) {
       return { ok: false, kind: 'refused', refillId: request.refillId, reason: 'refill_id_terminal_failure' };
     }
+    const same =
+      prior.decision.hang.parentRunId === request.parentRunId &&
+      prior.decision.hang.workerId === request.workerId &&
+      prior.decision.hang.hangAttemptId === request.hangAttemptId;
+    if (!same) {
+      return { ok: false, kind: 'refused', refillId: request.refillId, reason: 'refill_id_terminal_failure' };
+    }
+    return {
+      ok: true,
+      kind: 'idempotent_replay',
+      refillId: request.refillId,
+      hang: prior.decision.hang,
+      grantedUnits: prior.decision.grantedUnits,
+      parentRemaining: prior.decision.parentRemaining,
+    };
+  }
 
-    const hangDecision = this.byHang.get(hangKey(request));
-    if (hangDecision) return refuse('hang_already_decided');
-
-    if (!Number.isInteger(request.requestedUnits) || request.requestedUnits <= 0) return refuse('non_positive_units');
-
+  private refuseIfQuotaExceeded(request: RefillRequest, parent: number): GrantDecision | null {
     const cap = checkHandoffCap(
       { sessionHandoffs: request.sessionHandoffs, turnHandoffs: request.turnHandoffs },
       request.sessionCap,
       request.turnCap,
     );
-    if (!cap.allowed) return refuse(cap.reason ?? 'session_cap');
-
-    if (request.requestedUnits > request.sessionCap - request.sessionHandoffs) return refuse('session_cap');
-    if (request.requestedUnits > request.turnCap - request.turnHandoffs) return refuse('turn_cap');
-    if (request.requestedUnits > request.workerOriginalLocalCap) return refuse('exceeds_worker_original_local_cap');
-
-    const parent = this.parents.get(request.parentRunId);
-    if (parent === undefined) return refuse('unknown_parent_run');
-    if (request.requestedUnits > parent) return refuse('parent_exhausted');
-
+    if (!cap.allowed) return this.recordRefusal(request, cap.reason ?? 'session_cap');
+    if (request.requestedUnits > request.sessionCap - request.sessionHandoffs) return this.recordRefusal(request, 'session_cap');
+    if (request.requestedUnits > request.turnCap - request.turnHandoffs) return this.recordRefusal(request, 'turn_cap');
+    if (request.requestedUnits > request.workerOriginalLocalCap) return this.recordRefusal(request, 'exceeds_worker_original_local_cap');
+    if (request.requestedUnits > parent) return this.recordRefusal(request, 'parent_exhausted');
     if (request.roleBudgetRemaining !== undefined && !(request.roleBudgetRemaining > 0)) {
-      return refuse('role_budget_exhausted');
+      return this.recordRefusal(request, 'role_budget_exhausted');
     }
+    return null;
+  }
 
+  private commitGrant(request: RefillRequest, parent: number): GrantDecision {
     const parentRemaining = parent - request.requestedUnits;
     this.parents.set(request.parentRunId, parentRemaining);
     const granted: GrantDecision = {
@@ -283,5 +289,24 @@ export class InMemoryParentBudgetLedger {
     this.byRefill.set(request.refillId, { decision: granted, decidesHang: true });
     this.byHang.set(hangKey(request), granted);
     return granted;
+  }
+
+  private decide(request: RefillRequest): GrantDecision {
+    requireLegalIdentity(request);
+    requireLegalCaps(request);
+    requireLegalCounters(request);
+    const blocked = this.refuseIfDeadlineOrState(request);
+    if (blocked) return blocked;
+    const replayed = this.replayIfKnown(request);
+    if (replayed) return replayed;
+    if (this.byHang.get(hangKey(request))) return this.recordRefusal(request, 'hang_already_decided');
+    if (!Number.isInteger(request.requestedUnits) || request.requestedUnits <= 0) {
+      return this.recordRefusal(request, 'non_positive_units');
+    }
+    const parent = this.parents.get(request.parentRunId);
+    if (parent === undefined) return this.recordRefusal(request, 'unknown_parent_run');
+    const overQuota = this.refuseIfQuotaExceeded(request, parent);
+    if (overQuota) return overQuota;
+    return this.commitGrant(request, parent);
   }
 }
