@@ -1,8 +1,8 @@
 /**
  * Trajectory handoff enablement.
- * mechanism_off keeps the old tool path. auto_eligible allows pure reads until
- * a controlled tool or a task-mode user turn enters planner_readonly.
- * in_machine runs the state machine. Explicit off wins. Missing tiers stay off.
+ * mechanism_off and auto_eligible keep the old tool path in the turn kernel.
+ * auto_eligible is persisted auto_policy before a machine exists. A task-mode
+ * user turn may enter planner_readonly. Explicit off wins. Missing tiers stay off.
  * The turn kernel calls trajectoryHandoffGateFromMetadata.
  */
 

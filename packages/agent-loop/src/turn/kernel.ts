@@ -80,8 +80,8 @@ import {
 } from '../session/tool-wave-close.js';
 import { rollbackReasonOf } from '../session/step-tx.js';
 import { applyRunProfileToTools, trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
-import { denyTrajectoryTool, executeAutoEligibleToolWave, prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
-import { advanceExplicitHandoffAfterTools, closePlannerDirectAnswer, enterAutoPlannerReadonly, handoffContextMessage, prepareExplicitSessionHandoff } from '../trajectory-handoff/session-turn.js';
+import { denyTrajectoryTool, prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
+import { advanceExplicitHandoffAfterTools, closePlannerDirectAnswer, handoffContextMessage, prepareExplicitSessionHandoff } from '../trajectory-handoff/session-turn.js';
 import { defaultWorkspaceRoots } from '../workspace/default-roots.js';
 import type {
   AgentSpec,
@@ -142,18 +142,10 @@ async function executeGatedToolWave(
 ): Promise<Awaited<ReturnType<TurnKernelHost['executeToolCalls']>>> {
   const live = host.store.getSession(session.id) ?? session;
   const gate = trajectoryHandoffGateFromMetadata(handoffSessionMetadata(live));
-  if (gate.path === 'mechanism_off') {
+  if (gate.path !== 'in_machine') {
+    // Persisted auto_policy stays auto_eligible, but ordinary waves keep the
+    // pre-handoff tool path. Planner denial starts only after the machine is entered.
     return host.executeToolCalls(...args);
-  }
-  if (gate.path === 'auto_eligible') {
-    const turnTools = args[4];
-    return executeAutoEligibleToolWave({
-      session: live,
-      calls: args[0],
-      tools: turnTools ?? host.tools,
-      execute: (calls) => host.executeToolCalls(calls, args[1], args[2], args[3], turnTools),
-      enterPlanner: () => enterAutoPlannerReadonly(host, live.id),
-    });
   }
   const prepared = await prepareTrajectoryToolWave(live);
   if (!prepared.ok) {
