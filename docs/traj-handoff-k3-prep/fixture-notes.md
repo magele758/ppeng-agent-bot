@@ -46,13 +46,28 @@ export interface TrustedHostContext {
 }
 ```
 
-解析规则（文档契约，本预备不提供生产实现）：
+解析规则（文档契约，本预备不提供生产实现；入口骨架用本地 `closedEntryDecision` 编码，见下）：
 
 - `explicitOff === true` → 未开放。
 - 无可信上下文对象 → 未开放。
-- `source` 缺失 / 不是恰好 `'independent_swarm'` 或 `'flywheel'` → 未开放。
-- `'flywheel'` → 第三刀未开放。
-- `'independent_swarm'` 且未显式关闭 → **仅在第三刀入口已打开之后**才可开放；本预备与 tip 表征仍视为未开放。
+- `source` 缺失 / 不是恰好 `'independent_swarm'` 或 `'flywheel'` → 未开放（不精确字符串失败关闭）。
+- `'flywheel'`，或带 `orchestrationRunId` 且没有 source 字符串 → 飞轮关闭；第三刀未开放。
+- `'independent_swarm'` 且未显式关闭 → 本预备仍返回 `open: false`，原因 `trusted-but-entry-still-closed`。仅在获准入口打开之后，那一条才可以改为开放。
+- Worker `metadata` 永远不是资格。
+
+### 本地 `closedEntryDecision`（仅入口骨架，不是生产入口）
+
+`skeletons/trajectory-handoff-swarm-entry.test.js` 的本地规则表达「本预备入口仍关闭」。它不是生产解析器，不是入口门，也不是 Pattern B 原语。不要把它拷进 `packages/core/src/`。
+
+在本预备上，该规则的结果是：
+
+- 即使可信上下文的 `source` **恰好**是 `'independent_swarm'`，也返回 `{ open: false, reason: 'trusted-but-entry-still-closed' }`。可信且精确，仍然关闭。
+- Worker `metadata`（或其它 Worker 可写载体）**永远不是资格**。自报 `independent_swarm` / `enabled: true` 不得打开。
+- 运行带 `orchestrationRunId` 时原因是 `orchestrationRunId present`（飞轮关闭），**即使没有 source 字符串**。不得据此启用交接。飞轮来源解除属第四刀。
+- 不精确字符串失败关闭：空串、大小写变体、非字符串、未知值、缺失字段、没有可信上下文。不得默认成 `independent_swarm`。
+- `explicitOff === true` 优先于上述一切，仍为未开放。
+
+「可信 `independent_swarm` 可以启用」那条用例保持 `{ skip: true }`，入口打开前不得改成绿灯。
 
 ### 2. 父级账本内存夹具（见 `parent-ledger-interface-draft.ts`）
 
@@ -61,9 +76,9 @@ export interface TrustedHostContext {
 - 单进程内存 map，键：`parentRunId`。
 - 挂起裁决键：`parentRunId + workerId + hangAttemptId`。
 - 幂等键：`refillId`（全局或按 parentRunId 唯一，草稿要求跨父 run 也不可复用）。
-- 调用 `checkDeadline` 做期限判断，不要复制一套比较逻辑。
-- 用「单把锁 / 串行队列」模拟原子事务即可；存储技术可后选，测试要表现「两个并发申请最后一份只能成功一个」。
-- **不要**在本预备把该夹具接线到 `SwarmExecutor` 或 `host-integration.ts`。
+- 调用内核 `checkDeadline` 做期限判断。补额骨架里的行为用例保持 `{ skip: true }`，**不得**在骨架内再长出第二套 `checkDeadline`（不要复制 `now >= deadline` 比较）。`describeDecisionOrder` 那条未 skip 的顺序断言只锁草稿文案，不是补额行为测试，也不是父账本。
+- 用「单把锁 / 串行队列」模拟原子事务即可；存储技术可后选，测试要表现「两个并发申请最后一份只能成功一个」。本预备不提供该锁或扣减的生产实现。
+- **不要**在本预备把该夹具接线到 `SwarmExecutor` 或 `host-integration.ts`。不新增生产 schema。
 
 ### 3. 内核驱动
 
@@ -74,11 +89,12 @@ export interface TrustedHostContext {
 - 复用 `qualityPassed` / `failedQuality`，不改 `gate.ts`。
 - 三份证据夹具：缺失、不可用（抛错 / 空报告）、旧 `planVersion`。
 - 恢复后再完成：必须重新出具绑定当前版本与任务范围的证据。
+- **D6**（预留验收笔记，真实路径，`skip: true`）：恢复后再完成时，证据必须同时绑定当前版本（`planVersion`）**和**任务范围。缺一、绑错版本、或绑错任务，都不得过门。入口与恢复路径打开前保持跳过，不要写成绿灯，不要改 `gate.ts`。本预备没有跑 D6。
 - 内核终态 `done` 等不得被测试辅助函数映射成 implement 成功（对照 `trajectory-handoff-delivery-mapping.test.js`，但要走 Swarm 调用路径而不是只查表）。
 
 ### 5. 已持久化自动会话夹具（回退）
 
-第二刀合入前，普通会话自动策略的持久化形状可能还会变，不要在本树发明生产 schema。回退骨架只保留抽象记录：
+第二刀合入前，普通会话自动策略的持久化形状可能还会变。**不要在本树发明生产 schema**，也不要发明 `auto_policy` 表。回退骨架只保留抽象记录，对应用例保持 `{ skip: true }`：
 
 ```ts
 interface PersistedOrdinarySessionStub {
@@ -88,7 +104,9 @@ interface PersistedOrdinarySessionStub {
 }
 ```
 
-回退第三刀入口后，这些记录的启用结论必须不变。细节等第二刀落盘后再把 stub 换成真实 persist 形状。
+回退**不改写** enablement。关闭 Swarm 入口不得把这些记录改成开，也不得把它们改成关。
+
+tip 上缺 `capabilityTiers`（`undefined` / `null`）解析为 `enabled: false`、`enablementSource: 'parser_default'`。这不是默认开，等第二刀期间不得翻成默认开。`parser_default` 与尚未落盘的 `auto_policy` 在 `handoffRuntimeEnabled` 上保持关闭；只有显式开启才为真。stub 等第二刀真实 persist 形状落地后再替换。
 
 ## 如何（以及何时）把骨架搬进 `packages/core/test/`
 
@@ -100,11 +118,20 @@ interface PersistedOrdinarySessionStub {
 
 搬迁条件：
 
-1. 第二刀已合入，或至少不再与第二刀争用公共 fixture / `types.ts`。
-2. 表征用例在入口关闭时也能绿（A3–A8, A2）。
-3. 「独立 Swarm 可开」（A1）在入口打开前必须 `skip` 或断言未启用，不得先写成绿灯。
-4. 现有测试从 `../dist/swarm/executor.js` 导入。本 worktree 此刻无 `dist/`。搬迁后先 `pnpm run build` 再跑单文件，不要在未 build 时并入 `test:unit`。
-5. 不得在搬迁时改 executor 生产逻辑。
+1. 第二刀已合入，且不再与第二刀争用公共 fixture / `types.ts`。在此之前，**不要**把骨架拷进 `packages/core/test/`。
+2. 本 worktree 或合入后的 tip 已 build 出 `packages/core/dist`。此刻 `dist/` 不存在。未 build 时不要并入 `test:unit`。
+3. 表征用例在入口关闭时也能绿（A3–A8、A2，以及本预备上 trusted exact 仍为 `trusted-but-entry-still-closed`）。
+4. 「独立 Swarm 可开」（A1）在入口打开前必须 `skip` 或断言未启用，不得先写成绿灯。
+5. 现有测试从 `../dist/swarm/executor.js` 导入。搬迁后先 `pnpm run build` 再跑单文件。
+6. 不得在搬迁时改 executor 生产逻辑，不得顺手接生产 schema。
+
+预备期唯一允许的本地跑法（**不要**接进 `test:unit`；本说明不声称已经跑过）：
+
+```bash
+node --experimental-strip-types --test docs/traj-handoff-k3-prep/skeletons/
+```
+
+该命令只覆盖本目录骨架。行为用例仍应保持 skip；不要为了让它变绿而实现父账本或打开入口。
 
 ## 禁止的夹具写法
 

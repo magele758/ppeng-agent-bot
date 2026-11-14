@@ -84,52 +84,136 @@ test('characterization: flywheel implement hook does not mention handoff enablem
   );
 });
 
+/**
+ * Prep-tree stand-in only. Not a production resolver and not a Pattern B primitive.
+ * On this tree every input stays closed (`open: false`). Reasons name which
+ * closed case matched so the table is not a single hardcoded boolean.
+ *
+ * Priority: explicit off, missing context / worker-writable metadata,
+ * flywheel source, orchestrationRunId, missing or inexact source, then an
+ * exact trusted `independent_swarm` that is still closed because the entry is.
+ */
+function closedEntryDecision(input) {
+  const row = input && typeof input === 'object' ? input : {};
+  const ctx = row.ctx;
+  const metadata = row.metadata;
+  const orchestrationRunId =
+    row.orchestrationRunId ??
+    (ctx && typeof ctx === 'object' ? ctx.orchestrationRunId : undefined);
+
+  if (row.explicitOff === true) {
+    return { open: false, reason: 'explicit off wins' };
+  }
+  if (ctx == null) {
+    const workerWroteClaim =
+      metadata != null &&
+      (Object.prototype.hasOwnProperty.call(metadata, 'handoffSource') ||
+        metadata.enabled === true);
+    if (workerWroteClaim) {
+      return { open: false, reason: 'worker-writable metadata ignored' };
+    }
+    return { open: false, reason: 'missing context' };
+  }
+  if (ctx.source === 'flywheel') {
+    return { open: false, reason: 'flywheel source' };
+  }
+  if (orchestrationRunId != null && orchestrationRunId !== '') {
+    return { open: false, reason: 'orchestrationRunId present' };
+  }
+  if (!Object.prototype.hasOwnProperty.call(ctx, 'source')) {
+    return { open: false, reason: 'missing source' };
+  }
+  if (ctx.source !== 'independent_swarm') {
+    return { open: false, reason: 'inexact source' };
+  }
+  return { open: false, reason: 'trusted-but-entry-still-closed' };
+}
+
+/**
+ * Identity over a stub array. Closing the Swarm entry must not rewrite
+ * ordinary-session enablement. Does not touch disk and does not import persist.ts.
+ * auto_policy / explicit_on stay as given; explicit_off and parser_default stay
+ * off; missing capabilityTiers is not flipped to enabled.
+ */
+function swarmEntryRollbackLeavesOrdinarySessions(records) {
+  return records.map((row) => ({ ...row }));
+}
+
+
 test('fail-closed doc contract: missing / unknown / illegal / worker-writable / explicit off', () => {
-  // Documentation-level fixture notes encoded as executable expectations
-  // for a future resolver. This test does not provide a production resolver.
   const failClosedInputs = [
-    { name: 'missing context', ctx: null, explicitOff: false },
-    { name: 'missing source', ctx: {}, explicitOff: false },
-    { name: 'unknown source', ctx: { source: 'something_else' }, explicitOff: false },
-    { name: 'illegal empty string', ctx: { source: '' }, explicitOff: false },
-    { name: 'illegal type', ctx: { source: ['independent_swarm'] }, explicitOff: false },
+    { name: 'missing context', ctx: null, explicitOff: false, reason: 'missing context' },
+    { name: 'missing source', ctx: {}, explicitOff: false, reason: 'missing source' },
+    {
+      name: 'unknown source',
+      ctx: { source: 'something_else' },
+      explicitOff: false,
+      reason: 'inexact source',
+    },
+    { name: 'illegal empty string', ctx: { source: '' }, explicitOff: false, reason: 'inexact source' },
+    {
+      name: 'illegal type',
+      ctx: { source: ['independent_swarm'] },
+      explicitOff: false,
+      reason: 'inexact source',
+    },
+    {
+      name: 'Independent_Swarm',
+      ctx: { source: 'Independent_Swarm' },
+      explicitOff: false,
+      reason: 'inexact source',
+    },
+    {
+      name: 'padded string',
+      ctx: { source: ' independent_swarm ' },
+      explicitOff: false,
+      reason: 'inexact source',
+    },
+    { name: 'numeric source', ctx: { source: 1 }, explicitOff: false, reason: 'inexact source' },
+    {
+      name: 'object source',
+      ctx: { source: { kind: 'independent_swarm' } },
+      explicitOff: false,
+      reason: 'inexact source',
+    },
     {
       name: 'worker-writable metadata only',
       ctx: null,
       metadata: { handoffSource: 'independent_swarm', enabled: true },
       explicitOff: false,
+      reason: 'worker-writable metadata ignored',
     },
     {
       name: 'explicit off wins over trusted independent_swarm',
       ctx: { source: 'independent_swarm' },
       explicitOff: true,
+      reason: 'explicit off wins',
     },
     {
       name: 'flywheel source stays closed on knife 3',
       ctx: { source: 'flywheel' },
       explicitOff: false,
+      reason: 'flywheel source',
+    },
+    {
+      name: 'orchestrationRunId with no source',
+      ctx: {},
+      orchestrationRunId: 'orch-1',
+      explicitOff: false,
+      reason: 'orchestrationRunId present',
+    },
+    {
+      name: 'exact trusted independent_swarm still closed on this prep',
+      ctx: { source: 'independent_swarm' },
+      explicitOff: false,
+      reason: 'trusted-but-entry-still-closed',
     },
   ];
 
   for (const row of failClosedInputs) {
-    const trustedExact =
-      row.ctx &&
-      row.ctx.source === 'independent_swarm' &&
-      row.explicitOff !== true;
-    // Prep / tip: even a trusted exact match must stay closed.
-    const wouldOpenOnThisPrep = false;
-    assert.equal(
-      Boolean(trustedExact) && wouldOpenOnThisPrep,
-      false,
-      `${row.name} must not open handoff on this prep tree`,
-    );
-    if (row.metadata) {
-      assert.equal(
-        row.metadata.handoffSource === 'independent_swarm',
-        true,
-        'fixture constructed correctly',
-      );
-    }
+    const decision = closedEntryDecision(row);
+    assert.equal(decision.open, false, `${row.name} must not open handoff on this prep tree`);
+    assert.equal(decision.reason, row.reason, row.name);
   }
 });
 
@@ -143,4 +227,49 @@ test('rollback / persisted auto sessions stay on knife-2 policy when Swarm entry
   // - explicit_off / old-session default stay off
   // - closing the Swarm entry must not rewrite those records
   assert.fail('replace stub with knife-2 persist records after merge');
+});
+
+test('live: swarm-entry rollback does not rewrite ordinary-session enablement', () => {
+  const before = [
+    {
+      sessionId: 's-auto',
+      enablementSource: 'auto_policy',
+      enabled: true,
+      capabilityTiers: { planner: 'p', executor: 'e' },
+    },
+    {
+      sessionId: 's-on',
+      enablementSource: 'explicit_on',
+      enabled: true,
+      capabilityTiers: { planner: 'p' },
+    },
+    {
+      sessionId: 's-off',
+      enablementSource: 'explicit_off',
+      enabled: false,
+      capabilityTiers: { planner: 'p' },
+    },
+    { sessionId: 's-parser', enablementSource: 'parser_default', enabled: false },
+    { sessionId: 's-missing-tiers', enablementSource: 'parser_default', enabled: false },
+  ];
+  assert.equal(before.find((row) => row.enablementSource === 'auto_policy').enabled, true);
+  assert.equal(before.find((row) => row.enablementSource === 'explicit_on').enabled, true);
+  assert.equal('capabilityTiers' in before.find((row) => row.sessionId === 's-missing-tiers'), false);
+
+  const after = swarmEntryRollbackLeavesOrdinarySessions(before);
+  assert.deepEqual(after, before);
+
+  for (const row of after) {
+    const given = before.find((item) => item.sessionId === row.sessionId);
+    if (row.enablementSource === 'auto_policy' || row.enablementSource === 'explicit_on') {
+      assert.equal(row.enabled, given.enabled, `${row.sessionId} stays as given`);
+    }
+    if (row.enablementSource === 'explicit_off' || row.enablementSource === 'parser_default') {
+      assert.equal(row.enabled, false, `${row.sessionId} stays off`);
+    }
+    if (!Object.prototype.hasOwnProperty.call(row, 'capabilityTiers')) {
+      assert.equal(row.enabled, false, 'missing capabilityTiers is not flipped to enabled');
+      assert.equal(Object.prototype.hasOwnProperty.call(given, 'capabilityTiers'), false);
+    }
+  }
 });

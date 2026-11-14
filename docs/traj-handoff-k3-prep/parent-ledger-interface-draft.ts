@@ -8,8 +8,14 @@
  * until knife 2 has merged (public type-shape conflict risk).
  *
  * Storage and isolation technology are deliberately unset. Behaviour is not.
+ * This file exports types and a pure order list only: no class, no store,
+ * no lock, and no debit implementation. Nothing here is a Swarm entry
+ * gate or a Pattern B primitive (including closed-entry helpers).
  *
- * Contracts: v2.3 §6.3 R1, §10; remaining-slices v1.1 §4; knife34-decomposition §2.3.
+ * Crash recovery (R2 reservations, reconcile, unknown-outcome billing)
+ * is not a method on ParentBudgetLedger. Keep it in recovery.ts.
+ *
+ * Contracts: trajectory-handoff-plan v2.3 §6.3 R1, §10; remaining-slices v1.1 §4.
  *
  * Reuse existing kernels when implementing:
  *   checkDeadline({ persistedDeadline, now, timeoutTxnCommitted })
@@ -27,6 +33,32 @@ export type HangIdentity = {
   readonly hangAttemptId: string;
 };
 
+/**
+ * Identity the grant path will eventually require on the coordinator
+ * instruction. This is NOT the public CoordinatorResumeEvent.
+ *
+ * On tip c67112bc that public event is only planVersion, grantedQuota,
+ * waitDeadline, and countAgainstGrantedQuota. It has no refillId, runId,
+ * workerId, dedupeId, attemptId, or planId, and no coordinator_rejected
+ * variant. Do not copy this shape into agent-loop types until knife 2
+ * merges. Not an entry gate. Not a Pattern B primitive.
+ */
+export interface GrantPathEventIdentity {
+  readonly runId: string;
+  readonly workerId: string;
+  readonly dedupeId: string;
+  readonly attemptId: string;
+  readonly planId?: string;
+  readonly planVersion?: number;
+}
+
+
+/**
+ * Ledger input for one atomic debit, not the public resume event.
+ * GrantPathEventIdentity is what the grant path will eventually require.
+ * It is not a field of CoordinatorResumeEvent on tip c67112bc, and this
+ * request does not grow a second deadline calculator.
+ */
 export type RefillRequest = HangIdentity & {
   readonly refillId: string;
   readonly requestedUnits: LedgerUnit;
@@ -107,6 +139,9 @@ export interface ParentBudgetLedger {
    * Two workers racing for the last parent unit: one success, one refuse.
    * Two different refillIds racing for one hang: one decision, one refuse.
    * Same refillId retried after success: idempotent_replay.
+   *
+   * Crash recovery is not a method on this ledger. Do not add recover,
+   * replay, refund, or any balance-mutating implementation here.
    */
   debitAndGrant(request: RefillRequest): Promise<GrantDecision>;
 
@@ -119,22 +154,34 @@ export interface ParentBudgetLedger {
 /**
  * Host-side grant application after a successful debitAndGrant.
  * Not a second ledger. Must not debit the parent again.
+ * Must not zero the parent used-count. A new local quota may start at
+ * used=0; that reset is local only and is not a parent reset.
  *
  * On granted / idempotent_replay:
  *   - new local attemptId
  *   - new local remaining quota starts used=0, cap=grantedUnits
+ *   - parent used-count is NOT zeroed
  *   - session / turn / role-history counters are NOT zeroed
  *   - if a legal accepted planVersion is attached, awaiting_coordinator
  *     → executor_write counts 1 against the NEW local grant
  *   - if no legal planVersion, go planner_readonly or planner_repair
  *   - shared_scope_escalated leftover local units are already void and
  *     must not be added to the new grant
+ *
+ * event, when the public resume shape eventually carries it, is
+ * GrantPathEventIdentity (runId, workerId, dedupeId, attemptId, optional
+ * planId / planVersion). Passing it must not clear parent used-count.
  */
 export interface LocalGrantApplication {
   applySuccessfulGrant(input: {
     readonly decision: Extract<GrantDecision, { ok: true }>;
     readonly planVersion: number | null;
     readonly resumeTarget: 'executor_write' | 'planner_readonly' | 'planner_repair';
+    /**
+     * Absent on public CoordinatorResumeEvent today. Optional until knife 2
+     * merges that shape. Applying it must not zero parent used-count.
+     */
+    readonly event?: GrantPathEventIdentity;
   }): void;
 }
 

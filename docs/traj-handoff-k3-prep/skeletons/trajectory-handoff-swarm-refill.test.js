@@ -53,6 +53,93 @@ test('decision order lists waitDeadline before debit (draft contract)', async ()
   assert.ok(order.some((s) => s.includes('shared_scope_escalated')));
 });
 
+test('live fixture field invariants for skipped ledger cases (no ledger call)', () => {
+  const b2 = baseRequest({ now: '2026-11-14T10:00:00.000Z' });
+  assert.equal(b2.now, b2.waitDeadline);
+  assert.equal(b2.timeoutTxnCommitted, false);
+
+  const sessionFull = baseRequest({ sessionHandoffs: 6, requestedUnits: 1 });
+  assert.equal(sessionFull.sessionHandoffs, 6);
+  assert.equal(sessionFull.sessionCap, DEFAULT_SESSION_CAP);
+
+  const turnFull = baseRequest({ turnHandoffs: 3, requestedUnits: 1 });
+  assert.equal(turnFull.turnHandoffs, 3);
+  assert.equal(turnFull.turnCap, DEFAULT_TURN_CAP);
+
+  const nonPositive = [0, -1, 1.5, Number.NaN];
+  for (const requestedUnits of nonPositive) {
+    const req = baseRequest({ requestedUnits });
+    const positiveInteger = Number.isInteger(req.requestedUnits) && req.requestedUnits > 0;
+    assert.equal(positiveInteger, false, String(requestedUnits));
+  }
+
+  const cancel = baseRequest({
+    refillId: 'txn-cancel',
+    workerId: 'worker-a',
+    hangAttemptId: 'attempt-1',
+    parentRunId: 'run-parent',
+    competingTxn: 'cancel',
+  });
+  const timeout = baseRequest({
+    refillId: 'txn-timeout',
+    workerId: 'worker-a',
+    hangAttemptId: 'attempt-1',
+    parentRunId: 'run-parent',
+    competingTxn: 'timeout',
+    now: '2026-11-14T10:00:00.000Z',
+  });
+  const raceA = baseRequest({
+    workerId: 'worker-a',
+    refillId: 'refill-a',
+    hangAttemptId: 'attempt-a',
+  });
+  const raceB = baseRequest({
+    workerId: 'worker-b',
+    refillId: 'refill-b',
+    hangAttemptId: 'attempt-b',
+  });
+  const terminal = baseRequest({
+    refillId: 'refill-terminal',
+    now: '2026-11-14T10:00:00.000Z',
+  });
+  const terminalRetry = baseRequest({
+    refillId: 'refill-terminal',
+    now: '2026-11-14T09:00:00.000Z',
+  });
+  const onlyA = baseRequest({
+    workerId: 'worker-a',
+    hangAttemptId: 'attempt-a',
+    refillId: 'refill-a',
+  });
+  const staleB = baseRequest({
+    workerId: 'worker-b',
+    hangAttemptId: 'attempt-b',
+    refillId: 'refill-b',
+  });
+
+  assert.equal(cancel.parentRunId, timeout.parentRunId);
+  assert.equal(cancel.workerId, timeout.workerId);
+  assert.equal(cancel.hangAttemptId, timeout.hangAttemptId);
+  assert.notEqual(cancel.refillId, timeout.refillId);
+  assert.equal(raceA.parentRunId, raceB.parentRunId);
+  assert.notEqual(raceA.workerId, raceB.workerId);
+  assert.notEqual(raceA.refillId, raceB.refillId);
+  assert.notEqual(raceA.hangAttemptId, raceB.hangAttemptId);
+  assert.equal(terminal.refillId, terminalRetry.refillId);
+  assert.notEqual(terminal.now, terminalRetry.now);
+  assert.equal(onlyA.parentRunId, staleB.parentRunId);
+  assert.notEqual(onlyA.workerId, staleB.workerId);
+
+  for (const req of [b2, sessionFull, turnFull, cancel, timeout, raceA, raceB, terminal, terminalRetry, onlyA, staleB]) {
+    assert.equal(typeof req.parentRunId, 'string');
+    assert.equal(typeof req.workerId, 'string');
+    assert.equal(typeof req.hangAttemptId, 'string');
+    assert.equal(typeof req.refillId, 'string');
+    assert.ok(req.parentRunId.length > 0 && req.workerId.length > 0);
+    assert.ok(req.hangAttemptId.length > 0 && req.refillId.length > 0);
+  }
+});
+
 test('B1 happy path: debit parent and grant local in one transaction', { skip: true }, () => {
   ledgerNotBuilt();
   // expect kind === 'granted', parentRemaining decreased by N, local grant == N
@@ -138,5 +225,141 @@ test('C14 late resume of an old attempt / stale planVersion is ignored', { skip:
 
 test('C15 concurrent plan revisions with the same expectedOldVersion: one accepted', { skip: true }, () => {
   ledgerNotBuilt();
+  // Do not call commitPlanRevision until knife 2 has merged and packages/core/dist exists.
   // drive commitPlanRevision; second returns conflict
+});
+
+test('B5 first-commit wins between cancel and timeout', { skip: true }, () => {
+  ledgerNotBuilt();
+  const cancel = baseRequest({
+    competingTxn: 'cancel',
+    refillId: 'txn-cancel',
+    workerId: 'worker-a',
+    hangAttemptId: 'attempt-1',
+    stillAwaitingCoordinator: true,
+  });
+  const timeout = baseRequest({
+    competingTxn: 'timeout',
+    refillId: 'txn-timeout',
+    workerId: 'worker-a',
+    hangAttemptId: 'attempt-1',
+    now: '2026-11-14T10:00:00.000Z',
+    stillAwaitingCoordinator: true,
+  });
+  assert.equal(cancel.hangAttemptId, timeout.hangAttemptId);
+  assert.notEqual(cancel.refillId, timeout.refillId);
+  // first successful commit wins; the later txn is ignored
+});
+
+test('B6 restart uses persisted waitDeadline not leftover occupancy time', { skip: true }, () => {
+  ledgerNotBuilt();
+  const req = baseRequest({
+    waitDeadline: '2026-11-14T10:00:00.000Z',
+    now: '2026-11-14T09:30:00.000Z',
+    occupancyTimerEnded: true,
+    occupancyRemainingMs: 0,
+  });
+  assert.equal(req.occupancyRemainingMs, 0);
+  assert.notEqual(req.now, req.waitDeadline);
+  // decide from persisted waitDeadline; do not inherit ended occupancy remaining time
+});
+
+test('C2 terminal refillId cannot later succeed', { skip: true }, () => {
+  ledgerNotBuilt();
+  const failed = baseRequest({
+    refillId: 'refill-terminal',
+    now: '2026-11-14T10:00:00.000Z',
+    timeoutTxnCommitted: false,
+  });
+  const retrySameId = baseRequest({
+    refillId: 'refill-terminal',
+    now: '2026-11-14T09:00:00.000Z',
+    timeoutTxnCommitted: false,
+  });
+  assert.equal(failed.refillId, retrySameId.refillId);
+  // terminal failure freezes this refillId; a later grant needs a new refillId
+});
+
+test('C16 shared-scope escalation voids leftover', { skip: true }, () => {
+  ledgerNotBuilt();
+  const req = baseRequest({
+    escalation: 'shared_scope_escalated',
+    leftoverLocalUnits: 2,
+    requestedUnits: 1,
+  });
+  assert.equal(req.leftoverLocalUnits > 0, true);
+  // escalation voids leftover local units; they must not stay usable or be added to a later grant
+});
+
+test('C17 do not restore only A when B would go stale', { skip: true }, () => {
+  ledgerNotBuilt();
+  const workerA = baseRequest({
+    workerId: 'worker-a',
+    hangAttemptId: 'attempt-a',
+    refillId: 'refill-a',
+    planVersion: 2,
+    affectedWorkerIds: ['worker-b'],
+  });
+  const workerB = baseRequest({
+    workerId: 'worker-b',
+    hangAttemptId: 'attempt-b',
+    refillId: 'refill-b',
+    planVersion: 1,
+    staleIfOnlyARestored: true,
+  });
+  assert.notEqual(workerA.workerId, workerB.workerId);
+  assert.equal(workerB.staleIfOnlyARestored, true);
+  // must not grant or resume only A; pause and re-verify the affected set
+});
+
+test('C18 events without an accepted plan', { skip: true }, () => {
+  ledgerNotBuilt();
+  const req = baseRequest({
+    planId: null,
+    planVersion: 0,
+    eventTypes: ['failed', 'cancelled', 'timed_out', 'shared_scope_escalated'],
+  });
+  assert.equal(req.planVersion, 0);
+  assert.equal(req.planId, null);
+  // missing accepted plan must not block fail / cancel / timeout / escalation events
+});
+
+test('C19 crash recovery is not a grant', { skip: true }, () => {
+  ledgerNotBuilt();
+  const req = baseRequest({
+    recoveryKind: 'crash',
+    hangAttemptId: 'attempt-1',
+    createsNewAttempt: false,
+    grantsUnits: false,
+  });
+  assert.equal(req.createsNewAttempt, false);
+  assert.equal(req.grantsUnits, false);
+  // crash recovery does not increment, grant, or create a new attempt
+});
+
+test('C20 local_capped is not termination', { skip: true }, () => {
+  ledgerNotBuilt();
+  const req = baseRequest({
+    escalation: 'local_capped_escalated',
+    enters: 'awaiting_coordinator',
+    terminal: false,
+  });
+  assert.equal(req.terminal, false);
+  assert.equal(req.enters, 'awaiting_coordinator');
+  // local_capped_escalated is a handoff, not failed / cancelled / timed_out / capped
+});
+
+test('C21 grant N then executor_write consumes 1', { skip: true }, () => {
+  ledgerNotBuilt();
+  const req = baseRequest({
+    requestedUnits: 3,
+    resumeTarget: 'executor_write',
+    planVersion: 4,
+    consumesOnResume: 1,
+    parentDebitedAgain: false,
+  });
+  assert.equal(req.requestedUnits, 3);
+  assert.equal(req.consumesOnResume, 1);
+  assert.equal(req.parentDebitedAgain, false);
+  // parent already debited at grant time; executor_write counts 1 against the new local grant
 });
