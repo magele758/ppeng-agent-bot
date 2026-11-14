@@ -54,22 +54,36 @@ export interface SwarmExecutorDeps {
   swarmHandoffEntryEnabled?: boolean;
   /** Explicit off wins over the entry switch. */
   swarmHandoffExplicitOff?: boolean;
+  /** Separate from the independent Swarm switch. Missing/false keeps flywheel admission closed. */
+  flywheelHandoffEntryEnabled?: boolean;
+  /** Flywheel explicit off does not close the independent Swarm entry. */
+  flywheelHandoffExplicitOff?: boolean;
 }
 
 export class SwarmExecutor {
   private readonly launching = new Set<string>();
   private swarmHandoffEntryEnabled: boolean;
   private entryExplicitOff: boolean;
+  private flywheelHandoffEntryEnabled: boolean;
+  private flywheelEntryExplicitOff: boolean;
 
   constructor(private readonly deps: SwarmExecutorDeps) {
     this.swarmHandoffEntryEnabled = deps.swarmHandoffEntryEnabled === true;
     this.entryExplicitOff = deps.swarmHandoffExplicitOff === true;
+    this.flywheelHandoffEntryEnabled = deps.flywheelHandoffEntryEnabled === true;
+    this.flywheelEntryExplicitOff = deps.flywheelHandoffExplicitOff === true;
   }
 
   /** Close or reopen the approved independent-swarm entry without rebuilding the host. */
   setSwarmHandoffEntryEnabled(enabled: boolean): void {
     this.swarmHandoffEntryEnabled = enabled === true;
     this.entryExplicitOff = enabled !== true;
+  }
+
+  /** Close or reopen the flywheel composition entry without touching independent Swarm. */
+  setFlywheelHandoffEntryEnabled(enabled: boolean): void {
+    this.flywheelHandoffEntryEnabled = enabled === true;
+    this.flywheelEntryExplicitOff = enabled !== true;
   }
 
   private launchTeammate(sessionId: string, runId: string): void {
@@ -315,6 +329,7 @@ export class SwarmExecutor {
     const trusted = this.deps.trustedHandoff?.(run) ?? null;
     if (!trusted) return admitSwarmHandoff({ trusted: null, workerMetadata: null });
     const explicitOff = this.entryExplicitOff || trusted.explicitOff === true;
+    const flywheelExplicitOff = this.flywheelEntryExplicitOff || trusted.flywheelExplicitOff === true;
     return admitSwarmHandoff({
       trusted: {
         ...trusted,
@@ -322,6 +337,10 @@ export class SwarmExecutor {
         entryEnabled: explicitOff
           ? false
           : this.swarmHandoffEntryEnabled === true && trusted.entryEnabled !== false,
+        flywheelExplicitOff,
+        flywheelEntryEnabled: flywheelExplicitOff
+          ? false
+          : this.flywheelHandoffEntryEnabled === true && trusted.flywheelEntryEnabled !== false,
       },
       workerMetadata: null,
     });

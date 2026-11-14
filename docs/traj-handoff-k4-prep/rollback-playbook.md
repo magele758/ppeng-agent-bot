@@ -119,3 +119,13 @@ node --test packages/core/test/orchestration-engine.test.js
 - 不要回放结果未知的在途调用。
 - 不要改 Swarm 策略，不要改名或替换 `OrchestrationEngine`。
 - 不要把本剧本当成现在就可以执行回退的授权。
+
+
+## 已落地的关闭原语（第四刀实现）
+
+生产开关：`FLYWHEEL_HANDOFF_ENTRY_CONTROL_KEY`（`trajectory-handoff.flywheel-entry`），经 `readFlywheelHandoffEntrySwitch` / `rollbackFlywheelEntry(mode)` 读写。
+
+- `stop_new_admission`：写入显式关闭，立即阻止新的飞轮侧交接准入。独立 Swarm 开关 `trajectory-handoff.swarm-entry` 不变。已准入、仍在途的飞轮运行按 `inFlightPolicy: controlled_finish` 受控收尾，仍须经过证据门，不得因 `swarm.status === 'completed'` 在旧路径上宣布交付成功。
+- `cancel_in_flight`：同样先停新准入，并将 `inFlightPolicy` 设为 `cancel`。宿主对在途飞轮编排调用 `shouldCancelInFlightFlywheel`，以失败收尾，而不是把未完成的 implement 重放到关闭交接后的旧路径。
+
+缺失存储值表示获准飞轮入口仍打开。不得用关闭独立 Swarm 入口来顺便挡住飞轮。

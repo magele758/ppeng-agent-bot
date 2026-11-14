@@ -1,21 +1,33 @@
 /**
- * Independent Swarm handoff admission.
- * Only a trusted host context can open the entry. Worker metadata is ignored.
- * Flywheel orchestration stays closed. explicit off wins over the entry switch.
+ * Independent Swarm and flywheel handoff admission.
+ * Only a trusted host context can open an entry. Worker metadata is ignored.
+ * Each entry has its own switch: closing flywheel does not close independent Swarm.
+ * explicit off wins over the matching entry switch.
  */
 import { createInitialKernelState } from '@ppeng/agent-loop';
 import { qualityPassed } from '../quality/gate.js';
 import type { SwarmRun } from '../swarm/types.js';
 
+export {
+  FLYWHEEL_HANDOFF_ENTRY_CONTROL_KEY,
+  readFlywheelHandoffEntrySwitch,
+  rollbackFlywheelEntry,
+  flywheelNewAdmissionAllowed,
+  flywheelInFlightShouldCancel,
+} from './flywheel-entry.js';
+export type { FlywheelRollbackMode, FlywheelInFlightPolicy } from './flywheel-entry.js';
+
 export interface TrustedSwarmHostContext {
   readonly source?: unknown;
   readonly explicitOff?: boolean;
   readonly entryEnabled?: boolean;
+  readonly flywheelEntryEnabled?: boolean;
+  readonly flywheelExplicitOff?: boolean;
   readonly orchestrationRunId?: string | null;
 }
 
 export type SwarmAdmission =
-  | { readonly open: true; readonly source: 'independent_swarm' }
+  | { readonly open: true; readonly source: 'independent_swarm' | 'flywheel' }
   | {
       readonly open: false;
       readonly reason:
@@ -24,19 +36,25 @@ export type SwarmAdmission =
         | 'swarm_entry_closed'
         | 'flywheel_orchestration'
         | 'flywheel_source'
+        | 'flywheel_entry_closed'
         | 'source_not_admitted';
     };
+
+export type HandoffAdmissionSource = 'independent_swarm' | 'flywheel';
 
 export function trustedContextForSwarmRun(
   run: Pick<SwarmRun, 'orchestrationRunId'>,
   entryEnabled: boolean,
   explicitOff = false,
+  flywheelEntry?: { enabled: boolean; explicitOff?: boolean },
 ): TrustedSwarmHostContext {
   return {
     source: run.orchestrationRunId ? 'flywheel' : 'independent_swarm',
     orchestrationRunId: run.orchestrationRunId ?? null,
     entryEnabled,
     explicitOff,
+    flywheelEntryEnabled: flywheelEntry?.enabled === true,
+    flywheelExplicitOff: flywheelEntry?.explicitOff === true,
   };
 }
 
@@ -66,6 +84,37 @@ export function readSwarmHandoffEntrySwitch(stored: unknown): {
   return { enabled: false, explicitOff: true };
 }
 
+export function resolveHandoffAdmissionSource(
+  trusted: TrustedSwarmHostContext,
+): HandoffAdmissionSource | 'source_not_admitted' {
+  if (typeof trusted.orchestrationRunId === 'string' && trusted.orchestrationRunId.length > 0) {
+    return 'flywheel';
+  }
+  if (trusted.source === 'flywheel') return 'flywheel';
+  if (trusted.source === 'independent_swarm') return 'independent_swarm';
+  return 'source_not_admitted';
+}
+
+function admitIndependentSwarm(trusted: TrustedSwarmHostContext): SwarmAdmission {
+  if (trusted.explicitOff === true) return { open: false, reason: 'explicit_off' };
+  if (trusted.entryEnabled !== true) return { open: false, reason: 'swarm_entry_closed' };
+  return { open: true, source: 'independent_swarm' };
+}
+
+function closedFlywheelReason(trusted: TrustedSwarmHostContext): SwarmAdmission {
+  if (typeof trusted.orchestrationRunId === 'string' && trusted.orchestrationRunId.length > 0) {
+    return { open: false, reason: 'flywheel_orchestration' };
+  }
+  if (trusted.source === 'flywheel') return { open: false, reason: 'flywheel_source' };
+  return { open: false, reason: 'flywheel_entry_closed' };
+}
+
+function admitFlywheel(trusted: TrustedSwarmHostContext): SwarmAdmission {
+  if (trusted.flywheelExplicitOff === true) return { open: false, reason: 'explicit_off' };
+  if (trusted.flywheelEntryEnabled !== true) return closedFlywheelReason(trusted);
+  return { open: true, source: 'flywheel' };
+}
+
 export function admitSwarmHandoff(input: {
   readonly trusted?: TrustedSwarmHostContext | null;
   readonly workerMetadata?: Record<string, unknown> | null;
@@ -74,13 +123,9 @@ export function admitSwarmHandoff(input: {
   void input.workerMetadata;
   const trusted = input.trusted;
   if (!trusted) return { open: false, reason: 'no_trusted_context' };
-  if (trusted.explicitOff === true) return { open: false, reason: 'explicit_off' };
-  if (trusted.entryEnabled !== true) return { open: false, reason: 'swarm_entry_closed' };
-  if (typeof trusted.orchestrationRunId === 'string' && trusted.orchestrationRunId.length > 0) {
-    return { open: false, reason: 'flywheel_orchestration' };
-  }
-  if (trusted.source === 'flywheel') return { open: false, reason: 'flywheel_source' };
-  if (trusted.source === 'independent_swarm') return { open: true, source: 'independent_swarm' };
+  const source = resolveHandoffAdmissionSource(trusted);
+  if (source === 'independent_swarm') return admitIndependentSwarm(trusted);
+  if (source === 'flywheel') return admitFlywheel(trusted);
   return { open: false, reason: 'source_not_admitted' };
 }
 

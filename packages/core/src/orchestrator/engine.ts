@@ -3,6 +3,7 @@ import { nowIso } from '../id.js';
 import { OrchestratorStore } from './store.js';
 import type { OrchestrationRun, OrchestrationStep, OrchestrationStage } from './types.js';
 import type { SwarmRun, SwarmStatus } from '../swarm/types.js';
+import { deliveryEvidenceFromReview, evaluateSwarmDelivery } from '../trajectory-handoff/swarm-entry.js';
 
 const BOOTSTRAP_STAGES: OrchestrationStage[] = ['classify', 'research', 'implement', 'review', 'test'];
 
@@ -16,6 +17,10 @@ export interface OrchestrationEngineDeps {
   runResearch?: (run: OrchestrationRun) => Promise<string>;
   runReview?: (run: OrchestrationRun) => Promise<string | QualityReport>;
   runTest?: (run: OrchestrationRun) => Promise<string | QualityReport>;
+  /** Host-provided implement quality report. Missing means the evidence gate cannot be invoked. */
+  getImplementQualityReport?: (run: OrchestrationRun, swarm: SwarmRun) => unknown;
+  /** Rollback cancel-in-flight: fail running flywheel work; do not complete via the old path. */
+  shouldCancelInFlightFlywheel?: (run: OrchestrationRun) => boolean;
 }
 
 export class OrchestrationEngine {
@@ -65,6 +70,10 @@ export class OrchestrationEngine {
   }
 
   private async advanceRun(run: OrchestrationRun): Promise<void> {
+    if (this.deps.shouldCancelInFlightFlywheel?.(run) === true) {
+      this.failRun(run, 'flywheel_rollback_cancel_in_flight');
+      return;
+    }
     const steps = this.deps.store.listSteps(run.id);
 
     const active = steps.find((s) => s.status === 'running');
@@ -150,26 +159,63 @@ export class OrchestrationEngine {
     }
 
     const failed = swarm.status === 'failed' || swarm.status === 'cancelled';
+    if (failed) {
+      this.finishImplementStep(run, step, swarm, 'failed', 'swarm_failed');
+      return;
+    }
+
+    const delivery = this.evaluateImplementDelivery(run, swarm);
+    if (!delivery.success) {
+      this.finishImplementStep(run, step, swarm, 'failed', 'quality_gate_failed', delivery.reason);
+      return;
+    }
+    this.finishImplementStep(run, step, swarm, 'completed');
+  }
+
+  private evaluateImplementDelivery(run: OrchestrationRun, swarm: SwarmRun) {
+    const report = this.deps.getImplementQualityReport?.(run, swarm) ?? null;
+    const kernelState = kernelStateFromReport(report);
+    return evaluateSwarmDelivery({
+      report,
+      kernelState,
+      evidence: deliveryEvidenceFromReview(report),
+      gateInvoked: report != null && this.deps.getImplementQualityReport != null,
+    });
+  }
+
+  private finishImplementStep(
+    run: OrchestrationRun,
+    step: OrchestrationStep,
+    swarm: SwarmRun,
+    status: 'completed' | 'failed',
+    failureType?: string,
+    reason?: string,
+  ): void {
     this.deps.store.updateStep(step.id, {
-      status: failed ? 'failed' : 'completed',
-      outputArtifact: `swarm:${swarm.id}:${swarm.status}`,
-      failureType: failed ? 'swarm_failed' : undefined
+      status,
+      outputArtifact: reason ? `swarm:${swarm.id}:${swarm.status}:${reason}` : `swarm:${swarm.id}:${swarm.status}`,
+      failureType: status === 'failed' ? (failureType ?? 'quality_gate_failed') : undefined
     });
     this.deps.store.appendEvent({
       runId: run.id,
       stepId: step.id,
       kind: 'step_completed',
       actor: 'orchestrator',
-      payloadJson: JSON.stringify({ stage: step.stage, swarmId: swarm.id, swarmStatus: swarm.status })
+      payloadJson: JSON.stringify({
+        stage: step.stage,
+        swarmId: swarm.id,
+        swarmStatus: swarm.status,
+        reason,
+      })
     });
 
-    if (failed) {
+    if (status === 'failed') {
       this.deps.store.updateRunStatus(run.id, 'failed');
       this.deps.store.appendEvent({
         runId: run.id,
         kind: 'run_failed',
         actor: 'orchestrator',
-        payloadJson: JSON.stringify({ swarmId: swarm.id })
+        payloadJson: JSON.stringify({ swarmId: swarm.id, reason })
       });
     }
   }
@@ -194,4 +240,10 @@ export class OrchestrationEngine {
       payloadJson: JSON.stringify({ stage: step.stage })
     });
   }
+}
+
+function kernelStateFromReport(report: unknown): string | null {
+  if (!report || typeof report !== 'object') return null;
+  const record = report as Record<string, unknown>;
+  return typeof record.kernelState === 'string' ? record.kernelState : null;
 }
