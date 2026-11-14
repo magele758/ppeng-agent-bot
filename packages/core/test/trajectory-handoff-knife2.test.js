@@ -9,6 +9,7 @@ import { createChatSession, createTaskSession } from '../dist/runtime/session-fa
 import { forkSession } from '../dist/session/session-fork.js';
 import { readModelCatalog, writeModelCatalog } from '../dist/model/provider-catalog.js';
 import { resolvePinnedRoleAdapter } from '../dist/model/role-pinning.js';
+import { bindTurnKernelHost } from '../dist/runtime/l5-bindings.js';
 
 function openStore(prefix) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -267,6 +268,71 @@ test('explicit handoff fails closed when the role ref and the pin are both inval
     assert.equal(resolved.rolePinFailed, true);
     assert.notEqual(resolved.adapter?.modelName, 'openai/other-model');
     if (resolved.adapter) assert.equal(resolved.adapter.modelName, 'handoff-fail-closed');
+  } finally {
+    closeStore(opened.dir, opened.store);
+  }
+});
+
+function hostAdapter(name) {
+  return {
+    name,
+    modelName: name,
+    runTurn: async () => ({ stopReason: 'end', assistantParts: [] }),
+  };
+}
+
+function bindHost(store, modelAdapter) {
+  return bindTurnKernelHost({
+    store,
+    repoRoot: '/tmp/repo',
+    stateDir: '/tmp/state',
+    tools: [],
+    modelAdapter,
+    promptBuilder: { buildSystemPrompt: async () => '', buildMemoryAppendix: () => '' },
+  });
+}
+
+test('auto planner with no catalog pin uses the bound host adapter instead of failing closed', () => {
+  const { dir, store } = openStore('knife2-host-pin-');
+  try {
+    const model = hostAdapter('host-original');
+    const host = bindHost(store, model);
+    const adapter = host.resolveModelAdapter({
+      metadata: {
+        handoffEnablement: { source: 'auto_policy' },
+        capabilityTiers: { enablementSource: 'auto_policy', enabled: false },
+        handoffRole: 'planner',
+        handoffWorkTurn: true,
+      },
+    });
+    assert.equal(adapter, model);
+    assert.equal(adapter.modelName, 'host-original');
+  } finally {
+    closeStore(dir, store);
+  }
+});
+
+test('explicit invalid role ref still fail-closes when the pin is also unresolvable', () => {
+  const opened = pinCatalog();
+  try {
+    opened.store.db = opened.store.db ?? { exec() {} };
+    const model = hostAdapter('host-original');
+    const host = bindHost(opened.store, model);
+    assert.throws(
+      () => host.resolveModelAdapter({
+        metadata: {
+          capabilityTiers: {
+            enabled: true,
+            enablementSource: 'explicit_on',
+            roles: { plannerModel: 'missing/nope' },
+          },
+          handoffRole: 'planner',
+          pinnedSessionModel: 'missing/also',
+          modelOverride: 'openai/other-model',
+        },
+      }),
+      /both failed to resolve; failing closed/,
+    );
   } finally {
     closeStore(opened.dir, opened.store);
   }
