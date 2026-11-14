@@ -20,7 +20,7 @@ import { normalizeOpenAiCompatibleBaseUrl } from './list-models.js';
 import { createLogger } from '../logger.js';
 import { withImageCompatibility } from './image-compatibility.js';
 import type { ModelAdapter, SessionRecord } from '../types.js';
-import { normalizeStoredCapabilityTiers, type PersistedCapabilityTiers } from '../trajectory-handoff/persist.js';
+import { mergePersistedCapabilityTiers, normalizeStoredCapabilityTiers, type PersistedCapabilityTiers } from '../trajectory-handoff/persist.js';
 
 const log = createLogger('model-override');
 
@@ -416,14 +416,19 @@ export function normalizeCatalog(raw: Partial<ModelProviderCatalog> | null | und
 
 export function patchCatalogRouting(
   store: ModelProvidersStore,
-  patch: { fallbackRefs?: ModelRef[] | null; thinkingMode?: CatalogThinkingMode | null }
+  patch: { fallbackRefs?: ModelRef[] | null; thinkingMode?: CatalogThinkingMode | null; capabilityTiers?: unknown }
 ): ModelProviderCatalog {
   const catalog = readModelCatalog(store);
-  return writeModelCatalog(store, {
+  const next: ModelProviderCatalog = {
     ...catalog,
     fallbackRefs: patch.fallbackRefs === null ? undefined : patch.fallbackRefs ?? catalog.fallbackRefs,
     thinkingMode: patch.thinkingMode === null ? undefined : patch.thinkingMode ?? catalog.thinkingMode
-  });
+  };
+  if (Object.prototype.hasOwnProperty.call(patch, 'capabilityTiers')) {
+    const merged = mergePersistedCapabilityTiers(catalog.capabilityTiers, patch.capabilityTiers);
+    if (merged) next.capabilityTiers = merged;
+  }
+  return writeModelCatalog(store, next);
 }
 
 export function readModelCatalog(store: ModelProvidersStore): ModelProviderCatalog {

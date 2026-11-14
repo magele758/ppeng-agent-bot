@@ -242,30 +242,30 @@ export async function spawnSubagentOutcome(
   if (opts?.allowedTools?.length) {
     childMeta.allowedTools = opts.allowedTools;
   }
+  const liveParent = host.store.getSession(context.session.id) ?? context.session;
   Object.assign(
     childMeta,
-    inheritBotAllowlists(context.session.metadata, {
+    inheritBotAllowlists(liveParent.metadata, {
       agentAllowedTools: host.store.getAgent(agentId)?.allowedTools,
       requestedTools: opts?.allowedTools
     })
   );
-  Object.assign(childMeta, childModelInheritance(context.session.metadata));
-  const plannerChild = handoffChildCeiling(context.session.metadata).handoffRole === 'planner';
+  Object.assign(childMeta, childModelInheritance(liveParent.metadata));
+  const plannerChild = handoffChildCeiling(liveParent.metadata).handoffRole === 'planner';
   if (opts?.model && !plannerChild) {
     childMeta.modelOverride = opts.model;
   }
-  Object.assign(childMeta, handoffChildCeiling(context.session.metadata));
+  Object.assign(childMeta, handoffChildCeiling(liveParent.metadata));
   if (opts?.minConfidence != null) {
     childMeta.minConfidence = opts.minConfidence;
   }
 
-  const inheritedMode = childPermissionMode(context.session.metadata);
+  const inheritedMode = childPermissionMode(liveParent.metadata);
   if (inheritedMode) {
     childMeta.permissionMode = inheritedMode;
   }
-  Object.assign(childMeta, inheritForkRetrievalMetadata(context.session.metadata));
-  Object.assign(childMeta, inheritBotIdentityMetadata(context.session, host.store));
-  const liveParent = host.store.getSession(context.session.id) ?? context.session;
+  Object.assign(childMeta, inheritForkRetrievalMetadata(liveParent.metadata));
+  Object.assign(childMeta, inheritBotIdentityMetadata(liveParent, host.store));
   Object.assign(childMeta, inheritedExecutionMetadata(liveParent.metadata, liveParent.id));
 
   const subagent = host.store.createSession({

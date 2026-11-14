@@ -106,6 +106,7 @@ export interface ToolLoopStore {
   getTask: (taskId: string) => TaskRecord | undefined;
   updateTask: (taskId: string, patch: { artifacts: TaskArtifact[] }) => unknown;
   foldMessages?(sessionId: string): Array<{ parts: MessagePart[] }>;
+  getSession?(sessionId: string): SessionRecord | undefined;
 }
 
 export interface ToolLoopDeps {
@@ -341,6 +342,7 @@ function hostFromDeps(deps: ToolLoopDeps): ToolLoopHost {
     env: process.env,
     savedShellIsolation: () => resolveSandboxMode(getBoundSandboxSettingsStore(), process.env),
     assertSessionWritable: (sessionId) => deps.store.assertCurrentWriter?.(sessionId),
+    readSession: (sessionId) => deps.store.getSession?.(sessionId),
     gateDirtyInput: true,
     appendMessage: (sessionId, role, parts) => {
       deps.store.appendMessage(sessionId, role, parts);

@@ -81,12 +81,13 @@ import {
 import { rollbackReasonOf } from '../session/step-tx.js';
 import { applyRunProfileToTools, trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
 import { denyTrajectoryTool, prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
-import { advanceExplicitHandoffAfterTools, prepareExplicitSessionHandoff } from '../trajectory-handoff/session-turn.js';
+import { advanceExplicitHandoffAfterTools, closePlannerDirectAnswer, handoffContextMessage, prepareExplicitSessionHandoff } from '../trajectory-handoff/session-turn.js';
 import { defaultWorkspaceRoots } from '../workspace/default-roots.js';
 import type {
   AgentSpec,
   MessagePart,
   ModelStreamChunk,
+  ModelTurnInput,
   ModelTurnResult,
   RunContext,
   SessionMessage,
@@ -180,12 +181,33 @@ function recordExplicitHandoff(
   results: readonly { toolCallId: string; name: string; ok: boolean; content: string; metadata?: Record<string, unknown> }[],
 ): void {
   const session = host.store.getSession(sessionId);
-  const patch = advanceExplicitHandoffAfterTools(handoffSessionMetadata(session ?? {}), results);
+  const patch = advanceExplicitHandoffAfterTools(handoffSessionMetadata(session ?? {}), results, sessionId);
   if (patch) host.mergeSessionMetadata(sessionId, patch);
 }
 
 function textPart(text: string): MessagePart {
   return { type: 'text', text };
+}
+
+function foldHandoffContext(host: TurnKernelHost, sessionId: string, turnInput: ModelTurnInput): ModelTurnInput {
+  const text = handoffContextMessage(host.store.getSession(sessionId)?.metadata);
+  if (!text) return turnInput;
+  const message: SessionMessage = {
+    id: 'handoff-context-' + sessionId,
+    sessionId,
+    role: 'system',
+    parts: [textPart(text)],
+    createdAt: new Date(0).toISOString(),
+  };
+  return { ...turnInput, messages: [...turnInput.messages, message] };
+}
+
+function closePlannerAnswer(host: TurnKernelHost, sessionId: string, parts: readonly MessagePart[]): void {
+  if (parts.some((part) => part.type === 'tool_call')) return;
+  const answer = parts.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n');
+  if (!answer) return;
+  const patch = closePlannerDirectAnswer(host.store.getSession(sessionId)?.metadata, answer);
+  if (patch) host.mergeSessionMetadata(sessionId, patch);
 }
 
 function isContextOverflowError(err: unknown): boolean {
@@ -1128,7 +1150,8 @@ return undefined;
 async () => {
 async function __gate133() {
 
-await prepareExplicitSessionHandoff(host, sid);
+await prepareExplicitSessionHandoff(host, sid, { userTurn: turn === 0 });
+turnInput = foldHandoffContext(host, sid, turnInput);
 turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
 return undefined;
 }
@@ -1164,7 +1187,8 @@ return undefined;
 }
 async function __gate135() {
 try {
-            await prepareExplicitSessionHandoff(host, sid);
+            await prepareExplicitSessionHandoff(host, sid, { userTurn: false });
+            turnInput = foldHandoffContext(host, sid, turnInput);
             turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
           } catch (retryError) {
             const reason =
@@ -1223,7 +1247,8 @@ packedRetry = loopConfig.overflowReprepare
                     }),
               };
 turnInput = { ...turnInput, messages: packedRetry.messages };
-await prepareExplicitSessionHandoff(host, sid);
+await prepareExplicitSessionHandoff(host, sid, { userTurn: false });
+turnInput = foldHandoffContext(host, sid, turnInput);
 turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
 return undefined;
 }
@@ -1809,8 +1834,9 @@ return undefined;
 return undefined;
 }
 async function __gate97() {
-let stopPhase: any;
-let stopHook: any;
+closePlannerAnswer(host, sid, turnResult.assistantParts);
+let stopPhase: 'subagent_stop' | 'stop';
+let stopHook: { block?: boolean; systemMessage?: string; message?: string } | undefined;
 let goal: any;
 let steeredNow: any;
 async function __gate90() {
@@ -1942,6 +1968,7 @@ return undefined;
 }
 async function __gate100() {
 if (toolCalls.length === 0) {
+        closePlannerAnswer(host, sid, turnResult.assistantParts);
         return kernelTurnSignal('continue');
       }
 if (signal.aborted) {

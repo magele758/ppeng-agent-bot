@@ -764,6 +764,7 @@ export {
   denyTrajectoryTool,
   finishTrajectoryWrite,
   noteTrajectoryWrite,
+  trajectoryWritesPending,
   prepareTrajectoryToolWave,
   trajectoryToolPermission,
 } from './trajectory-handoff/tool-entry.js';

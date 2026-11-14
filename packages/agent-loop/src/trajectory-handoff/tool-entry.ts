@@ -70,6 +70,11 @@ export function noteTrajectoryWrite(sessionId: string, callId: string): void {
   pending.add(callId);
 }
 
+export function trajectoryWritesPending(sessionId: string): boolean {
+  const pending = inflightWrites.get(sessionId);
+  return Boolean(pending && pending.size > 0);
+}
+
 export function finishTrajectoryWrite(sessionId: string, callId: string): void {
   inflightWrites.get(sessionId)?.delete(callId);
 }
@@ -90,7 +95,7 @@ export function beginTrajectoryWrite(
 /** Denial reason, or undefined when the tool may run. Disabled handoff allows it. */
 export function denyTrajectoryTool(
   session: { metadata?: unknown } | undefined,
-  tool: { name: string; access?: string; sideEffectLevel?: string }
+  tool: { name: string; access?: string; sideEffectLevel?: string; planStore?: { kind?: string } }
 ): string | undefined {
   const metadata = asRecord(session?.metadata);
   if (!trajectoryHandoffGateFromMetadata(metadata).enabled) return undefined;
@@ -103,6 +108,14 @@ export function denyTrajectoryTool(
   if (!planner && !executor) return `Tool execution not allowed in handoff state ${state}`;
   const original = originalPerms(metadata);
   const phase = typeof metadata?.hostPhase === 'string' ? metadata.hostPhase : 'ordinary';
+  if (
+    tool.planStore?.kind === 'plan_state'
+    && (planner || executor)
+    && phase !== 'research'
+    && phase !== 'review'
+  ) {
+    return undefined;
+  }
   const phaseSet = phase === 'research' || phase === 'review' ? new Set<HandoffPerm>(['read']) : new Set(original);
   const roleSet = planner ? new Set<HandoffPerm>(['read']) : new Set(original);
   const perm = trajectoryToolPermission(tool);

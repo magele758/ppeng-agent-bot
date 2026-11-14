@@ -50,6 +50,7 @@ export interface PtcExecToolDependencies {
     sessionId: string,
     event: { kind: 'ptc_cell' | 'ptc_hook'; payload?: Record<string, unknown> }
   ) => void;
+  readSession?: (sessionId: string) => RunContext['session'] | undefined;
   saveProgram?: (
     sessionId: string,
     patch: Record<string, unknown>
@@ -137,6 +138,7 @@ export function createPtcExecTool(deps: PtcExecToolDependencies): ToolContract<P
           return result;
         },
         ...(jev ? { jev } : {}),
+        ...(deps.readSession ? { readSession: deps.readSession } : {}),
         onToolCall: (name, result) => {
           deps.emitTrace?.(context.session.id, {
             kind: 'ptc_hook',

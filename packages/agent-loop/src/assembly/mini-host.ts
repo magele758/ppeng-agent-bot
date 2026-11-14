@@ -10,7 +10,7 @@ import { defaultPrepareView } from '../turn/default-view.js';
 import type { ToolExecResult, TurnKernelHost, TurnKernelPrompt, TurnKernelStore } from '../turn/host.js';
 import { resolveLoopConfig } from '../turn/config.js';
 import { runSessionKernel, type TurnKernelOptions } from '../turn/kernel.js';
-import { denyTrajectoryTool } from '../trajectory-handoff/tool-entry.js';
+import { beginTrajectoryWrite, denyTrajectoryTool, finishTrajectoryWrite } from '../trajectory-handoff/tool-entry.js';
 import type { MessagePart, ModelAdapter, RunContext, ToolContract } from '../types.js';
 
 export function defaultMiniPrompt(systemPrompt?: string): TurnKernelPrompt {
@@ -71,13 +71,16 @@ async function executeToolsSimple(
   toolCalls: Array<{ toolCallId: string; name: string; input: Record<string, unknown> }>,
   context: RunContext,
   allowExternalAiTools: boolean,
-  turnTools?: ToolContract<Record<string, unknown>>[]
+  turnTools?: ToolContract<Record<string, unknown>>[],
+  readSession?: (sessionId: string) => RunContext['session'] | undefined,
 ) {
   const pool = turnTools ?? tools;
   const results: ToolExecResult[] = [];
   for (const tc of toolCalls) {
     const tool = pool.find((item) => item.name === tc.name);
-    const denied = denyTrajectoryTool(context.session, tool ?? { name: tc.name });
+    const session = readSession?.(context.session.id) ?? context.session;
+    const live = session === context.session ? context : { ...context, session };
+    const denied = denyTrajectoryTool(session, tool ?? { name: tc.name });
     if (denied) {
       results.push({ toolCallId: tc.toolCallId, name: tc.name, ok: false, content: denied });
       continue;
@@ -95,8 +98,9 @@ async function executeToolsSimple(
       });
       continue;
     }
+    const tracked = beginTrajectoryWrite(session, tool, tc.toolCallId);
     try {
-      const result = await tool.execute(context, tc.input);
+      const result = await tool.execute(live, tc.input);
       results.push({
         toolCallId: tc.toolCallId,
         name: tool.name,
@@ -113,6 +117,8 @@ async function executeToolsSimple(
         ok: false,
         content: err instanceof Error ? err.message : String(err),
       });
+    } finally {
+      if (tracked) finishTrajectoryWrite(session.id, tc.toolCallId);
     }
   }
   return results;
@@ -165,7 +171,8 @@ export function createMiniAssembledLoop(input: CreateAssembledLoopInput = {}): A
         toolCalls,
         context,
         allowExternalAiTools,
-        turnTools as ToolContract<Record<string, unknown>>[] | undefined
+        turnTools as ToolContract<Record<string, unknown>>[] | undefined,
+        (sessionId) => store.getSession(sessionId),
       ),
     async autoCompact() {
       return {};

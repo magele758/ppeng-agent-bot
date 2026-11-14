@@ -32,6 +32,11 @@ export interface HandoffContextPack {
   toolPairs: Array<{ callId: string; name: string; ok: boolean; result: string }>;
   completedEffects: Array<{ stepId: string; dedupeId: string; attemptId: string }>;
   failureEvidence?: { stepId: string; evidence: string };
+  plan?: {
+    version: number;
+    steps: Array<{ id: string; description: string; status?: string }>;
+    analysis?: string;
+  };
 }
 
 export function acceptedPlanVersion(plan: object | null | undefined): number {

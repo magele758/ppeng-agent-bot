@@ -18,6 +18,7 @@ export function distinguishEnablementSource(
 
 /** True only for an explicit open. Parser default and auto_policy stay off. */
 export function handoffRuntimeEnabled(metadata: Record<string, unknown> | undefined): boolean {
+  if (metadata?.handoffSuspended === 'session_cap') return false;
   const source = distinguishEnablementSource(metadata);
   if (source === 'explicit_off') return false;
   if (source === 'explicit_on') return true;

@@ -46,7 +46,7 @@ import { readModelCatalog, resolveSessionModelAdapter, type ModelRef } from '../
 import { applyThinkingEffortToTurn } from '../model/thinking-effort-settings.js';
 import { planModelFallback, rememberServedBy, runWithFallbackChain } from '../model/fallback-chain.js';
 import { resolveModelRoute, withProviderFallback } from '../model/registry-router.js';
-import { resolvePinnedRoleAdapter } from '../model/role-pinning.js';
+import { resolvePinnedRoleAdapter, selectOriginalModelPin } from '../model/role-pinning.js';
 import { waitSteeringChildrenIdle } from '../session/steering-subagent.js';
 import { runCaseGovernance } from '../evolving/case-governance.js';
 import { scheduleBackgroundCaseReview } from '../evolving/index.js';
@@ -81,6 +81,7 @@ import { tryGoalStore } from '../goal/goal-store.js';
 import {
   createKernelHookRegistry,
   createStreamResetTracker,
+  handoffRuntimeEnabled,
   recoveryPolicyEnabled,
   reasoningSpinWatchdogEnabled,
   registerKernelHooks
@@ -840,8 +841,20 @@ async function deliverPreparedTurn(
 }
 
 function routePreparedTurn(rt: L5Bindable, fitted: Parameters<ModelTurnCall>[0], stream: Parameters<ModelTurnCall>[1]) {
-  const session = fitted.sessionId ? rt.store.getSession(fitted.sessionId) : undefined;
+  let session = fitted.sessionId ? rt.store.getSession(fitted.sessionId) : undefined;
   if (session) {
+    const existingPin = typeof session.metadata?.pinnedSessionModel === 'string' ? session.metadata.pinnedSessionModel.trim() : '';
+    if (handoffRuntimeEnabled(session.metadata) && !existingPin) {
+      const pin = selectOriginalModelPin({
+        catalog: readModelCatalog(rt.store),
+        metadata: session.metadata,
+        env: process.env,
+      });
+      if (pin) {
+        rt.store.updateSession(session.id, { metadata: { ...session.metadata, pinnedSessionModel: pin } });
+        session = rt.store.getSession(session.id) ?? session;
+      }
+    }
     const pinned = resolvePinnedRoleAdapter({
       session,
       catalog: readModelCatalog(rt.store),

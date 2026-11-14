@@ -110,6 +110,8 @@ export interface ToolLoopHost {
   toolExecutionScope?(call: ToolCallPart, context: RunContext): { context: RunContext; release(): void };
   /** Reject a revoked execution before dispatching another tool. */
   assertSessionWritable?(sessionId: string): void;
+  /** Latest persisted session, read after awaits so a role change is visible. */
+  readSession?(sessionId: string): RunContext['session'] | undefined;
   /** Injected env; replaces direct process.env reads. */
   env: Record<string, string | undefined>;
   /** Owner-saved shell isolation mode (e.g. `direct`). Omit when the host has no saved setting. */
@@ -1110,6 +1112,21 @@ async function executeScopedTool(
 
   const execInput = pre.input !== undefined ? pre.input : toolCall.input;
   const snapshot = await captureToolSnapshot(tool, context, execInput);
+  const fresh = host.readSession?.(sessionId) ?? context.session;
+  const deniedNow = denyTrajectoryTool(fresh, tool);
+  if (deniedNow) {
+    return {
+      toolCallId: toolCall.toolCallId,
+      name: tool.name,
+      ok: false,
+      content: deniedNow,
+      problem: toolInfraProblem(tool.name, toolCall.toolCallId, 'TOOL_DISABLED_IN_SESSION', deniedNow, {
+        title: 'Tool not available in session',
+        status: 403,
+      }),
+    };
+  }
+  const liveContext = fresh === context.session ? context : { ...context, session: fresh };
 
   const startedAt = Date.now();
   let entered = false;
@@ -1128,21 +1145,22 @@ async function executeScopedTool(
     }
   };
 
-  const trackedWrite = beginTrajectoryWrite(context.session, tool, toolCall.toolCallId);
+  let trackedWrite = false;
   try {
-    if (context.abortSignal?.aborted) throw new Error(cancelledBySteer(context) ? 'Tool cancelled by user interjection before dispatch' : 'Session aborted before tool dispatch');
+    if (liveContext.abortSignal?.aborted) throw new Error(cancelledBySteer(liveContext) ? 'Tool cancelled by user interjection before dispatch' : 'Session aborted before tool dispatch');
     host.assertSessionWritable?.(sessionId);
+    trackedWrite = beginTrajectoryWrite(fresh, tool, toolCall.toolCallId);
     entered = true;
-    const once = await runUnlessJsonSourceRepeated(host, context, sessionId, tool.name, execInput, () =>
-      tool.execute(context, execInput as Record<string, unknown>)
+    const once = await runUnlessJsonSourceRepeated(host, liveContext, sessionId, tool.name, execInput, () =>
+      tool.execute(liveContext, execInput as Record<string, unknown>)
     );
     entered = once.executed;
     let result = once.result;
     if (completed && once.executed) {
-      completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
+      completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context: liveContext });
     }
 
-    if (cancelledBySteer(context)) result = {
+    if (cancelledBySteer(liveContext)) result = {
       ...result, ok: false,
       content: result.content + '\nTool cancelled by user interjection. Partial effects may remain; do not retry unless the user requests it.',
       metadata: { ...result.metadata, cancelledBySteer: true }
@@ -1189,10 +1207,10 @@ async function executeScopedTool(
       ...(hookRewrote ? { hookRewrote: true } : {}),
     };
   } catch (error) {
-    const failed = await toolExceptionResult(host, tool, toolCall, context, sessionId, execInput, snapshot, completed, exportSpan, error, attemptTrace(entered, startedAt));
+    const failed = await toolExceptionResult(host, tool, toolCall, liveContext, sessionId, execInput, snapshot, completed, exportSpan, error, attemptTrace(entered, startedAt));
     return hookRewrote ? { ...failed, hookRewrote: true } : failed;
   } finally {
-    if (trackedWrite) finishTrajectoryWrite(context.session.id, toolCall.toolCallId);
+    if (trackedWrite) finishTrajectoryWrite(fresh.id, toolCall.toolCallId);
   }
 }
 

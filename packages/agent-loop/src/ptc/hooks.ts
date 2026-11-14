@@ -1,5 +1,5 @@
 import type { RunContext, ToolContract, ToolExecutionResult } from '../types.js';
-import { denyTrajectoryTool } from '../trajectory-handoff/tool-entry.js';
+import { beginTrajectoryWrite, denyTrajectoryTool, finishTrajectoryWrite } from '../trajectory-handoff/tool-entry.js';
 
 const JS_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const RESERVED = new Set([
@@ -80,6 +80,8 @@ export interface PtcNamespaceOptions {
    */
   jev?: PtcJevApi;
   onToolCall?: (name: string, result: ToolExecutionResult) => void;
+  /** Read at tool invocation, after the cell has already been built. */
+  readSession?: (sessionId: string) => RunContext['session'] | undefined;
 }
 
 export interface PtcNamespace {
@@ -108,7 +110,8 @@ function normalizeToolArgs(name: string, raw: unknown): Record<string, unknown> 
 function readonlyToolHook(
   tool: ToolContract<any>,
   context: RunContext,
-  onToolCall?: (name: string, result: ToolExecutionResult) => void
+  onToolCall?: (name: string, result: ToolExecutionResult) => void,
+  readSession?: (sessionId: string) => RunContext['session'] | undefined,
 ): (raw?: unknown) => Promise<ToolExecutionResult> {
   return async (raw?: unknown) => {
     if (context.abortSignal?.aborted) throw new Error('PTC cell aborted');
@@ -123,11 +126,18 @@ function readonlyToolHook(
         })
       };
     }
-    const denied = denyTrajectoryTool(context.session, tool);
+    const session = readSession?.(context.session.id) ?? context.session;
+    const live = session === context.session ? context : { ...context, session };
+    const denied = denyTrajectoryTool(session, tool);
     if (denied) return { ok: false, content: denied };
-    const result = await tool.execute(context, args);
-    onToolCall?.(tool.name, result);
-    return result;
+    const tracked = beginTrajectoryWrite(session, tool, 'ptc:' + tool.name);
+    try {
+      const result = await tool.execute(live, args);
+      onToolCall?.(tool.name, result);
+      return result;
+    } finally {
+      if (tracked) finishTrajectoryWrite(session.id, 'ptc:' + tool.name);
+    }
   };
 }
 
@@ -154,7 +164,7 @@ export function buildPtcNamespace(options: PtcNamespaceOptions): PtcNamespace {
 
   for (const tool of options.authorizedTools) {
     if (!isPtcNamespaceTool(tool)) continue;
-    const hook = readonlyToolHook(tool, options.context, options.onToolCall);
+    const hook = readonlyToolHook(tool, options.context, options.onToolCall, options.readSession);
     toolsBag[tool.name] = hook;
     names.push(tool.name);
     if (JS_IDENTIFIER.test(tool.name) && !RESERVED.has(tool.name)) {

@@ -179,3 +179,46 @@ export function failClosedRoleAdapter(reason: string): ModelAdapter {
     },
   };
 }
+
+/**
+ * First qualifying original model for a session that has no pin yet.
+ * Skips heuristic providers, disabled models, catalog fallback refs, and the VL model.
+ */
+export function selectOriginalModelPin(input: {
+  catalog: ModelProviderCatalog;
+  metadata: unknown;
+  env?: NodeJS.ProcessEnv;
+}): string | undefined {
+  const metadata = asRecord(input.metadata);
+  const vlName = input.env?.RAW_AGENT_VL_MODEL_NAME?.trim() ?? '';
+  const fallback = new Set(
+    (input.catalog.fallbackRefs ?? []).map((ref) => ref.providerId + '/' + ref.modelId),
+  );
+  const named: string[] = [];
+  const modelRef = metadata?.modelRef;
+  if (typeof modelRef === 'string' && modelRef.trim()) named.push(modelRef.trim());
+  const refRecord = asRecord(modelRef);
+  if (typeof refRecord?.providerId === 'string' && typeof refRecord.modelId === 'string' && refRecord.providerId && refRecord.modelId) {
+    named.push(refRecord.providerId + '/' + refRecord.modelId);
+  }
+  if (input.catalog.defaultRef) {
+    named.push(input.catalog.defaultRef.providerId + '/' + input.catalog.defaultRef.modelId);
+  }
+  for (const provider of input.catalog.providers) {
+    if (provider.kind === 'heuristic') continue;
+    for (const model of provider.models) {
+      if (model.enabled === false) continue;
+      named.push(provider.id + '/' + model.id);
+    }
+  }
+  for (const candidate of named) {
+    if (fallback.has(candidate)) continue;
+    const parsed = parsePinnedRef(candidate, input.catalog);
+    if (!parsed) continue;
+    const provider = input.catalog.providers.find((item) => item.id === parsed.providerId);
+    if (!provider || provider.kind === 'heuristic') continue;
+    if (vlName && parsed.modelId === vlName) continue;
+    return parsed.providerId + '/' + parsed.modelId;
+  }
+  return undefined;
+}

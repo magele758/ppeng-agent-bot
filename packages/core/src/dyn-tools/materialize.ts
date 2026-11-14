@@ -28,6 +28,7 @@ export interface DynToolMaterializeDeps {
   createScratchPersist?: (context: RunContext) => PtcScratchPersist;
   goalSettingsStore?: Parameters<typeof readGoalSettings>[0];
   emitTrace?: (sessionId: string, event: { kind: string; payload?: Record<string, unknown> }) => void;
+  readSession?: (sessionId: string) => RunContext['session'] | undefined;
 }
 
 const SIDE_EFFECT_RANK: Record<SideEffectLevel, number> = { none: 0, workspace: 1, system: 2 };
@@ -121,7 +122,8 @@ export function materializePtcCellTool(
           });
           if (!result.ok) throw new Error(result.reason);
           return result;
-        }
+        },
+        ...(deps.readSession ? { readSession: deps.readSession } : {}),
       });
 
       const hooks: Record<string, unknown> = {

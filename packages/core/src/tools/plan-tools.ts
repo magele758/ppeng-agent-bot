@@ -335,7 +335,7 @@ async function applyAndPersist(
     return {
       ok: true,
       content: formatPlan(committed.plan),
-      ...(event.type === 'submit' ? { metadata: { handoffPlanAccepted: true, planVersion: committed.plan.version } } : {}),
+      metadata: handoffMetadata(event, committed.plan),
     };
   });
 }
@@ -347,6 +347,25 @@ const handoffArgSchema = {
   side_effect: { type: 'boolean' },
   resume_policy: { type: 'string' },
 };
+
+function handoffMetadata(event: PlanEvent, plan: PlanState): Record<string, unknown> {
+  const step = event.type === 'fail' || event.type === 'start' || event.type === 'complete'
+    ? plan.steps[event.stepIndex - 1]
+    : undefined;
+  const stepId = step?.id ?? step?.title ?? (event.type === 'fail' ? String(event.stepIndex) : undefined);
+  return {
+    plan,
+    planVersion: plan.version,
+    completedEffects: plan.appliedEffects ?? [],
+    ...(event.type === 'submit' ? { handoffPlanAccepted: true } : {}),
+    ...(event.type === 'fail' && stepId
+      ? {
+          handoffFriction: { kind: 'step_failed', stepId, evidence: event.error },
+          failureEvidence: event.error,
+        }
+      : {}),
+  };
+}
 
 function publishArgs(args: object): PlanPublish {
   const record = args as {
@@ -384,6 +403,7 @@ export function createPlanTools(): ToolContract<any>[] {
       required: ['analysis', 'steps']
     },
     approvalMode: 'never',
+    planStore: { kind: 'plan_state' },
     sideEffectLevel: 'none',
     async execute(context, args) {
       return applyAndPersist(context, {
@@ -405,6 +425,7 @@ export function createPlanTools(): ToolContract<any>[] {
       }
     },
     approvalMode: 'never',
+    planStore: { kind: 'plan_state' },
     sideEffectLevel: 'none',
     async execute(context, args) {
       const result = await applyAndPersist(context, { type: 'confirm' }, publishArgs(args ?? {}));
@@ -428,6 +449,7 @@ export function createPlanTools(): ToolContract<any>[] {
       required: ['step_index']
     },
     approvalMode: 'never',
+    planStore: { kind: 'plan_state' },
     sideEffectLevel: 'none',
     async execute(context, args) {
       return applyAndPersist(context, { type: 'start', stepIndex: Number(args.step_index) }, publishArgs(args));
@@ -447,6 +469,7 @@ export function createPlanTools(): ToolContract<any>[] {
       required: ['step_index']
     },
     approvalMode: 'never',
+    planStore: { kind: 'plan_state' },
     sideEffectLevel: 'none',
     async execute(context, args) {
       return applyAndPersist(context, {
@@ -470,6 +493,7 @@ export function createPlanTools(): ToolContract<any>[] {
       required: ['step_index', 'error']
     },
     approvalMode: 'never',
+    planStore: { kind: 'plan_state' },
     sideEffectLevel: 'none',
     async execute(context, args) {
       return applyAndPersist(context, {
