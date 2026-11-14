@@ -46,7 +46,7 @@ import { readModelCatalog, resolveSessionModelAdapter, type ModelRef } from '../
 import { applyThinkingEffortToTurn } from '../model/thinking-effort-settings.js';
 import { planModelFallback, rememberServedBy, runWithFallbackChain } from '../model/fallback-chain.js';
 import { resolveModelRoute, withProviderFallback } from '../model/registry-router.js';
-import { resolvePinnedRoleAdapter, selectOriginalModelPin } from '../model/role-pinning.js';
+import { handoffOriginalPinDue, handoffRoleRequest, resolvePinnedRoleAdapter, selectOriginalModelPin } from '../model/role-pinning.js';
 import { waitSteeringChildrenIdle } from '../session/steering-subagent.js';
 import { runCaseGovernance } from '../evolving/case-governance.js';
 import { scheduleBackgroundCaseReview } from '../evolving/index.js';
@@ -81,7 +81,6 @@ import { tryGoalStore } from '../goal/goal-store.js';
 import {
   createKernelHookRegistry,
   createStreamResetTracker,
-  handoffRuntimeEnabled,
   recoveryPolicyEnabled,
   reasoningSpinWatchdogEnabled,
   registerKernelHooks
@@ -840,30 +839,52 @@ async function deliverPreparedTurn(
   return result;
 }
 
+
+function existingSessionPin(session: SessionRecord): string {
+  return typeof session.metadata?.pinnedSessionModel === 'string' ? session.metadata.pinnedSessionModel.trim() : '';
+}
+
+/** Stamp the original-session pin once when a handoff role is due and none exists. */
+function ensureHandoffOriginalPin(rt: L5Bindable, session: SessionRecord): SessionRecord {
+  if (existingSessionPin(session) || !handoffOriginalPinDue(session)) return session;
+  const pin = selectOriginalModelPin({
+    catalog: readModelCatalog(rt.store),
+    metadata: session.metadata,
+    env: process.env,
+  });
+  if (!pin) return session;
+  rt.store.updateSession(session.id, { metadata: { ...session.metadata, pinnedSessionModel: pin } });
+  return rt.store.getSession(session.id) ?? session;
+}
+
+/**
+ * Role-pinned adapter, or null to use ordinary session routing.
+ * When auto policy names a role but no catalog pin could be established, the
+ * bound host adapter is the original session model. An explicit invalid role
+ * ref still fail-closes if the pin is also missing or unresolvable.
+ */
+function resolvePinnedTurnAdapter(rt: L5Bindable, session: SessionRecord): ModelAdapter | null {
+  const current = ensureHandoffOriginalPin(rt, session);
+  const pinned = resolvePinnedRoleAdapter({
+    session: current,
+    catalog: readModelCatalog(rt.store),
+    env: process.env,
+  });
+  if (!pinned.handled) return null;
+  if (pinned.adapter) return pinned.adapter;
+  const request = handoffRoleRequest(current);
+  if (request && !request.roleModel?.trim() && !existingSessionPin(current)) {
+    return rt.modelAdapter;
+  }
+  throw new Error(pinned.reason || 'trajectory handoff role pin failed closed');
+}
+
 function routePreparedTurn(rt: L5Bindable, fitted: Parameters<ModelTurnCall>[0], stream: Parameters<ModelTurnCall>[1]) {
   let session = fitted.sessionId ? rt.store.getSession(fitted.sessionId) : undefined;
   if (session) {
-    const existingPin = typeof session.metadata?.pinnedSessionModel === 'string' ? session.metadata.pinnedSessionModel.trim() : '';
-    if (handoffRuntimeEnabled(session.metadata) && !existingPin) {
-      const pin = selectOriginalModelPin({
-        catalog: readModelCatalog(rt.store),
-        metadata: session.metadata,
-        env: process.env,
-      });
-      if (pin) {
-        rt.store.updateSession(session.id, { metadata: { ...session.metadata, pinnedSessionModel: pin } });
-        session = rt.store.getSession(session.id) ?? session;
-      }
-    }
-    const pinned = resolvePinnedRoleAdapter({
-      session,
-      catalog: readModelCatalog(rt.store),
-      env: process.env,
-    });
-    if (pinned.handled) {
-      if (!pinned.adapter) throw new Error(pinned.reason || 'trajectory handoff role pin failed closed');
-      return invokeContextModel(rt, pinned.adapter, fitted, stream);
-    }
+    const pinnedAdapter = resolvePinnedTurnAdapter(rt, session);
+    session = rt.store.getSession(session.id) ?? session;
+    if (pinnedAdapter) return invokeContextModel(rt, pinnedAdapter, fitted, stream);
   }
   const route = resolveModelRoute({
     store: rt.store,
@@ -943,14 +964,9 @@ function jevToolGateForCalls(
 }
 
 function resolveL5TurnModel(rt: L5Bindable, session: SessionRecord | undefined): ModelAdapter {
-  const pinned = resolvePinnedRoleAdapter({
-    session,
-    catalog: readModelCatalog(rt.store),
-    env: process.env,
-  });
-  if (pinned.handled) {
-    if (!pinned.adapter) throw new Error(pinned.reason || 'trajectory handoff role pin failed closed');
-    return pinned.adapter;
+  if (session) {
+    const pinnedAdapter = resolvePinnedTurnAdapter(rt, session);
+    if (pinnedAdapter) return pinnedAdapter;
   }
   return resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter);
 }

@@ -5,7 +5,7 @@
  * parser default. Refs and caps are kept either way.
  */
 
-import { parseCapabilityTiers, type EnablementSource } from '@ppeng/agent-loop';
+import { classifyEnablement, parseCapabilityTiers, type EnablementSource } from '@ppeng/agent-loop';
 
 export interface PersistedCapabilityTiers {
   enabled: boolean;
@@ -87,18 +87,40 @@ export function mergePersistedCapabilityTiers(
 
 /**
  * New sessions can store an enablement policy. A bare create (no tiers, no
- * policy) is returned unchanged so production default stays off.
- * `auto_policy` is persisted for a later knife and is not turned on here.
+ * policy) stays unchanged unless `persistAutoPolicy` is set, which records
+ * auto_policy with enabled false. That stamp is not an explicit on, and it
+ * does not replace tiers or a policy that are already present.
+ * A type-error capabilityTiers value is left in place when the stored policy
+ * is already auto_policy, so neither the bad tiers nor the policy is dropped.
+ * auto_policy is not turned on here.
  */
 export function applySessionEnablement(
-  metadata: Record<string, unknown> | undefined
+  metadata: Record<string, unknown> | undefined,
+  options?: { persistAutoPolicy?: boolean }
 ): Record<string, unknown> | undefined {
-  if (!metadata) return metadata;
-  if (metadata.capabilityTiers == null && metadata.handoffEnablement == null) return metadata;
+  if (!metadata || (metadata.capabilityTiers == null && metadata.handoffEnablement == null)) {
+    if (!options?.persistAutoPolicy) return metadata;
+    return {
+      ...(metadata ?? {}),
+      handoffEnablement: { source: 'auto_policy' },
+      capabilityTiers: { enablementSource: 'auto_policy', enabled: false },
+    };
+  }
+
   const policy = asRecord(metadata.handoffEnablement);
   const source = typeof policy?.source === 'string' ? policy.source : undefined;
+  if (
+    source === 'auto_policy' &&
+    metadata.capabilityTiers != null &&
+    !normalizeStoredCapabilityTiers(metadata.capabilityTiers)
+  ) {
+    return metadata;
+  }
+
   const incoming = metadata.capabilityTiers ?? policy?.capabilityTiers;
-  const stamped = source && source in POLICY_SOURCE
+  const tiersClass = metadata.capabilityTiers == null ? undefined : classifyEnablement(metadata.capabilityTiers);
+  const autoWouldMaskExplicit = source === 'auto_policy' && (tiersClass === 'explicit_off' || tiersClass === 'explicit_on');
+  const stamped = source && source in POLICY_SOURCE && !autoWouldMaskExplicit
     ? { ...(asRecord(incoming) ?? {}), enablementSource: source, enabled: source === 'explicit_on' }
     : incoming;
   const normalized = normalizeStoredCapabilityTiers(stamped);

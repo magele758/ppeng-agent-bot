@@ -141,7 +141,10 @@ async function executeGatedToolWave(
   ...args: Parameters<TurnKernelHost['executeToolCalls']>
 ): Promise<Awaited<ReturnType<TurnKernelHost['executeToolCalls']>>> {
   const live = host.store.getSession(session.id) ?? session;
-  if (!trajectoryHandoffGateFromMetadata(handoffSessionMetadata(live)).enabled) {
+  const gate = trajectoryHandoffGateFromMetadata(handoffSessionMetadata(live));
+  if (gate.path !== 'in_machine') {
+    // Persisted auto_policy stays auto_eligible, but ordinary waves keep the
+    // pre-handoff tool path. Planner denial starts only after the machine is entered.
     return host.executeToolCalls(...args);
   }
   const prepared = await prepareTrajectoryToolWave(live);

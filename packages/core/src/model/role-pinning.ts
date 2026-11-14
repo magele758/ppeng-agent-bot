@@ -136,14 +136,72 @@ function roleModelOf(tiers: Record<string, unknown>, role: HandoffRole): string 
   return null;
 }
 
-/** Null unless this session explicitly enabled handoff and named a role. */
+function namedHandoffRole(metadata: Record<string, unknown>): HandoffRole | null {
+  const role = metadata.handoffRole;
+  return role === 'planner' || role === 'executor' ? role : null;
+}
+
+/** Same result as classifyEnablement === 'explicit_off'. Non-objects stay parser_default, not a close. */
+function tiersExplicitOff(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const obj = raw as Record<string, unknown>;
+  const tagged = obj.enablementSource;
+  if (tagged === 'explicit_off') return true;
+  if (tagged === 'auto_policy' || tagged === 'parser_default') return false;
+  if (tagged === 'explicit_on') return obj.enabled === false;
+  if (obj.enabled === false) return true;
+  return false;
+}
+
+/** Explicit close. Does not read role model strings. Wins over auto_policy and an explicit open. */
+function explicitHandoffClosed(metadata: Record<string, unknown>): boolean {
+  if (metadata.trajectoryHandoff === 'off') return true;
+  if (metadata.taskRunMode === 'handoff_off' || metadata.task_run_mode === 'handoff_off') return true;
+  const policy = asRecord(metadata.handoffEnablement);
+  if (policy?.source === 'explicit_off') return true;
+  return tiersExplicitOff(metadata.capabilityTiers);
+}
+
+function autoPolicyEnablement(metadata: Record<string, unknown>): boolean {
+  const tiers = asRecord(metadata.capabilityTiers);
+  if (tiers?.enablementSource === 'auto_policy') return true;
+  const policy = asRecord(metadata.handoffEnablement);
+  return policy?.source === 'auto_policy';
+}
+
+/**
+ * Planner/executor request when runtime handoff is on, or when a persisted
+ * auto policy has named a role and the session cap is not exhausted.
+ * Explicit off returns null. A non-object capabilityTiers is ignored:
+ * the role model stays null and the pin / modelRef remain the fallback.
+ */
 export function handoffRoleRequest(session: { metadata?: unknown } | undefined): PinnedRoleRequest | null {
   const metadata = asRecord(session?.metadata);
-  if (!handoffRuntimeEnabled(metadata)) return null;
-  const role = metadata?.handoffRole;
-  if (role !== 'planner' && role !== 'executor') return null;
-  const tiers = asRecord(metadata?.capabilityTiers) ?? {};
-  return { role, roleModel: roleModelOf(tiers, role), pinnedSessionModel: pinnedOriginal(metadata ?? {}) };
+  if (!metadata) return null;
+  const role = namedHandoffRole(metadata);
+  if (!role || explicitHandoffClosed(metadata)) return null;
+  const runtime = handoffRuntimeEnabled(metadata);
+  const auto = metadata.handoffSuspended !== 'session_cap' && autoPolicyEnablement(metadata);
+  if (!runtime && !auto) return null;
+  const tiers = asRecord(metadata.capabilityTiers);
+  return {
+    role,
+    roleModel: tiers ? roleModelOf(tiers, role) : null,
+    pinnedSessionModel: pinnedOriginal(metadata),
+  };
+}
+
+/**
+ * Stamp the original model once a handoff role is active and no pin exists.
+ * Explicit runtime open still qualifies. auto_policy qualifies only with a
+ * planner/executor role that is not suspended for the session cap.
+ */
+export function handoffOriginalPinDue(session: { metadata?: unknown } | undefined): boolean {
+  const metadata = asRecord(session?.metadata);
+  if (!metadata || explicitHandoffClosed(metadata)) return false;
+  if (handoffRuntimeEnabled(metadata)) return true;
+  if (metadata.handoffSuspended === 'session_cap') return false;
+  return namedHandoffRole(metadata) !== null && autoPolicyEnablement(metadata);
 }
 
 export function resolvePinnedRoleAdapter(input: {
