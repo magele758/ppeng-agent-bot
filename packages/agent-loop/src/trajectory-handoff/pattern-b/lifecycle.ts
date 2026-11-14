@@ -155,26 +155,24 @@ class LifecycleStoreImpl implements LifecycleStore {
   }
 }
 
-function parseStoredRecord(value: unknown): WorkspaceLifecycleRecord | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-  for (const key of Object.keys(value)) {
-    if (RECORD_KEY[key] !== true) return undefined;
-  }
+function isLifecyclePhase(value: unknown): value is WorkspaceLifecycleRecord['phase'] {
+  return value === 'created'
+    || value === 'retained'
+    || value === 'cleanup_pending'
+    || value === 'cleaned';
+}
+
+function parseRequiredRecord(value: object): WorkspaceLifecycleRecord | undefined {
   if (!('lifecycleId' in value) || typeof value.lifecycleId !== 'string') return undefined;
   if (!('runId' in value) || typeof value.runId !== 'string') return undefined;
   if (!('workerId' in value) || typeof value.workerId !== 'string') return undefined;
   if (!('taskScope' in value) || typeof value.taskScope !== 'string') return undefined;
   if (!('writableRoot' in value) || typeof value.writableRoot !== 'string') return undefined;
-  if (!('phase' in value) || (
-    value.phase !== 'created'
-    && value.phase !== 'retained'
-    && value.phase !== 'cleanup_pending'
-    && value.phase !== 'cleaned'
-  )) return undefined;
+  if (!('phase' in value) || !isLifecyclePhase(value.phase)) return undefined;
   if (!('discardConfirmed' in value) || typeof value.discardConfirmed !== 'boolean') return undefined;
   if (!('createdAt' in value) || typeof value.createdAt !== 'string') return undefined;
   if (!('updatedAt' in value) || typeof value.updatedAt !== 'string') return undefined;
-  const record: WorkspaceLifecycleRecord = {
+  return {
     lifecycleId: value.lifecycleId,
     runId: value.runId,
     workerId: value.workerId,
@@ -185,6 +183,12 @@ function parseStoredRecord(value: unknown): WorkspaceLifecycleRecord | undefined
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   };
+}
+
+function withOptionalPlanFields(
+  record: WorkspaceLifecycleRecord,
+  value: object,
+): WorkspaceLifecycleRecord | undefined {
   if ('planId' in value) {
     if (typeof value.planId !== 'string') return undefined;
     record.planId = value.planId;
@@ -194,6 +198,16 @@ function parseStoredRecord(value: unknown): WorkspaceLifecycleRecord | undefined
     record.planVersion = value.planVersion;
   }
   return record;
+}
+
+function parseStoredRecord(value: unknown): WorkspaceLifecycleRecord | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  for (const key of Object.keys(value)) {
+    if (RECORD_KEY[key] !== true) return undefined;
+  }
+  const record = parseRequiredRecord(value);
+  if (!record) return undefined;
+  return withOptionalPlanFields(record, value);
 }
 
 function memoryHook(initial: WorkspaceLifecycleRecord[] = []): PersistHook {

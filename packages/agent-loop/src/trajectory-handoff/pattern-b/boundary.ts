@@ -38,7 +38,7 @@ export function boundaryFromLifecycle(
   };
 }
 
-export function admitWorkerWrite(registry: BoundaryRegistry, admission: WriteAdmission): BoundaryDecision {
+function earlyWriteDenial(admission: WriteAdmission): BoundaryDecision | undefined {
   if (admission.workerClaimsSkipGate === true) {
     return deny('self_reported', 'Worker self-report cannot skip the gate');
   }
@@ -52,23 +52,10 @@ export function admitWorkerWrite(registry: BoundaryRegistry, admission: WriteAdm
   if (admission.sharedScopeChange === true) {
     return deny('shared_scope_escalated', 'Shared scope changes are refused locally');
   }
-  if (registry.hostEnforced !== true || typeof registry.canonicalize !== 'function') {
-    return deny('not_enforced', 'Host boundary enforcement is required');
-  }
-  const canonicalize = registry.canonicalize;
+  return undefined;
+}
 
-  let admitted: string;
-  try {
-    const value = canonicalize(admission.path);
-    if (typeof value !== 'string') return deny('outside_writable', 'Write path is outside the worker writable root');
-    admitted = value;
-  } catch {
-    return deny('not_enforced', 'Host boundary enforcement is required');
-  }
-  if (!WRITE_CHANNELS.some((channel) => channel === admission.channel)) {
-    return deny('unscoped_channel', 'Unscoped write channel');
-  }
-
+function resolveOwnBoundary(registry: BoundaryRegistry, admission: WriteAdmission): WritableBoundary | BoundaryDecision {
   const matches = registry.boundaries.filter((boundary) =>
     boundary.identity.runId === admission.actor.runId
     && boundary.identity.workerId === admission.actor.workerId
@@ -88,15 +75,27 @@ export function admitWorkerWrite(registry: BoundaryRegistry, admission: WriteAdm
   if (own.effectiveWrite !== true) {
     return deny('permission_denied', 'Write is outside the permission intersection');
   }
+  return own;
+}
 
-  let ownRoot = '';
-  const otherRoots: string[] = [];
-  const mounts: string[] = [];
-  const shared: string[] = [];
+type CanonicalRoots = {
+  ownRoot: string;
+  otherRoots: string[];
+  mounts: string[];
+  shared: string[];
+};
+
+function canonicalizeRoots(registry: BoundaryRegistry, own: WritableBoundary): CanonicalRoots | BoundaryDecision {
+  const canonicalize = registry.canonicalize;
+  if (typeof canonicalize !== 'function') {
+    return deny('not_enforced', 'Host boundary enforcement is required');
+  }
   try {
     const canonicalOwn = canonicalize(own.writableRoot);
     if (typeof canonicalOwn !== 'string') return deny('not_enforced', 'Host boundary enforcement is required');
-    ownRoot = canonicalOwn;
+    const otherRoots: string[] = [];
+    const mounts: string[] = [];
+    const shared: string[] = [];
     for (const boundary of registry.boundaries) {
       if (boundary === own) continue;
       const canonical = canonicalize(boundary.writableRoot);
@@ -113,19 +112,49 @@ export function admitWorkerWrite(registry: BoundaryRegistry, admission: WriteAdm
       if (typeof canonical !== 'string') return deny('not_enforced', 'Host boundary enforcement is required');
       shared.push(canonical);
     }
+    return { ownRoot: canonicalOwn, otherRoots, mounts, shared };
   } catch {
     return deny('not_enforced', 'Host boundary enforcement is required');
   }
+}
 
-  if (mounts.some((root) => pathContained(root, admitted))) {
+function decideAdmittedPath(admitted: string, roots: CanonicalRoots): BoundaryDecision {
+  if (roots.mounts.some((root) => pathContained(root, admitted))) {
     return deny('read_only_mount', 'Read-only mounts cannot be written');
   }
-  if (shared.some((root) => pathContained(root, admitted))) {
+  if (roots.shared.some((root) => pathContained(root, admitted))) {
     return deny('shared_target', 'Shared integration target cannot be written by a worker');
   }
-  if (otherRoots.some((root) => pathContained(root, admitted))) {
+  if (roots.otherRoots.some((root) => pathContained(root, admitted))) {
     return deny('other_worker', 'Another worker workspace cannot be written');
   }
-  if (pathContained(ownRoot, admitted)) return { allowed: true };
+  if (pathContained(roots.ownRoot, admitted)) return { allowed: true };
   return deny('outside_writable', 'Write path is outside the worker writable root');
+}
+
+export function admitWorkerWrite(registry: BoundaryRegistry, admission: WriteAdmission): BoundaryDecision {
+  const early = earlyWriteDenial(admission);
+  if (early) return early;
+  if (registry.hostEnforced !== true || typeof registry.canonicalize !== 'function') {
+    return deny('not_enforced', 'Host boundary enforcement is required');
+  }
+  const canonicalize = registry.canonicalize;
+
+  let admitted: string;
+  try {
+    const value = canonicalize(admission.path);
+    if (typeof value !== 'string') return deny('outside_writable', 'Write path is outside the worker writable root');
+    admitted = value;
+  } catch {
+    return deny('not_enforced', 'Host boundary enforcement is required');
+  }
+  if (!WRITE_CHANNELS.some((channel) => channel === admission.channel)) {
+    return deny('unscoped_channel', 'Unscoped write channel');
+  }
+
+  const own = resolveOwnBoundary(registry, admission);
+  if ('allowed' in own) return own;
+  const roots = canonicalizeRoots(registry, own);
+  if ('allowed' in roots) return roots;
+  return decideAdmittedPath(admitted, roots);
 }
