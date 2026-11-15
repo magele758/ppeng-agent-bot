@@ -1,10 +1,13 @@
 /**
- * Independent Swarm host wiring for Pattern B.
- * Flywheel runs stay on the non-isolation path. Missing enforcement fails closed.
+ * Pattern B host wiring for independent Swarm and host-qualified flywheel tasks.
+ * Unqualified flywheel runs stay on the non-isolation path.
+ * Missing enforcement fails closed. Worker claims do not set the role.
  */
 import {
+  canonicalPath,
   hostBoundaryKey,
   installHostBoundary,
+  pathContained,
   type BoundaryRegistry,
   type LifecycleStore,
   type PatternBRole,
@@ -47,23 +50,61 @@ function flywheelRun(run: SwarmRun, trusted: PatternBTrustedContext | null | und
   return trusted?.source === 'flywheel';
 }
 
+function hostFlywheelRole(task: SwarmTask, flywheel: boolean): Pick<PatternBTrustedContext, 'flywheelImplement' | 'flywheelPlanner'> {
+  if (!flywheel) return {};
+  if (task.requiredRole === 'implementer') return { flywheelImplement: true };
+  return { flywheelPlanner: true };
+}
+
+/** Real host boundary. A nested or relative root is not enforcement. */
+export function patternBHostBoundary(input: {
+  readonly runId: string;
+  readonly workerId: string;
+  readonly taskScope: string;
+  readonly writableRoot: string;
+  readonly sharedRoot: string;
+  readonly implement: boolean;
+  readonly expectedVersion?: string;
+}): BoundaryRegistry | undefined {
+  const writable = canonicalPath(input.writableRoot);
+  const shared = canonicalPath(input.sharedRoot);
+  if (!writable || !shared || writable === shared) return undefined;
+  if (pathContained(shared, writable) || pathContained(writable, shared)) return undefined;
+  const implement = input.implement === true;
+  return {
+    hostEnforced: true,
+    canonicalize: canonicalPath,
+    boundaries: [{
+      identity: { runId: input.runId, workerId: input.workerId, taskScope: input.taskScope },
+      writableRoot: writable,
+      role: implement ? 'executor' : 'planner',
+      effectiveWrite: implement,
+    }],
+    readOnlyMounts: [{ path: shared, kind: 'input' }],
+    sharedTargets: [{ targetId: 'shared', path: shared, expectedVersion: input.expectedVersion ?? 'workspace' }],
+  };
+}
 function trustedFor(
   run: SwarmRun,
+  task: SwarmTask,
   config: PatternBExecutorConfig,
   trusted: PatternBTrustedContext | null | undefined,
   boundary: BoundaryRegistry | undefined,
 ): PatternBTrustedContext {
   const explicitOff = config.explicitOff === true || trusted?.patternBExplicitOff === true;
+  const flywheel = flywheelRun(run, trusted);
   return {
-    source: flywheelRun(run, trusted) ? 'flywheel' : 'independent_swarm',
+    source: flywheel ? 'flywheel' : 'independent_swarm',
     orchestrationRunId: run.orchestrationRunId ?? trusted?.orchestrationRunId ?? null,
     patternBEnabled: config.enabled === true && !explicitOff && trusted?.patternBEnabled !== false,
     patternBExplicitOff: explicitOff,
     isolationTask: true,
     patternBHostEnforced: boundary?.hostEnforced === true,
     patternBCanonicalizer: typeof boundary?.canonicalize === 'function',
+    ...hostFlywheelRole(task, flywheel),
   };
 }
+
 
 function withTaskRole(registry: BoundaryRegistry, own: WritableBoundary, task: SwarmTask): BoundaryRegistry {
   const restrictive = task.requiredRole !== 'implementer' || own.role === 'planner';
@@ -153,7 +194,7 @@ export function resolvePatternBDispatch(input: {
   if (!input.task.capabilityTags.includes(PATTERN_B_ISOLATION_TASK_TAG)) return { kind: 'inactive' };
   const boundary = input.config.boundaryFor?.(input.run, input.task);
   const admission = admitPatternBIsolation({
-    trusted: trustedFor(input.run, input.config, input.trusted, boundary),
+    trusted: trustedFor(input.run, input.task, input.config, input.trusted, boundary),
     workerMetadata: null,
   });
   if (!admission.open) return closedDispatch(admission.reason);

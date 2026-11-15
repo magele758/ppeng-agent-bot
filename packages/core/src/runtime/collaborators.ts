@@ -19,8 +19,12 @@ import {
 import {
   PATTERN_B_ISOLATION_CONTROL_KEY,
   PATTERN_B_ISOLATION_RECORDS_KEY,
+  patternBImplementTask,
   readPatternBIsolationSwitch,
 } from '../trajectory-handoff/pattern-b-entry.js';
+import { patternBAcceptDelivery, patternBStoredIntegration } from '../trajectory-handoff/pattern-b-integrate.js';
+import { patternBHostBoundary } from '../trajectory-handoff/pattern-b-swarm.js';
+import { createFileIntegrationStore, createFileLifecycleStore } from '@ppeng/agent-loop/pattern-b';
 import { TeamDagExecutor } from '../teams/executor.js';
 import { readTeamsDagSettings } from '../teams/settings.js';
 import type { WorkspaceManager } from '../workspaces.js';
@@ -109,6 +113,10 @@ export function createRuntimeCollaborators(input: {
   const swarmEntry = readSwarmHandoffEntrySwitch(input.store.getDaemonControl(SWARM_HANDOFF_ENTRY_CONTROL_KEY));
   const flywheelEntry = readFlywheelHandoffEntrySwitch(input.store.getDaemonControl(FLYWHEEL_HANDOFF_ENTRY_CONTROL_KEY));
   const patternB = readPatternBIsolationSwitch(input.store.getDaemonControl(PATTERN_B_ISOLATION_CONTROL_KEY));
+  const patternBLifecycles = createFileLifecycleStore(`${input.stateDir}/pattern-b/lifecycles.json`);
+  const patternBIntegrations = createFileIntegrationStore(`${input.stateDir}/pattern-b/integrations.json`, {
+    apply() {},
+  }, { targets: { shared: 'workspace' } });
   const swarmExecutor = new SwarmExecutor({
     store: input.store.swarm(),
     reviewTask: (run, task, session) => reviewSwarmTask(input.spawnHost(), run, task, session),
@@ -129,8 +137,22 @@ export function createRuntimeCollaborators(input: {
     patternB: {
       enabled: patternB.enabled,
       explicitOff: patternB.explicitOff,
+      boundaryFor: (run, task) => patternBHostBoundary({
+        runId: run.id,
+        workerId: task.id,
+        taskScope: task.id,
+        writableRoot: `${input.stateDir}/pattern-b/${run.id}/${task.id}`,
+        sharedRoot: input.repoRoot,
+        implement: task.requiredRole === 'implementer',
+      }),
       readRecords: () => input.store.getDaemonControl(PATTERN_B_ISOLATION_RECORDS_KEY),
       writeRecords: (value) => input.store.setDaemonControl(PATTERN_B_ISOLATION_RECORDS_KEY, value),
+      lifecycles: patternBLifecycles,
+      acceptDelivery: (session, report) => patternBAcceptDelivery({
+        metadata: session.metadata,
+        report,
+        integration: patternBStoredIntegration(patternBIntegrations, session.metadata),
+      }),
     },
   });
   const teamDagExecutor = new TeamDagExecutor({
@@ -180,7 +202,7 @@ export function createRuntimeCollaborators(input: {
         updatedAt: swarmNowIso()
       });
       swarmExecutor.startRun(swarmId, [
-        { title: run.title, requiredRole: 'implementer' }
+        patternBImplementTask(run.title, patternB.enabled)
       ]);
     },
     tickSwarm: () => swarmExecutor.tick(),

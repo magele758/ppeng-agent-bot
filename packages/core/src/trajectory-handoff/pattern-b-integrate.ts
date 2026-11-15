@@ -110,3 +110,41 @@ export function patternBRollbackArtifacts(input: {
   }
   return { retained, deleted: [], copiedToShared: false };
 }
+
+export function patternBIntegrationId(runId: string, workerId: string): string {
+  return `pb-${runId}-${workerId}`;
+}
+
+function evidenceRecord(report: unknown): Record<string, unknown> | null {
+  if (!report || typeof report !== 'object' || !('handoffEvidence' in report)) return null;
+  const value = report.handoffEvidence;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+export function patternBStoredIntegration(
+  store: IntegrationStore,
+  metadata: Record<string, unknown> | undefined,
+): IntegrationRecord | undefined {
+  const runId = metadata?.patternBRunId;
+  const workerId = metadata?.patternBWorkerId;
+  if (typeof runId !== 'string' || typeof workerId !== 'string') return undefined;
+  return store.get(patternBIntegrationId(runId, workerId));
+}
+
+/** Shared delivery only after an accepted host integration and a fresh seal. */
+export function patternBAcceptDelivery(input: {
+  readonly metadata: Record<string, unknown> | undefined;
+  readonly report: unknown;
+  readonly integration: IntegrationRecord | undefined;
+}): boolean {
+  if (typeof input.metadata?.patternBHostKey !== 'string') return false;
+  const kernelState = typeof input.metadata.handoffState === 'string' ? input.metadata.handoffState : 'completed';
+  return patternBSharedDelivery({
+    report: input.report,
+    kernelState,
+    evidence: evidenceRecord(input.report),
+    gateInvoked: true,
+    integration: input.integration,
+  }).success;
+}
