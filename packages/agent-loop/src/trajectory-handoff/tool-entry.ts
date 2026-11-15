@@ -10,6 +10,7 @@ import { createTrajectoryHandoffAdapter } from './adapter.js';
 import { DEFAULT_SESSION_CAP, type HandoffState } from './types.js';
 import { trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
 import type { ToolExecResult } from '../turn/host.js';
+import { denyPatternBTool, patternBBlockedCalls, patternBBoundaryPending, type PatternBCall } from './pattern-b/tool-gate.js';
 
 export type HandoffPerm = 'read' | 'write' | 'command' | 'delegate' | 'external';
 
@@ -97,8 +98,11 @@ export function beginTrajectoryWrite(
 /** Denial reason, or undefined when the tool may run. Disabled handoff allows it. */
 export function denyTrajectoryTool(
   session: { metadata?: unknown } | undefined,
-  tool: { name: string; access?: string; sideEffectLevel?: string; planStore?: { kind?: string } }
+  tool: { name: string; access?: string; sideEffectLevel?: string; planStore?: { kind?: string } },
+  call?: PatternBCall,
 ): string | undefined {
+  const isolated = denyPatternBTool(session, tool, call);
+  if (isolated) return isolated;
   const metadata = asRecord(session?.metadata);
   if (!trajectoryHandoffGateFromMetadata(metadata).enabled) return undefined;
   const state = handoffStateOf(metadata);
@@ -139,6 +143,8 @@ export async function prepareTrajectoryToolWave(
   session: { id: string; metadata?: unknown }
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   const metadata = asRecord(session.metadata);
+  const boundary = patternBBoundaryPending(metadata, trajectoryWritesPending(session.id));
+  if (boundary) return boundary;
   if (!trajectoryHandoffGateFromMetadata(metadata).enabled) return { ok: true };
   const state = handoffStateOf(metadata);
   const entering = metadata?.handoffEntering;
@@ -205,16 +211,21 @@ export async function executeAutoEligibleToolWave(input: {
   enterPlanner: () => Promise<{ ok: true } | { ok: false; reason: string }>;
 }): Promise<ToolExecResult[]> {
   const metadata = asRecord(input.session.metadata);
+  const isolated = patternBBlockedCalls(input.session, input.calls, input.tools);
   const catalog = new Map(input.tools.map((tool) => [tool.name, tool]));
   const reads: Array<{ toolCallId: string; name: string; input: Record<string, unknown> }> = [];
   const controlled: Array<{ toolCallId: string; name: string; input: Record<string, unknown> }> = [];
   for (const call of input.calls) {
+    if (isolated?.denied.has(call.toolCallId)) continue;
     const tool = catalog.get(call.name) ?? { name: call.name };
     if (trajectoryToolPermission(tool) === 'read' && !mistaggedControlled(tool.name)) reads.push(call);
     else controlled.push(call);
   }
-  if (controlled.length === 0 || sessionHandoffCount(metadata) >= configuredSessionCap(metadata)) {
-    return input.execute([...input.calls]);
+  const exhausted = controlled.length === 0 || sessionHandoffCount(metadata) >= configuredSessionCap(metadata);
+  if (!isolated && exhausted) return input.execute([...input.calls]);
+  if (exhausted) {
+    const ran = await input.execute([...(isolated?.allowed ?? input.calls)]);
+    return mergeIsolatedDenials(input.calls, ran, isolated?.denied);
   }
   const entered = await input.enterPlanner();
   const denial = entered.ok ? PLANNING_REQUIRED : entered.reason;
@@ -224,10 +235,30 @@ export async function executeAutoEligibleToolWave(input: {
   for (const call of controlled) {
     byId.set(call.toolCallId, { toolCallId: call.toolCallId, name: call.name, ok: false, content: denial });
   }
-  return input.calls.map((call) => byId.get(call.toolCallId) ?? {
+  const ordered = input.calls.map((call) => byId.get(call.toolCallId) ?? {
     toolCallId: call.toolCallId,
     name: call.name,
     ok: false,
     content: 'missing tool result',
+  });
+  return isolated ? mergeIsolatedDenials(input.calls, ordered, isolated.denied) : ordered;
+}
+
+function mergeIsolatedDenials(
+  calls: ReadonlyArray<{ toolCallId: string; name: string }>,
+  ran: readonly ToolExecResult[],
+  denied: Map<string, string> | undefined,
+): ToolExecResult[] {
+  if (!denied || denied.size === 0) return [...ran];
+  const byId = new Map(ran.map((result) => [result.toolCallId, result]));
+  return calls.map((call) => {
+    const reason = denied.get(call.toolCallId);
+    if (reason) return { toolCallId: call.toolCallId, name: call.name, ok: false, content: reason };
+    return byId.get(call.toolCallId) ?? {
+      toolCallId: call.toolCallId,
+      name: call.name,
+      ok: false,
+      content: 'missing tool result',
+    };
   });
 }

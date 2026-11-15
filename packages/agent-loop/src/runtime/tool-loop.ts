@@ -1179,7 +1179,7 @@ async function executeScopedTool(
   const admitted = refuseBeforeDispatch(host, tools, toolCall, allowExternalAiTools, sessionId);
   if ('refused' in admitted) return admitted.refused;
   const { tool } = admitted;
-  const denied = denyTrajectoryTool(context.session, tool);
+  const denied = denyTrajectoryTool(context.session, tool, { input: toolCall.input });
   if (denied) {
     return {
       toolCallId: toolCall.toolCallId,
@@ -1234,7 +1234,7 @@ async function executeScopedTool(
   const execInput = pre.input !== undefined ? pre.input : toolCall.input;
   const snapshot = await captureToolSnapshot(tool, context, execInput);
   const fresh = host.readSession?.(sessionId) ?? context.session;
-  const deniedNow = denyTrajectoryTool(fresh, tool);
+  const deniedNow = denyTrajectoryTool(fresh, tool, { input: execInput });
   if (deniedNow) {
     return {
       toolCallId: toolCall.toolCallId,

@@ -80,7 +80,7 @@ async function executeToolsSimple(
     const tool = pool.find((item) => item.name === tc.name);
     const session = readSession?.(context.session.id) ?? context.session;
     const live = session === context.session ? context : { ...context, session };
-    const denied = denyTrajectoryTool(session, tool ?? { name: tc.name });
+    const denied = denyTrajectoryTool(session, tool ?? { name: tc.name }, { input: tc.input });
     if (denied) {
       results.push({ toolCallId: tc.toolCallId, name: tc.name, ok: false, content: denied });
       continue;
