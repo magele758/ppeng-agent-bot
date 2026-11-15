@@ -1,11 +1,33 @@
 /**
  * Independent Pattern B isolation switch.
  * Default off. Knife-3 and knife-4 entry flags do not open it.
- * Explicit off wins. This is not PATTERN_B_PRODUCTION_ENTRY.
+ * A flywheel task is admitted only when this switch is on and the host
+ * qualifies the role. Explicit off wins. This is not PATTERN_B_PRODUCTION_ENTRY.
  */
 export const PATTERN_B_ISOLATION_CONTROL_KEY = 'trajectory-handoff.pattern-b-isolation';
 export const PATTERN_B_ISOLATION_RECORDS_KEY = 'trajectory-handoff.pattern-b-isolation-records';
 export const PATTERN_B_ISOLATION_TASK_TAG = 'pattern-b-isolation';
+
+/** Tag the flywheel implement task only when Pattern B admission is open. */
+export function patternBImplementTask(title: string, isolationEnabled: boolean): {
+  title: string;
+  requiredRole: 'implementer';
+  capabilityTags?: string[];
+} {
+  if (isolationEnabled !== true) return { title, requiredRole: 'implementer' };
+  return { title, requiredRole: 'implementer', capabilityTags: [PATTERN_B_ISOLATION_TASK_TAG] };
+}
+export interface PatternBTrustedContext {
+  readonly source?: unknown;
+  readonly orchestrationRunId?: string | null;
+  readonly patternBEnabled?: boolean;
+  readonly patternBExplicitOff?: boolean;
+  readonly patternBHostEnforced?: boolean;
+  readonly patternBCanonicalizer?: boolean;
+  readonly isolationTask?: boolean;
+  readonly flywheelImplement?: boolean;
+  readonly flywheelPlanner?: boolean;
+}
 
 export interface PatternBSwitch {
   readonly enabled: boolean;
@@ -35,15 +57,6 @@ export interface PatternBIsolationRecord {
   readonly unintegratedRetained: true;
 }
 
-export interface PatternBTrustedContext {
-  readonly source?: unknown;
-  readonly orchestrationRunId?: string | null;
-  readonly patternBEnabled?: boolean;
-  readonly patternBExplicitOff?: boolean;
-  readonly patternBHostEnforced?: boolean;
-  readonly patternBCanonicalizer?: boolean;
-  readonly isolationTask?: boolean;
-}
 
 export type PatternBDenyReason =
   | 'no_trusted_context'
@@ -57,8 +70,41 @@ export type PatternBDenyReason =
   | 'self_reported';
 
 export type PatternBAdmission =
-  | { readonly open: true; readonly source: 'independent_swarm' }
+  | { readonly open: true; readonly source: 'independent_swarm' | 'flywheel' }
   | { readonly open: false; readonly reason: PatternBDenyReason };
+function workerClaimsIsolation(metadata: Record<string, unknown> | null | undefined): boolean {
+  if (!metadata) return false;
+  return metadata.patternBEnabled === true
+    || metadata.isolationEnabled === true
+    || metadata.workerClaimsIsolation === true
+    || metadata.workerClaimsSharedWrite === true
+    || metadata.workerClaimsSkipGate === true
+    || metadata.skipGate === true
+    || metadata.writableSharedTarget === true
+    || metadata.flywheelImplement === true
+    || metadata.flywheelPlanner === true;
+}
+
+function flywheelMarked(trusted: PatternBTrustedContext): boolean {
+  return trusted.source === 'flywheel'
+    || (typeof trusted.orchestrationRunId === 'string' && trusted.orchestrationRunId.length > 0);
+}
+
+function flywheelHostQualified(trusted: PatternBTrustedContext): boolean {
+  return trusted.patternBEnabled === true
+    && trusted.isolationTask === true
+    && (trusted.flywheelImplement === true || trusted.flywheelPlanner === true);
+}
+
+function sourceBlock(trusted: PatternBTrustedContext): PatternBDenyReason | undefined {
+  if (!flywheelMarked(trusted)) {
+    return trusted.source === 'independent_swarm' ? undefined : 'source_not_admitted';
+  }
+  if (trusted.patternBExplicitOff === true || flywheelHostQualified(trusted)) return undefined;
+  return typeof trusted.orchestrationRunId === 'string' && trusted.orchestrationRunId.length > 0
+    ? 'flywheel_orchestration'
+    : 'flywheel_source';
+}
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -108,25 +154,6 @@ export function patternBNewAdmissionAllowed(stored: unknown): boolean {
   return readPatternBIsolationSwitch(stored).enabled === true;
 }
 
-function workerClaimsIsolation(metadata: Record<string, unknown> | null | undefined): boolean {
-  if (!metadata) return false;
-  return metadata.patternBEnabled === true
-    || metadata.isolationEnabled === true
-    || metadata.workerClaimsIsolation === true
-    || metadata.workerClaimsSharedWrite === true
-    || metadata.workerClaimsSkipGate === true
-    || metadata.skipGate === true
-    || metadata.writableSharedTarget === true;
-}
-
-function sourceBlock(trusted: PatternBTrustedContext): PatternBDenyReason | undefined {
-  if (typeof trusted.orchestrationRunId === 'string' && trusted.orchestrationRunId.length > 0) {
-    return 'flywheel_orchestration';
-  }
-  if (trusted.source === 'flywheel') return 'flywheel_source';
-  if (trusted.source !== 'independent_swarm') return 'source_not_admitted';
-  return undefined;
-}
 
 function switchBlock(trusted: PatternBTrustedContext, claimed: boolean): PatternBDenyReason | undefined {
   if (trusted.patternBExplicitOff === true) return 'explicit_off';
@@ -146,7 +173,7 @@ export function admitPatternBIsolation(input: {
   if (!trusted) return { open: false, reason: claimed ? 'self_reported' : 'no_trusted_context' };
   const blocked = sourceBlock(trusted) ?? switchBlock(trusted, claimed);
   if (blocked) return { open: false, reason: blocked };
-  return { open: true, source: 'independent_swarm' };
+  return { open: true, source: flywheelMarked(trusted) ? 'flywheel' : 'independent_swarm' };
 }
 
 export type PatternBRecordRead =

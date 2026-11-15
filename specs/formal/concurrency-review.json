@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-15T00:29:30.914Z",
-  "reviewNote": "Pattern B isolation is a separate default-off switch on independent Swarm. Fingerprints refreshed for the host tool gate, kernel ordinary wave, Swarm dispatch, and collaborator wiring. Production entry stays closed. Knife-3 and knife-4 switches do not imply Pattern B. #516 is not relaxed. This refresh is not a new formal pass.",
+  "reviewedAt": "2026-11-15T04:46:24.000Z",
+  "reviewNote": "Pattern B isolation stays a separate default-off switch. A host-qualified flywheel implement task can be admitted only when that switch is on. Fingerprints refreshed for collaborator wiring. Production entry stays closed. Knife-3 and knife-4 switches do not imply Pattern B. #516 is not relaxed. This refresh is not a new formal pass.",
   "mapping": [
     {
       "step": "Production runtime startup and writer surfaces, cancellation and approval decisions; actual OS process probes",
@@ -647,7 +647,7 @@
     "packages/core/src/runtime/quality-gates.ts": "947f86e45a70e52fa98e98e54e5875b0b63c07bbe92eb51f0680a268fc719ba3",
     "packages/core/src/quality/gate.ts": "3087e0b9ce18721ed4ae9749458cffb84b5769ad93097649d03ac92eebdc2e98",
     "packages/core/src/orchestrator/engine.ts": "88a4217e5351af690f1a71e5f7f4500dc969355d20e0d755d6e95ddaa2504f22",
-    "packages/core/src/runtime/collaborators.ts": "7f5dd8385c2399b3debc795b2df8eae60a1446d2cd0fef59e678d41844c707f7",
+    "packages/core/src/runtime/collaborators.ts": "10cef3239a3d2d079f8c092bf946fae793b471102128820c669b8fffa7e986a5",
     "packages/agent-loop/src/model/model-adapters.ts": "5c976d04c86b2777e324a9dff92a12bd1890fe354537b76e5e0491b16faf3daf",
     "packages/agent-loop/src/model/reasoning-replay.test.ts": "042d48056410694d7d15a4465165ad5fcfe9673997b192b903d7652f798481d7",
     "packages/core/test/model-adapters.test.js": "4a0f76f56d59d22e21e4e36decf0d0ae138dde9d7a07d4229b6954573f84e02d",
