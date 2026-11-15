@@ -128,7 +128,7 @@ function readonlyToolHook(
     }
     const session = readSession?.(context.session.id) ?? context.session;
     const live = session === context.session ? context : { ...context, session };
-    const denied = denyTrajectoryTool(session, tool);
+    const denied = denyTrajectoryTool(session, tool, { input: args });
     if (denied) return { ok: false, content: denied };
     const tracked = beginTrajectoryWrite(session, tool, 'ptc:' + tool.name);
     try {

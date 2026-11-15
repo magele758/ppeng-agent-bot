@@ -24,6 +24,11 @@ export interface TrustedSwarmHostContext {
   readonly flywheelEntryEnabled?: boolean;
   readonly flywheelExplicitOff?: boolean;
   readonly orchestrationRunId?: string | null;
+  readonly patternBEnabled?: boolean;
+  readonly patternBExplicitOff?: boolean;
+  readonly patternBHostEnforced?: boolean;
+  readonly patternBCanonicalizer?: boolean;
+  readonly isolationTask?: boolean;
 }
 
 export type SwarmAdmission =
@@ -47,14 +52,30 @@ export function trustedContextForSwarmRun(
   entryEnabled: boolean,
   explicitOff = false,
   flywheelEntry?: { enabled: boolean; explicitOff?: boolean },
+  patternB?: {
+    enabled: boolean;
+    explicitOff?: boolean;
+    hostEnforced?: boolean;
+    canonicalizer?: boolean;
+    isolationTask?: boolean;
+  },
 ): TrustedSwarmHostContext {
-  return {
+  const context: TrustedSwarmHostContext = {
     source: run.orchestrationRunId ? 'flywheel' : 'independent_swarm',
     orchestrationRunId: run.orchestrationRunId ?? null,
     entryEnabled,
     explicitOff,
     flywheelEntryEnabled: flywheelEntry?.enabled === true,
     flywheelExplicitOff: flywheelEntry?.explicitOff === true,
+  };
+  if (!patternB) return context;
+  return {
+    ...context,
+    patternBEnabled: patternB.enabled === true && patternB.explicitOff !== true,
+    patternBExplicitOff: patternB.explicitOff === true,
+    patternBHostEnforced: patternB.hostEnforced === true,
+    patternBCanonicalizer: patternB.canonicalizer === true,
+    isolationTask: patternB.isolationTask === true,
   };
 }
 

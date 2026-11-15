@@ -8,6 +8,7 @@ import {
   evaluateSwarmDelivery,
   type TrustedSwarmHostContext,
 } from '../trajectory-handoff/swarm-entry.js';
+import { resolvePatternBDispatch, type PatternBExecutorConfig } from '../trajectory-handoff/pattern-b-swarm.js';
 import { SwarmStore, createSwarmId } from './store.js';
 import type { SwarmRole, SwarmRun, SwarmTask, SwarmTaskStatus } from './types.js';
 const ROLE_AGENT: Record<SwarmRole, string> = {
@@ -58,6 +59,8 @@ export interface SwarmExecutorDeps {
   flywheelHandoffEntryEnabled?: boolean;
   /** Flywheel explicit off does not close the independent Swarm entry. */
   flywheelHandoffExplicitOff?: boolean;
+  /** Independent Pattern B isolation. Missing keeps isolation off. */
+  patternB?: PatternBExecutorConfig;
 }
 
 export class SwarmExecutor {
@@ -66,12 +69,16 @@ export class SwarmExecutor {
   private entryExplicitOff: boolean;
   private flywheelHandoffEntryEnabled: boolean;
   private flywheelEntryExplicitOff: boolean;
+  private patternBEnabled: boolean;
+  private patternBExplicitOff: boolean;
 
   constructor(private readonly deps: SwarmExecutorDeps) {
     this.swarmHandoffEntryEnabled = deps.swarmHandoffEntryEnabled === true;
     this.entryExplicitOff = deps.swarmHandoffExplicitOff === true;
     this.flywheelHandoffEntryEnabled = deps.flywheelHandoffEntryEnabled === true;
     this.flywheelEntryExplicitOff = deps.flywheelHandoffExplicitOff === true;
+    this.patternBEnabled = deps.patternB?.enabled === true;
+    this.patternBExplicitOff = deps.patternB?.explicitOff === true;
   }
 
   /** Close or reopen the approved independent-swarm entry without rebuilding the host. */
@@ -84,6 +91,12 @@ export class SwarmExecutor {
   setFlywheelHandoffEntryEnabled(enabled: boolean): void {
     this.flywheelHandoffEntryEnabled = enabled === true;
     this.flywheelEntryExplicitOff = enabled !== true;
+  }
+
+  /** Stop or resume Pattern B admission. This does not delete persisted isolation records. */
+  setPatternBIsolationEnabled(enabled: boolean): void {
+    this.patternBEnabled = enabled === true;
+    this.patternBExplicitOff = enabled !== true;
   }
 
   private launchTeammate(sessionId: string, runId: string): void {
@@ -246,7 +259,22 @@ export class SwarmExecutor {
     const agentId = ROLE_AGENT[task.requiredRole] ?? 'general';
     const claimed = this.deps.store.claimTask(task.id, agentId);
     if (!claimed) return;
-
+    const isolation = this.isolateTask(run, task);
+    if (isolation.kind === 'fail_closed') {
+      this.deps.store.updateTask(task.id, { status: 'failed' });
+      this.deps.store.addReview({
+        id: createSwarmId('srev'),
+        swarmRunId: run.id,
+        taskId: task.id,
+        reviewerAgentId: 'evaluator',
+        role: 'evaluator',
+        scores: { correctness: 0 },
+        passed: false,
+        feedback: `Pattern B isolation failed closed: ${isolation.reason}`,
+        createdAt: nowIso(),
+      });
+      return;
+    }
     const prompt = [
       `Swarm goal: ${run.goal}`,
       `Task: ${task.title}`,
@@ -266,7 +294,10 @@ export class SwarmExecutor {
         role: task.requiredRole,
         prompt,
         background: true,
-        metadata: this.teammateMetadata(run, task)
+        metadata: {
+          ...this.teammateMetadata(run, task),
+          ...(isolation.kind === 'admit' ? isolation.metadata : {}),
+        },
       });
     } catch {
       this.deps.store.updateTask(task.id, { status: 'failed' });
@@ -346,6 +377,18 @@ export class SwarmExecutor {
     });
   }
 
+  private isolateTask(run: SwarmRun, task: SwarmTask) {
+    const config = this.deps.patternB;
+    if (!config) return { kind: 'inactive' as const };
+    return resolvePatternBDispatch({
+      run,
+      task,
+      config: { ...config, enabled: this.patternBEnabled, explicitOff: this.patternBExplicitOff },
+      trusted: this.deps.trustedHandoff?.(run) ?? null,
+      now: nowIso(),
+    });
+  }
+
   private teammateMetadata(run: SwarmRun, task: SwarmTask): Record<string, unknown> {
     const admission = this.admit(run);
     return {
@@ -357,6 +400,9 @@ export class SwarmExecutor {
   }
 
   private deliveryAccepted(session: SessionRecord, report: QualityReport): boolean {
+    if (typeof session.metadata?.patternBHostKey === 'string') {
+      return this.deps.patternB?.acceptDelivery?.(session, report) === true;
+    }
     const handoffState = session.metadata?.handoffState;
     if (typeof handoffState !== 'string' || handoffState.length === 0) return qualityPassed(report);
     const evidence = deliveryEvidenceFromReview(report);

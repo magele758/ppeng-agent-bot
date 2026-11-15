@@ -16,6 +16,11 @@ import {
   SWARM_HANDOFF_ENTRY_CONTROL_KEY,
   trustedContextForSwarmRun,
 } from '../trajectory-handoff/swarm-entry.js';
+import {
+  PATTERN_B_ISOLATION_CONTROL_KEY,
+  PATTERN_B_ISOLATION_RECORDS_KEY,
+  readPatternBIsolationSwitch,
+} from '../trajectory-handoff/pattern-b-entry.js';
 import { TeamDagExecutor } from '../teams/executor.js';
 import { readTeamsDagSettings } from '../teams/settings.js';
 import type { WorkspaceManager } from '../workspaces.js';
@@ -103,6 +108,7 @@ export function createRuntimeCollaborators(input: {
   });
   const swarmEntry = readSwarmHandoffEntrySwitch(input.store.getDaemonControl(SWARM_HANDOFF_ENTRY_CONTROL_KEY));
   const flywheelEntry = readFlywheelHandoffEntrySwitch(input.store.getDaemonControl(FLYWHEEL_HANDOFF_ENTRY_CONTROL_KEY));
+  const patternB = readPatternBIsolationSwitch(input.store.getDaemonControl(PATTERN_B_ISOLATION_CONTROL_KEY));
   const swarmExecutor = new SwarmExecutor({
     store: input.store.swarm(),
     reviewTask: (run, task, session) => reviewSwarmTask(input.spawnHost(), run, task, session),
@@ -112,11 +118,20 @@ export function createRuntimeCollaborators(input: {
     runSession: (sid) => input.runSession(sid),
     enqueueSchedulerWake: (sid, reason) => input.store.enqueueSchedulerWake(sid, reason),
     sessionTeammateFinished: (sid) => sessionTeammateFinished(input.store, sid),
-    trustedHandoff: (run) => trustedContextForSwarmRun(run, swarmEntry.enabled, swarmEntry.explicitOff, flywheelEntry),
+    trustedHandoff: (run) => trustedContextForSwarmRun(run, swarmEntry.enabled, swarmEntry.explicitOff, flywheelEntry, {
+      enabled: patternB.enabled,
+      explicitOff: patternB.explicitOff,
+    }),
     swarmHandoffEntryEnabled: swarmEntry.enabled,
     swarmHandoffExplicitOff: swarmEntry.explicitOff,
     flywheelHandoffEntryEnabled: flywheelEntry.enabled,
     flywheelHandoffExplicitOff: flywheelEntry.explicitOff,
+    patternB: {
+      enabled: patternB.enabled,
+      explicitOff: patternB.explicitOff,
+      readRecords: () => input.store.getDaemonControl(PATTERN_B_ISOLATION_RECORDS_KEY),
+      writeRecords: (value) => input.store.setDaemonControl(PATTERN_B_ISOLATION_RECORDS_KEY, value),
+    },
   });
   const teamDagExecutor = new TeamDagExecutor({
     store: input.store.teams(),

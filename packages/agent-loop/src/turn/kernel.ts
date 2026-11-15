@@ -81,6 +81,7 @@ import {
 import { rollbackReasonOf } from '../session/step-tx.js';
 import { applyRunProfileToTools, trajectoryHandoffGateFromMetadata } from '../runtime/run-profile.js';
 import { denyTrajectoryTool, prepareTrajectoryToolWave } from '../trajectory-handoff/tool-entry.js';
+import { denyPatternBTool } from '../trajectory-handoff/pattern-b/tool-gate.js';
 import { advanceExplicitHandoffAfterTools, closePlannerDirectAnswer, handoffContextMessage, prepareExplicitSessionHandoff } from '../trajectory-handoff/session-turn.js';
 import { defaultWorkspaceRoots } from '../workspace/default-roots.js';
 import type {
@@ -135,6 +136,34 @@ function handoffSessionMetadata(session: { metadata?: unknown }): Record<string,
   return metadata as Record<string, unknown>;
 }
 
+async function executePatternBOrdinaryWave(
+  host: TurnKernelHost,
+  live: { metadata?: unknown },
+  args: Parameters<TurnKernelHost['executeToolCalls']>,
+) {
+  const calls = args[0];
+  const turnTools = args[4];
+  const catalog = new Map<string, { name: string; access?: string; sideEffectLevel?: string }>();
+  for (const tool of turnTools ?? host.tools) catalog.set(tool.name, tool);
+  const denied: Array<{ toolCallId: string; name: string; ok: false; content: string }> = [];
+  const allowed: typeof calls = [];
+  for (const call of calls) {
+    const reason = denyPatternBTool(live, catalog.get(call.name) ?? { name: call.name }, { input: call.input });
+    if (reason) denied.push({ toolCallId: call.toolCallId, name: call.name, ok: false, content: reason });
+    else allowed.push(call);
+  }
+  if (denied.length === 0) return host.executeToolCalls(...args);
+  const ran = allowed.length === 0 ? [] : await host.executeToolCalls(allowed, args[1], args[2], args[3], turnTools);
+  const byId = new Map<string, (typeof ran)[number]>();
+  for (const result of [...denied, ...ran]) byId.set(result.toolCallId, result);
+  return calls.map((call) => byId.get(call.toolCallId) ?? {
+    toolCallId: call.toolCallId,
+    name: call.name,
+    ok: false,
+    content: 'missing tool result',
+  });
+}
+
 async function executeGatedToolWave(
   host: TurnKernelHost,
   session: { id: string; metadata?: unknown },
@@ -145,7 +174,7 @@ async function executeGatedToolWave(
   if (gate.path !== 'in_machine') {
     // Persisted auto_policy stays auto_eligible, but ordinary waves keep the
     // pre-handoff tool path. Planner denial starts only after the machine is entered.
-    return host.executeToolCalls(...args);
+    return executePatternBOrdinaryWave(host, live, args);
   }
   const prepared = await prepareTrajectoryToolWave(live);
   if (!prepared.ok) {
@@ -163,7 +192,7 @@ async function executeGatedToolWave(
   const denied: Array<{ toolCallId: string; name: string; ok: false; content: string }> = [];
   const allowed: typeof calls = [];
   for (const call of calls) {
-    const reason = denyTrajectoryTool(live, catalog.get(call.name) ?? { name: call.name });
+    const reason = denyTrajectoryTool(live, catalog.get(call.name) ?? { name: call.name }, { input: call.input });
     if (reason) denied.push({ toolCallId: call.toolCallId, name: call.name, ok: false, content: reason });
     else allowed.push(call);
   }

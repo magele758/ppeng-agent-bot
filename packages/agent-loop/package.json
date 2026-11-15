@@ -81,6 +81,10 @@
     "./assembly": {
       "types": "./dist/assembly/index.d.ts",
       "default": "./dist/assembly/index.js"
+    },
+    "./pattern-b": {
+      "types": "./dist/trajectory-handoff/pattern-b/host.d.ts",
+      "default": "./dist/trajectory-handoff/pattern-b/host.js"
     }
   },
   "scripts": {
