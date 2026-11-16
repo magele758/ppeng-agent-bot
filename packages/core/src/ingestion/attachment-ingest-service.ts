@@ -8,7 +8,7 @@ import type { Logger } from '../logger.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { ImageAssetRecord } from '../types.js';
 import { createPagedArtifact, formatArchivePreview } from '../artifact/paged-artifact.js';
-import { makeFsPorts } from './ports.js';
+import { makeFsPorts, originalPath } from './ports.js';
 import { runIngestion } from './pipeline.js';
 import type { AttachmentInput } from './normalize.js';
 import { resolveIngestionSettings } from './settings.js';
@@ -66,18 +66,20 @@ export class AttachmentIngestService {
   constructor(private readonly ctx: AttachmentIngestCtx) {}
 
   expandForMessage(
-    _sessionId: string,
+    sessionId: string,
     attachmentIds?: string[]
-  ): { imageAssetIds: string[]; textParts: string[] } {
+  ): { imageAssetIds: string[]; textParts: string[]; refs: Array<{id: string; name: string}> } {
     const imageAssetIds: string[] = [];
     const textParts: string[] = [];
-    for (const id of attachmentIds ?? []) {
+    const refs = [];
+    for (const id of new Set(attachmentIds)) {
       const row = this.ctx.store.getAttachment(id);
-      if (!row) continue;
+      if (!row || row.sessionId !== sessionId) throw new ValidationError('Attachment unavailable in this session');
+      refs.push({ id, name: row.fileName });
       if (row.imageAssetId) imageAssetIds.push(row.imageAssetId);
       if (row.emitText) textParts.push(row.emitText);
     }
-    return { imageAssetIds, textParts };
+    return { imageAssetIds, textParts, refs };
   }
 
   async ingestBase64(
@@ -115,7 +117,9 @@ export class AttachmentIngestService {
     file: AttachmentInput
   ): Promise<{ attachment: AttachmentRecord; imageAsset?: ImageAssetRecord; statuses: AttachmentStatus[] }> {
     const settings = resolveIngestionSettings(this.ctx.store);
+    const attachmentId = createId('att');
     const ports = makeFsPorts({
+      attachmentId,
       sessionId,
       stateDir: this.ctx.stateDir,
       settings,
@@ -186,8 +190,7 @@ export class AttachmentIngestService {
       if (resolved.route.mode === 'workspace') {
         localRelPath = resolved.route.relPath;
       } else if (resolved.kind !== 'image') {
-        const id = createId('att');
-        localRelPath = `attachments/${sessionId}/${id}_${(file.fileName || 'file').replace(/[\\/]/g, '_')}`;
+        localRelPath = originalPath(sessionId, attachmentId, resolved.fileName);
         const abs = join(this.ctx.stateDir, localRelPath);
         mkdirSync(dirname(abs), { recursive: true });
         writeFileSync(abs, resolved.fetched.buffer);
@@ -195,12 +198,12 @@ export class AttachmentIngestService {
     }
 
     const artifactHandle =
-      resolved?.route.mode === 'archive' ? resolved.route.handle : undefined;
+      resolved?.route.mode === 'archive' || resolved?.route.mode === 'workspace' ? resolved.route.handle : undefined;
     const imageAssetId =
       resolved?.route.mode === 'inline-image' ? resolved.route.imageAssetId : result.imageAssetIds[0];
 
     const attachment: AttachmentRecord = {
-      id: createId('att'),
+      id: attachmentId,
       sessionId,
       fileName: file.fileName || 'file',
       mimeType: file.mimeType ?? resolved?.fetched.mimeType,

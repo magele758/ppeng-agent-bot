@@ -306,7 +306,7 @@ export function sendUserMessage(
   host: SessionFacadeHost,
   sessionId: string,
   message: string,
-  options?: { imageAssetIds?: string[]; replyTo?: string | MessageReplyTo; contextSources?: unknown }
+  options?: { attachmentRefs?: import('@ppeng/api-types').TextPart['attachmentRefs']; imageAssetIds?: string[]; replyTo?: string | MessageReplyTo; contextSources?: unknown }
 ): SessionRecord {
   const session = host.store.getSession(sessionId);
   if (!session) {
@@ -316,13 +316,18 @@ export function sendUserMessage(
   const ids = options?.imageAssetIds?.filter(Boolean) ?? [];
   const sources = normalizeContextSources(options?.contextSources);
   const text = message.trim();
-  if (!text && ids.length === 0 && sources.length === 0) {
+  if (!text && !options?.attachmentRefs?.length && ids.length === 0 && sources.length === 0) {
     throw new ValidationError('Message, imageAssetIds, or contextSources required');
   }
   const routineReplyId = typeof options?.replyTo === 'string' ? options.replyTo : options?.replyTo?.messageId;
   const quote = typeof options?.replyTo === 'object' ? options.replyTo : undefined;
   const context = routineReplyContext(host.store, session, routineReplyId);
   const parts = applyContextSources(userMessageParts(text || (ids.length ? '(image)' : ''), ids, host.store), sources);
+  if (options?.attachmentRefs?.length) {
+    const first = parts.find(part => part.type === 'text');
+    if (first) first.attachmentRefs = options.attachmentRefs;
+    else parts.unshift({ type: 'text', text: '', attachmentRefs: options.attachmentRefs });
+  }
   if (context) parts.unshift(textPart(context));
   { const admitted=host.store.appendMessage(session.id, 'user', parts, { ...(quote ? { replyTo: quote } : {}), ...(context ? { key: `routine-context:${routineReplyId ?? 'latest'}` } : {}) });new SourceLedger(host.store).record(session.id,{kind:'user',ref:admitted.id,messageId:admitted.id,label:'direct user input'}); }
   mergeSessionMetadata(host.store, session.id, {

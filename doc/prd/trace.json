@@ -2625,6 +2625,15 @@
       ]
     },
     {
+      "id": "chat-file-originals",
+      "title": "普通对话与单 Bot 的混合附件和原件追问",
+      "tests": [
+        "e2e/composer-attachments.spec.ts",
+        "packages/core/test/chat-file-originals.test.js",
+        "scripts/test/chat-attachment-restart.test.mjs"
+      ]
+    },
+    {
       "id": "chat-floating-chrome",
       "title": "浮动聊天标题与低干扰摘要",
       "tests": [

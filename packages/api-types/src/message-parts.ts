@@ -29,6 +29,8 @@ export interface TextPart {
    * Model adapters read `text` only; this field is for reload and display.
    */
   contextSources?: ContextSource[];
+  /** Immutable, ordered session uploads selected for this user message. */
+  attachmentRefs?: Array<{ id: string; name: string }>;
 }
 
 /** Chain-of-thought / reasoning from the model (persisted for UI; replayed to the API as text). */

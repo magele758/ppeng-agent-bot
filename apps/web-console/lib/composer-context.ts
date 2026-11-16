@@ -20,18 +20,18 @@ export function composerHasAttachments(...collections: readonly (readonly unknow
 }
 
 /** Text and dragged context are both valid submissions, including context-only sends. */
-export function contextSubmission(text: string, sources: readonly ContextSource[]) {
-  return { hasContent: Boolean(text) || sources.length > 0, message: text || '(attachment)' };
+export function contextSubmission(text: string, sources: readonly ContextSource[], hasFiles = false) {
+  return { hasContent: Boolean(text) || sources.length > 0 || hasFiles, message: text || '(attachment)' };
 }
 
 export function composerClassName(base: string, acknowledged = false): string {
   return `${base}${acknowledged ? ' chat-composer--ack-flash' : ''}`;
 }
 
-export function composerSendDisabled(blocked: boolean, steerDisabled: boolean, running: boolean, text: string, contexts: readonly ContextSource[]): boolean {
+export function composerSendDisabled(blocked: boolean, steerDisabled: boolean, running: boolean, text: string, contexts: readonly ContextSource[], hasFiles = false): boolean {
   if (blocked || steerDisabled) return true;
   if (!running) return false;
-  return !contextSubmission(text.trim(), contexts).hasContent;
+  return !contextSubmission(text.trim(), contexts, hasFiles).hasContent;
 }
 
 export function withContextIds(sources: readonly ContextSource[]): PendingContextSource[] {
@@ -83,9 +83,17 @@ function labelsFromParts(value: unknown): ContextLabel[] {
   const labels: ContextLabel[] = [];
   for (const part of value) {
     if (!part || typeof part !== 'object') continue;
-    labels.push(...labelsFromUnknown((part as Record<string, unknown>).contextSources));
+    const p = part as Record<string, unknown>;
+    labels.push(...labelsFromUnknown(p.contextSources));
+    labels.push(...attachmentLabels(p.attachmentRefs));
   }
   return labels;
+}
+
+function attachmentLabels(value: unknown): ContextLabel[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(ref => typeof ref?.id === 'string' && typeof ref?.name === 'string')
+    .map(ref => ({kind: 'file', name: ref.name + ' · ' + ref.id.slice(-8)}));
 }
 
 function labelOf(kind: unknown, name: unknown): ContextLabel | null {

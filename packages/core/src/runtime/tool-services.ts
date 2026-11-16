@@ -244,6 +244,7 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
     getAgentMemoryById: async (id) => host.store.agentMemory().getEntryById(id),
     botLookup: host.store,
     historyStore: host.store,
+    chatAttachmentStore: host.store,
     listSessionMessages: (sessionId) => host.store.listMessages(sessionId),
     compactContext: host.compactContext
       ? (context, opts) => host.compactContext!(context, opts)

@@ -1102,6 +1102,9 @@ export const play = {
     streamDone: 'Stream finished',
     sessionCreated: 'Session created',
     taskCreated: 'Task session created',
+    uploadingFiles: 'Adding attachments…',
+    uploadFailed: 'Could not add attachment',
+    originalOnly: 'Original saved; text extraction is unavailable',
     addedFiles: 'Added {count} attachment(s)',
     addedRemote: 'Added remote attachment'
   },

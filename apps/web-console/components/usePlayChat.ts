@@ -2,6 +2,7 @@
 import { messageRetryBusy, retryMessageBody, runMessageRetry, userMessageText } from '@/lib/user-message-actions';
 import { goalMessage } from '@/lib/bot-goals';
 import { composerMessageToSend } from '@/lib/composer-next-hint';
+import { useChatAttachments } from './useChatAttachments';
 import { composerDraftKey } from '@/lib/composer-draft';
 import { useComposerDraftScope } from './useComposerDraftScope';
 import { recapCommandShouldSend } from '@/lib/session-recap';
@@ -254,19 +255,6 @@ function isNearBottom(el: HTMLElement | null) {
 
 function scrollElToBottom(el: HTMLElement) {
   el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
-}
-
-function fileToBase64Data(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const s = String(reader.result || '');
-      const i = s.indexOf(',');
-      resolve(i >= 0 ? s.slice(i + 1) : s);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 export interface PlayChatDeps {
@@ -1061,9 +1049,13 @@ export function usePlayChat(deps: PlayChatDeps) {
     }
   }, [stopSpeechDictation, t]);
 
+  const draftKey = composerDraftKey({ sessionId: selectedSessionId, surface: playSurface, botId });
+  const draftKeyRef = useRef(draftKey);
+  draftKeyRef.current = draftKey;
+  const uploadOwner = useRef<string | null>(null);
   useComposerDraftScope(
-    { key: composerDraftKey({ sessionId: selectedSessionId, surface: playSurface, botId }), botId },
-    liveOwnerRef.current === selectedSessionId,
+    { key: draftKey, botId },
+    [liveOwnerRef.current, uploadOwner.current].includes(selectedSessionId),
     {
       read: () => ({
         text: playInputLiveRef.current,
@@ -1084,6 +1076,10 @@ export function usePlayChat(deps: PlayChatDeps) {
       }
     }
   );
+
+  useLayoutEffect(() => {
+    uploadOwner.current = null;
+  }, [draftKey]);
 
   const toggleOptionalGroup = useCallback(
     async (groupId: string, on: boolean) => {
@@ -2062,13 +2058,19 @@ export function usePlayChat(deps: PlayChatDeps) {
       }),
     })) as { session: { id: string } };
     const sid = data.session.id;
+    adoptUploadSession(sid);
+    await persistPendingStrategy(sid);
+    return sid;
+  };
+
+  const adoptUploadSession = (sid: string) => {
+    if (draftKeyRef.current !== draftKey) return;
+    uploadOwner.current = sid;
     selectedSessionRef.current = sid;
     setSelectedSessionId(sid);
-    await persistPendingStrategy(sid);
     requestScrollPlayToBottom();
     sessionListStickTopRef.current = true;
-    await tick({ includePlayPanel: true });
-    return sid;
+    void tick({ includePlayPanel: true });
   };
 
   const messageRetryLock = useRef(false);
@@ -2149,6 +2151,11 @@ export function usePlayChat(deps: PlayChatDeps) {
       }
   };
 
+  const uploads = useChatAttachments({
+    ensureSession: ensurePlaySessionForImages, activeSession: () => selectedSessionRef.current,
+    draftKey, add: id => setPendingAttachmentIds(current => [...current, id]), report: setPlayStatus
+  });
+
   const sendPlayMessage = async () => {
     const text = goalMessage(composerMessageToSend(playInput), playSurface === 'bot' ? selectedGoalId : null);
     const quoteSnapshot = replyQuoteRef.current;
@@ -2170,14 +2177,14 @@ export function usePlayChat(deps: PlayChatDeps) {
     const contextSnapshot = pendingContext;
     const contextSources = contextSourcesForSend(pendingContext);
     const contextFields = contextSourcesBody(contextSources);
-    const contextLabels = contextLabelsOf(contextSources);
+    const contextLabels = [...contextLabelsOf(contextSources), ...attachmentIds.map(id => ({kind: 'file' as const, name: uploads.labels[id] ?? id}))];
     const hasAttachments = composerHasAttachments(imageAssetIds, attachmentIds, contextSources);
     if (!recapCommandShouldSend(composerMessageToSend(playInput), hasAttachments, recapActiveRef.current !== false)) {
       clearComposerOnly();
       setRecapNonce((n) => n + 1);
       return;
     }
-    const submission = contextSubmission(text, contextSources);
+    const submission = contextSubmission(text, contextSources, hasAttachments);
     const commandBotId = playSurface === 'bot' ? botIdRef.current : '';
     if (
       planBotComposerSend({
@@ -2233,8 +2240,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             immediate
-              ? { text: submission.message, target, ...contextFields, ...replyFields }
-              : { text: submission.message, target, ...steerBodyFromQueryMode(execMode), ...contextFields, ...replyFields }
+              ? { text: submission.message, target, attachmentIds, ...contextFields, ...replyFields }
+              : { text: submission.message, target, attachmentIds, ...steerBodyFromQueryMode(execMode), ...contextFields, ...replyFields }
           ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
         if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
@@ -2248,6 +2255,8 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
         if (data.status === 'rejected' || data.status === 'not_submitted') {
           forgetPendingReply(replyMemoryRef.current);
+          setPendingAttachmentIds(attachmentIds);
+          setPendingImageAssetIds(imageAssetIds);
           if (!immediate) setReplyQuote(quoteSnapshot);
           if (immediate) {
             const rejected = steerUiAfterSend({ rejected: true, text, optimistic: pendingSteerTextRef.current });
@@ -2292,6 +2301,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           setOptimisticContext([]);
           setOptimisticReply(null);
           setPlayInput(rejected.composer ?? text);
+          setPendingAttachmentIds(attachmentIds);
+          setPendingImageAssetIds(imageAssetIds);
           setPendingContext(contextSnapshot);
           setReplyQuote(quoteSnapshot);
         }
@@ -2309,7 +2320,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const generation = claimLiveTurn(liveTurnOwnerId(selectedSessionId));
     setPlaySending(true);
 
-    const preview = userPreviewText(text || '(image)', imageAssetIds);
+    const preview = userPreviewText(text || t('play.attachment'), imageAssetIds);
     const beginStreamTurn = () => {
       if (playSurface === 'bot') noteBotFirstTaskSent();
       acknowledgeLocalSendCommitted();
@@ -2516,63 +2527,9 @@ export function usePlayChat(deps: PlayChatDeps) {
     }
   };
 
-  const handleFileUpload = async (files: FileList) => {
-    const selectedFiles = Array.from(files);
-    try {
-      const sid = await ensurePlaySessionForImages();
-      const imgIds = [...pendingImageAssetIds];
-      const attIds = [...pendingAttachmentIds];
-      for (const file of selectedFiles) {
-        const b64 = await fileToBase64Data(file);
-        const data = (await api(`/api/sessions/${sid}/attachments/ingest-base64`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            dataBase64: b64,
-            mimeType: file.type || undefined,
-            fileName: file.name,
-          }),
-        })) as {
-          attachment?: { id?: string; imageAssetId?: string };
-          imageAsset?: { id?: string };
-        };
-        if (data.attachment?.id) attIds.push(data.attachment.id);
-        const assetId = data.attachment?.imageAssetId || data.imageAsset?.id;
-        if (assetId) imgIds.push(assetId);
-      }
-      setPendingImageAssetIds(imgIds);
-      setPendingAttachmentIds(attIds);
-      setPlayStatus({ text: t('play.status.addedFiles', { count: selectedFiles.length }), ok: true });
-      await tick({ includePlayPanel: true });
-    } catch (err) {
-      setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
-    }
-  };
-
   const handleUrlFetch = async () => {
     const url = imageUrlInput.trim();
-    if (!url) return;
-    try {
-      const sid = await ensurePlaySessionForImages();
-      const data = (await api(`/api/sessions/${sid}/attachments/fetch-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      })) as {
-        attachment?: { id?: string; imageAssetId?: string };
-        imageAsset?: { id?: string };
-      };
-      if (data.attachment?.id) {
-        setPendingAttachmentIds((x) => [...x, data.attachment!.id!]);
-      }
-      const assetId = data.attachment?.imageAssetId || data.imageAsset?.id;
-      if (assetId) setPendingImageAssetIds((x) => [...x, assetId]);
-      setImageUrlInput('');
-      setPlayStatus({ text: t('play.status.addedRemote'), ok: true });
-      await tick({ includePlayPanel: true });
-    } catch (err) {
-      setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
-    }
+    if (url && await uploads.url(url)) setImageUrlInput('');
   };
 
   // Follow new output only while the reader remains anchored to the latest message.
@@ -2758,12 +2715,14 @@ export function usePlayChat(deps: PlayChatDeps) {
     handlePlayMessagesScroll,
     refreshPlayPanel,
     requestScrollPlayToBottom,
-    sendPlayMessage,
+    sendPlayMessage: () => uploads.isUploading() ? Promise.resolve() : sendPlayMessage(),
     retryUserMessage,
     messageRetryBusy: retryBusy,
     recapNonce,
     armLiveSessionStream,
-    handleFileUpload,
+    handleFileUpload: uploads.files,
+    attachmentLabels: uploads.labels,
+    composerUnavailable: [workspaceAvailability.blocked, uploads.uploading].includes(true),
     handleUrlFetch,
     setPlayTitle,
     setPlayMeta,

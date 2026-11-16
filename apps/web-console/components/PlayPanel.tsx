@@ -61,7 +61,7 @@ import { botChatHeaderTitle, botNameFromCanonicalTitle } from '@/lib/bot-chat-he
 import { BotFace } from './BotFace';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { shouldOpenSessionSettingsOnInboxGrowth } from '@/lib/running-turn-send';
-import { ComposerContextChips, ignoreComposerDrop } from './ComposerContext';
+import { ComposerContextChips, allowComposerFiles, droppedComposerFiles } from './ComposerContext';
 import { ComposerReplyQuote } from './ReplyQuote';
 import { composerClassName, composerSendDisabled } from '@/lib/composer-context';
 import { ComposerModelPicker } from './ComposerModelPicker';
@@ -1591,7 +1591,7 @@ export function PlayPanel({
                               : t('play.composer.queueHint')
                           : t('play.send')
                     }
-                    disabled={composerSendDisabled(chat.workspaceAvailability.blocked, steerDisabled, chatRunning, chat.playInput, chat.pendingContext)}
+                    disabled={composerSendDisabled(chat.composerUnavailable, steerDisabled, chatRunning, chat.playInput, chat.pendingContext, chat.pendingAttachmentIds.length > 0)}
                     onClick={() => void chat.sendPlayMessage()}
                   >
                     {chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping ? (
@@ -1621,8 +1621,11 @@ export function PlayPanel({
                   data-testid="composer-drop-target"
                   data-surface={botSurface ? 'bot' : 'chat'}
                   data-first-task={headerBotId ? firstTask.phase : undefined}
-                  onDragOver={ignoreComposerDrop}
-                  onDrop={ignoreComposerDrop}
+                  onDragOver={allowComposerFiles}
+                  onDrop={event => {
+                    const files = droppedComposerFiles(event);
+                    if (files.length) void chat.handleFileUpload(files);
+                  }}
                 >
                   <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
       {renderComposerFace()}
@@ -1700,7 +1703,6 @@ export function PlayPanel({
                       type="file"
                       id="playImageFile"
                       className="sr-only"
-                      accept="image/*,.txt,.md,.csv,.json,.html,.xml,.log,.docx,.xlsx,.xlsm,.pdf"
                       multiple
                       onChange={(e) => {
                         const files = e.target.files;
@@ -1774,11 +1776,12 @@ export function PlayPanel({
                   {chat.pendingAttachmentIds.map((id) => (
                     <span key={`att-${id}`} className="pending-img-row">
                       <span className="chip chip-muted" title={id}>
-                        {t('play.composer.pendingAttachment', { id: id.slice(0, 12) })}
+                        {chat.attachmentLabels[id] ?? t('play.composer.pendingAttachment', { id: id.slice(-8) })}
                       </span>
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
+                        aria-label={t('play.composer.removeContext', { name: chat.attachmentLabels[id] })}
                         onClick={() => chat.setPendingAttachmentIds((x) => x.filter((y) => y !== id))}
                       >
                         ×

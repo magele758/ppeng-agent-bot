@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { retryMessageBody, runMessageRetry } from './user-message-actions.ts';
 
 test('retry preserves selected text images and quote [AC:user-message-actions#AC-3]', () => {
- const message = { role: 'user' as const, parts: [{ type: 'text' as const, text: 'original' }, { type: 'image' as const, assetId: 'img-1', mimeType: 'image/png' }], replyTo: { messageId: 'm0', botId: 'bot', excerpt: 'quote' } };
- assert.deepEqual(retryMessageBody(message), { message: 'original', imageAssetIds: ['img-1'], attachmentIds: [], replyTo: message.replyTo });
+ const message = { role: 'user' as const, parts: [{ type: 'text' as const, text: 'original', attachmentRefs: [{id:'att-old', name:'config.ts'}] }, { type: 'image' as const, assetId: 'img-1', mimeType: 'image/png' }], replyTo: { messageId: 'm0', botId: 'bot', excerpt: 'quote' } };
+ assert.deepEqual(retryMessageBody(message), { message: 'original', imageAssetIds: ['img-1'], attachmentIds: ['att-old'], replyTo: message.replyTo });
 });
 test('retry lock rejects duplicates and stale sessions and releases after failure [AC:user-message-actions#AC-4]', async () => {
  const lock = { current: false }; let selected = 's1'; let count = 0; let release!: () => void;

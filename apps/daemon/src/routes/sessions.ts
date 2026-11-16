@@ -1062,9 +1062,13 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const id = requireParam('id');
         const body = (await readBody()) as Record<string, unknown>;
         const sources = normalizeContextSources(body.contextSources);
-        const text = String(body.text ?? body.message ?? '').trim() || (sources.length ? '(attachment)' : '');
+        const attachmentIds = attachmentIdsFromBody(body);
+        const text = String(body.text ?? body.message ?? '').trim() || (sources.length + attachmentIds.length ? '(attachment)' : '');
         if (!text) throw new ValidationError('Missing steer text');
-        const contextParts = applyContextSources([], sources) as import('@ppeng/api-types').TextPart[];
+        const contextParts = [
+          ...applyContextSources([], sources) as import('@ppeng/api-types').TextPart[],
+          ...(attachmentIds.length ? runtime.attachmentContext(id, attachmentIds) : [])
+        ];
         const replyTo = replyToFromBody(body);
         if (typeof replyTo === 'string') throw new ValidationError('Quoted steering requires a message pointer');
         const ack = runtime.enqueueSteer(id, text, { ...steerRequestOptions(body), contextParts, replyTo });

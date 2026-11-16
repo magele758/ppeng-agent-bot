@@ -2313,6 +2313,14 @@ permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 - `e2e/agent-home-features.spec.ts`
 - `e2e/chat-experience.spec.ts`
 
+### chat-file-originals
+
+普通对话与单 Bot 的混合附件和原件追问
+
+- `e2e/composer-attachments.spec.ts`
+- `packages/core/test/chat-file-originals.test.js`
+- `scripts/test/chat-attachment-restart.test.mjs`
+
 ### chat-floating-chrome
 
 浮动聊天标题与低干扰摘要

@@ -51,6 +51,7 @@ export type StorageRoute =
   | {
       mode: 'workspace';
       relPath: string;
+      handle?: string;
       text?: string;
       truncated?: boolean;
       textUnavailable?: string;

@@ -3,7 +3,7 @@ import { looksBinary } from './encoding-policy.js';
 import type { AttachmentKind, ClassifiedAttachment, FetchedAttachment, RawAttachment } from './types.js';
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
-const TEXT_EXT = new Set(['.txt', '.md', '.csv', '.json', '.html', '.htm', '.xml', '.log', '.tsv']);
+const TEXT_EXT = new Set(['.txt', '.md', '.csv', '.json', '.html', '.htm', '.xml', '.log', '.tsv', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.py', '.go', '.rs', '.java', '.sh', '.yaml', '.yml', '.toml', '.css', '.sql', '.c', '.cpp', '.h']);
 const WORKSPACE_EXT = new Set(['.xlsx', '.xlsm', '.xls', '.docx', '.doc', '.pptx', '.ppt', '.pdf']);
 
 export function extOf(fileName: string): string {

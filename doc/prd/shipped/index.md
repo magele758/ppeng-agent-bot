@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 459 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 460 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -245,7 +245,7 @@
 - `bypass-skill-write` bypass 的 Bot 写技能不再被额外确认拦住
 - `bypass-source-scope` permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
-## chat（13）
+## chat（14）
 
 需求正文见 [chat](chat.md)。
 
@@ -255,6 +255,7 @@
 - `chat-clean-theme` 清爽的浅色阅读界面
 - `chat-column` 对话区对齐与阅读留白
 - `chat-experience` 对话页简洁易用
+- `chat-file-originals` 普通对话与单 Bot 的混合附件和原件追问
 - `chat-floating-chrome` 浮动聊天标题与低干扰摘要
 - `chat-header-menu-only` 聊天顶部只保留更多入口
 - `chat-inline-history` 单行附件入口与自动加载聊天历史
