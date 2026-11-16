@@ -2204,22 +2204,40 @@ export function usePlayChat(deps: PlayChatDeps) {
       return;
     }
     const running = liveTurnRunning(liveOwnerRef.current, selectedSessionRef.current, playSending, Boolean(streamOverlay), waitTyping);
-    if (running) {
-      if (!submission.hasContent || !selectedSessionId) return;
-      const steerSessionId = selectedSessionId;
+    async function steer(steerSessionId: string) {
       const steerGeneration = liveGenRef.current;
+      const current = () =>
+        steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current);
       const delivery = planRunningTurnDelivery({
         canonicalBotChat: composerIsCanonicalBot(),
         interruptPolicy: steerInterruptPolicy
       });
-      const immediate = delivery.optimistic;
-      if (delivery.blocked) {
-        setPlayStatus({ text: t('play.status.steerDisabled'), err: true });
-        return;
+      const { optimistic: immediate, target } = delivery;
+      const execMode = queryExecModeRef.current;
+      type Receipt = { status?: string; reason?: string; item?: SteerInboxItem };
+
+      function restoreSteerDraft() {
+        forgetPendingReply(replyMemoryRef.current);
+        setPendingAttachmentIds(attachmentIds);
+        setPendingImageAssetIds(imageAssetIds);
+        setPendingContext(contextSnapshot);
+        setReplyQuote(quoteSnapshot);
+        setPlayInput(text);
+        if (!immediate) return;
+        const rejected = steerUiAfterSend({ rejected: true, text, optimistic: pendingSteerTextRef.current });
+        pendingSteerTextRef.current = null;
+        pendingSteerSessionRef.current = null;
+        clearSteerSplit();
+        setOptimisticUser(rejected.bubble);
+        setOptimisticContext([]);
+        setOptimisticReply(null);
+        setPlayInput(rejected.composer ?? text);
       }
-      stopSpeechDictation();
-      consumeQuote(immediate);
-      if (immediate) {
+
+      function beginSteer() {
+        stopSpeechDictation();
+        consumeQuote(immediate);
+        if (!immediate) return;
         pendingSteerKnownIdsRef.current = new Set(
           historyMessagesRef.current.map((message) => messageId(message)).filter(Boolean)
         );
@@ -2232,83 +2250,84 @@ export function usePlayChat(deps: PlayChatDeps) {
         setOptimisticContext(contextLabels);
         clearComposerOnly();
       }
-      try {
-        const target = delivery.target;
-        const execMode = queryExecModeRef.current;
-        const data = (await api(`/api/sessions/${selectedSessionId}/steer`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            immediate
-              ? { text: submission.message, target, attachmentIds, ...contextFields, ...replyFields }
-              : { text: submission.message, target, attachmentIds, ...steerBodyFromQueryMode(execMode), ...contextFields, ...replyFields }
-          ),
-        })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
-        if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
-        acknowledgeLocalSendCommitted();
-        clearComposerOnly();
+
+      function showReceipt(data: Receipt) {
         if (delivery.revealSettings && execMode !== 'subagent' && data.item?.id) {
+          const item = data.item;
           setSteerInbox((prev) => [
             ...prev,
-            { id: data.item!.id, text: data.item!.text || text, target, mode: 'steering' }
+            { id: item.id, text: item.text || text, target, mode: 'steering' }
           ]);
         }
+      }
+
+      function successStatus(data: Receipt) {
+        if (immediate) return t('play.status.steered');
+        if (execMode === 'subagent') return t('play.status.queuedSubagent');
+        if (data.status !== 'queued') return t('play.status.steered');
+        return steerInterruptPolicy === 'queue' ? t('play.status.queuedEnd') : t('play.status.queuedNext');
+      }
+
+      function rejectionReason(reason?: string) {
+        if (reason === 'session_ended') return t('play.status.sessionEnded');
+        if (reason === 'no_session') return t('play.status.noSession');
+        if (reason === 'steer_disabled') return t('play.status.steerDisabled');
+        return reason || t('play.status.notAccepted');
+      }
+
+      async function submit() {
+        const modeFields = immediate ? {} : steerBodyFromQueryMode(execMode);
+        const data = (await api(`/api/sessions/${steerSessionId}/steer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: submission.message,
+            target,
+            attachmentIds,
+            ...modeFields,
+            ...contextFields,
+            ...replyFields
+          })
+        })) as Receipt;
+        if (!current()) return;
+        acknowledgeLocalSendCommitted();
         if (data.status === 'rejected' || data.status === 'not_submitted') {
-          forgetPendingReply(replyMemoryRef.current);
-          setPendingAttachmentIds(attachmentIds);
-          setPendingImageAssetIds(imageAssetIds);
-          if (!immediate) setReplyQuote(quoteSnapshot);
-          if (immediate) {
-            const rejected = steerUiAfterSend({ rejected: true, text, optimistic: pendingSteerTextRef.current });
-            pendingSteerTextRef.current = null;
-            pendingSteerSessionRef.current = null;
-            clearSteerSplit();
-            setOptimisticUser(rejected.bubble);
-            setOptimisticContext([]);
-            setOptimisticReply(null);
-            setPlayInput(rejected.composer ?? text);
-            setPendingContext(contextSnapshot);
-            setReplyQuote(quoteSnapshot);
-          }
-          const why =
-            data.reason === 'session_ended'
-              ? t('play.status.sessionEnded')
-              : data.reason === 'no_session'
-                ? t('play.status.noSession')
-                : data.reason === 'steer_disabled'
-                  ? t('play.status.steerDisabled')
-                  : data.reason || t('play.status.notAccepted');
-          setPlayStatus({ text: t('play.status.notAcceptedWhy', { why }), err: true });
-        } else if (!immediate && execMode === 'subagent') {
-          setPlayStatus({ text: t('play.status.queuedSubagent'), ok: true });
-        } else if (!immediate && data.status === 'queued') {
+          restoreSteerDraft();
           setPlayStatus({
-            text: steerInterruptPolicy === 'queue' ? t('play.status.queuedEnd') : t('play.status.queuedNext'),
-            ok: true
+            text: t('play.status.notAcceptedWhy', { why: rejectionReason(data.reason) }),
+            err: true
           });
-        } else {
-          setPlayStatus({ text: t('play.status.steered'), ok: true });
+          return;
         }
-      } catch (err) {
-        if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
-        if (!immediate) setReplyQuote(quoteSnapshot);
-        if (immediate) {
-          const rejected = steerUiAfterSend({ rejected: true, text, optimistic: pendingSteerTextRef.current });
-          pendingSteerTextRef.current = null;
-          pendingSteerSessionRef.current = null;
-          clearSteerSplit();
-          setOptimisticUser(rejected.bubble);
-          setOptimisticContext([]);
-          setOptimisticReply(null);
-          setPlayInput(rejected.composer ?? text);
-          setPendingAttachmentIds(attachmentIds);
-          setPendingImageAssetIds(imageAssetIds);
-          setPendingContext(contextSnapshot);
+        clearComposerOnly();
+        showReceipt(data);
+        setPlayStatus({ text: successStatus(data), ok: true });
+      }
+
+      function failed(error: unknown) {
+        if (!current()) return;
+        if (immediate) restoreSteerDraft();
+        else {
+          forgetPendingReply(replyMemoryRef.current);
           setReplyQuote(quoteSnapshot);
         }
-        forgetPendingReply(replyMemoryRef.current);
-        setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
+        setPlayStatus({ text: error instanceof Error ? error.message : String(error), err: true });
       }
+
+      if (delivery.blocked) {
+        setPlayStatus({ text: t('play.status.steerDisabled'), err: true });
+        return;
+      }
+      beginSteer();
+      try {
+        await submit();
+      } catch (error) {
+        failed(error);
+      }
+    }
+
+    if (running) {
+      if (submission.hasContent && selectedSessionId) await steer(selectedSessionId);
       return;
     }
     stopSpeechDictation();
@@ -2344,148 +2363,97 @@ export function usePlayChat(deps: PlayChatDeps) {
       clearComposerOnly();
     };
 
+    const commonBody = () => ({
+      message: sentText,
+      imageAssetIds,
+      attachmentIds,
+      ...contextFields,
+      ...replyFields,
+      ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
+      ...bodyForSend(),
+      ...modelRefBody(modelRefForSend),
+      ...workspaceBindingBody(workspaceBinding)
+    });
+
+    let streamed = false;
+    async function postMessage(path: string, body: object) {
+      return (await api(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })) as { session: { id: string } };
+    }
+
+    async function sendToSession(sid: string) {
+      if (useStream) {
+        streamed = true;
+        beginStreamTurn();
+        await readSseFetch(`/api/sessions/${sid}/stream`, commonBody(), undefined, { liveGen: generation });
+      } else {
+        beginWaitTurn();
+        await postMessage(`/api/sessions/${sid}/messages`, commonBody());
+      }
+      assertLiveTurn(generation);
+      if (!useStream) finishLiveTurn(generation);
+      setPlayStatus({ text: t('play.status.sent'), ok: true });
+      if (
+        shouldRefreshSuggestion({
+          botChat: playSurface === 'bot',
+          enabled: suggestionEnabled,
+          draft: playInputLiveRef.current,
+          busy: false,
+          hasSuggestion: Boolean(ghostText(inputGhostRef.current))
+        })
+      ) {
+        void requestInputSuggestion(sid);
+      }
+    }
+
+    function newSessionBody(chat: boolean) {
+      const fields = chat
+        ? { title: (text || t('play.attachment')).slice(0, 60) }
+        : { title: text.slice(0, 80), mode: 'task', autoRun: true, background: true };
+      return { ...commonBody(), agentId: resolveComposerAgentId(agentId, agents), ...fields };
+    }
+
+    async function createAndSend() {
+      const chat = mode === 'chat';
+      const body = newSessionBody(chat);
+      if (chat && useStream) {
+        streamed = true;
+        beginStreamTurn();
+        await readSseFetch('/api/chat/stream', body, undefined, { liveGen: generation });
+        assertLiveTurn(generation);
+        setPlayStatus({ text: t('play.status.streamDone'), ok: true });
+        return;
+      }
+      beginWaitTurn();
+      const data = await postMessage(chat ? '/api/chat' : '/api/sessions', body);
+      const sid = data.session.id;
+      assertSessionClaim(generation, sid);
+      liveOwnerRef.current = sid;
+      selectedSessionRef.current = sid;
+      setSelectedSessionId(sid);
+      finishLiveTurn(generation);
+      await refreshPlayPanel();
+      setPlayStatus({
+        text: chat ? t('play.status.sessionCreated') : t('play.status.taskCreated'),
+        ok: true
+      });
+    }
+
     try {
       const activeBotId = playSurface === 'bot' ? botIdRef.current : '';
       const hadSession = Boolean(selectedSessionRef.current);
-      let streamed = false;
       let sid = selectedSessionId;
       if (!sid && activeBotId) {
         const opened = await openBotSession(activeBotId, { liveGen: generation });
         sid = opened.sessionId;
       }
       assertLiveTurn(generation);
-      if (sid) {
-        if (useStream) {
-          streamed = true;
-          beginStreamTurn();
-          await readSseFetch(
-            `/api/sessions/${sid}/stream`,
-            {
-              message: text || '(attachment)',
-              imageAssetIds,
-              attachmentIds,
-              ...contextFields,
-              ...replyFields,
-              ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-              ...bodyForSend(),
-              ...modelRefBody(modelRefForSend),
-              ...workspaceBindingBody(workspaceBinding),
-            },
-            undefined,
-            { liveGen: generation }
-          );
-        } else {
-          beginWaitTurn();
-          await api(`/api/sessions/${sid}/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: text || '(attachment)',
-              imageAssetIds,
-              attachmentIds,
-              ...contextFields,
-              ...replyFields,
-              ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-              ...bodyForSend(),
-              ...modelRefBody(modelRefForSend),
-              ...workspaceBindingBody(workspaceBinding),
-            }),
-          });
-        }
-        assertLiveTurn(generation);
-        if (!useStream) finishLiveTurn(generation);
-        setPlayStatus({ text: t('play.status.sent'), ok: true });
-        if (
-          shouldRefreshSuggestion({
-            botChat: playSurface === 'bot',
-            enabled: suggestionEnabled,
-            draft: playInputLiveRef.current,
-            busy: false,
-            hasSuggestion: Boolean(ghostText(inputGhostRef.current))
-          })
-        ) {
-          void requestInputSuggestion(sid);
-        }
-      } else if (activeBotId) {
-        throw new Error(t('play.status.openBotFailed'));
-      } else if (mode === 'chat') {
-        if (useStream) {
-          streamed = true;
-          beginStreamTurn();
-          await readSseFetch('/api/chat/stream', {
-            message: text || '(attachment)',
-            title: (text || t('play.attachment')).slice(0, 60),
-            agentId: resolveComposerAgentId(agentId, agents),
-            imageAssetIds,
-            attachmentIds,
-            ...contextFields,
-            ...replyFields,
-            ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-            ...bodyForSend(),
-            ...modelRefBody(modelRefForSend),
-            ...workspaceBindingBody(workspaceBinding),
-          }, undefined, { liveGen: generation });
-          assertLiveTurn(generation);
-          setPlayStatus({ text: t('play.status.streamDone'), ok: true });
-        } else {
-          beginWaitTurn();
-          const data = (await api('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              message: text || '(attachment)',
-              title: (text || t('play.attachment')).slice(0, 60),
-              agentId: resolveComposerAgentId(agentId, agents),
-              imageAssetIds,
-              attachmentIds,
-              ...contextFields,
-              ...replyFields,
-              ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-              ...bodyForSend(),
-              ...modelRefBody(modelRefForSend),
-              ...workspaceBindingBody(workspaceBinding),
-            }),
-          })) as { session: { id: string } };
-          const newSid = data.session.id;
-          assertSessionClaim(generation, newSid);
-          liveOwnerRef.current = newSid;
-          selectedSessionRef.current = newSid;
-          setSelectedSessionId(newSid);
-          finishLiveTurn(generation);
-          await refreshPlayPanel();
-          setPlayStatus({ text: t('play.status.sessionCreated'), ok: true });
-        }
-      } else {
-        beginWaitTurn();
-        const data = (await api('/api/sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mode: 'task',
-            title: text.slice(0, 80),
-            message: text || '(attachment)',
-            imageAssetIds,
-            attachmentIds,
-            ...contextFields,
-            ...replyFields,
-            agentId: resolveComposerAgentId(agentId, agents),
-            autoRun: true,
-            background: true,
-            ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-            ...bodyForSend(),
-            ...modelRefBody(modelRefForSend),
-            ...workspaceBindingBody(workspaceBinding),
-          }),
-        })) as { session: { id: string } };
-        const newSid = data.session.id;
-        assertSessionClaim(generation, newSid);
-        liveOwnerRef.current = newSid;
-        selectedSessionRef.current = newSid;
-        setSelectedSessionId(newSid);
-        finishLiveTurn(generation);
-        await refreshPlayPanel();
-        setPlayStatus({ text: t('play.status.taskCreated'), ok: true });
-      }
+      if (sid) await sendToSession(sid);
+      else if (activeBotId) throw new Error(t('play.status.openBotFailed'));
+      else await createAndSend();
       assertLiveTurn(generation);
       if (!hadSession && !activeBotId && selectedSessionRef.current) {
         await persistPendingStrategy(selectedSessionRef.current);
