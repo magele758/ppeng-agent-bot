@@ -22,6 +22,7 @@ import { ProjectStore } from './workspace/project-store.js';
 import { CloudFolderStore } from './workspace/cloud-store.js';
 import { TeamPlanStore } from './teams/store.js';
 import { CapabilityStore } from './discovery/store.js';
+import { SidechatStore } from './sidechat/store.js';
 import { TaskStore } from './stores/task-store.js';
 import type { CreateTaskInput } from './stores/task-store.js';
 import { SelfHealStore } from './stores/self-heal-store.js';
@@ -87,6 +88,7 @@ function sqliteTableHasColumn(db: DatabaseSync, table: string, column: string): 
 export class SqliteStateStore {
   readonly dbPath: string;
   readonly db: DatabaseSync;
+  readonly sidechats: SidechatStore;
   /**
    * Monotonic version counter bumped on every state-mutating call. Used by
    * the daemon to emit `ETag: W/"<version>"` on list endpoints so the
@@ -120,6 +122,7 @@ export class SqliteStateStore {
     }
 
     this.db = new DatabaseSync(dbPath);
+    this.sidechats = new SidechatStore(this.db, dbPath);
     this.memory = new SessionMemoryBridge(this.db);
     this.tasks = new TaskStore(this.db);
     this.selfHeal = new SelfHealStore(this.db);
@@ -129,7 +132,7 @@ export class SqliteStateStore {
     this.misc = new MiscStore(this.db);
     this.sessions = new SessionStore(this.db, dbPath);
     const closeDb = this.db.close.bind(this.db);
-    this.db.close = () => { this.sessions.releaseWriterLocks(); closeDb(); };
+    this.db.close = () => { this.sessions.releaseWriterLocks(); this.sidechats.releaseWorker(); closeDb(); };
     this.inbox = new StepInboxStore(this.db);
     this.imageAssets = new ImageAssetStore(this.db);
     this.attachments = new AttachmentStore(this.db);

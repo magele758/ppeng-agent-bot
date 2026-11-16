@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 457,
+    "implemented": 458,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2848,6 +2848,13 @@
       "requirement": "群聊的也按bot的加一个菜单，用类似的菜单\n这个列表里很多功能都是重复的，看看哪些可以聚合，哪些可以放到一个统一入口，哪些可以放到更深的菜单里，让这个列表更清爽",
       "verificationStage": "software",
       "file": "acceptance/sidebar-unified-menu.yaml"
+    },
+    {
+      "id": "sidechat",
+      "title": "对话和 Bot 的原文批注与跨会话侧聊",
+      "requirement": "我想要开发一个功能，叫sidechat的能力，主要针对场景是模型返回的内容里有一部分，或者有一些词，是我不理解的，但是又不想新开一轮会话来影响我看当前轮返回的内容，这个可以在右侧有一个专门管理类似的会话的列表，可以多个会话，可以新增一个当前bot或者session流里的裂变的UI，你理解我要做一个什么样的东西吗？有点类似论文或者文档的批注的能力，针对某一个内容的扩写，以后又可以看到当时在这个地方的扩展思考，这样我觉得挺方便学习使用的\n你把跨会话查找也补到视觉稿里，用两个会话举个例子，我想实际点一下，看看从当前批注找到以前的讨论、再回到原文的体验。\n对话和bot都要有这个能力，这是这么设计的吧？",
+      "verificationStage": "software",
+      "file": "acceptance/sidechat.yaml"
     },
     {
       "id": "single-host-bot-completion",

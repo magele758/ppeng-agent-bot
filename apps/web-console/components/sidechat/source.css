@@ -1,0 +1,80 @@
+.sidechat-dock {
+  grid-row: 1;
+  grid-column: -2 / -1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--ui-border);
+  background: var(--ui-bg);
+  overflow: hidden;
+}
+.play-layout:has(> .sidechat-dock) > .play-rail {
+  display: none;
+}
+@media (min-width: 1101px) {
+  .play-layout.play-layout--rail:has(> .sidechat-dock) {
+    grid-template-columns: 220px minmax(0, 1fr) clamp(280px, 26vw, 420px);
+  }
+  .play-layout.play-layout--rail.is-sidebar-collapsed:has(> .sidechat-dock) {
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 26vw, 420px);
+  }
+}
+@media (max-width: 1100px) {
+  .play-layout > .sidechat-dock {
+    position: fixed;
+    inset: 0 0 0 auto;
+    width: min(100vw, 390px);
+    z-index: var(--ui-z-overlay);
+    box-shadow: var(--ui-shadow-md);
+  }
+}
+@media (max-width: 760px) {
+  .play-layout > .sidechat-dock {
+    width: 100%;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+}
+.sidechat-selection,
+.sidechat-location-notice {
+  position: fixed;
+  z-index: calc(var(--ui-z-overlay) + 1);
+  padding: 6px 10px;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-text);
+  color: var(--ui-bg);
+  font-size: var(--ui-text-sm);
+}
+.sidechat-location-notice {
+  bottom: 1rem;
+  left: 1rem;
+}
+[data-sidechat-ids] {
+  cursor: pointer;
+  background: color-mix(in srgb, var(--ui-warn) 18%, transparent);
+  text-decoration: underline dotted var(--ui-warn);
+  text-underline-offset: 3px;
+}
+[data-sidechat-ordinal]::after {
+  content: attr(data-sidechat-ordinal);
+  vertical-align: super;
+  font-size: 0.65em;
+  font-weight: 700;
+}
+
+[data-sidechat-active],
+[data-sidechat-whole-active='true'] {
+  background: color-mix(in srgb, var(--ui-warn) 36%, var(--ui-bg));
+  text-decoration: underline solid var(--ui-warn) 2px;
+}
+[data-sidechat-active][data-sidechat-ordinal]::after {
+  background: var(--ui-text);
+  color: var(--ui-bg);
+  border-radius: var(--ui-radius-sm);
+  padding-inline: 2px;
+}
+::highlight(sidechat-draft) {
+  background-color: color-mix(in srgb, var(--ui-warn) 36%, var(--ui-bg));
+  color: var(--ui-text);
+  text-decoration: underline;
+}

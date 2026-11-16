@@ -3,6 +3,7 @@
 import {
   useCallback,
   useLayoutEffect,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -103,6 +104,7 @@ export function ChatFeedWindow({
     return heightsRef.current.get(history[index]!.key) ?? FEED_ROW_ESTIMATE_PX;
   });
   prefixRef.current = prefix;
+  useRevealFeedRow(scrollerRef, historyRef, prefixRef, setScrollPosition, stickToBottomRef, scrollIntentRef);
   void heightsVersion;
 
   const range = feedRange(history, scrollTop, viewport, prefix, stickToBottomRef.current, scrollIntentRef.current);
@@ -202,3 +204,33 @@ export function ChatFeedWindow({
   );
 }
 
+function slotContains(slot: FeedSlot, key: string): boolean {
+  if (slot.key === key) return true;
+  return Boolean(slot.folded?.some((child) => slotContains(child, key)));
+}
+
+function useRevealFeedRow(
+  root: RefObject<HTMLDivElement | null>,
+  history: RefObject<FeedSlot[]>,
+  prefix: RefObject<number[]>,
+  setPosition: (p: { top: number }) => void,
+  stick: RefObject<boolean>,
+  intent: RefObject<FeedScrollIntent | null>
+) {
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const reveal = (event: Event) => {
+      const key = (event as CustomEvent<string>).detail;
+      const index = history.current.findIndex((slot) => slotContains(slot, key));
+      if (index < 0) return;
+      const top = prefix.current[index]!;
+      stick.current = false;
+      intent.current = { kind: 'pin', key: history.current[index]!.key, top, offset: 0 };
+      el.scrollTop = top;
+      setPosition({ top: el.scrollTop });
+    };
+    el.addEventListener('sidechat-reveal-feed-row', reveal);
+    return () => el.removeEventListener('sidechat-reveal-feed-row', reveal);
+  }, [root, history, prefix, setPosition, stick, intent]);
+}

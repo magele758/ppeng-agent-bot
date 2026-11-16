@@ -32,3 +32,5 @@ export type {
 } from './api-views.js';
 
 export { filterSessionsByQuery, type SessionSearchable } from './session-query.js';
+
+export type { SidechatAnchor, SidechatStatus, SidechatThread, SidechatMessage, SidechatDetail, SidechatMatch, SidechatSearchHit } from './sidechat.js';

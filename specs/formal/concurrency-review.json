@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-16T00:44:12.283106+00:00",
-  "reviewNote": "Pattern B isolation stays a separate default-off switch. A host-qualified flywheel implement task can be admitted only when that switch is on. Fingerprints refreshed for collaborator wiring. Production entry stays closed. Knife-3 and knife-4 switches do not imply Pattern B. #516 is not relaxed. This refresh is not a new formal pass. Reviewed skill discovery recovery: a load outside the candidate list returns its failed tool result to the current writer for search. Explicit permission denials still abort. Tool-result pairing, writer ownership and restart persistence are unchanged.",
+  "reviewedAt": "2026-11-16T03:56:29.217Z",
+  "reviewNote": "Reviewed v39 Sidechat migration and worker lock lifetime. Sidechat uses separate worker-slot lock files, its own run IDs and fenced turn updates. Opening the store itself takes no session or sidechat writer lock. The mapped session writer admission, stale release and approval paths are unchanged; the ordinary-session multiprocess matrix does not prove Sidechat concurrency.",
   "mapping": [
     {
       "step": "Production runtime startup and writer surfaces, cancellation and approval decisions; actual OS process probes",
@@ -435,7 +435,7 @@
   ],
   "sha256": {
     "packages/core/src/runtime.ts": "da6e96558b2118a7d789d1d72fceed5c60bd1718498ad5833fe7ac09014d3ad1",
-    "packages/core/src/storage.ts": "fcf7f62aa8a6318d5053e515cf7379acc38be89b9b2f83ca9d3417fc710e4ebf",
+    "packages/core/src/storage.ts": "3eb186b22bf54b08f374596531d9411227fd47bb109f6d62e8acebff18203456",
     "packages/core/src/stores/session-store.ts": "04d0113c7cc0af605573f1538561b4a403d39ca4c6bd91392a49e322b6d2ecc7",
     "packages/core/src/stores/approval-store.ts": "16b5ab8290b6f09a4ab373877f559b55e917af24a196bd2df942776a078ddf3a",
     "packages/core/src/runtime/restart-recovery.ts": "9c356e4b2b3f61f6e4cf0dc48dc71e92b9540294521428c43acf64a7a96af96e",
@@ -498,7 +498,7 @@
     "packages/core/src/turn/prepare-turn-input.ts": "583a15261fca39b1233eb9a71d18e30fef864604f1ab44212b3c7ea2a7872b79",
     "packages/core/src/session/inbox-overflow.ts": "0b7b76fbe2dbd5c8cbcf80766dd44eefd3237673aa57d594ad200c41e8abfccc",
     "packages/agent-loop/src/session/inbox-overflow.ts": "031b689482934c60d94c79fcbcb199976e02af4a6580bf4be085fcbb1a37595a",
-    "packages/core/src/stores/migrations/index.ts": "649da1e474ca54571d5b51d7b964825df96565db0c5945f4f5414688a2fecaef",
+    "packages/core/src/stores/migrations/index.ts": "f842f7ea700a3904527447b6e4f4d84e4f908cc58aab9be1c73ad2319a9439ee",
     "packages/core/src/approval/unattended-approval.ts": "74aff0a40282eaffa6a84610d4c0e2550f94eee268c99ea72f80b1b44879ebfd",
     "packages/core/test/unattended-approval-writer-scope.test.js": "23c17f903361bc53bbb0b7733eb4bf9147b4977c4dc546f800862cf2856b9371",
     "packages/core/src/bots/bot-work.ts": "f68e28fc8eb187c04392953ce644d47dd85c39ed0a04d0f9f4bc61979fbfd2b5",

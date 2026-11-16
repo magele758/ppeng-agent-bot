@@ -1,3 +1,4 @@
+import { createSidechatSchema } from '../../sidechat/schema.js';
 import { ensureMemorySuppressionSchema } from '../../memory/deletion-suppression.js';
 import { ensureSoftwareInvocationSchema } from '../../connectors/software-execution.js';
 import { ensureBotWorkSchema } from '../../bots/bot-work.js';
@@ -1084,6 +1085,7 @@ export const MIGRATIONS: Migration[] = [
       `);
     }
   },
+  { version: 39, description: 'source-anchored sidechat threads, turns and search index', up: createSidechatSchema },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

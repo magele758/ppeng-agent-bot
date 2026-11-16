@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-16T00:44:12.283936+00:00",
-  "reviewNote": "Newly covered Pattern B pairing sources after the portable POSIX path helper: pattern-b/tool-gate.ts, boundary.ts, paths.ts, host-registry.ts, and types.ts are mapped on a separate tool-loop closure step, not folded into knife admission. Pattern B isolation stays a separate default-off switch. A host-qualified flywheel implement task can be admitted only when that switch is on. Fingerprints refreshed for collaborator wiring. Production entry stays closed. Knife-3 and knife-4 switches do not imply Pattern B. #516 is not relaxed. This refresh is not a new formal pass. Reviewed skill discovery recovery: a load outside the candidate list returns its failed tool result to the current writer for search. Explicit permission denials still abort. Tool-result pairing, writer ownership and restart persistence are unchanged.",
+  "reviewedAt": "2026-11-16T03:56:29.213Z",
+  "reviewNote": "Reviewed v39 Sidechat storage construction, close and migration. Source-anchored annotations use their own thread/turn tables. They neither append to the session transcript nor deliver tool results. The existing Execute/result persistence and same-batch pairing mappings still apply. The Sidechat model path exposes no tools and sits outside the bounded tool-wave model.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -411,7 +411,7 @@
     "packages/agent-loop/src/turn/host.ts": "abd0dcc968ee85ed46f16cff9c08f3fb3ed421d7995c76ccdd65f9aabecf2511",
     "packages/agent-loop/src/session/writer-claim.ts": "349510a83419f13914d10d023d64f334abeb6484b4928746262e2fcc61e34876",
     "packages/core/src/stores/session-store.ts": "04d0113c7cc0af605573f1538561b4a403d39ca4c6bd91392a49e322b6d2ecc7",
-    "packages/core/src/storage.ts": "fcf7f62aa8a6318d5053e515cf7379acc38be89b9b2f83ca9d3417fc710e4ebf",
+    "packages/core/src/storage.ts": "3eb186b22bf54b08f374596531d9411227fd47bb109f6d62e8acebff18203456",
     "packages/agent-loop/SKILL.md": "c7a1fa28f1e4a29f2efdb9a34c2e4f4da66b93cf456c433faba3b313deb6063c",
     "packages/core/src/session/step-inbox.ts": "34ed1835c457036cd69afc4326b48c9416104c8bce2d17793388d899e7652f01",
     "packages/agent-loop/src/session/step-inbox.ts": "1d6168438b363a2f52edd2495f647e61fda236d3dc4b8e9e25e14760680f1e94",
@@ -421,7 +421,7 @@
     "packages/core/src/turn/prepare-turn-input.ts": "583a15261fca39b1233eb9a71d18e30fef864604f1ab44212b3c7ea2a7872b79",
     "packages/core/src/session/inbox-overflow.ts": "0b7b76fbe2dbd5c8cbcf80766dd44eefd3237673aa57d594ad200c41e8abfccc",
     "packages/agent-loop/src/session/inbox-overflow.ts": "031b689482934c60d94c79fcbcb199976e02af4a6580bf4be085fcbb1a37595a",
-    "packages/core/src/stores/migrations/index.ts": "649da1e474ca54571d5b51d7b964825df96565db0c5945f4f5414688a2fecaef",
+    "packages/core/src/stores/migrations/index.ts": "f842f7ea700a3904527447b6e4f4d84e4f908cc58aab9be1c73ad2319a9439ee",
     "packages/core/src/sandbox/model-isolation.ts": "4b706b09281996636c2949b0881769fe0c516ca90a1a2bc54acf5ce9f78e7eae",
     "packages/core/src/runtime/spawn-host.ts": "17b8402661b2044641d9c2bc0750e979cd179730643ea3848f649856f90c816e",
     "packages/core/test/model-sandbox-isolation.test.js": "8876a267194eef04bb632daeb08fc454c6c6e6ae894d91303d63c3741dd7c560",

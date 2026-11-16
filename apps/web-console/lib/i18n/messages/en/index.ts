@@ -1,3 +1,5 @@
+import { sidechat } from './sidechat.ts';
+import { sidechatSource } from './sidechatSource.ts';
 import { coaching } from './coaching.ts';
 import { daydream } from './daydream.ts';
 import { botSettings } from './botSettings.ts';
@@ -28,6 +30,8 @@ import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
 export const en = {
+  sidechatSource,
+  sidechat,
   coaching,
   daydream,
   botSettings,

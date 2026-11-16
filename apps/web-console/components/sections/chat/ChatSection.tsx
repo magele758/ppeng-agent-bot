@@ -201,7 +201,7 @@ export function ChatSection({ active }: { active: boolean }) {
   };
 
   const selectSession = useCallback(
-    async (id: string): Promise<PlaySurface> => {
+    async (id: string, scrollToBottom = true): Promise<PlaySurface> => {
       setSelectedSessionId(id);
       const match = visibleBotForSession(botsRef.current, id, sessionsRef.current);
       const surface: PlaySurface = match ? 'bot' : 'chat';
@@ -217,7 +217,7 @@ export function ChatSection({ active }: { active: boolean }) {
         if (sess?.agentId) chat.setAgentId(sess.agentId);
       }
       await chat.refreshPlayPanel();
-      chat.requestScrollPlayToBottom();
+      if (scrollToBottom) chat.requestScrollPlayToBottom();
       return surface;
     },
     [chat, setPlaySurface, setSelectedSessionId]
@@ -301,6 +301,10 @@ export function ChatSection({ active }: { active: boolean }) {
       approvals={approvals}
       selectedSessionId={selectedSessionId}
       onSelectSession={(id) => void selectSession(id)}
+      onSidechatNavigate={async (id) => {
+        const surface = await selectSession(id, false);
+        if (selectedSessionRef.current === id) navigate(surface);
+      }}
       onDeleteSessions={deleteSessions}
       onNewSession={() => {
         chat.applyBotSelection(null);

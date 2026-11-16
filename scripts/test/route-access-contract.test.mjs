@@ -205,6 +205,7 @@ async function seedFixtures(d) {
 /** Owner routes whose resource is named in the body / query instead of the path. */
 function bodyRefCases(f) {
   return {
+    'POST /api/sidechats': {sessionId:f.session, question:'new question'},
     'POST /api/sessions': { workspaceBinding: { kind: 'cloud_folder', cloudFolderId: f['cloud-folder'] }, autoRun: false },
     'POST /api/lab/composer-hint': { sessionId: f.session },
     'POST /api/chat': { sessionId: f.session, message: 'B-INJECT' },
@@ -222,6 +223,9 @@ function bodyRefCases(f) {
 /** Self-filtered writes that need a request shaped around A's data. */
 function selfFilteredWriteCases(f) {
   return {
+    'POST /api/sidechats/:id/messages': {question:'follow-up',requestId:'r1'},
+    'POST /api/sidechats/:id/retry': {requestId:'r1',attemptId:'retry1'},
+    'POST /api/sidechats/:id/stop': {requestId:'r1'},
     'PUT /api/bot-pin-settings': { state: { customized: true, ids: ['B-pin'], roomIds: [] } },
     'PATCH /api/user/preferences': { values: { 'lab.debugDisplay': 'false' } },
     'POST /api/sessions/cancel-all': {},
