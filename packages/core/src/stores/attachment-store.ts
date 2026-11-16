@@ -4,6 +4,14 @@ import type { AttachmentRecord } from '../ingestion/attachment-ingest-service.js
 import type { AttachmentKind } from '../ingestion/types.js';
 import type { AttachmentStatus } from '../ingestion/status.js';
 
+export interface SentAttachment {
+  id: string;
+  name: string;
+  kind: string;
+  uploadedAt: string;
+  imageAssetId?: string;
+}
+
 export class AttachmentStore {
   constructor(private readonly db: DatabaseSync) {}
 
@@ -50,6 +58,21 @@ export class AttachmentStore {
       .prepare(`SELECT * FROM attachments WHERE session_id = ? ORDER BY created_at ASC`)
       .all(sessionId) as Array<Record<string, unknown>>;
     return rows.map((r) => this.map(r));
+  }
+
+  sentReferences(sessionId: string): Array<SentAttachment & { seq: number }> {
+    // Range compaction replaces the folded view. Original user rows remain in the WAL.
+    return this.db.prepare(`
+      SELECT a.id, a.file_name AS name, a.kind, a.created_at AS uploadedAt, a.image_asset_id AS imageAssetId, msg.seq
+      FROM session_messages AS msg, json_each(msg.parts_json) AS part,
+           json_each(part.value, '$.attachmentRefs') AS ref
+      JOIN attachments a ON a.id = json_extract(ref.value, '$.id') AND a.session_id = msg.session_id
+      WHERE msg.session_id = ? AND msg.role = 'user' AND instr(msg.parts_json, '"attachmentRefs":') > 0
+      ORDER BY msg.seq, part.key, ref.key
+    `).all(sessionId).map(row => ({
+      id: String(row.id), name: String(row.name), kind: String(row.kind), uploadedAt: String(row.uploadedAt),
+      imageAssetId: optionalString(row.imageAssetId), seq: Number(row.seq)
+    }));
   }
 
   private map(row: Record<string, unknown>): AttachmentRecord {

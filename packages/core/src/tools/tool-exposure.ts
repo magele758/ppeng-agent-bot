@@ -38,6 +38,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
             "work_evidence",
             "spill_tool_result",
             "retrieve_tool_result",
+            "read_chat_attachment",
             "read_artifact_page",
             "search_artifact_content"
         ]

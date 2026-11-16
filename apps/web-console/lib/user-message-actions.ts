@@ -10,7 +10,7 @@ export function retryMessageBody(message: ChatMessage) {
   return {
     message: userMessageText(message),
     imageAssetIds: message.parts.filter(part => part.type === 'image').map(part => part.assetId),
-    attachmentIds: [],
+    attachmentIds: message.parts.flatMap(part => part.type === 'text' ? (part.attachmentRefs ?? []).map(ref => ref.id) : []),
     replyTo: readStoredReplyTo(message) ?? undefined
   };
 }

@@ -1,3 +1,4 @@
+import { sharedMessageVisible } from './bots/shared-context-isolation.js';
 import {SourceLedger} from './learning/sources.js';
 /**
  * Persistent state for single-node / dev: SQLite + same-process stores.
@@ -685,6 +686,16 @@ export class SqliteStateStore {
 
   getAttachment(id: string): AttachmentRecord | undefined {
     return this.attachments.getAttachment(id);
+  }
+
+  listSentAttachments(sessionId: string) {
+    const result = new Map<string, import('./stores/attachment-store.js').SentAttachment>();
+    for (const ref of this.attachments.sentReferences(sessionId)) {
+      if (result.has(ref.id) || !sharedMessageVisible(this, sessionId, ref)) continue;
+      const { seq: _seq, ...entry } = ref;
+      result.set(entry.id, entry);
+    }
+    return [...result.values()];
   }
 
   listAttachmentsForSession(sessionId: string): AttachmentRecord[] {

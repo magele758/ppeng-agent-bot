@@ -348,6 +348,12 @@ function withRoomRetrievalTouch(store: SqliteStateStore, tool: ToolContract): To
   };
 }
 
+function assertFreshSessionAttachments(input: {attachmentIds?: string[]; imageAssetIds?: string[]}) {
+  if (input.attachmentIds?.length || input.imageAssetIds?.length) {
+    throw new ValidationError('Send uploaded assets to the existing session that owns them');
+  }
+}
+
 export class RawAgentRuntime {
   private readonly log = createLogger('runtime');
   readonly repoRoot: string;
@@ -1161,20 +1167,15 @@ export class RawAgentRuntime {
     background?: boolean;
     metadata?: Record<string, unknown>;
   }): SessionRecord {
+    assertFreshSessionAttachments(input);
     const session = createChatSessionFn(sessionFacadeFrom(this.l5()), {
       ...input,
       message: undefined,
       imageAssetIds: undefined
     });
     const sources = normalizeContextSources(input.contextSources);
-    const extra = this.attachmentIngest.expandForMessage(session.id, input.attachmentIds);
-    const imageAssetIds = [...(input.imageAssetIds ?? []), ...extra.imageAssetIds];
-    const text = [input.message, ...extra.textParts].filter((s) => String(s ?? '').trim()).join('\n\n');
-    if (text || imageAssetIds.length > 0 || sources.length > 0) {
-      return sendUserMessageFn(sessionFacadeFrom(this.l5()), session.id, text || '(attachment)', {
-        imageAssetIds,
-        contextSources: sources
-      });
+    if (input.message?.trim() || sources.length) {
+      return this.sendUserMessage(session.id, input.message ?? '', {...input, contextSources: sources});
     }
     return session;
   }
@@ -1191,23 +1192,16 @@ export class RawAgentRuntime {
     background?: boolean;
     metadata?: Record<string, unknown>;
   }): { task: TaskRecord; session: SessionRecord } {
+    assertFreshSessionAttachments(input);
     const sources = normalizeContextSources(input.contextSources);
-    const hasAtt = Boolean(input.attachmentIds?.length) || sources.length > 0;
+    const hasAtt = sources.length > 0;
     const result = createTaskSessionFn(sessionFacadeFrom(this.l5()), {
       ...input,
       message: hasAtt ? undefined : input.message,
       imageAssetIds: hasAtt ? undefined : input.imageAssetIds
     });
     if (!hasAtt) return result;
-    const extra = this.attachmentIngest.expandForMessage(result.session.id, input.attachmentIds);
-    const imageAssetIds = [...(input.imageAssetIds ?? []), ...extra.imageAssetIds];
-    const text = [input.message, ...extra.textParts].filter((s) => String(s ?? '').trim()).join('\n\n');
-    if (text || imageAssetIds.length > 0 || sources.length > 0) {
-      sendUserMessageFn(sessionFacadeFrom(this.l5()), result.session.id, text || '(attachment)', {
-        imageAssetIds,
-        contextSources: sources
-      });
-    }
+    this.sendUserMessage(result.session.id, input.message ?? '', {...input, contextSources: sources});
     return { task: result.task, session: this.store.getSession(result.session.id) ?? result.session };
   }
 
@@ -1353,12 +1347,14 @@ export class RawAgentRuntime {
     }
   ): SessionRecord {
     const extra = this.attachmentIngest.expandForMessage(sessionId, options?.attachmentIds);
-    const imageAssetIds = [...(options?.imageAssetIds ?? []), ...extra.imageAssetIds];
-    const text = [message, ...extra.textParts].filter((s) => String(s).trim()).join('\n\n');
-    const body = text || (imageAssetIds.length > 0 ? '(attachment)' : message);
+    const imageAssetIds = [...new Set([...(options?.imageAssetIds ?? []), ...extra.imageAssetIds])];
+    for (const id of imageAssetIds) {
+      if (this.store.getImageAsset(id)?.sessionId !== sessionId) throw new ValidationError('Image unavailable in this session');
+    }
     const append = () => {
-      const session = sendUserMessageFn(sessionFacadeFrom(this.l5()), sessionId, body, {
+      const session = sendUserMessageFn(sessionFacadeFrom(this.l5()), sessionId, message, {
         imageAssetIds,
+        attachmentRefs: extra.refs,
         replyTo: options?.replyTo,
         contextSources: options?.contextSources
       });
@@ -1366,6 +1362,12 @@ export class RawAgentRuntime {
       return session;
     };
     return options?.autoRun ? withHumanContinuationAdmission(this.store, sessionId, append) : append();
+  }
+
+  attachmentContext(sessionId: string, ids: string[]): import('@ppeng/api-types').TextPart[] {
+    if (!ids.length) return [];
+    const { refs } = this.attachmentIngest.expandForMessage(sessionId, ids);
+    return [{type: 'text', text: '', attachmentRefs: refs}];
   }
 
   enqueueSteer(sessionId: string, text: string, opts?: EnqueueSteerOptions): SteerAck {

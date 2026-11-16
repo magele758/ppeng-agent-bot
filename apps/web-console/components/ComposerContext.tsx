@@ -43,6 +43,19 @@ export function ignoreComposerDrop(event: DragEvent<HTMLElement>) {
   if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
 }
 
+export function allowComposerFiles(event: DragEvent<HTMLElement>) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = event.dataTransfer.types.includes('Files') ? 'copy' : 'none';
+}
+
+export function droppedComposerFiles(event: DragEvent<HTMLElement>): File[] {
+  event.preventDefault();
+  const items = Array.from(event.dataTransfer.items);
+  if (!items.length) return Array.from(event.dataTransfer.files);
+  return items.filter(item => item.kind === 'file' && !item.webkitGetAsEntry?.()?.isDirectory)
+    .map(item => item.getAsFile()).filter((file): file is File => file !== null);
+}
+
 export function ComposerContextChips({
   items,
   onRemove

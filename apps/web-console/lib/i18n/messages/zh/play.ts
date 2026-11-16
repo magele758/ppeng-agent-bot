@@ -1099,6 +1099,9 @@ export const play = {
     streamDone: '流式完成',
     sessionCreated: '会话已创建',
     taskCreated: '任务会话已创建',
+    uploadingFiles: '正在添加附件…',
+    uploadFailed: '附件添加失败',
+    originalOnly: '已保存原件，暂无法提取正文',
     addedFiles: '已添加 {count} 个附件',
     addedRemote: '已添加远程附件'
   },

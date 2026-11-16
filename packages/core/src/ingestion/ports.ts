@@ -1,12 +1,18 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 import { fetchPinnedPublic, webFetchAllowsPrivate, type PublicFetchDeps } from '../net/public-fetch.js';
 import type { ImageAssetRecord } from '../types.js';
 import type { IngestionSettings } from './settings.js';
 import { DEFAULT_DOWNLOAD_MAX_BYTES, defaultIngestionSettings } from './settings.js';
 
 export const DOWNLOAD_MAX_BYTES = DEFAULT_DOWNLOAD_MAX_BYTES;
+
+export function originalPath(sessionId: string, attachmentId: string, fileName: string) {
+  const ext = extname(fileName).toLowerCase();
+  const suffix = /^\.[a-z0-9]{1,12}$/.test(ext) ? ext : '';
+  return `attachments/${sessionId}/${attachmentId}/original${suffix}`;
+}
 
 export interface DownloadResult {
   ok: boolean;
@@ -18,6 +24,7 @@ export interface DownloadResult {
 
 export interface IngestionPorts {
   sessionId: string;
+  attachmentId?: string;
   settings: IngestionSettings;
   tmpDir: string;
   download(url: string, maxBytes?: number): Promise<DownloadResult>;
@@ -78,6 +85,7 @@ export async function defaultDownload(
 
 export function makeFsPorts(input: {
   sessionId: string;
+  attachmentId?: string;
   stateDir: string;
   settings?: IngestionSettings;
   ingestImage: IngestionPorts['ingestImage'];
@@ -88,6 +96,7 @@ export function makeFsPorts(input: {
   const uploads = join(input.stateDir, 'attachments', input.sessionId);
   return {
     sessionId: input.sessionId,
+    attachmentId: input.attachmentId,
     settings,
     tmpDir: tmp,
     download: (url, maxBytes) => defaultDownload(url, maxBytes ?? settings.maxBytes),

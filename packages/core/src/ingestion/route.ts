@@ -1,7 +1,7 @@
 import { extname } from 'node:path';
 import { extractOoxmlText, ooxmlKindOf } from './ooxml-text.js';
 import { textFileTypeLabel } from './emit.js';
-import type { IngestionPorts } from './ports.js';
+import { originalPath, type IngestionPorts } from './ports.js';
 import type { DecodedAttachment, ResolvedAttachment, StorageRoute } from './types.js';
 
 export interface RouteContext {
@@ -86,8 +86,10 @@ async function decideRoute(d: DecodedAttachment, ctx: RouteContext): Promise<Sto
     case 'workspace': {
       const buf = d.fetched.buffer;
       if (!buf) return { mode: 'workspace-failed', reason: '下载结果缺少文件字节' };
-      const saveName = safeFileName(d.fileName, d.index);
-      const relPath = `attachments/${ctx.ports.sessionId}/${saveName}`.replace(/\\/g, '/');
+      const { sessionId, attachmentId } = ctx.ports;
+      const relPath = attachmentId
+        ? originalPath(sessionId, attachmentId, d.fileName)
+        : `attachments/${sessionId}/${safeFileName(d.fileName, d.index)}`;
       const saved = await ctx.ports.persistWorkspace(relPath, relPath, buf);
       if (saved.ok === false) {
         return { mode: 'workspace-failed', reason: saved.reason };
@@ -104,6 +106,7 @@ async function decideRoute(d: DecodedAttachment, ctx: RouteContext): Promise<Sto
             mode: 'workspace',
             relPath: saved.relPath,
             text: archived.preview,
+            handle: archived.handle,
             truncated: true
           };
         }

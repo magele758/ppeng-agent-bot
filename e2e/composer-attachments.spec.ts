@@ -20,12 +20,12 @@ test.afterAll(async ({ request }) => {
   for (const bot of [alpha, beta]) if (bot?.id) await request.patch(`/api/bots/${bot.id}`, { data: { hidden: true } });
 });
 
-test('三处消息框忽略拖放并保留草稿和发送能力 [AC:composer-drop-retirement-soak-isolation#AC-1]', async ({ page }) => {
+test('三处消息框忽略未支持的拖放并保留草稿和发送能力 [AC:composer-drop-retirement-soak-isolation#AC-1]', async ({ page }) => {
   for (const surface of ['chat', 'bot', 'group'] as const) {
     await openSurface(page, surface);
     const text = `保留草稿 ${surface} ${stamp()}`;
     await composerInput(page, surface).fill(text);
-    for (const kind of ['file', 'folder', 'text', 'url']) {
+    for (const kind of (surface === 'group' ? ['file', 'folder', 'text', 'url'] : ['folder', 'text', 'url'])) {
       const cancelled = await composerInput(page, surface).evaluate((target, kind) => {
         const transfer = new DataTransfer();
         if (kind === 'text' || kind === 'url') transfer.setData(kind === 'url' ? 'text/uri-list' : 'text/plain', 'https://example.com');
@@ -52,6 +52,39 @@ test('三处消息框忽略拖放并保留草稿和发送能力 [AC:composer-dro
 
 for (const surface of ['chat', 'bot'] as const) {
  test.describe(surface, () => {
+  test('混合拖入的文件和图片随消息送达 [AC:chat-file-originals#AC-1]', async ({ page }) => {
+    await openSurface(page, surface);
+    const input = composerInput(page, surface);
+    const question = '核对配置与截图 ' + stamp();
+    await input.fill(question);
+    await input.evaluate(target => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(['const expected = 7321;'], 'config.ts'));
+      const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='), c => c.charCodeAt(0));
+      transfer.items.add(new File([bytes], 'screen.png', { type: 'image/png' }));
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    });
+    await expect(input).toHaveValue(question);
+    await expect(page.locator('#pendingImages')).toContainText('config.ts');
+    await expect(page.locator('#pendingImages')).toContainText('screen.png');
+    await input.evaluate(target => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(['const expected = 9684;'], 'config.ts'));
+      target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    });
+    const versions = page.locator('#pendingImages .pending-img-row .chip').filter({hasText:'config.ts'});
+    await expect(versions).toHaveCount(2);
+    const labels = await versions.allTextContents();
+    expect(new Set(labels).size).toBe(2);
+    const sent = page.waitForResponse(res => isSend(res.url(), res.request().method(), surface));
+    await page.locator('#btnSend').click();
+    const res = await sent;
+    expect(res.ok()).toBe(true);
+    expect(res.request().postDataJSON().attachmentIds).toHaveLength(3);
+    const turn = page.locator('#playMessages .chat-turn--user').filter({ hasText: question });
+    for (const label of labels) await expect(turn).toContainText(label);
+    await expect(turn).toContainText('screen.png');
+  });
   test('加号附件可添加移除并发送，失败不会误报成功 [AC:composer-drop-retirement-soak-isolation#AC-2]', async ({ page, request }) => {
     await openSurface(page, surface);
     await page.getByRole('button', { name: '附件', exact: true }).click();
@@ -75,7 +108,7 @@ for (const surface of ['chat', 'bot'] as const) {
     const imageBody = await imageResponse.json();
     const imageId = imageBody.attachment?.imageAssetId || imageBody.imageAsset?.id;
     expect(imageId).toBeTruthy();
-    await expect(page.locator('#pendingImages .pending-img-row')).toHaveCount(3);
+    await expect(page.locator('#pendingImages .pending-img-row')).toHaveCount(2);
     const remoteAttachment = await request.post(`/api/sessions/${sessionId}/attachments/ingest-base64`, { data: { dataBase64: Buffer.from('URL attachment').toString('base64'), mimeType: 'text/plain', fileName: 'remote.txt' } });
     expect(remoteAttachment.ok()).toBe(true);
     const remoteBody = await remoteAttachment.json();
@@ -83,20 +116,21 @@ for (const surface of ['chat', 'bot'] as const) {
     await page.route('**/attachments/fetch-url', route => route.fulfill({ json: remoteBody }));
     await page.locator('#playImageUrl').fill('https://example.com/remote.txt');
     await page.locator('#composerAttachPanel button').last().click();
-    await expect(page.locator('#pendingImages .pending-img-row')).toHaveCount(4);
+    await expect(page.locator('#pendingImages .pending-img-row')).toHaveCount(3);
     await page.unroute('**/attachments/fetch-url');
     await page.route('**/attachments/fetch-url', route => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: '附件读取失败' }) }));
     await page.locator('#playImageUrl').fill('https://example.com/missing.txt');
     await page.locator('#composerAttachPanel button').last().click();
     await expect(page.locator('#playStatus')).toHaveClass(/err/);
-    await expect(page.locator('#pendingImages .pending-img-row')).toHaveCount(4);
+    await expect(page.locator('#pendingImages .pending-img-row')).toHaveCount(3);
     await composerInput(page, surface).fill(`附件发送 ${stamp()}`);
     const sent = page.waitForResponse(res => isSend(res.url(), res.request().method(), surface));
     await page.locator('#btnSend').click();
     const res = await sent;
     expect(res.ok()).toBe(true);
     expect(res.request().postDataJSON().attachmentIds).toEqual([ids[0], imageBody.attachment.id, remoteBody.attachment.id]);
-    expect(res.request().postDataJSON().imageAssetIds).toEqual([imageId]);
+    const persisted = await request.get(`/api/sessions/${sessionId}`);
+    expect(JSON.stringify((await persisted.json()).messages)).toContain(imageId);
   });
  });
 }

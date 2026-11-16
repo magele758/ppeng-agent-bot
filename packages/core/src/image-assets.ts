@@ -419,10 +419,11 @@ async function pruneColdAssets(
 ): Promise<void> {
   const cutoff = new Date(Date.now() - retentionDays * 86400000).toISOString();
   const assets = store.listImageAssetsForSession(sessionId);
-  for (const a of assets) {
-    if (a.retentionTier !== 'cold') continue;
-    if (a.createdAt >= cutoff) continue;
-    if (a.kind === 'contact_sheet') continue;
+  const expired = assets.filter(a => a.retentionTier === 'cold' && a.createdAt < cutoff && a.kind !== 'contact_sheet');
+  if (!expired.length) return;
+  const held = new Set(store.listSentAttachments(sessionId).map(row => row.imageAssetId));
+  for (const a of expired) {
+    if (held.has(a.id)) continue;
     try {
       const abs = join(stateDir, a.localRelPath);
       await unlink(abs);

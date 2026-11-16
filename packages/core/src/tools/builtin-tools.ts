@@ -1,3 +1,4 @@
+import { chatAttachmentTool } from './chat-attachment-tool.js';
 import { createRoomRouteTool } from '../rooms/route-tool.js';
 import { createHistoryTools } from './history-tools.js';
 import type { HistoryStore } from '../session/history-retrieval.js';
@@ -93,6 +94,7 @@ import {
 } from '../a2ui/index.js';
 
 export interface RuntimeToolServices {
+  chatAttachmentStore?: import('../storage.js').SqliteStateStore;
   currentUserText?(sessionId: string): Promise<string>;
   loadSkill: (
     name: string,
@@ -1942,6 +1944,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     workspaceListTool,
     recordSummaryTool,
     lspRequestTool,
+    ...(services.chatAttachmentStore ? [chatAttachmentTool(services.chatAttachmentStore)] : []),
     ...createArtifactTools()
   ];
 
@@ -1981,7 +1984,7 @@ const BUILTIN_ACCESS: Record<string, NonNullable<ToolContract['access']>> = {
   bg_check: 'read', workspace_list: 'read', lsp_request: 'read', list_machines: 'read', list_email_inboxes: 'read',
   check_email_inbox_availability: 'read', search_email_threads: 'read', read_email_thread: 'read',
   memory_get: 'read', memory_search: 'read', memory_read: 'read', memory_prefetch: 'read',
-  history_search: 'read', history_read: 'read', read_artifact_page: 'read', search_artifact_content: 'read',
+  history_search: 'read', history_read: 'read', read_chat_attachment: 'read', read_artifact_page: 'read', search_artifact_content: 'read',
   write_file: 'edit', edit_file: 'edit', notebook_edit: 'edit', harness_write_spec: 'edit', TodoWrite: 'edit',
   task_create: 'edit', task_update: 'edit', record_summary: 'edit', memory_set: 'edit', memory_delete: 'edit',
   handoff_state: 'edit', submit_plan: 'edit', request_confirmation: 'edit', confirm_plan: 'edit', start_step: 'edit',

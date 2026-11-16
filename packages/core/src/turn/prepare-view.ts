@@ -1,3 +1,4 @@
+import { withAttachmentContent } from '../ingestion/message-attachments.js';
 /**
  * Product view ports around A's prepareRichView / fold budget.
  */
@@ -40,6 +41,7 @@ export {
 
 export interface PrepareViewHost {
   store: {
+    getAttachment?(id: string): import('../ingestion/attachment-ingest-service.js').AttachmentRecord | undefined;
     getImageAsset(id: string): ImageAssetRecord | undefined;
     readHistoryById?(sessionId: string, messageId: string): SessionMessage | undefined;
     getDaemonControl?(key: string): unknown;
@@ -94,7 +96,9 @@ export async function prepareMessagesForModel(
     dynSettings.enabled || messagesMayNeedRetiredAnnotation(messages, session);
   sealSharedExposure(host.store,session.id,messages);
   const scoped=messages.filter(message=>sharedMessageVisible(host.store,session.id,message));
-  return prepareRichView(session, coordinatorViewOf(session, embedReplyQuotes(foregroundNotices(host, session, scoped), id => {
+  const budget = resolveHistoryTokenBudget('RAW_AGENT_EPISODIC_TOKEN_BUDGET', host.turnShapeBySession.get(session.id) ?? {});
+  const attached = withAttachmentContent(scoped, session.id, host.store, budget);
+  return prepareRichView(session, coordinatorViewOf(session, embedReplyQuotes(foregroundNotices(host, session, attached), id => {
     const original = host.store.readHistoryById?.(session.id, id);
     return original && sharedMessageVisible(host.store, session.id, original) ? original : undefined;
   })), {

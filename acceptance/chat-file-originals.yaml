@@ -1,0 +1,21 @@
+id: chat-file-originals
+title: 普通对话与单 Bot 的混合附件和原件追问
+status: implemented
+requirement: |
+  按这个方案开始实现第一期吧，先把普通对话和单 Bot 的文件、图片混合拖入打通，同名文件要能区分版本，重启和上下文压缩后也能追问原件，做完跑一遍端到端验收。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  本期替代 composer-drop-retirement-soak-isolation#AC-1 在普通和单 Bot 对话的文件拖放行为，群聊、目录和文字维持原规则。
+criteria:
+  - id: AC-1
+    given: 普通对话或单 Bot 对话中已有草稿
+    when: 一起拖入文本文件和图片后发送
+    then: 草稿保留，每份文件以名称显示且可移除，所选原件随同一条用户消息进入当前对话
+  - id: AC-2
+    given: 同一对话上传内容不同的同名文件
+    when: 分别引用两个版本
+    then: 两个版本可区分且旧版仍保有原来的内容
+  - id: AC-3
+    given: 已发送的文件与图片所在轮次已被压缩，服务使用原数据重新启动
+    when: 继续追问旧附件内容
+    then: 可重新找到对应文件和图片，读到原始内容，其他会话和未发送的草稿不可作为本会话的已发送附件
