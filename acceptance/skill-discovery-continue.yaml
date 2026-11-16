@@ -1,0 +1,12 @@
+id: skill-discovery-continue
+title: 辅助技能未命中时继续当前任务
+status: implemented
+requirement: |
+  这个辅助技能当时不在本轮候选列表里，加载被拒，系统随即结束了整轮。结果是第一步还没做完，第二步也没开始。
+  这个问题怎么解决
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 已启用严格加载，辅助技能在当前使用范围内
+    when: 尝试直接加载候选或最近搜索结果之外的技能
+    then: 本轮保持可执行，Bot 可以搜索并加载命中的技能继续工作

@@ -3870,6 +3870,12 @@ Secure Form fill-from-Vault
 
 - `packages/core/test/skill-capture.test.js`
 
+### skill-discovery-continue
+
+辅助技能未命中时继续当前任务
+
+- `packages/core/test/skill-load-recovery.test.js`
+
 ### skill-manifest-boundary
 
 技能能力边界
