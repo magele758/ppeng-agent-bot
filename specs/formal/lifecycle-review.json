@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-16T00:44:12.282195+00:00",
-  "reviewNote": "Pattern B isolation stays a separate default-off switch. A host-qualified flywheel implement task can be admitted only when that switch is on. Fingerprints refreshed for collaborator wiring. Production entry stays closed. Knife-3 and knife-4 switches do not imply Pattern B. #516 is not relaxed. This refresh is not a new formal pass. Reviewed skill discovery recovery: a load outside the candidate list returns its failed tool result to the current writer for search. Explicit permission denials still abort. Tool-result pairing, writer ownership and restart persistence are unchanged.",
+  "reviewedAt": "2026-11-16T03:56:29.215Z",
+  "reviewNote": "Reviewed v39 Sidechat initialization and SQLite teardown. Annotation state transitions operate on sidechat_turns and leave the session status, loop, approval and transcript transition sites intact. The existing lifecycle scenarios cover ordinary session operations. Independent Sidechat tests cover annotation completion, stopping and retry.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -448,7 +448,7 @@
     "packages/core/test/subagent-delegation-policy.test.js": "60b176e40ebb2365e00a334e4d9c0a42a790b22de9817105f237dfb3e58361ea",
     "packages/core/src/teams/fd-lock.ts": "d57a0749119f69108c5da9d47f93b4c6ad937c00b1e4115cc923a7c4957e3735",
     "packages/agent-loop/src/turn/host.ts": "abd0dcc968ee85ed46f16cff9c08f3fb3ed421d7995c76ccdd65f9aabecf2511",
-    "packages/core/src/storage.ts": "fcf7f62aa8a6318d5053e515cf7379acc38be89b9b2f83ca9d3417fc710e4ebf",
+    "packages/core/src/storage.ts": "3eb186b22bf54b08f374596531d9411227fd47bb109f6d62e8acebff18203456",
     "packages/core/src/stores/session-store.ts": "04d0113c7cc0af605573f1538561b4a403d39ca4c6bd91392a49e322b6d2ecc7",
     "packages/agent-loop/src/session/writer-claim.ts": "349510a83419f13914d10d023d64f334abeb6484b4928746262e2fcc61e34876",
     "packages/core/src/turn/kernel.ts": "a2b760d572886f7bb46b9fd2b3e3d39364ae9bad9d8200fe8ba77f8d313841e2",
@@ -462,7 +462,7 @@
     "packages/core/src/turn/prepare-turn-input.ts": "583a15261fca39b1233eb9a71d18e30fef864604f1ab44212b3c7ea2a7872b79",
     "packages/core/src/session/inbox-overflow.ts": "0b7b76fbe2dbd5c8cbcf80766dd44eefd3237673aa57d594ad200c41e8abfccc",
     "packages/agent-loop/src/session/inbox-overflow.ts": "031b689482934c60d94c79fcbcb199976e02af4a6580bf4be085fcbb1a37595a",
-    "packages/core/src/stores/migrations/index.ts": "649da1e474ca54571d5b51d7b964825df96565db0c5945f4f5414688a2fecaef",
+    "packages/core/src/stores/migrations/index.ts": "f842f7ea700a3904527447b6e4f4d84e4f908cc58aab9be1c73ad2319a9439ee",
     "packages/core/src/approval/unattended-approval.ts": "74aff0a40282eaffa6a84610d4c0e2550f94eee268c99ea72f80b1b44879ebfd",
     "packages/core/test/unattended-approval-writer-scope.test.js": "23c17f903361bc53bbb0b7733eb4bf9147b4977c4dc546f800862cf2856b9371",
     "packages/core/src/bots/bot-work.ts": "f68e28fc8eb187c04392953ce644d47dd85c39ed0a04d0f9f4bc61979fbfd2b5",

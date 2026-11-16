@@ -212,6 +212,14 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/bot-work/settings', AUTHENTICATED],
     ['POST /api/bot-work/settings', ADMIN],
 
+    // Sidechats are personal; each read/write also checks current source-session access.
+    ['GET /api/sidechats', selfFiltered('sidechat')],
+    ['POST /api/sidechats', owner('session', sessionBodyRef('sessionId'))],
+    ['GET /api/sidechats/:id', selfFiltered('sidechat')],
+    ['POST /api/sidechats/:id/messages', selfFiltered('sidechat')],
+    ['POST /api/sidechats/:id/retry', selfFiltered('sidechat')],
+    ['POST /api/sidechats/:id/stop', selfFiltered('sidechat')],
+
     // sessions
     ['GET /api/sessions', selfFiltered('session')],
     ['GET /api/search/messages', selfFiltered('session')],

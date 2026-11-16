@@ -3838,6 +3838,19 @@ Secure Form fill-from-Vault
 
 - `e2e/sidebar-unified-menu.spec.ts`
 
+### sidechat
+
+对话和 Bot 的原文批注与跨会话侧聊
+
+- `apps/daemon/test/sidechat-http.test.ts`
+- `apps/web-console/lib/sidechat-anchor.test.ts`
+- `apps/web-console/lib/sidechat-editor.test.ts`
+- `e2e/sidechat-controls.spec.ts`
+- `e2e/sidechat-marks.spec.ts`
+- `e2e/sidechat-reading.spec.ts`
+- `e2e/sidechat.spec.ts`
+- `packages/core/test/sidechat-store.test.js`
+
 ### single-host-bot-completion
 
 单机 Bot 工作收尾与默认入口

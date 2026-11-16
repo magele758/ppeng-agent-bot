@@ -1,4 +1,5 @@
 'use client';
+import { SidechatWholeReply } from './sidechat/SourceContext';
 import { useAssistantName } from './AssistantNameContext';
 import { UserMessageActions } from './UserMessageActions';
 import {CorrectionCapture} from './LearningWorkbench';
@@ -965,9 +966,19 @@ function quoteTarget(p: TurnActionsProps) {
   return { reply, onQuote: p.onQuote };
 }
 
+function sidechatSourceId(role: string, message: ChatMessage) {
+  return role === 'assistant' ? replyMessageId(message) : undefined;
+}
+
+function useCompletedSourceId(role: string, message: ChatMessage, index: number) {
+  const hold = useContext(ReplyActionHoldContext);
+  return assistantActionsHeld(role, hold, index) ? undefined : sidechatSourceId(role, message);
+}
+
 function TurnActions(p: TurnActionsProps) {
   const target = correctionTarget(p);
   return <>
+    <SidechatWholeReply messageId={sidechatSourceId(p.role, p.m)} text={replySourceText(p.m.parts)} />
     <TurnActionButtons correction={target} quote={quoteTarget(p)} />
     {target && replySourceText(p.parts).trim() ? <SaveToObsidian key={target.sessionId+target.messageId}
       id={target.sessionId} messageIds={p.messageIds ?? [target.messageId]} /> : null}
@@ -1003,6 +1014,7 @@ export function ChatTurnFromMessage({
   const assistantName = useAssistantName();
   const shown = brief ? { ...m, parts: visibleBriefParts(m.parts) } : m;
   const r = normalizedRole(m);
+  const sidechatId = useCompletedSourceId(r, m, msgIndex);
   const storedReply = r === 'user' ? readStoredReplyTo(m) : null;
   /** 与流式行一致：助手侧（含「调用工具」等结构化气泡）统一不占左侧头像列 */
   const noAvatar = r === 'tool' || r === 'system' || r === 'assistant';
@@ -1050,7 +1062,7 @@ export function ChatTurnFromMessage({
     <ReplyActions index={msgIndex} m={m} role={r} sessionId={sessionId} quoteBot={quoteBot} onQuote={onQuote} parts={shown.parts} />
   );
   return (
-    <div className={`chat-turn ${buildModClass(r)}${continuedClass(hideRoleLabel)}${noAvatar ? ' chat-turn--no-avatar' : ''}`}>
+    <div data-sidechat-message={sidechatId} className={`chat-turn ${buildModClass(r)}${continuedClass(hideRoleLabel)}${noAvatar ? ' chat-turn--no-avatar' : ''}`}>
       {!noAvatar ? <div className="chat-avatar">{avatarText(r, t('play.me'))}</div> : null}
       <div className="chat-turn__content">
         <UserMessageActions message={m} sessionId={sessionId} modelView={modelView} />

@@ -1,0 +1,315 @@
+.sc-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  font-size: var(--ui-text-md);
+  text-align: start;
+}
+.sc-panel button,
+.sc-panel input,
+.sc-panel select,
+.sc-panel textarea {
+  font: inherit;
+  color: inherit;
+}
+.sc-panel button {
+  cursor: pointer;
+}
+.sc-panel button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.sc-panel :is(button, input, select, textarea, summary):focus-visible {
+  outline: var(--ui-focus);
+  outline-offset: -2px;
+}
+.sc-panel .sc-heading,
+.sc-library-bar,
+.sc-compose-actions,
+.sc-generation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sc-panel > header,
+.sc-library,
+.sc-search,
+.sc-compose,
+.sc-thread-detail {
+  padding: var(--ui-space-3);
+}
+.sc-panel > header,
+.sc-library {
+  border-bottom: 1px solid var(--ui-border);
+}
+.sc-panel :is(h2, h3, p, blockquote) {
+  margin: 0;
+}
+.sc-panel h2 {
+  font-size: var(--ui-text-xl);
+}
+.sc-panel h3 {
+  font-size: var(--ui-text-lg);
+}
+.sc-button,
+.sc-panel .sc-search button,
+.sc-generation button,
+.sc-error button {
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--ui-accent);
+  padding: 4px 6px;
+}
+.sc-panel button:hover:not(:disabled) {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+}
+.sc-tabs {
+  display: flex;
+  gap: 2px;
+}
+.sc-tabs > button:first-child {
+  color: var(--ui-text);
+  font-weight: 600;
+  background: var(--ui-surface);
+}
+.sc-library {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.sc-thread-list {
+  max-height: 150px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.sc-thread-list > button,
+.sc-panel .sc-hit > button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+  text-align: start;
+  padding: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--ui-radius-md);
+}
+.sc-thread-list > button[aria-pressed='true'] {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+}
+.sc-index {
+  flex: none;
+  padding: 1px 5px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  font-variant-numeric: tabular-nums;
+}
+.sc-thread-copy {
+  min-width: 0;
+  flex: 1;
+}
+.sc-thread-copy > * {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-thread-list time,
+.sc-panel small,
+.sc-note {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+.sc-panel .sc-note,
+.sc-panel .sc-error {
+  padding: 8px;
+  line-height: 1.5;
+}
+.sc-error {
+  color: var(--ui-danger);
+}
+.sc-source {
+  padding: 10px;
+  border-inline-start: 3px solid var(--ui-accent);
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius-sm);
+}
+.sc-panel blockquote {
+  max-height: 8lh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 5px 0;
+  line-height: 1.5;
+}
+.sc-thread-detail,
+.sc-preview-scroll,
+.sc-results {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.sc-thread-detail {
+  display: block;
+}
+.sc-messages article {
+  margin-block: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.sc-messages article[data-role='user'] {
+  max-width: 90%;
+  margin-inline-start: auto;
+  padding: 7px 10px;
+  background: var(--ui-surface);
+  border-radius: var(--ui-radius-md);
+}
+.sc-messages article[data-role='user'] p {
+  white-space: pre-wrap;
+}
+.sc-messages article[data-hit='true'] {
+  border-inline-start: 3px solid var(--ui-accent);
+  padding-inline-start: 8px;
+}
+.sc-compose {
+  border-top: 1px solid var(--ui-border);
+  margin-top: auto;
+}
+.sc-compose form {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  padding: 6px;
+  background: var(--ui-bg);
+}
+.sc-compose textarea,
+.sc-search input,
+.sc-search select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+}
+.sc-compose textarea {
+  border: 0;
+  resize: vertical;
+  max-height: 20vh;
+}
+.sc-compose-actions button {
+  border: 1px solid var(--ui-accent);
+  background: var(--ui-accent);
+  color: var(--ui-accent-contrast);
+  padding: 4px 10px;
+  border-radius: var(--ui-radius-sm);
+}
+.sc-compose-actions button:hover:not(:disabled) {
+  color: var(--ui-text);
+}
+.sc-generation {
+  padding-bottom: 5px;
+}
+.sc-search {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+.sc-filters {
+  flex: none;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+.sc-filters summary,
+.sc-hit summary {
+  cursor: pointer;
+}
+.sc-filters label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block: 4px;
+}
+.sc-filters :is(input, select) {
+  width: 70%;
+}
+.sc-hit {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  margin: 0 0 6px;
+  overflow: hidden;
+}
+.sc-panel .sc-hit > button {
+  display: grid;
+  gap: 3px;
+  color: var(--ui-text);
+}
+.sc-hit span,
+.sc-hit small,
+.sc-hit strong {
+  overflow-wrap: anywhere;
+}
+.sc-hit em {
+  font-size: var(--ui-text-xs);
+  color: var(--ui-accent);
+  font-style: normal;
+}
+.sc-hit details {
+  font-size: var(--ui-text-xs);
+  padding: 0 8px 6px;
+}
+.sc-hit details button {
+  display: block;
+  text-align: start;
+}
+@media (max-width: 760px) {
+  .sc-panel {
+    height: 100%;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .sc-panel[data-list='false'] .sc-thread-list,
+  .sc-panel[data-list='true'] .sc-select {
+    display: none;
+  }
+  .sc-panel[data-list='true'] .sc-thread-list {
+    max-height: none;
+  }
+  .sc-panel[data-list='true'] .sc-library {
+    flex: 1;
+  }
+  .sc-panel button {
+    min-height: 36px;
+  }
+}
+
+.sc-pinned-source {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 34%;
+  overflow: auto;
+  padding: var(--ui-space-2) var(--ui-space-3) 0;
+}
+.sc-thread-detail {
+  flex: 1 1 80px;
+}
+.sc-library {
+  max-height: 38%;
+}
+.sc-panel[data-list='true'] .sc-library {
+  max-height: none;
+}

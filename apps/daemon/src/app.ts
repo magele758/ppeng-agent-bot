@@ -85,6 +85,7 @@ import { workspaceRoutes } from './routes/workspace.js';
 import { requireLabLogin, resolveRequestAuth } from './user-auth.js';
 import { isExternalAgentTaskPath } from './external-agent-settings.js';
 import { externalAgentRoutes } from './routes/external-agents.js';
+import { sidechatRoutes } from './routes/sidechat.js';
 import { registeredMachinesRoutes } from './routes/registered-machines.js';
 
 export interface DaemonAppDeps {
@@ -111,6 +112,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(authRoutes({ runtime, authStore: deps.authStore, env }))
     .addAll(miscRoutes(runtime, { pkgName: deps.pkgName, pkgVersion: deps.pkgVersion }))
     .addAll(sessionsRoutes(runtime))
+    .addAll(sidechatRoutes(runtime,env))
     .addAll(composerHintRoutes(runtime))
     .addAll(botsRoutes(runtime))
     .addAll(botCoachingRoutes(runtime))

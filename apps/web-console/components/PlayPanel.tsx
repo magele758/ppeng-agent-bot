@@ -31,6 +31,8 @@ import { readPlaySidebarCollapsed, writePlaySidebarCollapsed } from '@/lib/play-
 import { readPlayRailOpen, writePlayRailOpen } from '@/lib/play-rail-open';
 import type { usePlayChat } from './usePlayChat';
 import { ActivityPanel } from './ActivityPanel';
+import { SidechatWorkspace, SidechatDock } from './sidechat/SidechatWorkspace';
+import { SidechatEntry, SidechatReturn } from './sidechat/SourceContext';
 import { ArtifactRail } from './ArtifactRail';
 import { BotCronPanel } from './BotCronPanel';
 import { composerModelLocked } from '@/lib/bot-model';
@@ -111,6 +113,7 @@ export interface PlayPanelProps {
   approvals: ApprovalItem[];
   selectedSessionId: string | null;
   onSelectSession: (id: string) => void;
+  onSidechatNavigate: (id: string) => Promise<void>;
   onDeleteSessions?: (ids: string[]) => Promise<void>;
   onNewSession: () => void;
   onRunSession: () => void;
@@ -335,6 +338,7 @@ export function PlayPanel({
   approvals,
   selectedSessionId,
   onSelectSession,
+  onSidechatNavigate,
   onDeleteSessions,
   onNewSession,
   onCancelSession,
@@ -1278,6 +1282,8 @@ export function PlayPanel({
                   <h2 className="chat-panel-title" id="playTitle">
                     {headerBotId ? <BotDetailToggle botId={headerBotId} name={headerTitle} open={botDetailOpen} onToggle={() => setBotDetailOpen(open => !open)} /> : headerTitle}
                   </h2>
+                  <SidechatEntry />
+                  <SidechatReturn />
                   <button
                     type="button"
                     className="chat-panel-header__mobile-toggle"
@@ -1814,6 +1820,7 @@ export function PlayPanel({
   const renderPlayRail = () => (
         <aside className="play-rail" hidden={railCollapsed}>
           <div className="play-rail__tabs" role="tablist" aria-label={t('play.rail.aria')}>
+            <SidechatEntry tab />
             <button
               type="button"
               role="tab"
@@ -1887,14 +1894,26 @@ export function PlayPanel({
   );
 
   return (
-    <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
-      {renderCreateDialog()}
-      {renderMobileBar()}
-      <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}${sidebarCollapsed && !mobileSessionsOpen ? ' is-sidebar-collapsed' : ''}${mobileSessionsOpen ? ' mobile-sessions-open' : ''}`}>
-        {renderPlaySidebar()}
-        {renderPlayMain()}
-        {renderPlayRail()}
-      </div>
-    </section>
+    <SidechatWorkspace
+      sessionId={selectedSessionId}
+      enabled={sidechatAvailable(active, openGroupId, chat.showModelView)}
+      chat={chat}
+      onNavigate={onSidechatNavigate}
+    >
+      <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
+        {renderCreateDialog()}
+        {renderMobileBar()}
+        <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}${sidebarCollapsed && !mobileSessionsOpen ? ' is-sidebar-collapsed' : ''}${mobileSessionsOpen ? ' mobile-sessions-open' : ''}`}>
+          {renderPlaySidebar()}
+          {renderPlayMain()}
+          {renderPlayRail()}
+          <SidechatDock />
+        </div>
+      </section>
+    </SidechatWorkspace>
   );
+}
+
+function sidechatAvailable(active: boolean, room: string | null, modelView: boolean) {
+  return active && !room && !modelView;
 }
