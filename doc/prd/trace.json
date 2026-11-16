@@ -4198,6 +4198,13 @@
       ]
     },
     {
+      "id": "secure-form-short-digit-leak",
+      "title": "短数字验证码不因编号或时间被误判为泄露",
+      "tests": [
+        "packages/core/test/secure-form-short-digit-leak.test.js"
+      ]
+    },
+    {
       "id": "secure-form-vault",
       "title": "Secure Form fill-from-Vault",
       "tests": [

@@ -967,29 +967,6 @@ at RawAgentRuntime.runScheduler
 
 升级到新版本后，旧版本留下的数据库能自动升级并继续使用，会话、记忆等数据一条不丢。
 
-## secure-form
-对话里的单字段安全表单
-
-用户在对话里填写一次性验证码、密码、卡号或 CVV，而不是走浏览器 vault_fill。
-模型只收到填写状态和一条不透明的 uvref。明文只进 UserVault，不进模型上下文，也不进对话文本。
-这条路径与 vault_fill（浏览器会话填表）和 SecretVault（连接器环境变量）分开。
-
-## secure-form-multi
-对话里的多字段安全表单
-
-用户在对话里一次性填写多个验证字段（如卡号和 CVV），而不是分别填写。
-模型只收到多个字段的填写状态和对应的不透明 uvref。明文只进 UserVault，不进模型上下文，也不进对话文本。
-保持单字段向后兼容；多字段和单字段共用同一接口。
-
-## secure-form-vault
-Secure Form fill-from-Vault
-
-Lab Secure Form card can pick a saved UserVault login or card entry and map fields
-by match (username/password/otp, cardNumber/cvv). Daemon POST /secure-form accepts
-vaultEntryId (and entryId alias) while keeping legacy value/values. Port resolves
-uvref: server-side; receipts stay fillRefs; plaintext never enters the model or
-transcript. Separate track from browser vault_fill.
-
 ## settings-categories
 设置页「行为 / 安全 / 工具 / 集成」分类易用化
 

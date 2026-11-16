@@ -450,11 +450,34 @@ export function createSecureFormPort(options: SecureFormPortOptions): SecureForm
   };
 }
 
-/** True when model-facing text would leak a just-stored secret. */
+/** CVV, PIN, and a typical one-time code. Longer digit runs stay on substring match. */
+const SHORT_DIGIT_SECRET_MAX_LENGTH = 6;
+
+function isShortDigitSecret(value: string): boolean {
+  if (value.length < 3 || value.length > SHORT_DIGIT_SECRET_MAX_LENGTH) return false;
+  return /^\d+$/.test(value);
+}
+
+/**
+ * A short digit code counts only as its own value: a JSON string, a JSON
+ * number, or a standalone token. Digits inside a hex id or `.918Z` do not.
+ */
+function shortDigitAppearsAsValue(body: string, secret: string): boolean {
+  if (body.includes(JSON.stringify(secret))) return true;
+  return new RegExp(`(?<![0-9A-Za-z])${secret}(?![0-9A-Za-z])`).test(body);
+}
+
+/**
+ * True when model-facing text would leak a just-stored secret.
+ * Short digit codes are not a leak just because an id or timestamp contains them.
+ * Card numbers and longer passwords still match anywhere in the text.
+ */
 export function secureFormTextLeaks(text: string, secret: string): boolean {
   const body = String(text ?? '');
   const value = String(secret ?? '');
-  return value.length >= 3 && body.includes(value);
+  if (value.length < 3) return false;
+  if (isShortDigitSecret(value)) return shortDigitAppearsAsValue(body, value);
+  return body.includes(value);
 }
 
 interface SecureFormToolResultPart {
