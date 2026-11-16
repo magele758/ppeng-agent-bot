@@ -247,7 +247,7 @@ function finishToolResult(
   if (
     name === 'load_skill' &&
     result.ok === false &&
-    /allowedSkills|not enabled for this|not in the current turn's shortlist|not in the latest search_skills|Suggested:/.test(content)
+    content.endsWith("is not enabled for this turn's allowedSkills. Stop. Do not load another name.")
   ) {
     endTurn(deps, context, context.session.id);
     return { ...result, ok: false, content: 'Stopped. This load_skill name is outside this turn. Do not load another name.' };

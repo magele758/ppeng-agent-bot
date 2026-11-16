@@ -4397,6 +4397,13 @@
       ]
     },
     {
+      "id": "skill-discovery-continue",
+      "title": "辅助技能未命中时继续当前任务",
+      "tests": [
+        "packages/core/test/skill-load-recovery.test.js"
+      ]
+    },
+    {
       "id": "skill-manifest-boundary",
       "title": "技能能力边界",
       "tests": [

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-15T04:46:24.000Z",
-  "reviewNote": "Pattern B isolation stays a separate default-off switch. A host-qualified flywheel implement task can be admitted only when that switch is on. Fingerprints refreshed for collaborator wiring. Production entry stays closed. Knife-3 and knife-4 switches do not imply Pattern B. #516 is not relaxed. This refresh is not a new formal pass.",
+  "reviewedAt": "2026-11-16T00:44:12.282195+00:00",
+  "reviewNote": "Pattern B isolation stays a separate default-off switch. A host-qualified flywheel implement task can be admitted only when that switch is on. Fingerprints refreshed for collaborator wiring. Production entry stays closed. Knife-3 and knife-4 switches do not imply Pattern B. #516 is not relaxed. This refresh is not a new formal pass. Reviewed skill discovery recovery: a load outside the candidate list returns its failed tool result to the current writer for search. Explicit permission denials still abort. Tool-result pairing, writer ownership and restart persistence are unchanged.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -422,7 +422,7 @@
     "packages/agent-loop/src/runtime/tool-loop.ts": "8d0c44c45bfa056f8968ac78d7eb94e2bdb7f188556f3e0dddcaf799bf7a03d3",
     "packages/agent-loop/src/session/interrupt.ts": "1842240883d68a0ca20da065c9d2ba238a24a782bca5f9148f0da51026236f96",
     "packages/agent-loop/src/session/run-outcome.ts": "1386c49b291410f0d888ee0b02afa8c145ec11396268b334f5813ac3ffe849ea",
-    "packages/core/src/runtime/tool-loop.ts": "f73bc598ee3c131fbad645d0edfb29b0ca62844ec2ad6d2dcf5f1a5bf5469f4a",
+    "packages/core/src/runtime/tool-loop.ts": "71e395e3d15da184d1b6d20bd249be1c2e147087f47e3a1d7a96abdd991ce7d1",
     "packages/agent-loop/src/assembly/create-assembled-loop.ts": "acae47516f5b679639849351381b4d7a746ddcd07e1a1a2e3ddf52373b87eaf9",
     "packages/agent-loop/src/assembly/mini-host.ts": "89a775fbae6850911bc93d2b3e9ecf1ec508fc111227210e9fd531b8516c394f",
     "packages/agent-loop/src/assembly/normal-host.ts": "da1277222a77d1817b2c92bf926b2525d9fb54d015f28dd49f998bccd97942bb",

@@ -99,3 +99,34 @@ test('shared exact IDs retain session discovery boundaries [AC:shared-skill-exac
   assert.match((await resolveSkillLoad(host, 'diagnostics', 's1')).content ?? '', /shared diagnostics/);
   assert.match((await resolveSkillLoad(host, 'diagnostics', 's2')).error ?? '', /search_skills/);
 });
+
+test('候选未命中后同一轮能搜索并加载 [AC:skill-discovery-continue#AC-1]', async () => {
+  const { createBuiltinTools } = await import('../dist/tools/builtin-tools.js');
+  const { toolsForTurn } = await import('../dist/runtime/tool-loop.js');
+  for (const mode of ['shortlist', 'lazy']) {
+    const { host, shared, store } = fixture(mode);
+    const session = store.getSession('discovery');
+    const controller = new AbortController();
+    const context = { session, abortSignal: controller.signal };
+    const tools = createBuiltinTools({
+      stateStore: store,
+      loadSkill: (...args) => resolveSkillLoad(host, ...args),
+      searchSkills: (...args) => resolveSkillSearch(host, ...args)
+    });
+    const wrapped = toolsForTurn({ tools, abortTurn: () => controller.abort() });
+    const load = wrapped.find(tool => tool.name === 'load_skill');
+    const search = wrapped.find(tool => tool.name === 'search_skills');
+    if (mode === 'lazy') await search.execute(context, { query: 'zebra unique local verification', limit: 1 });
+    const missed = await load.execute(context, { name: shared.id });
+    assert.equal(missed.ok, false);
+    assert.equal(controller.signal.aborted, false);
+    assert.match(missed.content, /search_skills/);
+    const hits = await search.execute(context, { query: shared.description, limit: 20 });
+    const hit = JSON.parse(hits.content).hits.find(item => item.id === shared.id);
+    assert.ok(hit);
+    const loaded = await load.execute(context, { name: hit.id });
+    assert.equal(loaded.ok, true);
+    assert.match(loaded.content, /Otter shared procedure/);
+    assert.equal(controller.signal.aborted, false);
+  }
+});

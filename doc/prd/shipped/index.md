@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 456 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 457 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -1031,13 +1031,14 @@
 
 - `single-host-bot-completion` 单机 Bot 工作收尾与默认入口
 
-## skill（10）
+## skill（11）
 
 需求正文见 [skill](skill.md)。
 
 - `skill-capture-dismissal` 技能沉淀完成提示可收起和关闭
 - `skill-capture-intent-confirmation` 模型判断技能沉淀并在提炼前请求确认
 - `skill-capture-save` 技能沉淀确认后能把正文存下来
+- `skill-discovery-continue` 辅助技能未命中时继续当前任务
 - `skill-load-recovery` 自建技能与搜索结果可加载
 - `skill-load-visible` 对话流直接显示加载的技能名称
 - `skill-manifest-boundary` 技能能力边界

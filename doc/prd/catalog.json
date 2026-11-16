@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 456,
+    "implemented": 457,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2876,6 +2876,13 @@
       "requirement": "我看现在skill沉淀的功能有问题，特别是最后存储的部分，已经失败好几次了，排查修复一下",
       "verificationStage": "software",
       "file": "acceptance/skill-capture-save.yaml"
+    },
+    {
+      "id": "skill-discovery-continue",
+      "title": "辅助技能未命中时继续当前任务",
+      "requirement": "这个辅助技能当时不在本轮候选列表里，加载被拒，系统随即结束了整轮。结果是第一步还没做完，第二步也没开始。\n这个问题怎么解决",
+      "verificationStage": "software",
+      "file": "acceptance/skill-discovery-continue.yaml"
     },
     {
       "id": "skill-load-recovery",
