@@ -3695,6 +3695,12 @@ Agent Home 故障排查技能
 - `apps/web-console/lib/secure-form-card.test.ts`
 - `packages/core/test/secure-form-multi.test.js`
 
+### secure-form-short-digit-leak
+
+短数字验证码不因编号或时间被误判为泄露
+
+- `packages/core/test/secure-form-short-digit-leak.test.js`
+
 ### secure-form-vault
 
 Secure Form fill-from-Vault

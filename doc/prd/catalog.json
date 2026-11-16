@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 458,
+    "implemented": 459,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2687,6 +2687,13 @@
       "requirement": "用户在对话里一次性填写多个验证字段（如卡号和 CVV），而不是分别填写。\n模型只收到多个字段的填写状态和对应的不透明 uvref。明文只进 UserVault，不进模型上下文，也不进对话文本。\n保持单字段向后兼容；多字段和单字段共用同一接口。",
       "verificationStage": "software",
       "file": "acceptance/secure-form-multi.yaml"
+    },
+    {
+      "id": "secure-form-short-digit-leak",
+      "title": "短数字验证码不因编号或时间被误判为泄露",
+      "requirement": "修复安全表单回执检查把短数字秘密误判成泄露的问题。\n短数字秘密不能因为嵌在 id 或时间戳里就判泄露；真正作为独立值出现仍要拒绝。\n卡号 4111111111111111 和更长密码仍必须被拒绝。\n不要把该测试加进已知抖动名单，不要放宽验收标准，不要删测试。",
+      "verificationStage": "software",
+      "file": "acceptance/secure-form-short-digit-leak.yaml"
     },
     {
       "id": "secure-form-vault",
