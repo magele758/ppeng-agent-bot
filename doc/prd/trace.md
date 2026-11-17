@@ -2544,6 +2544,14 @@ Lab connector authorization states and SecretVault grant
 - `e2e/font-size-preference.spec.ts`
 - `e2e/mac-retina-text-readability.spec.ts`
 
+### console-home-shell
+
+控制台视觉与外壳
+
+- `apps/web-console/components/shell/Rail.settings-icon.test.ts`
+- `apps/web-console/lib/theme.home.test.ts`
+- `apps/web-console/styles/home-tokens.test.ts`
+
 ### console-knowledge
 
 知识与记忆：分层记忆、搜索与摄取设置

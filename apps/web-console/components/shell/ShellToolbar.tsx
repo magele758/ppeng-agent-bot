@@ -13,7 +13,7 @@ export function ShellToolbar() {
     <div className="lab-toolbar" id="serverMeta">
       {serverMeta ? (
         <>
-          <span>
+          <span className="lab-toolbar__meta">
             {serverMeta.name} v{serverMeta.version}
           </span>
           {serverMeta.adapter ? <span>{serverMeta.adapter}</span> : null}

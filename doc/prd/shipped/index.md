@@ -342,6 +342,7 @@
 需求正文见 [console](console.md)。
 
 - `console-font-size-preference` 控制台字体大小偏好
+- `console-home-shell` 控制台视觉与外壳
 - `console-knowledge` 知识与记忆：分层记忆、搜索与摄取设置
 - `console-navigation` 控制台主导航与页面结构
 - `console-sections-redesign` 控制台其余页面视觉与本会话始终允许

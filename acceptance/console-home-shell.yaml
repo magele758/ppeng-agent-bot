@@ -1,0 +1,31 @@
+id: console-home-shell
+title: 控制台视觉与外壳
+status: implemented
+requirement: |
+  Implement the approved console redesign, batch 1 only: visual tokens and the app shell.
+  User approved: keep today's top-level nav (Bot and 会话 are separate; do not merge or regroup), sage green accent, light and dark together.
+  Scope: styles/tokens, theme (light+dark, persisted the way the console already persists preferences — no new env vars), app shell chrome (sidebar, top bar), and the nav labels. Do not restyle section interiors.
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  用户已在对话中批准界面设计第 2 版：鼠尾草绿强调色，浅色与深色一起做，一级导航保持现状（Bot 与会话分开，不合并、不重组）。本批只做视觉 token 与应用外壳。
+criteria:
+  - id: AC-1
+    given: 控制台使用默认外观
+    when: 在浅色和深色之间切换
+    then: "页面底、侧栏面板、主文字和唯一强调色分别用第 2 版的浅色或深色；浅色强调色是 #3D6A4D，深色强调色是 #82BD95。成功、待处理、危险、信息各自有颜色，不和强调色混用"
+  - id: AC-2
+    given: 用户在默认外观下选了浅色或深色
+    when: 重新打开控制台
+    then: 仍是上次的深浅色。选择跟其他界面偏好一样记在这台浏览器里，不需要新的环境变量
+  - id: AC-3
+    given: 用户看着左侧主导航
+    when: 查看一级入口
+    then: 仍然是彼此分开的六项，顺序为 Bot、对话、Bots 与 Agents、任务、知识与记忆、设置。Bot 和对话没有合成一项，运维不在这一列。中文和 English 各用自己的名称
+  - id: AC-4
+    given: 默认外观的浅色或深色
+    when: 看左侧导航和非对话页的顶栏
+    then: 侧栏和顶栏是实色面板，靠 1px 分隔线区分层级，没有投影和渐变。当前项的图标用强调色。任务上的待处理数字用待处理色，不用强调色
+  - id: AC-5
+    given: 默认外观
+    when: 看侧栏顶部和左下角
+    then: 顶部是强调色底上的 A 和 Agent Home。左下角写着「模型与外观」（English 为 Model and appearance），展开后仍能配置模型、切换语言和深浅色。键盘焦点落在导航项上时，焦点环是强调色
