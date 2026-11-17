@@ -197,7 +197,12 @@ test('only explicit HTTP approval grants approval [AC:ci-audit-p1-p2#AC-4]', asy
       getSession: () => undefined
     };
     const route = miscRoutes(runtime, { pkgName: 'test', pkgVersion: '0' }).find(r => r.pattern === '/api/approvals/:id/:decision');
-    const call = () => route.handler({ requireParam: key => key === 'id' ? 'a' : action, auth: ANON, response: { setHeader() {}, end() {} } });
+    const call = () => route.handler({
+      requireParam: key => key === 'id' ? 'a' : action,
+      readBody: async () => ({}),
+      auth: ANON,
+      response: { setHeader() {}, end() {} }
+    });
     if (action === 'approve' || action === 'reject') {
       await call(); assert.equal(granted, action === 'approve' ? 'approved' : 'rejected');
     } else {
