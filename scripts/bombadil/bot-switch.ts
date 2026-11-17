@@ -11,7 +11,7 @@ const view = extract(({ document }) => {
   return {
     title, feed, draft: input?.value ?? '', editable: !!input && !input.disabled && !input.readOnly,
     canSend: !!send && !send.disabled,
-    choices: rows.filter(row => row.querySelector('button')).map(row => row.getAttribute('data-bot-name'))
+    choices: rows.filter(row => row.querySelector('[data-session-id][role="button"]')).map(row => row.getAttribute('data-bot-name'))
   };
 });
 
@@ -23,7 +23,7 @@ export const transcriptOwnership = always(() => {
 
 const selectBot = registerCustomAction('selectBot', async (document, _window, name: string) => {
   const rows = document.querySelectorAll('[data-testid="functional-group-ungrouped"] [data-bot-name]');
-  Array.from(rows).find(row => row.getAttribute('data-bot-name') === name)?.querySelector('button')?.click();
+  Array.from(rows).find(row => row.getAttribute('data-bot-name') === name)?.querySelector<HTMLElement>('[data-session-id][role="button"]')?.click();
 });
 const draft = registerCustomAction('draftProbe', async (document, _window, text: string) => {
   const input = document.querySelector<HTMLTextAreaElement>('#playInput');

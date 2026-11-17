@@ -118,5 +118,5 @@ async function runComparison() {
 }
 await runComparison();
 persist();
-console.log(result.preflightError ?? result.comparison);
+console.log(JSON.stringify(result, null, 2));
 if (result.comparison.status !== 'complete') process.exitCode = 1;
