@@ -146,9 +146,13 @@ async function openForkParent() {
     workspaceBindingBound: true
   });
   runtime.sendUserMessage(session.id, PARENT_CHAT, { autoRun: true });
+  assert.throws(
+    () => runtime.sendUserMessage(session.id, FORK_TASK, { imageAssetIds: [foreignAssetId] }),
+    /Image unavailable in this session/
+  );
   runtime.sendUserMessage(session.id, FORK_TASK, {
     autoRun: true,
-    imageAssetIds: [parentAssetId, foreignAssetId],
+    imageAssetIds: [parentAssetId],
     contextSources: [{ kind: 'file', name: 'brief.txt', text: ATTACHMENT_BODY }]
   });
   const running = runtime.runHumanSession(session.id);

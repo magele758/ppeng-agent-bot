@@ -63,6 +63,7 @@ const EXTRA_RESERVED = new Set<string>([
   'codex_exec',
   'cursor_agent',
   'read_artifact_page',
+  'read_chat_attachment',
   'search_artifact_content',
   'submit_plan',
   'request_confirmation',
