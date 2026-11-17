@@ -20,8 +20,7 @@ test('按用户叫法定位到实际代码、验收和两种验证 [AC:agent-fea
   assert.ok(feature.sources.includes('apps/web-console/components/usePlayChat.ts'));
   assert.ok(feature.acceptance.includes('acceptance/bot-switch-live-turn.yaml'));
   assert.ok(feature.tests.includes('e2e/bot-switch-live-turn.spec.ts'));
-  assert.equal(feature.regression, 'node scripts/prd/core-cases.mjs --case bot-switch');
-  assert.equal(feature.exploration, null);
+  assert.equal(feature.exploration, 'pnpm run test:stability:bots');
 });
 
 test('校验真实地图并拒绝失效入口 [AC:agent-feature-map#AC-2]', () => {

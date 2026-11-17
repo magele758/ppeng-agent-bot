@@ -147,6 +147,9 @@ node scripts/prd/core-cases.mjs
 
 回归 `node scripts/prd/core-cases.mjs --case bot-switch`
 
+探索 `pnpm run test:stability:bots`
+
 对应现状：[主对话](current/03-conversation.md)
 
 - `bot-switch-live-turn` 切换 Bot 后主画面离开上一场进行中的对话
+- `bombadil-bot-stability` Bot 切换稳定性探索

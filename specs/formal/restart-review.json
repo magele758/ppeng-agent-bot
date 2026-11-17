@@ -448,7 +448,7 @@
     "scripts/formal/run-restart-verification.mjs": "ca9423e352534619b1f7107ff8aadf455b530d0ec93d419d4f2e31d86570f7d1",
     "scripts/test/session-restart-recovery-verification.test.mjs": "f0e29fc1b42280c8fd4f18b59f590ce669229920056e84b73c73f593aca256d7",
     "skills/verify-session-restart/SKILL.md": "ac32ffd6d9f0b84852c7d3ebb6f05503d485a1d4d03a2553a5cc23fb385bf194",
-    "package.json": "efff616967590a5b1503527d745ba5f88cd1d0c00b909455cdfd91eea856cb54",
+    "package.json": "913b4520b72ae6d070bd5233bba8720295fa264a5675b5f45d90c7087de38bce",
     "scripts/formal/run-formal-regression.mjs": "f6a9d8e8a45d372115a9e81ca0ab800ff32bac727a349ae73ca6bb35dcd1076d",
     ".github/workflows/release-gate.yml": "627734b5e304825f29a6c037da6e8b244cc2f30cf6cce55c07e828fe5db09f4b",
     "scripts/formal/lifecycle-verifier.mjs": "3555385ae003dbf6ac4e6e54021e1b6cbc4979be7f43c25ba3573ad32f8e1195",

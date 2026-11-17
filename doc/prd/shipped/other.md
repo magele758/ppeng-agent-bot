@@ -79,6 +79,11 @@ Host parks durable wait for owned bg_run
 Under an active Goal or Routine, bg_run should host-park a durable wait (hostParked)
 so the model does not need a second wait_for round. Fewer watch loops; quieter complete.
 
+## bombadil-bot-stability
+Bot 切换稳定性探索
+
+那你开发一下，给当前项目加入看看是否可以提升稳定性测试
+
 ## bots
 Bot 名册、互发消息与权限
 

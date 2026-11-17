@@ -115,3 +115,5 @@ cases:
       - 03-conversation
     specs:
       - bot-switch-live-turn
+      - bombadil-bot-stability
+    exploration: test:stability:bots

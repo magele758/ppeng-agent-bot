@@ -96,12 +96,7 @@ function runPlaywright(registry, env) {
   });
 }
 
-async function main(registry) {
-  const existing = process.env.PLAYWRIGHT_BASE_URL?.trim();
-  if (existing) {
-    return runPlaywright(registry, { ...process.env });
-  }
-
+export async function runIsolatedLab(registry, runTest) {
   const buildStatus = ensureNextBuild();
   if (buildStatus !== 0) return buildStatus;
 
@@ -136,7 +131,7 @@ async function main(registry) {
 
   await waitFor(() => daemonHealthy(daemonBase), { timeoutMs: 25_000, intervalMs: 150, label: 'daemon', registry });
   await waitFor(() => httpOk(webBase), { timeoutMs: 45_000, intervalMs: 200, label: 'next', registry });
-  return runPlaywright(registry, {
+  return runTest({
     ...process.env,
     PLAYWRIGHT_BASE_URL: webBase,
     PLAYWRIGHT_AUTH_PROBE_DAEMON_ORIGIN: daemonBase,
@@ -144,4 +139,11 @@ async function main(registry) {
   });
 }
 
-process.exitCode = await runWithCleanup(main);
+async function main(registry) {
+  if (process.env.PLAYWRIGHT_BASE_URL?.trim()) return runPlaywright(registry, { ...process.env });
+  return runIsolatedLab(registry, env => runPlaywright(registry, env));
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  process.exitCode = await runWithCleanup(main);
+}
