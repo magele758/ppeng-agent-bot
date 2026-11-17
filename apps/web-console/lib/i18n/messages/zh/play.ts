@@ -141,7 +141,7 @@ export const play = {
     saveFailed: '回复方式没有保存',
     saved: '已保存',
   },
-  rowMenu: { delete: '删除 Bot', deleteConfirm: '删除 {name} 和它的定时任务？历史会话、群聊记录将保留。此操作不可撤销。', loading: '正在加载…', advanced: '高级设置与用量', label: '{name} 的更多操作', details: '查看详情', cron: '查看定时任务', group: '加入分组', room: '加入群聊', remove: '隐藏 Bot', empty: '没有可加入的目标' },
+  rowMenu: { delete: '删除 Bot', deleteConfirm: '删除 {name} 和它的定时任务？历史会话、群聊记录将保留。此操作不可撤销。', loading: '正在加载…', advanced: '高级设置与用量', label: '{name} 的更多操作', details: '查看详情', pin: '置顶', unpin: '取消置顶', moveTo: '移到「{name}」', moveOut: '移出分组', cron: '查看定时任务', group: '加入分组', room: '加入群聊', remove: '隐藏 Bot', empty: '没有可加入的目标' },
   entry: { new: '新建', remove: '移除', confirmRemove: '确认移除', removeBot: '移除 Bot「{name}」', removeBotConfirm: '移除 Bot「{name}」？它将从 Bot 列表隐藏，已有对话、群聊和任务会保留；这不会删除会话。', removeFailed: '移除失败：{error}' },
   groupModel: {
     settings: "默认模型",
@@ -183,6 +183,14 @@ export const play = {
     title: "置顶",
     empty: "把 Bot 或群聊拖到这里置顶",
     hint: "把 Bot 或群聊拖出此区域可取消置顶"
+  },
+  botHome: {
+    loading: "正在加载 Bot 列表",
+    emptyTitle: "无 Bot",
+    emptyHint: "用上方的「新建」创建第一只 Bot。",
+    errorTitle: "没能加载 Bot 列表",
+    errorHint: "后台暂时没有响应。已显示的内容会保留，恢复前不会显示成空列表。",
+    retry: "重试"
   },
   send: '发送',
   add: '新增',

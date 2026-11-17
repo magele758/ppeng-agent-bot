@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 465 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 466 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -337,10 +337,11 @@
 
 - `connector-authorization` Lab connector authorization states and SecretVault grant
 
-## console（7）
+## console（8）
 
 需求正文见 [console](console.md)。
 
+- `console-bot-visual` Bot 页视觉与列表状态
 - `console-font-size-preference` 控制台字体大小偏好
 - `console-knowledge` 知识与记忆：分层记忆、搜索与摄取设置
 - `console-navigation` 控制台主导航与页面结构

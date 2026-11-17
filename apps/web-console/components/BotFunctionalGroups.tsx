@@ -14,6 +14,7 @@ import { displayPinnedRoomIds } from '@/lib/bot-pin';
 import { arrangeSidebarRows, beginSidebarDrag, BOT_DRAG_MIME, commitBotPinState, commitRegionOrder, currentSidebarDrag, dropPlace, endSidebarDrag, forgetRegionRef, getBotPinServerSnapshot, getBotPinSnapshot, groupRowsWithoutPinnedBots, moveSidebarItem, orderRegionKey, regionRefs, ROOM_DRAG_MIME, sameOrderRegion, savedRegionRefs, sortBotRows, subscribeBotPins, type OrderRegion } from '@/lib/bot-pin-area';
 import { canMoveBot, canMoveRoom, factEditorState, functionalGroupRows, functionalGroupPresentation, FUNCTIONAL_GROUPS_CHANGED_EVENT, groupForBot, groupSaveDisabled, functionalGroupSaveRequest, moveBotInGroups, moveRoomInGroups, roomsInGroup, upsertFunctionalGroup, type FunctionalGroup } from '@/lib/functional-group-view';
 import { PlayGroupRow, deletePlayRoom, type SidebarRoom } from './play-group/PlayBotGroupList';
+import { BotListNotices } from './BotListStatus';
 
 function groupDeletion(group: FunctionalGroup, withBots: boolean) {
   const path = `/api/bot-functional-groups/${encodeURIComponent(group.id)}`;
@@ -302,6 +303,8 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
               room={room}
               names={room.botIds.map(nameOf).join('、')}
               members={room.botIds.map((id) => ({ id, name: nameOf(id) }))}
+              bots={bots}
+              rooms={rooms}
               selected={selectedRoomId === room.id}
               busy={deletingRoomId === room.id}
               disabled={deletingRoomId !== null || pending}
@@ -317,12 +320,12 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
     </section>;
   };
 
-  return <div className={styles.root}>
+  return <div className={`${styles.root} bot-home`}>
     <div className={styles.toolbar}>
       <span>{t('play.functionalGroups.title')}</span>
 
     </div>
-    <GroupLoadError error={error} loaded={loaded} retry={() => setRetry(n => n + 1)} />
+    <BotListNotices loaded={loaded} error={error} botCount={bots.length} roomCount={rooms.length} groupCount={groups.length} onRetry={() => setRetry(n => n + 1)} />
     {editing ? <BotEntryDialog label={editing.id ? t('play.functionalGroups.rename') : t('play.functionalGroups.create')}><form className={styles.editor} onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <label>{t('play.functionalGroups.name')}<input required autoFocus value={editing.name} disabled={pending} maxLength={80} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /></label>
       <button type="submit" className="btn btn-sm" disabled={groupSaveDisabled(editing, pending)} aria-label={t('play.functionalGroups.save')}>{t('common.save')}</button>

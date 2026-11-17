@@ -27,15 +27,19 @@ import {
   ROOM_DRAG_MIME,
   sameOrderRegion,
   savedRegionRefs,
-  subscribeBotPins
+  subscribeBotPins,
+  type PinRoom,
+  type PinRosterBot
 } from '@/lib/bot-pin-area';
 import {
   FUNCTIONAL_GROUPS_CHANGED_EVENT,
   looseRooms,
 } from '@/lib/functional-group-view';
 import { RowActionMenu } from '../RowActionMenu';
+import { RoomRowActions } from '../BotRowActions';
 import { GroupFace, type GroupMemberFace } from './GroupFace';
 import './play-group.css';
+import '../bot-home.css';
 
 /** Group rows change on this page through events; the timer only catches changes made elsewhere. */
 const ROOM_POLL_MS = 3000;
@@ -78,6 +82,8 @@ export function PlayGroupRow({
   draggable = false,
   placement,
   className,
+  bots = [],
+  rooms = [],
   onOpen,
   onDelete,
   onDragStart,
@@ -94,6 +100,8 @@ export function PlayGroupRow({
   draggable?: boolean;
   placement: 'loose' | 'group' | 'pin';
   className?: string;
+  bots?: readonly PinRosterBot[];
+  rooms?: readonly PinRoom[];
   onOpen: () => void;
   onDelete: () => void;
   onDragStart?: (event: DragEvent<HTMLDivElement>) => void;
@@ -137,6 +145,7 @@ export function PlayGroupRow({
         </div>
       </div>
       <RowActionMenu label={t('play.rowMenu.label',{name:room.title})}>
+        <RoomRowActions roomId={room.id} bots={bots} rooms={rooms} />
         <button type="button" onClick={onOpen}>{t('play.group.openAria',{title:room.title})}</button>
         <button type="button" data-testid="play-group-delete" aria-label={t('play.group.deleteAria',{title:room.title})} disabled={disabled} aria-busy={busy} onClick={onDelete}>{t('play.group.deleteLabel')}</button>
       </RowActionMenu>
@@ -277,6 +286,8 @@ export function PlayBotGroupList({
             disabled={deletingId !== null}
             draggable
             placement="loose"
+            bots={bots}
+            rooms={rooms}
             className={place === 'before' ? 'is-insert-before' : place === 'after' ? 'is-insert-after' : undefined}
             onOpen={() => onOpen(room.id)}
             onDelete={() => { void deleteGroup(room); }}

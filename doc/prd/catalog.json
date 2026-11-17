@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 465,
+    "implemented": 466,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1434,6 +1434,13 @@
       "requirement": "The Lab Connectors panel shows a visible authorization state for every connector:\nneedsAuth (credential required, no SecretVault reference yet), needsGrant (a\nreference is present, or no secret is required, and the user has not granted),\nand granted. One-click grant posts only a SecretVault name or an existing\ncredential reference. Secret values never enter the grant record, the public\nlist, or the model prompt. The same grant is available on the chat surface:\na needsAuth or needsGrant card shows Grant, and Grant posts only a SecretVault\nname to the existing grant route.",
       "verificationStage": "software",
       "file": "acceptance/connector-authorization.yaml"
+    },
+    {
+      "id": "console-bot-visual",
+      "title": "Bot 页视觉与列表状态",
+      "requirement": "Implement the approved console redesign, Bot page only. User approved the v2 Bot structure exactly: pinned (bots and rooms mixed), unpinned rooms, functional groups, ungrouped, shared info; row menu to pin and move group; + creates bot, room, functional group. Do not regroup. Visual only plus matching empty/loading/error states. Sage green, and respect light/dark CSS variables if the shell PR has not landed yet — do not invent a second theme system and do not edit the shell, styles/tokens, or nav.",
+      "verificationStage": "software",
+      "file": "acceptance/console-bot-visual.yaml"
     },
     {
       "id": "console-font-size-preference",

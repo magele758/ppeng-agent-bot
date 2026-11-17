@@ -1,0 +1,127 @@
+/* Bot page visuals. Shell tokens win when they exist; otherwise sage light/dark. */
+.bot-home {
+  --bot-panel: var(--ui-panel, light-dark(#FAFAF8, #161A16));
+  --bot-card: var(--ui-card, light-dark(#FFFFFF, #1C211C));
+  --bot-sunk: var(--ui-sunk, light-dark(#ECEEE9, #0C0F0C));
+  --bot-line: var(--ui-line, light-dark(#E1E4DD, #283028));
+  --bot-line-2: var(--ui-line-strong, light-dark(#C9CFC4, #3B453C));
+  --bot-text: var(--ui-ink, light-dark(#1A201B, #E7ECE7));
+  --bot-text-2: var(--ui-ink-2, light-dark(#556057, #A2ADA4));
+  --bot-text-3: var(--ui-ink-3, light-dark(#879088, #6E7A70));
+  --bot-accent: var(--ui-sage, light-dark(#3D6A4D, #82BD95));
+  --bot-accent-soft: var(--ui-sage-soft, light-dark(#E1ECE4, #1F2F25));
+  --bot-on-accent: var(--ui-on-sage, light-dark(#FFFFFF, #0D150F));
+  --bot-ok: var(--ui-ok, light-dark(#2C7A4D, #6FC38D));
+  --bot-warn: var(--ui-warn, light-dark(#93650F, #DFB25E));
+  --bot-bad: var(--ui-danger, light-dark(#B53C2A, #EE8B78));
+  --bot-bad-soft: var(--ui-danger-soft, light-dark(#F9E6E1, #371C17));
+  color: var(--bot-text);
+  background: var(--bot-panel);
+  color-scheme: light dark;
+}
+
+html[data-theme="light"] .bot-home { color-scheme: light; }
+html[data-theme="dark"] .bot-home { color-scheme: dark; }
+
+.bot-home :focus-visible {
+  outline: 2px solid var(--bot-accent);
+  outline-offset: 1px;
+}
+
+.bot-list-status {
+  margin: 8px;
+  padding: 16px 12px;
+  border: 1px solid var(--bot-line);
+  border-radius: 12px;
+  background: var(--bot-card);
+  text-align: center;
+}
+
+.bot-list-status__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.bot-list-status__hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bot-text-2);
+}
+
+.bot-list-status button {
+  margin-top: 10px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--bot-accent);
+  border-radius: 8px;
+  background: var(--bot-accent);
+  color: var(--bot-on-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.bot-list-status--error,
+.bot-list-status.is-kept {
+  text-align: start;
+  background: var(--bot-bad-soft);
+  border-color: var(--bot-bad);
+  color: var(--bot-bad);
+}
+
+.bot-list-status--error .bot-list-status__hint,
+.bot-list-status.is-kept .bot-list-status__hint { color: inherit; }
+
+.bot-list-status--loading {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  padding: 8px;
+}
+
+.bot-list-skel {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.bot-list-skel i,
+.bot-list-skel b {
+  display: block;
+  border-radius: 8px;
+  background: var(--bot-sunk);
+}
+
+.bot-list-skel i { width: 32px; height: 32px; border-radius: 10px; flex: none; }
+.bot-list-skel b { height: 10px; flex: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .bot-list-skel i,
+  .bot-list-skel b { animation: bot-list-pulse 1.2s ease-in-out infinite; }
+}
+
+@keyframes bot-list-pulse {
+  50% { opacity: 0.35; }
+}
+
+.bot-home .list-item.selected,
+.bot-home .list-item--session.selected {
+  background: var(--bot-sunk);
+}
+
+.bot-home .bot-row-pop {
+  border: 1px solid var(--bot-line-2);
+  border-radius: 12px;
+  background: var(--bot-card);
+  color: var(--bot-text);
+}
+
+.bot-home .bot-row-pop button:hover {
+  background: var(--bot-sunk);
+}

@@ -32,6 +32,7 @@ import {
   visiblePinnedRooms
 } from '@/lib/bot-pin-area';
 import { PlayGroupRow, deletePlayRoom, type SidebarRoom } from './play-group/PlayBotGroupList';
+import './bot-home.css';
 import styles from './BotFunctionalGroups.module.css';
 
 export function BotPinArea({
@@ -143,7 +144,7 @@ export function BotPinArea({
   if (!active) return null;
   return (
     <section
-      className={`${styles.pin}${over ? ` ${styles.dropTarget}` : ''}`}
+      className={`${styles.pin} bot-home${over ? ` ${styles.dropTarget}` : ''}`}
       data-testid="bot-pin-area"
       aria-labelledby="bot-pin-title"
       onDragOver={onDragOver}
@@ -261,6 +262,8 @@ export function BotPinArea({
               room={room}
               names={names}
               members={room.botIds.map((id) => ({ id, name: bots.find((bot) => bot.id === id)?.name ?? id }))}
+              bots={bots}
+              rooms={rooms}
               selected={selectedRoomId === room.id}
               busy={deletingId === room.id}
               disabled={deletingId !== null}

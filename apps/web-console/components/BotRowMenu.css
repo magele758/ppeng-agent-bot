@@ -1,8 +1,8 @@
 html body .bot-entry-dialog[role="dialog"]:has(.bot-row-dialog) {
   width: min(440px, 100%);
   border: 1px solid var(--ui-border);
-  border-radius: 18px;
-  box-shadow: 0 16px 60px rgb(0 0 0 / 0.16);
+  border-radius: 14px;
+  box-shadow: none;
 }
 html body .bot-entry-dialog[role="dialog"]:has(.bot-row-dialog[data-view="cron"]) {
   width: min(640px, 100%);
