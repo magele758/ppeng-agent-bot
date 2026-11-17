@@ -72,10 +72,18 @@ test('行菜单可置顶和移动分组，新建仍是 Bot、群聊和功能分�
 
 test('Bot 页用鼠尾草绿，并跟随浅色深色变量 [AC:console-bot-visual#AC-6]', () => {
   const css = read('./bot-home.css');
-  assert.match(css, /#3D6A4D/);
-  assert.match(css, /#82BD95/);
-  assert.match(css, /var\(--ui-sage/);
-  assert.match(css, /light-dark\(/);
+  const groups = read('./BotFunctionalGroups.module.css');
+  const detail = read('./BotDetailMenu.module.css');
+  assert.match(css, /var\(--ui-home-accent,\s*light-dark\(#3D6A4D,\s*#82BD95\)\)/);
+  assert.match(css, /var\(--ui-home-panel,/);
+  assert.match(css, /var\(--ui-home-text,/);
+  assert.match(css, /var\(--ui-home-danger,/);
+  assert.equal(css.includes('--ui-home-accent:'), false);
+  assert.equal(css.includes('--bot-accent:'), false);
+  assert.match(groups, /var\(--ui-home-accent,/);
+  assert.match(detail, /var\(--ui-home-accent,/);
+  assert.equal(groups.includes('--bot-'), false);
+  assert.equal(detail.includes('--bot-'), false);
   assert.match(css, /html\[data-theme="dark"\]/);
   assert.match(css, /html\[data-theme="light"\]/);
   assert.equal(css.includes('data-bot-theme'), false);
