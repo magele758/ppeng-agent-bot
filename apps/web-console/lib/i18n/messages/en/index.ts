@@ -26,6 +26,7 @@ import { more } from './more.ts';
 import { nav } from './nav.ts';
 import { ops } from './ops.ts';
 import { play } from './play.ts';
+import { chatPage } from './chatPage.ts';
 import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
@@ -46,6 +47,7 @@ export const en = {
   auth,
   nav,
   play,
+  chatPage,
   more,
   memory,
   teams,

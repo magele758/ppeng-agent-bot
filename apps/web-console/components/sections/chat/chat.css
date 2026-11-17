@@ -101,8 +101,8 @@
   max-height: min(60vh, 560px);
   gap: var(--ui-space-3);
   padding: var(--ui-space-4);
-  border-radius: var(--ui-radius-md);
-  box-shadow: var(--ui-shadow-md);
+  border-radius: 12px;
+  box-shadow: none;
 }
 
 .session-settings__head {
@@ -124,9 +124,35 @@
 }
 
 .session-settings__fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--ui-space-3);
+}
+
+.session-settings__seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--ui-bg);
+}
+
+.session-settings__seg button {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.session-settings__seg button.is-selected {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-weight: 600;
 }
 
 .session-settings__field {
@@ -776,4 +802,79 @@ html[data-chat-width="full"] .chat-panel-body {
     position: static;
     width: 100%;
   }
+}
+
+/* 会话页（与 Bot 分开）。鼠尾草绿优先用即将落地的 --ui-sage，否则用设计稿色值。 */
+html:not([data-theme="dark"]) .play-layout[data-play-surface="chat"] {
+  --chat-sage: var(--ui-sage, #3D6A4D);
+  --chat-sage-soft: var(--ui-sage-soft, #E1ECE4);
+  --chat-on-sage: var(--ui-sage-contrast, #ffffff);
+}
+
+html[data-theme="dark"] .play-layout[data-play-surface="chat"] {
+  --chat-sage: var(--ui-sage, #82BD95);
+  --chat-sage-soft: var(--ui-sage-soft, #1F2F25);
+  --chat-on-sage: var(--ui-sage-contrast, #0D150F);
+}
+
+html .lab-shell .play-layout[data-play-surface="chat"] .chat-panel-body .chat-turn--user .chat-bubble {
+  background: var(--chat-sage-soft);
+  color: var(--ui-text);
+  border: 0;
+  border-radius: 14px 14px 4px 14px;
+  box-shadow: none;
+}
+
+.play-layout[data-play-surface="chat"] .chat-send-btn:not(.chat-send-btn--steer) {
+  background: var(--chat-sage);
+  border-color: var(--chat-sage);
+  color: var(--chat-on-sage);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.play-layout[data-play-surface="chat"] .session-date-group__label {
+  padding: 10px 8px 4px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--ui-text-muted);
+}
+
+.play-layout[data-play-surface="chat"] .session-item__title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.play-layout[data-play-surface="chat"] .session-item__title-row .session-item__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play-layout[data-play-surface="chat"] .session-item__when {
+  flex: none;
+  font-size: 11px;
+  color: var(--ui-text-muted);
+}
+
+.play-layout[data-play-surface="chat"] .list-item--session.selected {
+  background: var(--ui-bg);
+  border-radius: 8px;
+}
+
+.play-layout[data-play-surface="chat"] .chat-composer {
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.play-layout[data-play-surface="chat"] .chat-panel-header__quiet {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ui-text-muted);
 }

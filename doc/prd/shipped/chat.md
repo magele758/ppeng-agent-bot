@@ -66,6 +66,11 @@
 聊天面板头部「⋯」更多菜单（只看关键信息 / 模型所见 / 重新运行会话）被下方聊天内容和毛玻璃层盖住，
 弹层半透明、文字看不清。要求弹层完整显示在最上层、文字清晰、背景不透明。
 
+## chat-page-redesign
+会话页按已批准的设计稿改版
+
+Implement the approved console redesign, chat (会话) page only. Keep 会话 as its own top-level item, separate from Bot. Keep existing chat behavior from AGENTS.md: optimistic user bubble and assistant placeholder, clear composer on send, thinking collapsed in history and open while streaming, tool results collapsed, Markdown body. Restyle to the design, including session settings and date grouping if the design shows them and the app already has that data. Sage green via existing or forthcoming CSS variables. Do not implement 「本会话始终允许」.
+
 ## chat-reading
 会话正文阅读节奏
 

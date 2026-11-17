@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
-import { displayedQuestion, isSingleBotChat, lastUserQuestion, type QuestionMessage } from '@/lib/session-row';
+import { displayedQuestion, lastUserQuestion, rowPreviewWanted, type QuestionMessage } from '@/lib/session-row';
 
 import type { BotInfo, SessionSummary } from '@/lib/types';
 
 export function useVisibleQuestion(session: SessionSummary, bots: readonly BotInfo[], question: string) {
   const { id, updatedAt } = session;
-  const enabled = !question && isSingleBotChat(session, bots);
+  const enabled = rowPreviewWanted(question, session, bots);
   const row = useRef<HTMLDivElement>(null);
   const [preview, setPreview] = useState({ id: '', text: '' });
   useEffect(() => {

@@ -150,6 +150,35 @@ export function displayedQuestion(
   return lastUserQuestion(messages);
 }
 
+/** Preview line for an ordinary session. Hidden when it repeats the title. */
+export function rowSubtitleText(kind: string, title: string, question: string, fallback: string): string {
+  if (kind !== 'plain') return fallback;
+  return plainRowSubtitle(title, question);
+}
+
+export function plainRowSubtitle(title: string | undefined, question: string): string {
+  const line = oneLineQuestion(question);
+  const heading = oneLineQuestion(title ?? '');
+  if (!line || line === heading) return '';
+  return line;
+}
+
+export function rowPreviewWanted(
+  question: string,
+  session: SessionRowSession,
+  bots: readonly BotInfo[]
+): boolean {
+  if (question.trim()) return false;
+  if (isChildTaskSession(session, bots)) return false;
+  if (isSingleBotChat(session, bots)) return true;
+  return plainSessionPreview(session);
+}
+
+function plainSessionPreview(session: SessionRowSession): boolean {
+  if (metadataString(session.metadata, 'roomId')) return false;
+  return true;
+}
+
 export function botSessionSubtitle(
   question: string,
   emptyHint: string

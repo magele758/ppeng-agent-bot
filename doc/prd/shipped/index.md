@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 465 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 466 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -252,7 +252,7 @@
 - `bypass-skill-write` bypass 的 Bot 写技能不再被额外确认拦住
 - `bypass-source-scope` permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
-## chat（14）
+## chat（15）
 
 需求正文见 [chat](chat.md)。
 
@@ -267,6 +267,7 @@
 - `chat-header-menu-only` 聊天顶部只保留更多入口
 - `chat-inline-history` 单行附件入口与自动加载聊天历史
 - `chat-more-menu-on-top` 对话头部「⋯」更多菜单在最上层且不透明
+- `chat-page-redesign` 会话页按已批准的设计稿改版
 - `chat-reading` 会话正文阅读节奏
 - `chat-tail-kept` 对话结束时助手正文留在对话里
 - `chat-width` 内容展示宽度

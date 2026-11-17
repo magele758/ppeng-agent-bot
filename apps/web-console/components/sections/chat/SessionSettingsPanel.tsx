@@ -13,6 +13,80 @@ export type ExecPreset = 'chat' | 'task' | 'orchestrator';
 
 type PlayChat = ReturnType<typeof usePlayChat>;
 
+const EXEC_PRESETS: ExecPreset[] = ['chat', 'task', 'orchestrator'];
+
+function execPresetLabel(preset: ExecPreset): 'play.assembly.chat' | 'play.assembly.task' | 'play.assembly.orchestrator' {
+  if (preset === 'task') return 'play.assembly.task';
+  if (preset === 'orchestrator') return 'play.assembly.orchestrator';
+  return 'play.assembly.chat';
+}
+
+function segmentClass(selected: boolean): string | undefined {
+  if (selected) return 'is-selected';
+  return undefined;
+}
+
+function commitGoal(sessionId: string | null, draft: string, committed: string, save: (next: string) => void) {
+  if (!sessionId) return;
+  const next = draft.trim();
+  if (next !== committed.trim()) save(next);
+}
+
+function GoalConditionField({
+  value,
+  committed,
+  sessionId,
+  onChange,
+  onCommit
+}: {
+  value: string;
+  committed: string;
+  sessionId: string | null;
+  onChange: (next: string) => void;
+  onCommit: (next: string) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <label className="session-settings__field session-settings__field--wide">
+      <FieldLabel tip={t('play.settings.goalTip')}>{t('play.strategy.goal')}</FieldLabel>
+      <input
+        type="text"
+        className="input-compact"
+        placeholder={t('chatPage.goalPlaceholder')}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={() => commitGoal(sessionId, value, committed, onCommit)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return;
+          event.preventDefault();
+          onCommit(value);
+        }}
+        aria-label={t('play.strategy.goalAria')}
+      />
+    </label>
+  );
+}
+
+function ExecModeSegments({ value, disabled, onChange }: { value: ExecPreset; disabled: boolean; onChange: (preset: ExecPreset) => void }) {
+  const { t } = useI18n();
+  return (
+    <div role="group" className="session-settings__seg" aria-label={t('play.assembly.execMode')}>
+      {EXEC_PRESETS.map((preset) => (
+        <button
+          key={preset}
+          type="button"
+          aria-pressed={value === preset}
+          className={segmentClass(value === preset)}
+          disabled={disabled}
+          onClick={() => onChange(preset)}
+        >
+          {t(execPresetLabel(preset))}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export interface SessionSettingsPanelProps {
   panelRef: RefObject<HTMLDivElement | null>;
   chat: PlayChat;
@@ -70,26 +144,10 @@ export function SessionSettingsPanel({
       ) : null}
 
       <div className="session-settings__fields">
-        <label className="session-settings__field">
+        <div className="session-settings__field session-settings__field--wide">
           <FieldLabel tip={t('play.settings.execModeTip')}>{t('play.assembly.execMode')}</FieldLabel>
-          <select
-            value={botSurface ? 'auto' : execPreset}
-            disabled={botSurface}
-            aria-label={t('play.execModeAria')}
-            title={botSurface ? t('play.assembly.botAutoTitle') : undefined}
-            onChange={(e) => onExecPreset(e.target.value as ExecPreset)}
-          >
-            {botSurface ? (
-              <option value="auto">{t('play.assembly.autonomous')}</option>
-            ) : (
-              <>
-                <option value="chat">{t('play.assembly.chat')}</option>
-                <option value="task">{t('play.assembly.task')}</option>
-                <option value="orchestrator">{t('play.assembly.orchestrator')}</option>
-              </>
-            )}
-          </select>
-        </label>
+          <ExecModeSegments value={execPreset} disabled={botSurface} onChange={onExecPreset} />
+        </div>
 
         <label className="session-settings__field">
           <FieldLabel tip={t('play.settings.agentTip')}>Agent</FieldLabel>
@@ -102,8 +160,16 @@ export function SessionSettingsPanel({
             onChange={(e) => onSupportAgent(e.target.value)}
           >
             {botLocked ? <option value={chat.agentId}>{chat.agentId} · Bot</option> : agentOptions}
-          </select>
-        </label>
+            </select>
+          </label>
+
+          <GoalConditionField
+            value={chat.goalDraft}
+            committed={goalCommitted}
+            sessionId={selectedSessionId}
+            onChange={chat.setGoalDraft}
+            onCommit={(next) => void chat.saveGoalCondition(next)}
+          />
 
         {botSurface ? null : (
           <label className="session-settings__field">
@@ -162,28 +228,6 @@ export function SessionSettingsPanel({
               <option value="legacy">{t('play.strategy.legacy')}</option>
               <option value="ptc">{t('play.strategy.ptc')}</option>
             </select>
-          </label>
-          <label className="session-settings__field session-settings__field--wide">
-            <FieldLabel tip={t('play.settings.goalTip')}>{t('play.strategy.goal')}</FieldLabel>
-            <input
-              type="text"
-              className="input-compact"
-              placeholder={t('play.strategy.goalPlaceholder')}
-              value={chat.goalDraft}
-              onChange={(e) => chat.setGoalDraft(e.target.value)}
-              onBlur={() => {
-                if (!selectedSessionId) return;
-                const next = chat.goalDraft.trim();
-                if (next !== goalCommitted.trim()) void chat.saveGoalCondition(next);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void chat.saveGoalCondition(chat.goalDraft);
-                }
-              }}
-              aria-label={t('play.strategy.goalAria')}
-            />
           </label>
         </div>
         {showOptionalTools ? (

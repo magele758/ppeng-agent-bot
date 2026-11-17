@@ -66,6 +66,8 @@ import { ComposerReplyQuote } from './ReplyQuote';
 import { composerClassName, composerSendDisabled } from '@/lib/composer-context';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
+import { ChatPlainHeaderStatus } from './sections/chat/ChatPlainHeader';
+import { plainAgentName } from '@/lib/chat-page-redesign';
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
 import { PlayBotGroupList, type SidebarRoom } from './play-group/PlayBotGroupList';
 import { GrokHistorySource } from './GrokHistorySource';
@@ -1040,6 +1042,7 @@ export function PlayPanel({
         checked={checked}
         selectMode={selectMode}
         deleting={deleting}
+        showWhen={!botSurface}
         status={
           <>
             <SessionFavoriteMark session={s} />
@@ -1261,6 +1264,13 @@ export function PlayPanel({
             <header className={`chat-panel-header chat-panel-header--floating${headerBotName ? ' chat-panel-header--bot' : ''}${mobileBotBarOpen ? ' is-mobile-open' : ''}`}>
       <div className="chat-panel-header__text">
         {renderTitleRow()}
+        <ChatPlainHeaderStatus
+          botSurface={botSurface}
+          hasSession={Boolean(selectedSessionId)}
+          agentId={chat.agentId}
+          agentName={plainAgentName(agents, chat.agentId)}
+          status={selectedSession?.status}
+        />
         {mobileBotBarOpen && <div className="mobile-bot-secondary">{renderHeaderDetails()}{headerBotId && <BotPermissionsLink botId={headerBotId} botName={headerTitle} />}</div>}
       </div>
       {renderHeaderActions()}
@@ -1642,6 +1652,17 @@ export function PlayPanel({
                 <div className={`chat-composer-dock${botSurface && !composerStatusText ? ' chat-composer-dock--empty' : ''}`}>
                   <div className="chat-composer-dock__left">
                     {!botSurface ? <>
+                    <div className="chat-composer-dock__pickers">
+                    <ComposerModelPicker
+                      options={enabledModelOptions}
+                      modelRef={chat.modelRef}
+                      defaultRef={chat.modelCatalog?.catalog.defaultRef ?? null}
+                      onSelect={(next) => void chat.saveModelRef(next)}
+                      onManage={onOpenModelSetup}
+                      lockedReason={
+                        composerModelLocked(chat.botModelOverride) ? t('play.botModel.composerLocked') : undefined
+                      }
+                    />
                     <button
                       type="button"
                       ref={configBtnRef}
@@ -1665,17 +1686,6 @@ export function PlayPanel({
                         ▾
                       </span>
                     </button>
-                    <div className="chat-composer-dock__pickers">
-                    <ComposerModelPicker
-                      options={enabledModelOptions}
-                      modelRef={chat.modelRef}
-                      defaultRef={chat.modelCatalog?.catalog.defaultRef ?? null}
-                      onSelect={(next) => void chat.saveModelRef(next)}
-                      onManage={onOpenModelSetup}
-                      lockedReason={
-                        composerModelLocked(chat.botModelOverride) ? t('play.botModel.composerLocked') : undefined
-                      }
-                    />
                     <WorkspacePicker
                       binding={chat.workspaceBinding}
                       bound={chat.workspaceBindingBound}
@@ -1906,7 +1916,7 @@ export function PlayPanel({
       <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
         {renderCreateDialog()}
         {renderMobileBar()}
-        <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}${sidebarCollapsed && !mobileSessionsOpen ? ' is-sidebar-collapsed' : ''}${mobileSessionsOpen ? ' mobile-sessions-open' : ''}`}>
+        <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}${sidebarCollapsed && !mobileSessionsOpen ? ' is-sidebar-collapsed' : ''}${mobileSessionsOpen ? ' mobile-sessions-open' : ''}`} data-play-surface={playSurface}>
           {renderPlaySidebar()}
           {renderPlayMain()}
           {renderPlayRail()}
