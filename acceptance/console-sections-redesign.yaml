@@ -1,0 +1,25 @@
+id: console-sections-redesign
+title: 控制台其余页面视觉与本会话始终允许
+status: implemented
+notes: |
+  assumedApproval: standing-order-2026-10-22
+requirement: |
+  Implement the approved console redesign for every console section except the app shell, the Bot page, and the chat page, plus the one new behavior 「本会话始终允许」. Keep the current information architecture: 审批 stays under 任务, 运维 stays under 设置. Do not add a top-level 待处理, 工作, or 运维, and do not add ⌘K. Sage green via CSS variables; do not edit shell, tokens, nav, Bot, or chat components.
+  「本会话始终允许」: Define "same kind" narrowly and document it in the acceptance criteria: same tool name and same sandbox isolation mode, within the current session only, revocable. Do not widen it to all tools or across sessions. The acceptance criteria must state the allow, the boundary, and the revoke. Persist through the existing settings/session mechanism, no new env flag.
+criteria:
+  - id: AC-1
+    given: 当前会话里有一次工具调用正在等你批准
+    when: 选择「本会话始终允许」
+    then: 这一次继续执行；之后在同一会话里，工具名相同且沙箱隔离方式相同的调用不再询问
+  - id: AC-2
+    given: 当前会话已经允许了某个工具的某一种沙箱隔离方式
+    when: 换成别的工具、同名工具的另一种隔离方式、或另一场会话里的同类调用
+    then: 仍然要询问。省略隔离或写成自动，只和同样属于「自动」的调用算同类；系统沙箱、直接执行、远端各自独立，互不放开。没有隔离参数的工具只和同样未指定隔离的同名工具算同类。已经拒绝过的那一次精确调用保持拒绝
+  - id: AC-3
+    given: 当前会话里有一条「本会话始终允许」
+    when: 撤销这一条
+    then: 下一次该会话里的同类调用重新询问，同一会话里的其他允许还在。允许记在这场会话上，不新增环境变量
+  - id: AC-4
+    given: 打开 Bots 与 Agents、任务、知识与记忆、设置（含设置里的运维）
+    when: 查看这些页面的浅色和深色
+    then: "这些页面使用外壳定义的鼠尾草绿变量（--ui-home-*；浅色强调色 #3D6A4D，深色 #82BD95）。变量缺失时才回退到已有界面变量，不另起一套色板。卡片靠底色和 1px 描边区分，不用阴影。空、加载中、出错有统一样式。一级导航仍是 Bot、对话、Bots 与 Agents、任务、知识与记忆、设置；审批在任务里，运维在设置里；没有一级「待处理」「工作」「运维」，也没有 ⌘K"

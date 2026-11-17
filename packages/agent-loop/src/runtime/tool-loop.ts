@@ -41,6 +41,7 @@ import {
   policySkipsAutoApproval,
   type ApprovalPolicy,
 } from '../approval/approval-policy.js';
+import { approvalStillRequired, settlePending, settleRequireCard } from '../approval/session-tool-grant.js';
 import {
   applyPermissionModeGate,
   resolvePermissionMode,
@@ -541,21 +542,21 @@ export function checkToolApprovals(
     if (existing?.status === 'approved') continue;
     if (permissionMode === 'bypass') continue;
     if (existing?.status === 'pending') {
-      citeAuthorizedBy(host, existing, tc.input);
-      waiting = true;
+      waiting = settlePending(waiting, () => citeAuthorizedBy(host, existing, tc.input), session.metadata, tool.name, fingerprintInput);
       continue;
     }
 
     if (decision.action === 'require_card') {
-      host.createApproval({
-        sessionId: sid,
-        toolName: tool.name,
-        reason: decision.reason,
-        args: decision.fingerprintInput,
-        idempotencyKey: idemKey,
-        ...approvalCitation(tc.input),
-      });
-      waiting = true;
+      waiting = settleRequireCard(waiting, () => {
+        host.createApproval({
+          sessionId: sid,
+          toolName: tool.name,
+          reason: decision.reason,
+          args: decision.fingerprintInput,
+          idempotencyKey: idemKey,
+          ...approvalCitation(tc.input),
+        });
+      }, session.metadata, tool.name, fingerprintInput, existing?.status);
       continue;
     }
 
@@ -588,7 +589,7 @@ export function checkToolApprovals(
       );
       continue;
     }
-    if (!needsApproval(tool, tc)) continue;
+    if (!approvalStillRequired(needsApproval(tool, tc), session.metadata, tool.name, tc.input, existing?.status)) continue;
     if (existing?.status === 'pending') {
       waiting = true;
       continue;

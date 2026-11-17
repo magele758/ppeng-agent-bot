@@ -869,7 +869,8 @@ export const play = {
     connectorGrantVault: 'Vault name',
     connectorGrantDone: 'Granted',
     connectorGrantFailed: 'Could not grant. Try again.',
-    connectorGrantPrompt: 'Grant {title} with a vault name. The secret stays in the vault.'
+    connectorGrantPrompt: 'Grant {title} with a vault name. The secret stays in the vault.',
+    allowSession: 'Always allow in this chat'
   },
 
   model: {

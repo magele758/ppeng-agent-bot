@@ -16,7 +16,9 @@ import { connectorGrantApprovalCard } from '@/lib/connectors-grant-card';
 import { attachBeforeAskUserDecision, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { useI18n } from '@/lib/i18n';
 import type { ApprovalItem } from '@/lib/types';
+import { approvalPostInit } from '@/lib/session-tool-grant';
 import { ApprovalActionPreview } from './ApprovalActionPreview';
+import { SessionAllowButton } from './SessionAllowButton';
 import { ConnectorGrantApproval } from './ConnectorGrantCard';
 import { ApprovalReasonLine } from './AutoReviewMarks';
 
@@ -100,7 +102,7 @@ function ApprovalItemRow({
     hasQuestion: Boolean(shown.question)
   });
 
-  const postDecision = async (decision: 'approve' | 'reject') => {
+  const postDecision = async (decision: 'approve' | 'reject', sessionGrant = false) => {
     const plan = approvalPostPlan({
       decision,
       isAsk,
@@ -120,7 +122,7 @@ function ApprovalItemRow({
         })
     });
     const path = decision === 'approve' ? 'approve' : 'reject';
-    const send = () => api(`/api/approvals/${a.id}/${path}`, { method: 'POST' }).then(() => undefined);
+    const send = () => api(`/api/approvals/${a.id}/${path}`, approvalPostInit(sessionGrant)).then(() => undefined);
     if (flow === 'attach') {
       await attachBeforeAskUserDecision({
         toolName: a.toolName,
@@ -173,6 +175,11 @@ function ApprovalItemRow({
         >
           {t('play.approval.reject')}
         </button>
+        <SessionAllowButton
+          approval={a}
+          disabled={approvalApproveDisabled(isAsk, reply)}
+          onAllow={() => void postDecision('approve', true).catch(() => undefined)}
+        />
       </div>
     </div>
   );

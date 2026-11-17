@@ -869,7 +869,8 @@ export const play = {
     connectorGrantVault: '保险库名称',
     connectorGrantDone: '已授权',
     connectorGrantFailed: '授权失败，请再试一次。',
-    connectorGrantPrompt: '用保险库名称授权 {title}。密钥值留在保险库里。'
+    connectorGrantPrompt: '用保险库名称授权 {title}。密钥值留在保险库里。',
+    allowSession: '本会话始终允许'
   },
 
   model: {

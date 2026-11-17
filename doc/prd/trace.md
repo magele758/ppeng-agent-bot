@@ -2575,6 +2575,15 @@ Bot 页视觉与列表状态
 - `e2e/lab.features.spec.ts`
 - `e2e/lab.smoke.spec.ts`
 
+### console-sections-redesign
+
+控制台其余页面视觉与本会话始终允许
+
+- `apps/daemon/test/session-tool-grant.test.ts`
+- `apps/web-console/components/sections/console-sections.test.ts`
+- `apps/web-console/lib/session-tool-grant.test.ts`
+- `packages/agent-loop/src/approval/session-tool-grant.test.ts`
+
 ### console-settings
 
 设置页渐进披露与搜索
