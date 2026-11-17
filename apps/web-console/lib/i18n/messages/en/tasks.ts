@@ -167,6 +167,20 @@ export const tasks = {
     workspacesTitle: 'Workspaces',
     workspacesDesc: 'Directories agents can read and write.',
     workspacesEmptyTitle: 'No workspaces',
-    workspacesEmptyDesc: 'Workspaces bound to sessions are listed here.'
+    workspacesEmptyDesc: 'Workspaces bound to sessions are listed here.',
+    allowSession: 'Always allow in this chat',
+    allowSessionAria: 'Always allow {tool} in this chat',
+    allowSessionHint: 'Later calls of this tool with the same isolation in this chat will not ask. Revoke it below.',
+    grantsTitle: 'Allowed for this chat',
+    grantsDesc: 'Applies only in that chat: the same tool and the same isolation stop asking. Revoking makes the next one ask again.',
+    revoke: 'Revoke',
+    revokeAria: 'Revoke the session allow for {tool}',
+    isolationAuto: 'Auto',
+    isolationOs: 'OS sandbox',
+    isolationDirect: 'Direct',
+    isolationRemote: 'Remote',
+    isolationContainer: 'Container',
+    isolationUnspecified: 'No isolation choice',
+    isolationUnknown: 'Unknown isolation'
   }
 };

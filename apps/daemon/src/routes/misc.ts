@@ -16,6 +16,7 @@ import {
 import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified } from '../http-utils.js';
 import { guardSession } from '../session-guard.js';
+import { rememberSessionGrant } from '../session-tool-grant.js';
 
 const APPROVAL_STATUSES: ReadonlyArray<ApprovalRecord['status']> = ['pending', 'approved', 'rejected'];
 
@@ -186,13 +187,14 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
     {
       method: 'POST',
       pattern: '/api/approvals/:id/:decision',
-      handler: async ({ requireParam, response, auth }) => {
+      handler: async ({ requireParam, readBody, response, auth }) => {
         const id = requireParam('id');
         const action = requireParam('decision');
         if (action !== 'approve' && action !== 'reject') throw new ValidationError('Invalid approval decision');
         const decision = action === 'approve' ? 'approved' : 'rejected';
         const pending = runtime.listApprovals().find((item) => item.id === id);
         if (pending) guardSession(runtime, pending.sessionId, auth);
+        rememberSessionGrant(runtime, action, pending, await readBody());
         const approval = await runtime.approve(id, decision);
         const session = runtime.getSession(approval.sessionId);
         const pendingLeft = runtime

@@ -417,6 +417,14 @@ export {
 } from '../approval/approval-policy.js';
 export type { ApprovalPolicy, ApprovalPolicyRule } from '../approval/approval-policy.js';
 export {
+  SESSION_TOOL_GRANT_KEY,
+  addSessionToolGrant,
+  isolationModeOf,
+  normalizeSessionToolGrants,
+  otherPendingCovered
+} from '../approval/session-tool-grant.js';
+export type { PendingLike, SessionToolGrant } from '../approval/session-tool-grant.js';
+export {
   loadPolicyFromRepo,
   mergeApprovalPolicies,
   filePolicyRequiresBashApproval,

@@ -5,6 +5,7 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 import type { SectionId } from '@/lib/nav';
 import { Section, SubTabs, type SubTabItem } from '../ui';
 import { useSectionNav } from '../shell/useSectionNav';
+import './console-sections.css';
 
 export interface SectionFrameProps {
   section: Exclude<SectionId, 'chat' | 'settings' | 'bot'>;
@@ -27,7 +28,7 @@ export function SectionFrame({ section, active, badges, actions, renderSub }: Se
     badge: badges?.[id]
   }));
   return (
-    <div className="lab-page">
+    <div className="lab-page console-section">
       <Section
         id={`section-${section}`}
         title={t(`shell.nav.${section}`)}

@@ -1,0 +1,152 @@
+/* Section interiors (agents, tasks, knowledge, settings/ops).
+   Sage comes from the shell palette --ui-home-*. Fallbacks are existing tokens, not a second palette. */
+
+.console-section {
+  background: var(--ui-home-bg, var(--ui-bg));
+  color: var(--ui-home-text, var(--ui-text));
+  font-size: var(--ui-home-ui, 13px);
+}
+
+.console-section .ui-section__title {
+  font-size: var(--ui-home-title, 20px);
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--ui-home-text, var(--ui-text));
+}
+
+.console-section .ui-section__desc,
+.console-section .ui-group__desc,
+.console-section .muted,
+.console-section .ag-panel__lead,
+.console-section .settings-load {
+  color: var(--ui-home-text-secondary, var(--ui-text-muted));
+  font-size: var(--ui-home-hint, 12px);
+}
+
+.console-section .ui-group__title,
+.console-section .ops-workspace__title {
+  font-size: var(--ui-home-section, 16px);
+  font-weight: 650;
+  color: var(--ui-home-text, var(--ui-text));
+}
+
+.console-section .ui-subtabs {
+  border-bottom: 1px solid var(--ui-home-line, var(--ui-border));
+}
+
+.console-section .ui-subtabs__tab.is-active {
+  color: var(--ui-home-text, var(--ui-text));
+  border-bottom: 2px solid var(--ui-home-accent, var(--ui-accent));
+  font-weight: 600;
+}
+
+.console-section :is(.card, .ui-group, .ui-empty, .ag-card, .ag-panel, .list-item, .ops-workspace, .console-grants) {
+  background: var(--ui-home-surface, var(--ui-surface));
+  color: var(--ui-home-text, var(--ui-text));
+  border: 1px solid var(--ui-home-line, var(--ui-border));
+  border-radius: var(--ui-home-radius-card, 12px);
+  box-shadow: var(--ui-home-shadow, none);
+  background-image: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.console-section :is(input, select, textarea) {
+  background: var(--ui-home-surface, var(--ui-surface));
+  color: var(--ui-home-text, var(--ui-text));
+  border: 1px solid var(--ui-home-line-strong, var(--ui-border));
+  border-radius: var(--ui-home-radius-control, 8px);
+  box-shadow: var(--ui-home-shadow, none);
+}
+
+.console-section .btn-primary {
+  background: var(--ui-home-accent, var(--ui-accent));
+  border-color: var(--ui-home-accent, var(--ui-accent));
+  color: var(--ui-home-on-accent, var(--ui-accent-contrast));
+  border-radius: var(--ui-home-radius-control, 8px);
+  box-shadow: var(--ui-home-shadow, none);
+}
+
+.console-section .btn {
+  border-radius: var(--ui-home-radius-control, 8px);
+  box-shadow: var(--ui-home-shadow, none);
+}
+
+.console-section :focus-visible {
+  outline: 2px solid var(--ui-home-accent, var(--ui-accent));
+  outline-offset: 1px;
+}
+
+.console-section .ui-empty {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.console-section .ui-empty__title {
+  color: var(--ui-home-text, var(--ui-text));
+  font-size: var(--ui-home-chat, 14px);
+  font-weight: 600;
+}
+
+.console-section [role='alert'] {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-home-danger, var(--ui-danger));
+  border-radius: var(--ui-home-radius-card, 12px);
+  background: var(--ui-home-danger-soft, var(--ui-surface));
+  color: var(--ui-home-danger, var(--ui-danger));
+  font-size: var(--ui-home-hint, 12px);
+}
+
+.console-section .console-iso {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--ui-home-radius-tag, 6px);
+  background: var(--ui-home-sunk, var(--ui-bg));
+  color: var(--ui-home-text-secondary, var(--ui-text-muted));
+  font-size: var(--ui-home-label, 11px);
+  font-weight: 600;
+}
+
+.console-section .console-iso--direct {
+  background: var(--ui-home-danger-soft, var(--ui-surface));
+  color: var(--ui-home-danger, var(--ui-danger));
+}
+
+.console-section .console-grants {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.console-section .console-grants__title {
+  margin: 0;
+  font-size: var(--ui-home-section, 16px);
+  font-weight: 650;
+}
+
+.console-section .console-grants__desc,
+.console-section .console-grants__session {
+  margin: 0;
+  color: var(--ui-home-text-secondary, var(--ui-text-muted));
+  font-size: var(--ui-home-hint, 12px);
+}
+
+.console-section .console-grants__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.console-section .console-grants__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
