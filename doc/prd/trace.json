@@ -2107,6 +2107,13 @@
       ]
     },
     {
+      "id": "bombadil-bot-stability",
+      "title": "Bot 切换稳定性探索",
+      "tests": [
+        "scripts/bombadil/bot-switch.test.mjs"
+      ]
+    },
+    {
       "id": "bot-async-summary",
       "title": "Bot 历史摘要后台更新",
       "tests": [

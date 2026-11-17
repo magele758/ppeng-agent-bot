@@ -1,0 +1,15 @@
+id: bombadil-bot-stability
+title: Bot 切换稳定性探索
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  那你开发一下，给当前项目加入看看是否可以提升稳定性测试
+criteria:
+  - id: AC-1
+    given: 两个测试 Bot 各有自己的历史消息
+    when: 在两个 Bot 之间反复切换并发送消息
+    then: 能识别另一方的消息混入当前对话，并区分干净样本和已知串线样本
+  - id: AC-2
+    given: 一次独立的稳定性测试已结束
+    when: 检查两个 Bot 实际收到的用户消息
+    then: 任一 Bot 未收到测试发送或收到了发给对方的消息时，本次不能报告通过

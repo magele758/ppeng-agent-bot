@@ -1859,6 +1859,12 @@ Host parks durable wait for owned bg_run
 
 - `packages/core/test/bg-run-host-park.test.js`
 
+### bombadil-bot-stability
+
+Bot 切换稳定性探索
+
+- `scripts/bombadil/bot-switch.test.mjs`
+
 ### bot-async-summary
 
 Bot 历史摘要后台更新
