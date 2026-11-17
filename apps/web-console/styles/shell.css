@@ -382,3 +382,131 @@
     padding: var(--ui-space-3);
   }
 }
+
+.brand-mark__letter {
+  display: none;
+}
+
+/* home-shell */
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root,
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .app.lab-shell,
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .app.lab-shell > .lab-main {
+  background-color: var(--ui-home-bg);
+  background-image: none;
+  box-shadow: var(--ui-home-shadow);
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .app.lab-shell > .lab-rail,
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-shell > .lab-main > .lab-toolbar,
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__foot-menu {
+  background-color: var(--ui-home-panel);
+  background-image: none;
+  border-color: var(--ui-home-line);
+  box-shadow: var(--ui-home-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail {
+  color: var(--ui-home-text);
+  font-size: var(--ui-home-ui);
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-toolbar {
+  color: var(--ui-home-text-secondary);
+  font-size: var(--ui-home-hint);
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-toolbar__meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--ui-home-mono);
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__link {
+  color: var(--ui-home-text-secondary);
+  border-color: transparent;
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__link:hover,
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__link[aria-current='page'] {
+  background: var(--ui-home-hover);
+  color: var(--ui-home-text);
+  border-color: transparent;
+  box-shadow: var(--ui-home-shadow);
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__link[aria-current='page'] .lab-rail__icon {
+  color: var(--ui-home-accent);
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__link:focus-visible,
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__toggle:focus-visible,
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__foot-trigger:focus-visible {
+  outline: 2px solid var(--ui-home-accent);
+  outline-offset: 1px;
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail .brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--ui-home-radius-control);
+  background: var(--ui-home-accent);
+  color: var(--ui-home-on-accent);
+  display: grid;
+  place-items: center;
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail .brand-mark__letter {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail .brand-glyph {
+  display: none;
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__badge {
+  background: var(--ui-home-warn-soft);
+  color: var(--ui-home-warn);
+  border-radius: var(--ui-home-radius-tag);
+  font-size: var(--ui-home-label);
+  font-weight: 600;
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail.is-collapsed .lab-rail__badge {
+  width: 8px;
+  min-width: 8px;
+  height: 8px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+  background: var(--ui-home-warn);
+  border-radius: 4px;
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__foot-menu {
+  background-color: var(--ui-home-surface);
+  border: 1px solid var(--ui-home-line-strong);
+  border-radius: var(--ui-home-radius-dialog);
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail__foot-trigger {
+  width: 100%;
+  height: auto;
+  min-height: 32px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 7px 10px;
+  color: var(--ui-home-text-secondary);
+}
+
+html:is(:not([data-skin]), [data-skin="classic"]) body.lab-root .lab-rail.is-collapsed .lab-rail__foot-trigger {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}

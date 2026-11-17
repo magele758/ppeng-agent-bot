@@ -338,11 +338,12 @@
 
 - `connector-authorization` Lab connector authorization states and SecretVault grant
 
-## console（7）
+## console（8）
 
 需求正文见 [console](console.md)。
 
 - `console-font-size-preference` 控制台字体大小偏好
+- `console-home-shell` 控制台视觉与外壳
 - `console-knowledge` 知识与记忆：分层记忆、搜索与摄取设置
 - `console-navigation` 控制台主导航与页面结构
 - `console-settings` 设置页渐进披露与搜索

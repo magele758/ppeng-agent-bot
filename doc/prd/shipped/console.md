@@ -5,6 +5,13 @@
 
 现在字体又太大了，你在设置里给我加一个字体大小选择的，尺寸参考macos的字体选择吧
 
+## console-home-shell
+控制台视觉与外壳
+
+Implement the approved console redesign, batch 1 only: visual tokens and the app shell.
+User approved: keep today's top-level nav (Bot and 会话 are separate; do not merge or regroup), sage green accent, light and dark together.
+Scope: styles/tokens, theme (light+dark, persisted the way the console already persists preferences — no new env vars), app shell chrome (sidebar, top bar), and the nav labels. Do not restyle section interiors.
+
 ## console-knowledge
 知识与记忆：分层记忆、搜索与摄取设置
 
