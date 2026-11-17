@@ -173,6 +173,7 @@ function useRailFoot(children: ReactNode) {
           <circle cx="12" cy="12" r="1.5" />
           <circle cx="12" cy="19" r="1.5" />
         </svg>
+        <span className="lab-rail__label">{t('shell.nav.footMenu')}</span>
       </button>
       <div
         id="lab-rail-foot-menu"
@@ -231,6 +232,7 @@ export function Rail({ footer }: { footer?: ReactNode | ((collapsed: boolean) =>
       <div className="lab-rail__top">
         <div className="lab-rail__brand">
           <span className="brand-mark" aria-hidden="true">
+            <span className="brand-mark__letter">A</span>
             <svg className="brand-glyph" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M8 24V8l8 8 8-8v16" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
               <circle cx="16" cy="16" r="3" fill="currentColor" />

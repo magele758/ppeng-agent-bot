@@ -2895,6 +2895,15 @@
       ]
     },
     {
+      "id": "console-home-shell",
+      "title": "控制台视觉与外壳",
+      "tests": [
+        "apps/web-console/components/shell/Rail.settings-icon.test.ts",
+        "apps/web-console/lib/theme.home.test.ts",
+        "apps/web-console/styles/home-tokens.test.ts"
+      ]
+    },
+    {
       "id": "console-knowledge",
       "title": "知识与记忆：分层记忆、搜索与摄取设置",
       "tests": [
