@@ -24,6 +24,12 @@ apps/web-console 前端很乱：功能堆在一起，配置太多不好用，交
 apps/web-console 前端很乱：功能堆在一起，配置太多不好用，交互不清晰。目标是整体重构，让控制台清晰、易用。
 主导航：Bot / 对话 / Bots 与 Agents / 任务 / 知识与记忆 / 设置。运维不在左侧主导航，从设置进入。
 
+## console-sections-redesign
+控制台其余页面视觉与本会话始终允许
+
+Implement the approved console redesign for every console section except the app shell, the Bot page, and the chat page, plus the one new behavior 「本会话始终允许」. Keep the current information architecture: 审批 stays under 任务, 运维 stays under 设置. Do not add a top-level 待处理, 工作, or 运维, and do not add ⌘K. Sage green via CSS variables; do not edit shell, tokens, nav, Bot, or chat components.
+「本会话始终允许」: Define "same kind" narrowly and document it in the acceptance criteria: same tool name and same sandbox isolation mode, within the current session only, revocable. Do not widen it to all tools or across sessions. The acceptance criteria must state the allow, the boundary, and the revoke. Persist through the existing settings/session mechanism, no new env flag.
+
 ## console-settings
 设置页渐进披露与搜索
 

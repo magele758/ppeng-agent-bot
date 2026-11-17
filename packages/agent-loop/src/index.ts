@@ -468,6 +468,17 @@ export {
   stripAutoReviewFlags,
 } from './approval/auto-review.js';
 export type { AutoReviewDecision, AutoReviewKind } from './approval/auto-review.js';
+export {
+  SESSION_TOOL_GRANT_KEY,
+  addSessionToolGrant,
+  approvalStillRequired,
+  callsNotCoveredBySessionGrant,
+  isolationModeOf,
+  normalizeSessionToolGrants,
+  otherPendingCovered,
+  sessionGrantCovers,
+} from './approval/session-tool-grant.js';
+export type { PendingLike, SessionToolGrant } from './approval/session-tool-grant.js';
 
 export type {
   DecideHitlLatchInput,

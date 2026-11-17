@@ -4,19 +4,22 @@ import { useState } from 'react';
 import { approvalInboxStatusText } from '@/lib/approval-inbox';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { approvalPostInit, type SessionToolGrant } from '@/lib/session-tool-grant';
 import { sortAgentsById } from '@/lib/sort-utils';
-import { EmptyState, SettingsGroup } from '../../ui';
-import { useLab } from '../../shell/LabProvider';
-import { ListFallback } from './ListFallback';
-import { OutboundDraftsPanel } from './OutboundDraftsPanel';
-import styles from './tasks.module.css';
 import { ApprovalActionPreview } from '../../ApprovalActionPreview';
 import { InboxApprovalReason } from '../../AutoReviewMarks';
+import { IsolationMark, SessionAllowButton } from '../../SessionAllowButton';
+import { useLab } from '../../shell/LabProvider';
+import { EmptyState, SettingsGroup } from '../../ui';
+import { ListFallback } from './ListFallback';
+import { OutboundDraftsPanel } from './OutboundDraftsPanel';
+import { SessionGrantList } from './SessionGrantList';
+import styles from './tasks.module.css';
 
 /** 待审批工具调用、站内邮件与工作区 */
 export function InboxView() {
   const { t } = useI18n();
-  const { approvals, workspaces, agents, mailAll, listState, tick, navigate, openSession } = useLab();
+  const { approvals, workspaces, agents, mailAll, listState, tick, navigate, openSession, sessions } = useLab();
   const [mailFrom, setMailFrom] = useState('');
   const [mailTo, setMailTo] = useState('');
   const [mailBody, setMailBody] = useState('');
@@ -25,11 +28,20 @@ export function InboxView() {
   const agentsSorted = sortAgentsById(agents);
   const onRefresh = () => void tick();
 
-  const decide = (id: string, verdict: 'approve' | 'reject') => {
+  const failApproval = (error: unknown) => {
+    setApprovalError(error instanceof Error ? error.message : String(error));
+  };
+  const postApproval = (id: string, verdict: 'approve' | 'reject', sessionGrant = false) => {
     setApprovalError(null);
-    void api(`/api/approvals/${id}/${verdict}`, { method: 'POST' }).then(onRefresh, (error: unknown) => {
-      setApprovalError(error instanceof Error ? error.message : String(error));
-    });
+    void api(`/api/approvals/${id}/${verdict}`, approvalPostInit(sessionGrant)).then(onRefresh, failApproval);
+  };
+  const revokeGrants = (sessionId: string, grants: SessionToolGrant[]) => {
+    setApprovalError(null);
+    void api(`/api/sessions/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionToolGrants: grants })
+    }).then(onRefresh, failApproval);
   };
 
   const handleSendMail = async () => {
@@ -77,6 +89,7 @@ export function InboxView() {
                   </div>
                   <div className={styles.rowMeta}>
                     <InboxApprovalReason approval={a} />
+                    <IsolationMark toolName={a.toolName} args={a.args} />
                     <span>{t('tasks.inbox.session', { id: a.sessionId })}</span>
                     {expiryNote ? <span>{expiryNote}</span> : null}
                   </div>
@@ -87,15 +100,16 @@ export function InboxView() {
                           type="button"
                           className="btn btn-primary btn-sm"
                           aria-label={t('tasks.inbox.approveAria', { tool: a.toolName })}
-                          onClick={() => decide(a.id, 'approve')}
+                          onClick={() => postApproval(a.id, 'approve')}
                         >
                           {t('tasks.inbox.approve')}
                         </button>
+                        <SessionAllowButton approval={a} onAllow={(id) => postApproval(id, 'approve', true)} />
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
                           aria-label={t('tasks.inbox.rejectAria', { tool: a.toolName })}
-                          onClick={() => decide(a.id, 'reject')}
+                          onClick={() => postApproval(a.id, 'reject')}
                         >
                           {t('tasks.inbox.reject')}
                         </button>
@@ -111,6 +125,7 @@ export function InboxView() {
             })}
           </div>
         </ListFallback>
+        <SessionGrantList sessions={sessions} onRevoke={revokeGrants} />
       </SettingsGroup>
 
       <OutboundDraftsPanel />

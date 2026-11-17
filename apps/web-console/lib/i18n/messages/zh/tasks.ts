@@ -167,6 +167,20 @@ export const tasks = {
     workspacesTitle: '工作区',
     workspacesDesc: 'Agent 可以读写的目录。',
     workspacesEmptyTitle: '没有工作区',
-    workspacesEmptyDesc: '为会话绑定工作区后，会在这里列出。'
+    workspacesEmptyDesc: '为会话绑定工作区后，会在这里列出。',
+    allowSession: '本会话始终允许',
+    allowSessionAria: '本会话始终允许 {tool}',
+    allowSessionHint: '之后本会话里，同一工具且同一隔离方式不再询问。可在下方撤销。',
+    grantsTitle: '本会话已允许',
+    grantsDesc: '只在对应会话里生效：同一工具、同一隔离方式不再询问。撤销后会重新询问。',
+    revoke: '撤销',
+    revokeAria: '撤销 {tool} 的本会话允许',
+    isolationAuto: '自动',
+    isolationOs: '系统沙箱',
+    isolationDirect: '直接执行',
+    isolationRemote: '远端',
+    isolationContainer: '容器',
+    isolationUnspecified: '未指定隔离',
+    isolationUnknown: '未知隔离'
   }
 };

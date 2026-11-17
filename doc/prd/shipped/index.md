@@ -345,6 +345,7 @@
 - `console-home-shell` 控制台视觉与外壳
 - `console-knowledge` 知识与记忆：分层记忆、搜索与摄取设置
 - `console-navigation` 控制台主导航与页面结构
+- `console-sections-redesign` 控制台其余页面视觉与本会话始终允许
 - `console-settings` 设置页渐进披露与搜索
 - `console-skin-motion` 各外观独立特效与极简黑白
 - `console-skins` 多套可切换外观

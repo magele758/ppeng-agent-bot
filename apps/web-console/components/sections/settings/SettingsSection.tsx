@@ -11,6 +11,7 @@ import { ModelOnboardingBanner } from '../../ModelOnboardingBanner';
 import { OpsWorkspace } from '../ops/OpsSection';
 import { SETTINGS_ENTRIES, type SettingsCategoryId } from './registry';
 import './settings.css';
+import '../console-sections.css';
 
 export function SettingsSection({ active }: { active: boolean }) {
   const { t } = useI18n();
@@ -64,7 +65,7 @@ export function SettingsSection({ active }: { active: boolean }) {
   const categoryLabel = (id: SettingsCategoryId) => t(`settings.categories.${id}` as MessageKey);
 
   return (
-    <div className="lab-page">
+    <div className="lab-page console-section">
       <Section
         id="section-settings"
         title={t('shell.nav.settings')}
