@@ -4,15 +4,18 @@ import type { SidechatMessage, SidechatThread } from '@ppeng/api-types';
 import { useI18n } from '@/lib/i18n';
 import type { SidechatDetail } from '@/lib/sidechat-api';
 import { MarkdownHtml } from '../MarkdownHtml';
+import { ReplyActions } from './learning-tools';
 
 export function SidechatMessages({
   messages,
   hit,
-  author
+  author,
+  onCite
 }: {
   messages: SidechatMessage[];
   hit?: string;
   author: string;
+  onCite?: (text: string) => void;
 }) {
   const { t } = useI18n();
   const list = useRef<HTMLDivElement>(null);
@@ -29,6 +32,7 @@ export function SidechatMessages({
         <article key={m.id} data-message={m.id} data-role={m.role} data-hit={m.id === hit}>
           <small>{m.role === 'user' ? t('sidechat.you') : author}</small>
           <MessageBody message={m} />
+          <ReplyActions message={m} onCite={onCite} />
         </article>
       ))}
     </div>

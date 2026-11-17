@@ -1023,6 +1023,21 @@ commerce UI clone; separate from login Secure Form track.
 你把跨会话查找也补到视觉稿里，用两个会话举个例子，我想实际点一下，看看从当前批注找到以前的讨论、再回到原文的体验。
 对话和bot都要有这个能力，这是这么设计的吧？
 
+## sidechat-concurrency
+侧聊凝练和删除期间保持用户的最新操作
+
+重新review下，看看这些问题是否真实存在，如果确实有问题，分多个agent去解决问题，提交合并
+
+## sidechat-delete
+删除会话中的侧聊批注
+
+会话中的侧聊批注，要能够删除
+
+## sidechat-learning
+侧聊的掌握、一句话批注和引用回主线
+
+你参考下 open-chrome-ai针对侧聊新增的哪些能力，都补齐一下，那边的产品功能推进的更多点，你可以参考下
+
 ## single-host-bot-completion
 单机 Bot 工作收尾与默认入口
 

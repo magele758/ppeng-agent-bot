@@ -63,3 +63,30 @@ export function createSidechatSchema(db: DatabaseSync): void {
     END;
   `);
 }
+
+/** Learning state lives beside the annotation. Titles stay searchable after a rename. */
+export function upgradeSidechatLearning(db: DatabaseSync): void {
+  addLearningColumns(db);
+  const fts = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sidechat_fts'").get();
+  if (!fts) return;
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS sidechat_title_au AFTER UPDATE OF title ON sidechat_threads
+    WHEN OLD.title != NEW.title BEGIN
+      INSERT INTO sidechat_fts(sidechat_fts, rowid, text) VALUES('delete', -2 * OLD.n + 1, OLD.title);
+      INSERT INTO sidechat_fts(rowid, text) VALUES(-2 * NEW.n + 1, NEW.title);
+    END;
+  `);
+}
+
+function addLearningColumns(db: DatabaseSync): void {
+  const names = new Set(
+    (db.prepare('PRAGMA table_info(sidechat_threads)').all() as { name: string }[]).map((column) => column.name)
+  );
+  if (!names.has('grasp')) {
+    db.exec("ALTER TABLE sidechat_threads ADD COLUMN grasp TEXT NOT NULL DEFAULT 'thinking'");
+  }
+  if (!names.has('note')) db.exec("ALTER TABLE sidechat_threads ADD COLUMN note TEXT NOT NULL DEFAULT ''");
+  if (!names.has('note_revision')) {
+    db.exec('ALTER TABLE sidechat_threads ADD COLUMN note_revision INTEGER NOT NULL DEFAULT 0');
+  }
+}

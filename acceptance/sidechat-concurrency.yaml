@@ -1,0 +1,15 @@
+id: sidechat-concurrency
+title: 侧聊凝练和删除期间保持用户的最新操作
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  重新review下，看看这些问题是否真实存在，如果确实有问题，分多个agent去解决问题，提交合并
+criteria:
+  - id: AC-1
+    given: 一条批注正在凝练
+    when: 用户保存或清除批注，或再次凝练后旧结果才返回
+    then: 旧结果不会覆盖用户后来保存、清除或再次凝练的结果
+  - id: AC-2
+    given: 一条侧聊正在回答
+    when: 删除在保存时失败
+    then: 侧聊仍在，回答可以继续完成，之后仍能追问

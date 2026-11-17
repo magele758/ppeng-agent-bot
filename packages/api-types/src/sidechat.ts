@@ -9,6 +9,7 @@ export interface SidechatAnchor {
 }
 
 export type SidechatStatus = 'generating' | 'complete' | 'failed' | 'stopped';
+export type SidechatGrasp = 'thinking' | 'mastered';
 
 export interface SidechatThread {
   id: string;
@@ -20,6 +21,8 @@ export interface SidechatThread {
   title: string;
   anchor: SidechatAnchor;
   status: SidechatStatus;
+  grasp: SidechatGrasp;
+  note: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,7 +43,7 @@ export interface SidechatDetail extends SidechatThread {
 }
 
 export interface SidechatMatch {
-  field: 'quote' | 'title' | 'user' | 'assistant';
+  field: 'quote' | 'title' | 'user' | 'assistant' | 'note';
   snippet: string;
   messageId?: string;
 }

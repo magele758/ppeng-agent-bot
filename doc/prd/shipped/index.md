@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 460 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 463 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -1027,6 +1027,14 @@
 需求正文见 [other](other.md)。
 
 - `sidebar-unified-menu` 统一群聊和分组菜单
+
+## sidechat（3）
+
+需求正文见 [other](other.md)。
+
+- `sidechat-concurrency` 侧聊凝练和删除期间保持用户的最新操作
+- `sidechat-delete` 删除会话中的侧聊批注
+- `sidechat-learning` 侧聊的掌握、一句话批注和引用回主线
 
 ## single（1）
 

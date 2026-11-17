@@ -3865,6 +3865,31 @@ Secure Form fill-from-Vault
 - `e2e/sidechat.spec.ts`
 - `packages/core/test/sidechat-store.test.js`
 
+### sidechat-concurrency
+
+侧聊凝练和删除期间保持用户的最新操作
+
+- `apps/daemon/test/sidechat-http.test.ts`
+- `packages/core/test/sidechat-store.test.js`
+
+### sidechat-delete
+
+删除会话中的侧聊批注
+
+- `apps/daemon/test/sidechat-distill-cancel.test.ts`
+- `apps/daemon/test/sidechat-http.test.ts`
+- `e2e/sidechat-delete.spec.ts`
+- `packages/core/test/sidechat-store.test.js`
+
+### sidechat-learning
+
+侧聊的掌握、一句话批注和引用回主线
+
+- `apps/daemon/test/sidechat-http.test.ts`
+- `apps/web-console/lib/sidechat-learning.test.ts`
+- `e2e/sidechat-learning.spec.ts`
+- `packages/core/test/sidechat-store.test.js`
+
 ### single-host-bot-completion
 
 单机 Bot 工作收尾与默认入口

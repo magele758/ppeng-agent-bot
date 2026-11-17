@@ -1,4 +1,4 @@
-import type { SidechatSearchHit, SidechatThread, SidechatMessage } from '@ppeng/api-types';
+import type { SidechatGrasp, SidechatSearchHit, SidechatThread, SidechatMessage } from '@ppeng/api-types';
 import { api } from './api';
 import type { SidechatEditorTarget } from './sidechat-editor';
 
@@ -11,6 +11,8 @@ export type SidechatQuery = {
   botId?: string;
   from?: string;
   to?: string;
+  grasp?: string;
+  noted?: string;
 };
 export type SidechatPage = { items: SidechatSearchHit[]; nextCursor?: number | null };
 const base = '/api/sidechats';
@@ -58,6 +60,19 @@ export function submitSidechat(
 ) {
   if (target.kind === 'thread') return post(threadPath(target.threadId) + '/messages', req);
   return post(base, { sessionId, messageId: target.messageId, anchor: target.anchor, ...req });
+}
+export function updateSidechat(id: string, patch: { grasp?: SidechatGrasp; note?: string; title?: string }) {
+  return api(threadPath(id), {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(patch)
+  }) as Promise<SidechatDetail>;
+}
+export function distillSidechat(id: string) {
+  return post(threadPath(id) + '/note', {});
+}
+export function deleteSidechat(id: string) {
+  return api(threadPath(id), { method: 'DELETE' }) as Promise<{ deleted: true }>;
 }
 export function changeGeneration(threadId: string, action: 'stop' | 'retry', requestId: string, actionId: string) {
   return post(

@@ -10,9 +10,12 @@ import {
   type SidechatEditorTarget,
   type SidechatPanelRequest
 } from '@/lib/sidechat-editor';
-import { changeGeneration, submitSidechat, type SidechatDetail } from '@/lib/sidechat-api';
+import { changeGeneration, deleteSidechat, submitSidechat, type SidechatDetail } from '@/lib/sidechat-api';
 import { SidechatSearch } from './SidechatSearch';
 import { LoadError, Loading, SidechatMessages, SourceLink } from './SidechatMessages';
+import { SessionThreads } from './session-threads';
+import { LearningBar } from './learning-tools';
+import { AutoAsk } from './auto-ask';
 import { useSidechatDetail, useSidechatDraftBook } from './useSidechats';
 import './sidechat.css';
 
@@ -32,6 +35,7 @@ type Props = {
   onOpenSource: (thread: SidechatThread) => void;
   onReturn?: () => void;
   onViewChange?: (request: SidechatPanelRequest) => void;
+  onCite: (text: string) => void;
 };
 const list: SidechatPanelRequest = { kind: 'list' };
 type SearchScope = { quote?: string };
@@ -136,6 +140,11 @@ export function SidechatPanel(props: Props) {
             onRelated={(quote) => setSearch({ quote })}
             onSent={sent}
             onRefresh={props.onRefresh}
+            onDeleted={() => {
+              props.onRefresh();
+              select(list);
+            }}
+            onCite={props.onCite}
           />
         </>
       )}
@@ -158,7 +167,7 @@ function listedThreads(threads: SidechatThread[], view: SidechatPanelRequest) {
   return threads.filter((t) => ids.has(t.id));
 }
 function ThreadList(p: ListProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const items = listedThreads(p.threads, p.view);
   return (
     <div className="sc-library">
@@ -173,22 +182,7 @@ function ThreadList(p: ListProps) {
         <MenuButton label={t('sidechat.add')} onClick={p.onNew} testId="sidechat-new" />
       </div>
       <div className="sc-thread-list">
-        {items.map((thread) => (
-          <button
-            type="button"
-            key={thread.id}
-            data-testid="sidechat-thread"
-            aria-pressed={thread.id === threadId(p.view)}
-            onClick={() => p.onSelect({ kind: 'thread', threadId: thread.id })}
-          >
-            <span className="sc-index">{thread.ordinal}</span>
-            <span className="sc-thread-copy">
-              <strong>{thread.title}</strong>
-              <small>{thread.anchor.quote}</small>
-            </span>
-            <time dateTime={thread.updatedAt}>{new Date(thread.updatedAt).toLocaleDateString(locale)}</time>
-          </button>
-        ))}
+        <SessionThreads threads={items} view={p.view} onSelect={p.onSelect} />
       </div>
       {p.error ? (
         <LoadError retry={p.retry} />
@@ -206,6 +200,8 @@ type ConvoProps = {
   onRelated: (q: string) => void;
   onSent: (from: SidechatEditorTarget, detail: SidechatDetail) => void;
   onRefresh: () => void;
+  onDeleted: () => void;
+  onCite: (text: string) => void;
 };
 function Conversation(p: ConvoProps) {
   const { t } = useI18n();
@@ -225,6 +221,20 @@ function Conversation(p: ConvoProps) {
 }
 function DetailPlaceholder({ fault, retry }: { fault: string; retry: () => void }) {
   return fault ? <LoadError retry={retry} /> : <Loading />;
+}
+function autoPrompt(target: SidechatEditorTarget) {
+  return target.kind === 'draft' ? target.autoAsk : undefined;
+}
+function askText(
+  generating: boolean | undefined,
+  book: SidechatDraftBook,
+  key: string,
+  text: string,
+  send: () => void
+) {
+  if (generating) return;
+  book.edit(key, text);
+  send();
 }
 function cannotSend(book: SidechatDraftBook, key: string, generating: boolean) {
   return generating || book.sending(key) || !book.text(key).trim();
@@ -268,7 +278,13 @@ function Editor(p: EditorProps) {
   return (
     <>
       <div className="sc-pinned-source">
-        <SourceCard target={p.target} detail={p.detail} onLocate={p.onLocate} onRelated={p.onRelated} />
+        <SourceCard
+          target={p.target}
+          detail={p.detail}
+          onLocate={p.onLocate}
+          onRelated={p.onRelated}
+          onDeleted={p.onDeleted}
+        />
       </div>
       <div
         ref={scroll}
@@ -283,6 +299,7 @@ function Editor(p: EditorProps) {
           <SidechatMessages
             messages={p.detail.messages}
             author={p.detail.thread.botId || p.detail.thread.agentId}
+            onCite={p.onCite}
           />
         ) : (
           <MenuButton
@@ -295,6 +312,15 @@ function Editor(p: EditorProps) {
         )}
       </div>
       <div className="sc-compose">
+        <AutoAsk address={key} prompt={autoPrompt(p.target)} book={p.book} run={() => void send()} />
+        <LearningBar
+          detail={p.detail}
+          ask={(text) => askText(generating, p.book, key, text, () => void send())}
+          onUpdated={(detail) => {
+            p.receive(detail);
+            p.onRefresh();
+          }}
+        />
         {p.detail && (
           <Generation
             detail={p.detail}
@@ -341,7 +367,44 @@ function Editor(p: EditorProps) {
     </>
   );
 }
-function SourceCard(p: Pick<EditorProps, 'target' | 'detail' | 'onLocate' | 'onRelated'>) {
+function DeleteAnnotation({ id, onDeleted }: { id: string | undefined; onDeleted: () => void }) {
+  const { t } = useI18n();
+  const [fault, setFault] = useState(false);
+  if (!id) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className="sc-button sc-delete"
+        data-testid="sidechat-delete"
+        onClick={() => void confirmDelete(id, t('sidechat.deleteConfirm'), setFault, onDeleted)}
+      >
+        {t('sidechat.delete')}
+      </button>
+      {fault ? (
+        <span role="alert" className="sc-error">
+          {t('sidechat.deleteError')}
+        </span>
+      ) : null}
+    </>
+  );
+}
+async function confirmDelete(
+  id: string,
+  message: string,
+  setFault: (fault: boolean) => void,
+  onDeleted: () => void
+) {
+  if (!window.confirm(message)) return;
+  setFault(false);
+  try {
+    await deleteSidechat(id);
+    onDeleted();
+  } catch {
+    setFault(true);
+  }
+}
+function SourceCard(p: Pick<EditorProps, 'target' | 'detail' | 'onLocate' | 'onRelated' | 'onDeleted'>) {
   const { t } = useI18n();
   const thread = p.detail?.thread;
   const a = p.target.kind === 'draft' ? p.target.anchor : thread?.anchor;
@@ -352,7 +415,10 @@ function SourceCard(p: Pick<EditorProps, 'target' | 'detail' | 'onLocate' | 'onR
         <small>
           {t('sidechat.source')} {thread?.ordinal}
         </small>
-        {p.detail && <SourceLink detail={p.detail} onOpen={p.onLocate} />}
+        <div className="sc-source-actions">
+          {p.detail && <SourceLink detail={p.detail} onOpen={p.onLocate} />}
+          <DeleteAnnotation key={thread?.id} id={thread?.id} onDeleted={p.onDeleted} />
+        </div>
       </div>
       <blockquote>{a.quote}</blockquote>
       {a.kind === 'range' && (

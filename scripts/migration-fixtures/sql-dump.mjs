@@ -1,7 +1,7 @@
 /**
  * Text dump / load for SQLite state DBs (node:sqlite has no `.dump`).
  *
- * Dump order: plain tables (schema + rows by rowid), then FTS virtual tables
+ * Dump order: plain tables (schema + rows by rowid), views, then FTS virtual tables
  * (their shadow tables are skipped and the index is rebuilt on load), then
  * indexes and triggers — triggers last so loading rows does not fire them.
  */
@@ -46,6 +46,7 @@ export function dumpDatabase(db, header = []) {
       );
     }
   }
+  for (const view of objects.filter((row) => row.type === 'view')) lines.push(`${view.sql};`);
   for (const vt of objects.filter(isVirtual)) {
     lines.push(`${vt.sql};`);
     if (/\bcontent\s*=/i.test(vt.sql)) {

@@ -10,6 +10,8 @@ export interface SearchOptions {
   botId?: string;
   from?: string;
   to?: string;
+  grasp?: 'thinking' | 'mastered';
+  noted?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -40,12 +42,21 @@ function selection(owner: string, visible: readonly string[], opts: SearchOption
       args.push(value);
     }
   }
+  learningFilters(opts, where, args);
   return {
     sql: `SELECT ${threadColumns}, s.title AS session_title
           FROM sidechat_threads t JOIN sessions s ON s.id = t.session_id
           WHERE ${where.join(' AND ')}`,
     args
   };
+}
+
+function learningFilters(opts: SearchOptions, where: string[], args: string[]): void {
+  if (opts.grasp === 'thinking' || opts.grasp === 'mastered') {
+    where.push('t.grasp=?');
+    args.push(opts.grasp);
+  }
+  if (opts.noted) where.push("trim(t.note)!=''");
 }
 
 function matching(query: string, hasFts: boolean) {
@@ -63,6 +74,16 @@ function matching(query: string, hasFts: boolean) {
                FROM sidechat_corpus c JOIN scope ON scope.id = c.thread_id
                WHERE ${condition}`;
   return { sql, args };
+}
+
+function withNotes(matched: { sql: string; args: string[] }, query: string) {
+  const sql = `${matched.sql}
+    UNION ALL
+    SELECT 0 AS docid, scope.id AS thread_id, 'note' AS field, NULL AS message_id, scope.note AS text,
+           instr(lower(scope.note), lower(?)) AS pos, 1 AS rank
+    FROM scope
+    WHERE trim(scope.note) != '' AND instr(lower(scope.note), lower(?)) > 0`;
+  return { sql, args: [...matched.args, query, query] };
 }
 
 function group(rows: HitRow[]): SidechatSearchHit[] {
@@ -107,7 +128,7 @@ export function searchSidechats(
       .all(...scope.args, limit, offset);
     return group(rows as unknown as HitRow[]);
   }
-  const matched = matching(query, hasFts);
+  const matched = withNotes(matching(query, hasFts), query);
   const rows = db
     .prepare(
       `WITH scope AS (${scope.sql}), matched AS (${matched.sql}),

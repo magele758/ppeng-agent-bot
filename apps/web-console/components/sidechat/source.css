@@ -39,11 +39,23 @@
 .sidechat-location-notice {
   position: fixed;
   z-index: calc(var(--ui-z-overlay) + 1);
-  padding: 6px 10px;
+  padding: 4px;
   border-radius: var(--ui-radius-md);
   background: var(--ui-text);
   color: var(--ui-bg);
   font-size: var(--ui-text-sm);
+}
+.sidechat-selection {
+  display: flex;
+  gap: 2px;
+}
+.sidechat-selection button {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 6px;
 }
 .sidechat-location-notice {
   bottom: 1rem;
@@ -54,6 +66,10 @@
   background: color-mix(in srgb, var(--ui-warn) 18%, transparent);
   text-decoration: underline dotted var(--ui-warn);
   text-underline-offset: 3px;
+}
+[data-sidechat-grasp='mastered'] {
+  background: color-mix(in srgb, var(--ui-ok) 28%, transparent);
+  text-decoration-color: var(--ui-ok);
 }
 [data-sidechat-ordinal]::after {
   content: attr(data-sidechat-ordinal);

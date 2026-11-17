@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
+import { createSidechatSchema, upgradeSidechatLearning } from '../dist/sidechat/schema.js';
+import { DatabaseSync } from 'node:sqlite';
 
 function fixture(t) {
   const store = new SqliteStateStore(':memory:');
@@ -11,6 +13,47 @@ function fixture(t) {
   const add = (title) => store.createSession({ title, mode: 'chat', agentId: 'general' }).id;
   return { store, side: store.sidechats, a: add('模型推理入门'), b: add('部署排查') };
 }
+
+test('旧侧聊学习升级可重复且没有全文索引时仍有默认值', (t) => {
+  const db = new DatabaseSync(':memory:');
+  t.after(() => db.close());
+  db.exec('CREATE TABLE sessions(id TEXT PRIMARY KEY)');
+  createSidechatSchema(db);
+  db.exec(`INSERT INTO sessions VALUES ('source');
+    INSERT INTO sidechat_threads(id,owner,session_id,create_request,message_id,agent_id,ordinal,title,anchor,created,updated)
+    VALUES ('old','alice','source','r1','m1','general',1,'旧标题','{"quote":"旧摘录"}','before','before')`);
+  db.exec('DROP TABLE sidechat_fts');
+  upgradeSidechatLearning(db);
+  upgradeSidechatLearning(db);
+  assert.deepEqual({ ...db.prepare('SELECT grasp,note,note_revision FROM sidechat_threads').get() }, {
+    grasp: 'thinking', note: '', note_revision: 0
+  });
+});
+
+test('另一连接编辑或再次凝练后旧结果不能覆盖批注 [AC:sidechat-concurrency#AC-1]', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'sidechat-note-race-'));
+  const path = join(dir, 'runtime.sqlite');
+  const first = new SqliteStateStore(path);
+  const second = new SqliteStateStore(path);
+  t.after(() => {
+    first.sidechats.releaseWorker();
+    second.sidechats.releaseWorker();
+    first.db.close();
+    second.db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const session = first.createSession({ mode: 'chat', agentId: 'general', title: '并发学习' });
+  const { thread } = first.sidechats.start('alice', input(session.id));
+  const revision = first.sidechats.beginNote('alice', thread.id);
+  second.sidechats.revise('alice', thread.id, { note: '' });
+  assert.equal(first.sidechats.finishNote('alice', thread.id, revision, '过期结论'), false);
+  const old = first.sidechats.beginNote('alice', thread.id);
+  const fresh = second.sidechats.beginNote('alice', thread.id);
+  assert.equal(second.sidechats.finishNote('alice', thread.id, fresh, '最新结论'), true);
+  assert.equal(first.sidechats.finishNote('alice', thread.id, old, '过期结论'), false);
+  assert.equal(first.sidechats.finishNote('alice', thread.id, fresh, '重复完成'), false);
+  assert.equal(first.sidechats.get('alice', [session.id], thread.id).note, '最新结论');
+});
 
 function input(sessionId, requestId = 'r1') {
   return {
@@ -185,4 +228,84 @@ test('详情读取期间另一连接完成回复，状态与消息仍来自同�
   const afterCommit = read();
   assert.equal(afterCommit.status, 'complete');
   assert.equal(afterCommit.messages.at(-1).text, '已完成');
+});
+
+function anchored(sessionId, requestId, quote, question) {
+  return {
+    sessionId,
+    messageId: 'msg1',
+    agentId: 'general',
+    question,
+    requestId,
+    anchor: { kind: 'range', quote, start: 0, end: quote.length }
+  };
+}
+
+test('删除一条批注后，摘录和只在该讨论里出现的词都找不到，其余批注还在 [AC:sidechat-delete#AC-2]', (t) => {
+  const { store, side, a, b } = fixture(t);
+  const kept = side.start('alice', anchored(a, 'kept', 'KV cache', 'kepttoken 的问题'));
+  side.finish(kept.thread.id, kept.runId, 'complete', 'kepttoken 的回答');
+  const sibling = side.start('alice', anchored(b, 'sib', 'KV cache', '同会话还在'));
+  side.finish(sibling.thread.id, sibling.runId, 'complete', '另一条回答');
+  const gone = side.start('alice', anchored(b, 'gone', 'only-this-excerpt', '问题 plumtoken'));
+  side.finish(gone.thread.id, gone.runId, 'complete', '回答 plumtoken');
+  assert.equal(side.remove('bob', gone.thread.id), false);
+  assert.ok(side.get('alice', [b], gone.thread.id));
+  assert.equal(side.remove('alice', gone.thread.id), true);
+  assert.equal(side.remove('alice', gone.thread.id), false);
+  assert.equal(side.get('alice', [b], gone.thread.id), undefined);
+  assert.equal(
+    store.db.prepare('SELECT count(*) AS n FROM sidechat_turns WHERE thread_id = ?').get(gone.thread.id).n,
+    0
+  );
+  assert.deepEqual(side.search('alice', [a, b], { query: 'plumtoken' }), []);
+  assert.deepEqual(side.search('alice', [a, b], { exactQuote: 'only-this-excerpt' }), []);
+  assert.deepEqual(
+    side.search('alice', [a, b], { exactQuote: 'kv cache' }).map((hit) => hit.thread.id).sort(),
+    [kept.thread.id, sibling.thread.id].sort()
+  );
+  assert.deepEqual(
+    side.search('alice', [a, b], { query: 'kepttoken' }).map((hit) => hit.thread.id),
+    [kept.thread.id]
+  );
+  assert.deepEqual(
+    side.list('alice', b).map((thread) => thread.id),
+    [sibling.thread.id]
+  );
+});
+
+test('掌握状态、一句话和改标题后，只能按自己的批注筛选和搜到 [AC:sidechat-learning#AC-3] [AC:sidechat-learning#AC-6]', (t) => {
+  const { side, a } = fixture(t);
+  const first = side.start('alice', anchored(a, 'one', 'KV cache', '先问这个'));
+  side.finish(first.thread.id, first.runId, 'complete', '先回答这个');
+  const second = side.start('alice', anchored(a, 'two', '另一处', '再问这个'));
+  side.finish(second.thread.id, second.runId, 'complete', '再回答这个');
+  assert.equal(side.get('alice', [a], first.thread.id).grasp, 'thinking');
+  assert.equal(side.get('alice', [a], first.thread.id).note, '');
+  assert.equal(side.revise('bob', first.thread.id, { grasp: 'mastered', note: '手写金句xyz', title: '新的旁注标题' }), false);
+  assert.equal(side.revise('alice', first.thread.id, { grasp: 'mastered', note: '手写金句xyz', title: '新的旁注标题' }), true);
+  const saved = side.get('alice', [a], first.thread.id);
+  assert.equal(saved.grasp, 'mastered');
+  assert.equal(saved.note, '手写金句xyz');
+  assert.equal(saved.title, '新的旁注标题');
+  assert.deepEqual(
+    side.search('alice', [a], { grasp: 'mastered' }).map((hit) => hit.thread.id),
+    [first.thread.id]
+  );
+  assert.deepEqual(
+    side.search('alice', [a], { grasp: 'thinking' }).map((hit) => hit.thread.id),
+    [second.thread.id]
+  );
+  assert.deepEqual(
+    side.search('alice', [a], { noted: true }).map((hit) => hit.thread.id),
+    [first.thread.id]
+  );
+  const found = side.search('alice', [a], { query: '手写金句xyz' });
+  assert.equal(found[0].thread.id, first.thread.id);
+  assert.equal(found[0].matches.some((match) => match.field === 'note' && match.snippet.includes('手写金句xyz')), true);
+  assert.equal(side.search('alice', [a], { query: '新的旁注标题' })[0].thread.id, first.thread.id);
+  assert.deepEqual(side.search('bob', [a], { query: '手写金句xyz' }), []);
+  assert.equal(side.revise('alice', first.thread.id, { note: '' }), true);
+  assert.deepEqual(side.search('alice', [a], { query: '手写金句xyz' }), []);
+  assert.deepEqual(side.search('alice', [a], { noted: true }), []);
 });

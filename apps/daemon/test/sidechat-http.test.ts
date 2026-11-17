@@ -33,7 +33,7 @@ function fixture(t: TestContext, turn: ModelAdapter['runTurn']) {
     readBody: async (req: any) => req.body,
     policy: buildRoutePolicy({ runtime, owners: new ResourceOwnerStore(runtime.store.db) })
   }).addAll(sidechatRoutes(runtime, {}));
-  async function request(path: string, body?: unknown, user = 'ada') {
+  async function request(path: string, body?: unknown, user = 'ada', method?: string) {
     let value: any;
     const response = {
       setHeader() {},
@@ -42,7 +42,7 @@ function fixture(t: TestContext, turn: ModelAdapter['runTurn']) {
       }
     };
     const success = await router.dispatch(
-      { method: body ? 'POST' : 'GET', body } as any,
+      { method: method ?? (body === undefined ? 'GET' : 'POST'), body } as any,
       response as any,
       new URL('/api/sidechats' + path, 'http://localhost'),
       { isolate: true, labProxy: true, user: { id: user, tenantId: 't', email: user + '@example.test' } }
@@ -75,6 +75,71 @@ function fixture(t: TestContext, turn: ModelAdapter['runTurn']) {
   return { runtime, source, request, done };
 }
 const answer = (text: string) => ({ stopReason: 'end' as const, assistantParts: [{ type: 'text' as const, text }] });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+test('凝练迟到时保留改写、清除和后一次凝练 [AC:sidechat-concurrency#AC-1]', { timeout: 5000 }, async (t) => {
+  const pending: Array<ReturnType<typeof deferred<string>>> = [];
+  const f = fixture(t, async (input) => {
+    if (!JSON.stringify(input.messages).includes('凝练成一句话')) return answer('完成的讨论');
+    const turn = deferred<string>();
+    pending.push(turn);
+    return answer(await turn.promise);
+  });
+  const chat = f.runtime.createChatSession({ agentId: 'general', metadata: { userId: 'ada' } });
+  const created = await f.request('', f.source(chat.id));
+  const path = '/' + created.thread.id;
+  await f.done(created.thread.id);
+  async function startNote() {
+    const count = pending.length;
+    const result = f.request(path + '/note', {}, 'ada', 'POST').then(
+      value => ({ value, error: undefined }),
+      error => ({ value: undefined, error })
+    );
+    while (pending.length === count) await new Promise(resolve => setImmediate(resolve));
+    return { result, gate: pending.at(-1)! };
+  }
+  for (const note of ['后来手写的结论', '']) {
+    const old = await startNote();
+    await f.request(path, { note }, 'ada', 'PATCH');
+    old.gate.resolve('过期凝练');
+    const result = await old.result;
+    assert.equal((await f.request(path)).thread.note, note);
+    assert.equal(result.error?.statusCode, 409);
+  }
+  const old = await startNote();
+  const latest = await startNote();
+  latest.gate.resolve('后一次凝练');
+  assert.equal((await latest.result).value.thread.note, '后一次凝练');
+  old.gate.resolve('前一次凝练');
+  assert.equal((await old.result).error?.statusCode, 409);
+  assert.equal((await f.request(path)).thread.note, '后一次凝练');
+});
+
+test('删除落库失败后回答继续完成并可追问 [AC:sidechat-concurrency#AC-2]', async (t) => {
+  const gate = deferred<void>();
+  let signal: AbortSignal | undefined;
+  const f = fixture(t, async (input) => {
+    signal = input.signal;
+    await gate.promise;
+    return answer('保留的完整回答');
+  });
+  const chat = f.runtime.createChatSession({ agentId: 'general', metadata: { userId: 'ada' } });
+  const created = await f.request('', f.source(chat.id));
+  const path = '/' + created.thread.id;
+  f.runtime.store.db.exec(`CREATE TRIGGER reject_sidechat_delete BEFORE DELETE ON sidechat_threads
+    BEGIN SELECT RAISE(ABORT, 'delete failed'); END;`);
+  await assert.rejects(f.request(path, undefined, 'ada', 'DELETE'), /delete failed/);
+  assert.equal(signal?.aborted, false);
+  gate.resolve();
+  assert.equal((await f.done(created.thread.id)).messages.at(-1).text, '保留的完整回答');
+  await f.request(path + '/messages', { question: '继续追问', requestId: 'after-delete-failure' });
+  assert.equal((await f.done(created.thread.id)).messages.length, 4);
+});
 
 test('both source identities reply in an isolated durable conversation [AC:sidechat#AC-2]', async (t) => {
   const calls: ModelTurnInput[] = [];
@@ -324,4 +389,79 @@ test('visible replacement replies can be annotated and removed originals retain 
   const hits = await f.request('?q=deleted-tail-needle');
   assert.equal(hits.items[0].thread.id, other.thread.id);
   assert.equal(hits.items[0].matches[0].field, 'quote');
+});
+
+test('删除进行中的批注会停掉回答；别人删不掉也看不到 [AC:sidechat-delete#AC-3]', async (t) => {
+  let arm: ((input: ModelTurnInput) => void) | null = null;
+  let sawAbort = false;
+  const f = fixture(t, async (input) => {
+    if (!arm) return answer('留下的回答');
+    const notify = arm;
+    arm = null;
+    if (!input.signal) throw new Error('missing signal');
+    notify(input);
+    await new Promise((_resolve, reject) => {
+      input.signal!.addEventListener('abort', () => {
+        sawAbort = true;
+        reject(new Error('aborted'));
+      });
+    });
+    return answer('不应留下');
+  });
+  const chat = f.runtime.createChatSession({ agentId: 'general', title: 'Chat', metadata: { userId: 'ada' } });
+  const body = f.source(chat.id);
+  const messages = () => f.runtime.store.listMessages(chat.id).length;
+  const before = messages();
+  const kept = await f.request('', { ...body, requestId: 'keep', question: 'kepttoken 的问题' });
+  await f.done(kept.thread.id);
+  arm = () => undefined;
+  const created = await f.request('', { ...body, requestId: 'drop', question: '问题 plumtoken' });
+  assert.equal(created.thread.status, 'generating');
+  await assert.rejects(f.request('/' + created.thread.id, undefined, 'bob', 'DELETE'), (error: any) => {
+    assert.equal(error.statusCode, 404);
+    assert.equal(String(error.message).includes('plumtoken'), false);
+    return true;
+  });
+  assert.equal((await f.request('/' + created.thread.id)).thread.status, 'generating');
+  assert.deepEqual((await f.request('?q=plumtoken', undefined, 'bob')).items, []);
+  assert.equal((await f.request('/' + created.thread.id, undefined, 'ada', 'DELETE')).deleted, true);
+  assert.equal(sawAbort, true);
+  await assert.rejects(f.request('/' + created.thread.id), { statusCode: 404 });
+  assert.deepEqual((await f.request('?q=plumtoken')).items, []);
+  assert.equal((await f.request('?q=kepttoken')).items[0].thread.id, kept.thread.id);
+  assert.equal(messages(), before);
+});
+
+test('没有完成回答时不能凝练；完成后一句话、掌握和标题只属于本人 [AC:sidechat-learning#AC-4] [AC:sidechat-learning#AC-6]', async (t) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const f = fixture(t, async (input) => {
+    const blob = JSON.stringify(input.messages);
+    if (blob.includes('凝练成一句话')) return answer('只缓存历史键值。');
+    await gate;
+    return answer('side answer');
+  });
+  const chat = f.runtime.createChatSession({ agentId: 'general', title: 'Chat', metadata: { userId: 'ada' } });
+  const created = await f.request('', f.source(chat.id));
+  await assert.rejects(f.request('/' + created.thread.id + '/note', {}, 'ada', 'POST'), {
+    statusCode: 400,
+    message: 'sidechat_note_needs_reply'
+  });
+  assert.equal((await f.request('/' + created.thread.id)).thread.note, '');
+  release();
+  await f.done(created.thread.id);
+  const noted = await f.request('/' + created.thread.id + '/note', {}, 'ada', 'POST');
+  assert.equal(noted.thread.note, '只缓存历史键值。');
+  await assert.rejects(f.request('/' + created.thread.id, { grasp: 'mastered', title: '别人的标题' }, 'bob', 'PATCH'), {
+    statusCode: 404
+  });
+  const renamed = await f.request('/' + created.thread.id, { grasp: 'mastered', title: '新的旁注标题' }, 'ada', 'PATCH');
+  assert.equal(renamed.thread.grasp, 'mastered');
+  assert.equal(renamed.thread.title, '新的旁注标题');
+  assert.equal(renamed.thread.note, '只缓存历史键值。');
+  const hits = await f.request('?q=' + encodeURIComponent('只缓存历史键值'));
+  assert.equal(hits.items[0].thread.id, created.thread.id);
+  assert.deepEqual((await f.request('?q=' + encodeURIComponent('只缓存历史键值'), undefined, 'bob')).items, []);
 });

@@ -32,7 +32,7 @@ function collectRows(rows: Set<HTMLElement>, node: Node) {
   for (const row of node.querySelectorAll<HTMLElement>(selector)) rows.add(row);
 }
 function stamp(group: SidechatThread[]) {
-  return JSON.stringify(group.map((t) => [t.id, t.ordinal, t.anchor, t.title]));
+  return JSON.stringify(group.map((t) => [t.id, t.ordinal, t.anchor, t.title, t.grasp, t.note]));
 }
 function updateRow(row: HTMLElement, groups: MarkerBook, label: MarkLabel) {
   const family = groups.get(row.dataset.sidechatMessage!);

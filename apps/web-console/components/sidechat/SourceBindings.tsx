@@ -5,6 +5,7 @@ import { useI18n } from '@/lib/i18n';
 import type { SidechatPanelRequest } from '../../lib/sidechat-editor';
 import { useSourceMarks } from './use-source-marks';
 import { selectedAnchor, messageRange } from './source-dom';
+import { SelectionBar } from './selection-bar';
 
 const rowSelector = '[data-sidechat-message]';
 function selectedRow(range: Range, feed: HTMLElement) {
@@ -85,20 +86,23 @@ export function SourceBindings({
   }, [feed, sessionId]);
   if (!choice) return null;
   return (
-    <button
-      type="button"
-      data-testid="sidechat-selection"
-      className="sidechat-selection"
-      style={{ left: choice.left, top: choice.top }}
-      onPointerDown={(e) => e.preventDefault()}
-      onClick={() => {
-        open({ kind: 'draft', messageId: choice.messageId, anchor: choice.anchor });
+    <SelectionBar
+      choice={choice}
+      threads={threads}
+      labels={{
+        start: t('sidechatSource.start'),
+        explain: t('sidechat.explainPlain'),
+        existing: t('sidechat.openExisting'),
+        copy: t('sidechat.copy'),
+        copied: t('sidechat.copied'),
+        explainPrompt: t('sidechat.explainPlainPrompt', { quote: choice.anchor.quote.slice(0, 160) })
+      }}
+      open={(request) => {
+        open(request);
         setChoice(null);
         window.getSelection()?.removeAllRanges();
       }}
-    >
-      {t('sidechatSource.start')}
-    </button>
+    />
   );
 }
 

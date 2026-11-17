@@ -1,4 +1,4 @@
-import type { SidechatMessage, SidechatStatus, SidechatThread } from '@ppeng/api-types';
+import type { SidechatGrasp, SidechatMessage, SidechatStatus, SidechatThread } from '@ppeng/api-types';
 
 export interface ThreadRow {
   id: string;
@@ -9,6 +9,8 @@ export interface ThreadRow {
   ordinal: number;
   title: string;
   anchor: string;
+  grasp: string;
+  note: string | null;
   status: SidechatStatus;
   created: string;
   updated: string;
@@ -26,7 +28,7 @@ export interface TurnRow {
   created: string;
 }
 
-export const threadColumns = `t.id,t.session_id,t.message_id,t.agent_id,t.bot_id,t.ordinal,t.title,t.anchor,t.created,t.updated,
+export const threadColumns = `t.id,t.session_id,t.message_id,t.agent_id,t.bot_id,t.ordinal,t.title,t.anchor,t.grasp,t.note,t.created,t.updated,
   (SELECT status FROM sidechat_turns WHERE thread_id=t.id ORDER BY n DESC LIMIT 1) AS status`;
 
 export function readThread(row: ThreadRow): SidechatThread {
@@ -40,9 +42,18 @@ export function readThread(row: ThreadRow): SidechatThread {
     title: row.title,
     anchor: JSON.parse(row.anchor),
     status: row.status,
+    grasp: threadGrasp(row.grasp),
+    note: threadNote(row.note),
     createdAt: row.created,
     updatedAt: row.updated
   };
+}
+
+function threadGrasp(value: string): SidechatGrasp {
+  return value === 'mastered' ? 'mastered' : 'thinking';
+}
+function threadNote(value: string | null): string {
+  return value ?? '';
 }
 
 export function readMessages(turn: TurnRow): SidechatMessage[] {
