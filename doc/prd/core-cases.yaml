@@ -1,6 +1,11 @@
 note: 领域包和交互卡片没有单独的验收规格，所以不进核心用例。演进不是日常入口由运维页规格证明。
 cases:
   - id: default-entry
+    route: "#/bot"
+    aliases: [左侧边栏, 首页, Bot 名册, sidebar]
+    sources:
+      - apps/web-console/lib/nav.ts
+      - apps/web-console/components/BotFunctionalGroups.tsx
     title: 打开产品落在默认 Bot，旧的普通会话还在
     chapters:
       - 01-product
@@ -10,6 +15,11 @@ cases:
       - bots
       - bot-entry-simplification
   - id: forever-chat
+    route: "#/bot"
+    aliases: [主对话, 长会话, 上下文压缩, compact]
+    sources:
+      - apps/web-console/components/ChatFeedWindow.tsx
+      - packages/core/src/session/bot-compact-policy.ts
     title: 一只 Bot 一条主对话，压缩和换模型都不另开
     chapters:
       - 03-conversation
@@ -18,6 +28,11 @@ cases:
       - bot-dual-compact
       - bot-window-compact
   - id: speak-while-busy
+    route: "#/bot"
+    aliases: [插话, 输入框, steer, 输入建议]
+    sources:
+      - apps/web-console/components/PlayPanel.tsx
+      - apps/daemon/src/steer-request.ts
     title: 发出的话马上出现、忙时还能插话、下一句建议要按 Tab 才采纳
     chapters:
       - 03-conversation
@@ -26,6 +41,11 @@ cases:
       - bot-input-suggestion
       - session-recap
   - id: goal-done-means-done
+    route: "#/bot"
+    aliases: [目标面板, 子任务, 完成判定, goals]
+    sources:
+      - apps/web-console/components/bot-work/BotGoals.tsx
+      - packages/core/src/bots/goals/service.ts
     title: 目标没达到不能显示完成，子任务结果回到原来的目标
     chapters:
       - 04-goals-and-collaboration
@@ -34,6 +54,11 @@ cases:
       - bot-goal-result-return
       - bot-multi-goal-coordination
   - id: room-speaks-when-picked
+    route: "#/bot"
+    aliases: [群聊, 群成员, 点名, room]
+    sources:
+      - apps/web-console/components/bot-work/BotRooms.tsx
+      - apps/web-console/components/play-group/RoomMemberDrawer.tsx
     title: 群里只有被点到的才发言
     chapters:
       - 04-goals-and-collaboration
@@ -41,6 +66,11 @@ cases:
       - bot-room-speaker-pick
       - bot-rooms
   - id: approval-and-failure
+    route: "#/bot"
+    aliases: [待审批, 批准, 超时, approval]
+    sources:
+      - apps/web-console/components/ApprovalBanner.tsx
+      - apps/web-console/lib/approval-feed.ts
     title: 待批准停在对话里等人决定，超时未批不执行
     chapters:
       - 06-safety-and-runtime
@@ -49,6 +79,11 @@ cases:
       - bot-goal-nested-approval
       - unattended-approval-expiry
   - id: skills-and-routines
+    route: "#/bot"
+    aliases: [技能共享, 定时任务, routines, skills]
+    sources:
+      - apps/web-console/components/BotSkillSharing.tsx
+      - apps/web-console/components/RoutineSchedule.tsx
     title: 技能和定时任务的结果留在这只 Bot 上
     chapters:
       - 05-memory-skills-routines
@@ -57,9 +92,26 @@ cases:
       - bot-routine-main-session
       - agent-skill-management
   - id: ops-without-evolution
+    route: "#/settings/ops/health"
+    aliases: [运维, 服务健康, 自愈, health]
+    sources:
+      - apps/web-console/components/sections/ops/OpsSection.tsx
+      - apps/web-console/lib/nav.ts
     title: 运维页能看服务和自愈，没有演进入口；工具默认按层提供，不是一次全给
     chapters:
       - 07-evolution-and-platform
     specs:
       - ops-console
       - tool-exposure-tiers
+  - id: bot-switch
+    route: "#/bot"
+    aliases: [左侧边栏, 切换会话, 串线, 消息错投, bot switch]
+    sources:
+      - apps/web-console/components/BotFunctionalGroups.tsx
+      - apps/web-console/components/usePlayChat.ts
+      - apps/web-console/components/PlayPanel.tsx
+    title: 流式回复期间切换 Bot，聊天记录和发送目标跟随当前会话
+    chapters:
+      - 03-conversation
+    specs:
+      - bot-switch-live-turn

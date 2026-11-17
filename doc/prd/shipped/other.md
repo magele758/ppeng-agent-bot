@@ -6,21 +6,6 @@
 Phase 2 — 把用户需求变成可执行的验收标准，负责人只评审验收用例（不看代码），
 发布门禁证明每一条已批准的标准都有通过的测试。
 
-## agent-as-folder-eval
-Agent-as-folder path + eval default-on
-
-Agent-as-folder + eval default-on minimal mergeable PR from origin/main.
-
-## agent-learning-governance
-纠错评测、技能验证、输入授权与事件调度
-
-这4个点也都挺好，帮我全部实现，做完测试和审查后直接合并。
-
-## agent-skill-management
-Agent 在对话中管理自身技能
-
-然后这个共享skill、沉淀skill、修改skill、管理更新删除的能力，我想要agent也具备自己去操作的能力
-
 ## agents-clean-layout
 Bot 管理页清爽布局
 

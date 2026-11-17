@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 463 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 464 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -10,11 +10,12 @@
 
 - `acceptance-gate` 验收标准门禁（需求 → 可执行验收用例）
 
-## agent（3）
+## agent（4）
 
-需求正文见 [other](other.md)。
+需求正文见 [agent](agent.md)。
 
 - `agent-as-folder-eval` Agent-as-folder path + eval default-on
+- `agent-feature-map` 从用户说法查找功能实现和验证入口
 - `agent-learning-governance` 纠错评测、技能验证、输入授权与事件调度
 - `agent-skill-management` Agent 在对话中管理自身技能
 
