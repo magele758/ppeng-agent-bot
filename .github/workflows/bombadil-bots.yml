@@ -1,0 +1,53 @@
+name: Bot stability exploration
+on:
+  workflow_dispatch:
+  push:
+    branches: ['bench/bombadil-comparison']
+  pull_request:
+    paths:
+      - '.github/workflows/bombadil-bots.yml'
+      - 'scripts/bombadil/**'
+      - 'apps/web-console/components/BotFunctionalGroups.tsx'
+      - 'apps/web-console/components/usePlayChat.ts'
+      - 'apps/web-console/components/PlayPanel.tsx'
+      - 'e2e/bot-switch-live-turn.spec.ts'
+      - 'e2e/font-size-preference.spec.ts'
+      - 'e2e/helpers/font-comparison.ts'
+      - 'apps/web-console/components/FontSizeSettingsCard.tsx'
+      - 'scripts/e2e-run.mjs'
+permissions:
+  contents: read
+jobs:
+  bot-switch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - name: Install Bombadil v0.7.10
+        run: |
+          curl --fail --location --retry 3 https://github.com/antithesishq/bombadil/releases/download/v0.7.10/bombadil-x86_64-linux --output "$RUNNER_TEMP/bombadil"
+          chmod +x "$RUNNER_TEMP/bombadil"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Detect seeded transcript contamination
+        run: pnpm run test:stability:bots --canary --time-limit 45s
+      - name: Explore clean Bot sessions
+        run: pnpm run test:stability:bots --time-limit 90s
+      - name: Compare existing font regressions with three exploration runs
+        if: ${{ !cancelled() }}
+        env:
+          CHROME: /usr/bin/google-chrome
+        run: pnpm run test:stability:compare --rounds 3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bombadil-bot-traces
+          path: test-results/bombadil
+          if-no-files-found: ignore
+          retention-days: 7

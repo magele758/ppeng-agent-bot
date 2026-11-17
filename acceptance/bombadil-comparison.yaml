@@ -1,0 +1,15 @@
+id: bombadil-comparison
+title: 比较固定回归与浏览器探索的验证收益
+status: approved
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  那你完整开发一下 Bombadil 的测试用例，看看从功能、性能、覆盖度上，能比之前提升多少，然后真实测试一下，如果有提升或者有价值就提交pr
+criteria:
+  - id: AC-1
+    given: 固定回归和探索均已实际观察字体设置界面
+    when: 汇总相同字号、语言和视口组合
+    then: 报告各自覆盖、探索独有的组合和联合覆盖增量，重复状态只计一次
+  - id: AC-2
+    given: 某组未运行、校准未检出预期故障或测量缺失
+    when: 汇总功能及耗时结果
+    then: 不产生有效提升结论，缺失的性能样本不能记作零

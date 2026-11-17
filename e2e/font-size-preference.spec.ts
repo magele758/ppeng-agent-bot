@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './helpers/font-comparison';
 import { openChat } from './font-fixture';
 test.use({ viewport: { width: 1280, height: 950 } });
 test('font defaults, options, instant update and draft preservation [AC:console-font-size-preference#AC-1] [AC:console-font-size-preference#AC-2] [AC:console-font-size-preference#AC-3]', async ({page}) => {
