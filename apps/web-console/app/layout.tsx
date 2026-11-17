@@ -51,7 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body>
+      <body className="lab-root">
         <svg aria-hidden="true" width="0" height="0" style={{ position: 'absolute' }}>
           <filter id="droplet" x="-15%" y="-15%" width="130%" height="130%" colorInterpolationFilters="sRGB">
             <feTurbulence type="fractalNoise" baseFrequency="0.01" numOctaves="2" seed="4" result="noise"/>

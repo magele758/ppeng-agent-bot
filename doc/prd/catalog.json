@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 465,
+    "implemented": 466,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1441,6 +1441,13 @@
       "requirement": "现在字体又太大了，你在设置里给我加一个字体大小选择的，尺寸参考macos的字体选择吧",
       "verificationStage": "software",
       "file": "acceptance/console-font-size-preference.yaml"
+    },
+    {
+      "id": "console-home-shell",
+      "title": "控制台视觉与外壳",
+      "requirement": "Implement the approved console redesign, batch 1 only: visual tokens and the app shell.\nUser approved: keep today's top-level nav (Bot and 会话 are separate; do not merge or regroup), sage green accent, light and dark together.\nScope: styles/tokens, theme (light+dark, persisted the way the console already persists preferences — no new env vars), app shell chrome (sidebar, top bar), and the nav labels. Do not restyle section interiors.",
+      "verificationStage": "software",
+      "file": "acceptance/console-home-shell.yaml"
     },
     {
       "id": "console-knowledge",

@@ -29,8 +29,8 @@
   --ui-leading-normal: 1.5;
 
   /* layout */
-  --ui-rail-width: 208px;
-  --ui-rail-width-collapsed: 56px;
+  --ui-rail-width: 196px;
+  --ui-rail-width-collapsed: 52px;
   --ui-content-max: 1120px;
   --ui-toolbar-height: 40px;
   --ui-subtabs-height: 36px;
@@ -54,6 +54,70 @@
   --ui-warn: var(--color-warn);
   --ui-ok: var(--color-ok);
   --ui-focus: 2px solid var(--color-text-secondary);
+}
+
+/* Agent Home design v2 palette. Classic shell reads these.
+   Section interiors keep the legacy --ui-bg / --color-* aliases until their own batches.
+   Skins set their own --ui-* and do not use --ui-home-*. */
+:root {
+  --ui-home-bg: #111411;
+  --ui-home-panel: #161A16;
+  --ui-home-surface: #1C211C;
+  --ui-home-sunk: #0C0F0C;
+  --ui-home-hover: #262D27;
+  --ui-home-line: #283028;
+  --ui-home-line-strong: #3B453C;
+  --ui-home-text: #E7ECE7;
+  --ui-home-text-secondary: #A2ADA4;
+  --ui-home-text-tertiary: #6E7A70;
+  --ui-home-accent: #82BD95;
+  --ui-home-accent-soft: #1F2F25;
+  --ui-home-on-accent: #0D150F;
+  --ui-home-ok: #6FC38D;
+  --ui-home-ok-soft: #17291D;
+  --ui-home-warn: #DFB25E;
+  --ui-home-warn-soft: #30270F;
+  --ui-home-danger: #EE8B78;
+  --ui-home-danger-soft: #371C17;
+  --ui-home-info: #82B4E6;
+  --ui-home-info-soft: #162636;
+  --ui-home-radius-tag: 6px;
+  --ui-home-radius-control: 8px;
+  --ui-home-radius-card: 12px;
+  --ui-home-radius-dialog: 14px;
+  --ui-home-title: 20px;
+  --ui-home-section: 16px;
+  --ui-home-chat: 14px;
+  --ui-home-chat-leading: 1.65;
+  --ui-home-ui: 13px;
+  --ui-home-hint: 12px;
+  --ui-home-label: 11px;
+  --ui-home-mono: 12px;
+  --ui-home-shadow: none;
+}
+
+:root[data-theme='light'] {
+  --ui-home-bg: #F4F5F2;
+  --ui-home-panel: #FAFAF8;
+  --ui-home-surface: #FFFFFF;
+  --ui-home-sunk: #ECEEE9;
+  --ui-home-hover: #E6E9E3;
+  --ui-home-line: #E1E4DD;
+  --ui-home-line-strong: #C9CFC4;
+  --ui-home-text: #1A201B;
+  --ui-home-text-secondary: #556057;
+  --ui-home-text-tertiary: #879088;
+  --ui-home-accent: #3D6A4D;
+  --ui-home-accent-soft: #E1ECE4;
+  --ui-home-on-accent: #FFFFFF;
+  --ui-home-ok: #2C7A4D;
+  --ui-home-ok-soft: #E0F0E6;
+  --ui-home-warn: #93650F;
+  --ui-home-warn-soft: #F9EFD6;
+  --ui-home-danger: #B53C2A;
+  --ui-home-danger-soft: #F9E6E1;
+  --ui-home-info: #2A69A4;
+  --ui-home-info-soft: #E2ECF6;
 }
 
 :root[data-font-size="13"] { --reading-size: 13px; }
