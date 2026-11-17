@@ -82,11 +82,14 @@ test('发送后用户气泡留在鼠尾草绿浅底，思考折叠规则和 Mark
   assert.match(turns, /function ToolCallFold/);
   const toolCall = turns.slice(turns.indexOf('function ToolCallFold'), turns.indexOf('function ReasoningFold'));
   assert.equal(toolCall.includes('open'), false);
-  assert.match(chatCss, /--chat-sage:\s*var\(--ui-sage,\s*#3D6A4D\)/);
-  assert.match(chatCss, /--chat-sage-soft:\s*var\(--ui-sage-soft,\s*#E1ECE4\)/);
-  assert.match(chatCss, /#82BD95/);
-  assert.match(chatCss, /#1F2F25/);
-  assert.match(chatCss, /\.play-layout\[data-play-surface="chat"\] \.chat-panel-body \.chat-turn--user \.chat-bubble[\s\S]*background:\s*var\(--chat-sage-soft\)/);
+  assert.equal(chatCss.includes('--chat-sage'), false);
+  assert.equal(chatCss.includes('--ui-sage'), false);
+  assert.match(chatCss, /background:\s*var\(--ui-home-accent-soft,\s*#E1ECE4\)/);
+  assert.match(chatCss, /background:\s*var\(--ui-home-accent,\s*#3D6A4D\)/);
+  assert.match(chatCss, /color:\s*var\(--ui-home-on-accent,\s*#FFFFFF\)/);
+  assert.match(chatCss, /background:\s*var\(--ui-home-accent-soft,\s*#1F2F25\)/);
+  assert.match(chatCss, /background:\s*var\(--ui-home-accent,\s*#82BD95\)/);
+  assert.match(chatCss, /\.play-layout\[data-play-surface="chat"\] \.chat-panel-body \.chat-turn--user \.chat-bubble[\s\S]*background:\s*var\(--ui-home-accent-soft/);
 });
 
 test('普通会话顶栏写出助手名称和空闲或正在工作，并且标在会话页上 [AC:chat-page-redesign#AC-4]', () => {
