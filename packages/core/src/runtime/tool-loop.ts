@@ -61,6 +61,7 @@ import {
   pairedToolCallIdsFromMessages,
   processToolResults as processToolResultsA,
   runTurnWithRetries as runTurnWithRetriesA,
+  callsNotCoveredBySessionGrant,
   stripAutoReviewFlags,
   type FileApprovalPolicy as LoopFilePolicy,
   type ToolLoopHost,
@@ -571,7 +572,7 @@ function holdSourceScope(
   if (!deps.governanceStore) return 'proceed';
   const ledger = new SourceLedger(deps.governanceStore);
   ledger.observe(session.id);
-  const plan = planSourceScopeHold(deps.store, ledger, session, tools, calls);
+  const plan = planSourceScopeHold(deps.store, ledger, session, tools, callsNotCoveredBySessionGrant(calls, session.metadata));
   for (const item of plan.create) {
     const args = stripAutoReviewFlags(item.input);
     hostFromDeps(deps).createApproval({
@@ -592,7 +593,7 @@ function holdDirectIsolation(
 ): 'waiting' | 'proceed' {
   if (resolvePermissionMode(session.metadata, process.env) === 'bypass') return 'proceed';
   const plan = planDirectIsolationHold(
-    calls,
+    callsNotCoveredBySessionGrant(calls, session.metadata),
     deps.store.listApprovals(),
     session.id,
     shellIsolationAvailability(agentSandboxKindFromEnv(process.env))

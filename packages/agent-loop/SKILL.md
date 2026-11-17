@@ -17,6 +17,10 @@ Bot 模式不在这个包里（它在 daemon / RawAgentRuntime 上）。
 
 Chat Completions 与 Responses 的历史回放只发送 `text` 和工具调用/结果，不把持久化的 `reasoning` 拼入助手 `content` / `output_text`。只有思考而没有正文和工具的旧消息不制造空回复；含工具的消息保持调用与结果配对。原历史、当前响应中的思考、正文和合法重复句均保留，不做按文字相同的去重。Responses 不再生成 `[Earlier reasoning]` 正文前缀。既有 reasoning-only 当前结果的内核提升回退保持不变。
 
+### 本会话同类允许
+
+`session.metadata.sessionToolGrants` 是 `{ toolName, isolation }[]`，只对当前会话生效。`checkToolApprovals` 对工具名和隔离档位都相同、且这一次精确调用没有被拒绝过的操作，不再新建审批卡。隔离档位由 `isolationModeOf` 归一：`bash` / `bg_run` / `work_evidence` 省略或 `auto` 为 `auto`，`os`、`direct`、`remote`、`container` 各自独立，其它工具为 `unspecified`。拒绝仍然有效。撤销是从该数组去掉对应条目。没有新的环境变量。
+
 ## 1. 装配档位与分层规范
 
 SDK 提供 4 个组装档位（高档位包含所有低档位模块）：

@@ -1,5 +1,6 @@
 import { flowSessionView } from './flow-session-view.js';
 import { applySessionFavorite } from '../session-favorite.js';
+import { sessionToolGrantPatch } from '../session-tool-grant.js';
 import { sendSessionList } from '../session-list-summary.js';
 import { goalScope } from '@ppeng/agent-core';
 import { readFileSync } from 'node:fs';
@@ -459,6 +460,12 @@ function applyOptionalToolGroups(runtime: RawAgentRuntime, id: string, body: Rec
   });
 }
 
+function applySessionToolGrants(runtime: RawAgentRuntime, id: string, body: Record<string, unknown>): void {
+  const patch = sessionToolGrantPatch(body);
+  if (!patch) return;
+  runtime.mergeSessionMetadata(id, patch);
+}
+
 function applyTaskModeMetadata(runtime: RawAgentRuntime, id: string, body: Record<string, unknown>): void {
   const ptcPatch = ptcMetadataPatchFromInput(body);
   if (Object.keys(ptcPatch).length === 0) return;
@@ -601,6 +608,7 @@ function applySessionPatch(runtime: RawAgentRuntime, id: string, body: Record<st
   applyWorkspaceBindingPatch(runtime, id, body);
   applyModelRefPatch(runtime, id, body);
   applySessionRecordPatch(runtime, id, body);
+  applySessionToolGrants(runtime, id, body);
 }
 
 export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
