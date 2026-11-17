@@ -268,7 +268,7 @@ export function PlayBotGroupList({
   };
 
   return (
-    <div className="play-group-block">
+    <div className="play-group-block bot-home">
       {deleteError ? <p role="alert" className="play-group-error" data-testid="play-group-delete-error">{deleteError}</p> : null}
       {ordered.map((entry) => {
         const room = entry.value;

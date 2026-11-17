@@ -29,7 +29,3 @@ export function botListPhase(
   if (!loaded) return unloadedPhase(error);
   return loadedPhase(error, botCount, roomCount, groupCount);
 }
-
-export function playSidebarClass(botSurface: boolean): string {
-  return botSurface ? 'play-sidebar bot-home' : 'play-sidebar';
-}

@@ -89,7 +89,6 @@ import { BotCreateForm } from './sections/agents/BotCreateForm';
 import { BotGroupCreateForm } from './sections/agents/BotGroupCreateForm';
 import { useLab } from './shell/LabProvider';
 import { approvalsForChat } from '@/lib/goal-chat-approvals';
-import { playSidebarClass } from './bot-list-phase';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
@@ -1085,7 +1084,7 @@ export function PlayPanel({
   };
 
   const renderPlaySidebar = () => (
-        <aside className={playSidebarClass(botSurface)} id="mobile-session-list" hidden={sidebarCollapsed && !mobileSessionsOpen}>
+        <aside className="play-sidebar" id="mobile-session-list" hidden={sidebarCollapsed && !mobileSessionsOpen}>
           <div className="play-sidebar__head" data-testid="session-toolbar" role="toolbar" aria-label={t('polish.toolbar')}>
             <div className="create-menu" ref={createMenuRef} onMouseEnter={openCreateMenu} onMouseLeave={scheduleCreateMenuClose} onKeyDown={(event) => {
               if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;

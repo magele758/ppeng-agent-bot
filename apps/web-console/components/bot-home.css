@@ -1,5 +1,6 @@
 /* Bot page colors come from the shell palette. Hex values apply only when a token is absent. */
-.bot-home {
+.bot-home,
+.play-sidebar:has(.bot-home) {
   color: var(--ui-home-text, light-dark(#1A201B, #E7ECE7));
   background: var(--ui-home-panel, light-dark(#FAFAF8, #161A16));
   color-scheme: light dark;
