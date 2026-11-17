@@ -569,7 +569,7 @@
     "packages/agent-loop/src/model/error-class.ts": "a7632c1f16a9aa1c89896d1f30078f630c2373ec0211bb9a032c2d18ea241ca7",
     "packages/core/src/tools/tool-exposure.ts": "10b3bdba9b89a9d53b2c0a70a31f51c87d408fc66e430d0cbfb5db426e2e68c6",
     "packages/core/src/jev/apply.ts": "8574ad0574a301d6c388e0fc0ae5a4f231b2ae816e722df880441db02ed5ed95",
-    "packages/core/test/tool-exposure-tiers.test.js": "f7ea69e8b91e921d5b1a21a54ff8c153c75c7640185bec0847fbf01403bc19de",
+    "packages/core/test/tool-exposure-tiers.test.js": "e8de33efdc8cb630b4f484bec9e8633d468847540c0bb6878d8b6845565cd202",
     "packages/core/src/bots/goals/specialty-services.ts": "07e77b8093de317102181338d40fe618b3326f5fd6d5d8f6ddc0a2b46138b024",
     "packages/core/test/bot-goal-live-chain.test.js": "0414065f9774c8dde8bdcf884d12d0325e6870ffe72c145a87cd28d28c279f04",
     "packages/core/src/bots/goals/execution-evidence.ts": "05398f02e85bc3430de036d60f2d5fba4dc8936ae040003248e67cb7f51f1c76",
