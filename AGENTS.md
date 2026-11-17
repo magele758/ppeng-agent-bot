@@ -17,6 +17,8 @@
 
 ## Learned Workspace Facts
 
+- 完整产品文档与规格入口是 `pnpm feature-map` 和 `doc/prd/README.md`。定位产品行为用 `pnpm feature-map <用户叫法>`（如「串线」「左侧边栏」）。机器读取用 `node scripts/prd/feature-map.mjs --json <词>`。入口、实现和验证映射维护在 `doc/prd/core-cases.yaml`，改动后运行 `node scripts/prd/build-catalog.mjs`。
+
 - **手册目录**：专题文档见 [`doc/README.md`](doc/README.md)；项目入口为根目录 `README.md` / `README.zh.md`
 - 模型通过 `.env` 配置，支持 `openai-compatible`，需 `RAW_AGENT_BASE_URL`、`RAW_AGENT_API_KEY`、`RAW_AGENT_MODEL_NAME`
 - 可选 **VL**：`RAW_AGENT_VL_MODEL_NAME`（及可选 `RAW_AGENT_VL_BASE_URL` / `RAW_AGENT_VL_API_KEY`）启用 `hybrid-router`，含图用户轮走 VL；`vision_analyze` 工具亦使用该 VL

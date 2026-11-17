@@ -15,6 +15,12 @@ node scripts/prd/core-cases.mjs
 
 `default-entry`
 
+入口 `#/bot` · 常用叫法 左侧边栏、首页、Bot 名册、sidebar
+
+实现入口 [apps/web-console/lib/nav.ts](../../apps/web-console/lib/nav.ts)、[apps/web-console/components/BotFunctionalGroups.tsx](../../apps/web-console/components/BotFunctionalGroups.tsx)
+
+回归 `node scripts/prd/core-cases.mjs --case default-entry`
+
 对应现状：[产品是什么](current/01-product.md)、[Bot、名册与工作台](current/02-bots-and-workspace.md)
 
 - `single-host-bot-completion` 单机 Bot 工作收尾与默认入口
@@ -24,6 +30,12 @@ node scripts/prd/core-cases.mjs
 ## 一只 Bot 一条主对话，压缩和换模型都不另开
 
 `forever-chat`
+
+入口 `#/bot` · 常用叫法 主对话、长会话、上下文压缩、compact
+
+实现入口 [apps/web-console/components/ChatFeedWindow.tsx](../../apps/web-console/components/ChatFeedWindow.tsx)、[packages/core/src/session/bot-compact-policy.ts](../../packages/core/src/session/bot-compact-policy.ts)
+
+回归 `node scripts/prd/core-cases.mjs --case forever-chat`
 
 对应现状：[主对话](current/03-conversation.md)
 
@@ -35,6 +47,12 @@ node scripts/prd/core-cases.mjs
 
 `speak-while-busy`
 
+入口 `#/bot` · 常用叫法 插话、输入框、steer、输入建议
+
+实现入口 [apps/web-console/components/PlayPanel.tsx](../../apps/web-console/components/PlayPanel.tsx)、[apps/daemon/src/steer-request.ts](../../apps/daemon/src/steer-request.ts)
+
+回归 `node scripts/prd/core-cases.mjs --case speak-while-busy`
+
 对应现状：[主对话](current/03-conversation.md)
 
 - `bot-immediate-steer` Bot 回合中直接插入并转向
@@ -44,6 +62,12 @@ node scripts/prd/core-cases.mjs
 ## 目标没达到不能显示完成，子任务结果回到原来的目标
 
 `goal-done-means-done`
+
+入口 `#/bot` · 常用叫法 目标面板、子任务、完成判定、goals
+
+实现入口 [apps/web-console/components/bot-work/BotGoals.tsx](../../apps/web-console/components/bot-work/BotGoals.tsx)、[packages/core/src/bots/goals/service.ts](../../packages/core/src/bots/goals/service.ts)
+
+回归 `node scripts/prd/core-cases.mjs --case goal-done-means-done`
 
 对应现状：[目标、协作与外部软件](current/04-goals-and-collaboration.md)
 
@@ -55,6 +79,12 @@ node scripts/prd/core-cases.mjs
 
 `room-speaks-when-picked`
 
+入口 `#/bot` · 常用叫法 群聊、群成员、点名、room
+
+实现入口 [apps/web-console/components/bot-work/BotRooms.tsx](../../apps/web-console/components/bot-work/BotRooms.tsx)、[apps/web-console/components/play-group/RoomMemberDrawer.tsx](../../apps/web-console/components/play-group/RoomMemberDrawer.tsx)
+
+回归 `node scripts/prd/core-cases.mjs --case room-speaks-when-picked`
+
 对应现状：[目标、协作与外部软件](current/04-goals-and-collaboration.md)
 
 - `bot-room-speaker-pick` 群聊按贴题程度决定谁开口
@@ -63,6 +93,12 @@ node scripts/prd/core-cases.mjs
 ## 待批准停在对话里等人决定，超时未批不执行
 
 `approval-and-failure`
+
+入口 `#/bot` · 常用叫法 待审批、批准、超时、approval
+
+实现入口 [apps/web-console/components/ApprovalBanner.tsx](../../apps/web-console/components/ApprovalBanner.tsx)、[apps/web-console/lib/approval-feed.ts](../../apps/web-console/lib/approval-feed.ts)
+
+回归 `node scripts/prd/core-cases.mjs --case approval-and-failure`
 
 对应现状：[安全、模型与运行方式](current/06-safety-and-runtime.md)
 
@@ -74,6 +110,12 @@ node scripts/prd/core-cases.mjs
 
 `skills-and-routines`
 
+入口 `#/bot` · 常用叫法 技能共享、定时任务、routines、skills
+
+实现入口 [apps/web-console/components/BotSkillSharing.tsx](../../apps/web-console/components/BotSkillSharing.tsx)、[apps/web-console/components/RoutineSchedule.tsx](../../apps/web-console/components/RoutineSchedule.tsx)
+
+回归 `node scripts/prd/core-cases.mjs --case skills-and-routines`
+
 对应现状：[记忆、技能与定时任务](current/05-memory-skills-routines.md)
 
 - `bot-scoped-skill-sharing` Bot 私有技能沉淀与指定 Bot 共享
@@ -84,7 +126,27 @@ node scripts/prd/core-cases.mjs
 
 `ops-without-evolution`
 
+入口 `#/settings/ops/health` · 常用叫法 运维、服务健康、自愈、health
+
+实现入口 [apps/web-console/components/sections/ops/OpsSection.tsx](../../apps/web-console/components/sections/ops/OpsSection.tsx)、[apps/web-console/lib/nav.ts](../../apps/web-console/lib/nav.ts)
+
+回归 `node scripts/prd/core-cases.mjs --case ops-without-evolution`
+
 对应现状：[自愈、演进与平台能力](current/07-evolution-and-platform.md)
 
 - `ops-console` 运维页：系统健康总览与轨迹浏览
 - `tool-exposure-tiers` 工具三层分类与独立的渐进和全量提供方式
+
+## 流式回复期间切换 Bot，聊天记录和发送目标跟随当前会话
+
+`bot-switch`
+
+入口 `#/bot` · 常用叫法 左侧边栏、切换会话、串线、消息错投、bot switch
+
+实现入口 [apps/web-console/components/BotFunctionalGroups.tsx](../../apps/web-console/components/BotFunctionalGroups.tsx)、[apps/web-console/components/usePlayChat.ts](../../apps/web-console/components/usePlayChat.ts)、[apps/web-console/components/PlayPanel.tsx](../../apps/web-console/components/PlayPanel.tsx)
+
+回归 `node scripts/prd/core-cases.mjs --case bot-switch`
+
+对应现状：[主对话](current/03-conversation.md)
+
+- `bot-switch-live-turn` 切换 Bot 后主画面离开上一场进行中的对话

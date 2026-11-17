@@ -1,0 +1,21 @@
+id: agent-feature-map
+title: 从用户说法查找功能实现和验证入口
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  产品功能的Map，用来同步一些信息，让各种coding-agent能更好的理解和修改项目
+  就是这个自动化测试的工具
+  功能地图，太简陋了吧？我之前没有完整功能的prd的文档列表吗？
+criteria:
+  - id: AC-1
+    given: 编码助手只知道用户对核心功能的叫法
+    when: 查询功能地图
+    then: 返回对应界面入口、实现文件、验收依据、回归测试和已配置的探索测试入口
+  - id: AC-2
+    given: 某个核心功能的实现文件、路由或探索脚本已经失效
+    when: 校验功能地图
+    then: 报出失效条目，避免让助手依赖过时的定位信息
+  - id: AC-3
+    given: 用户从产品地图浏览或检索核心流程之外的功能
+    when: 查看产品全貌或按规格、名称、需求用语查询
+    then: 能找到完整产品文档目录、每一份验收规格及其交付状态，并能查看已有的章节和测试依据

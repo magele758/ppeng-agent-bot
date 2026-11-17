@@ -22,7 +22,10 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
     if (token === '--list') args.list = true;
-    else if (token === '--cases') {
+    else if (token === '--case') {
+      args.caseId = argv[++i];
+      if (!args.caseId) throw new Error('--case needs an id');
+    } else if (token === '--cases') {
       const value = argv[++i];
       if (!value) {
         console.error('--cases needs a file');
@@ -30,7 +33,7 @@ function parseArgs(argv) {
       }
       args.cases = isAbsolute(value) ? value : resolve(process.cwd(), value);
     } else if (token === '--help' || token === '-h') {
-      console.log('node scripts/prd/core-cases.mjs [--list] [--cases <file>]');
+      console.log('node scripts/prd/core-cases.mjs [--list] [--cases <file>] [--case <id>]');
       process.exit(0);
     } else {
       console.error(`unknown argument: ${token}`);
@@ -92,7 +95,7 @@ const plan = planCoreRun(loaded.cases, {
   specsById: new Map(specs.map((spec) => [spec.id, spec])),
   testsBySpec: indexed.testsBySpec,
   runnerByFile: indexed.runnerByFile,
-});
+}, args.caseId);
 if (!plan.ok) {
   for (const error of plan.errors) console.error(error);
   process.exit(1);

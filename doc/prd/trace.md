@@ -1725,6 +1725,12 @@ Agent-as-folder path + eval default-on
 
 - `packages/core/test/agent-as-folder-eval.test.js`
 
+### agent-feature-map
+
+从用户说法查找功能实现和验证入口
+
+- `scripts/prd/feature-map.test.mjs`
+
 ### agent-learning-governance
 
 纠错评测、技能验证、输入授权与事件调度

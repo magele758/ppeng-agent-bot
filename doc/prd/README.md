@@ -4,6 +4,12 @@
 
 Bot 的交互细则仍以 [Bot 产品书](../bot/README.md) 为准。本目录写能力说明和功能台账，并链到产品书与验收规格，不另写一套互相矛盾的交互规则。验收规格 [`acceptance/*.yaml`](../../acceptance) 决定一条功能算不算已经交付。
 
+## 按用户的说法找功能
+
+`pnpm feature-map` 展示产品文档总览，含产品现状七章、Bot 产品书分章、已交付台账、待开发方向和验收对照。按功能名、规格 ID 或需求原话可检索所有状态的规格，包括尚未归入现状章节的条目。比如收到“左侧边栏切 Bot 后消息串线”，运行 `pnpm feature-map 串线` 查看界面入口、源文件、验收依据和测试命令。`node scripts/prd/feature-map.mjs --json 串线` 供 Codex、Claude Code 和 Cursor 等助手直接读取。无关键词的 `--json` 返回完整文档、规格和流程。只看有实现入口的核心流程用 `pnpm feature-map --core`，对应[核心回归地图](core-cases.md)。
+
+修改核心流程时同步 [core-cases.yaml](core-cases.yaml) 的用户叫法、路由或实现入口，然后重新生成目录。测试文件由验收标签推导。用 `node scripts/prd/core-cases.mjs --case bot-switch --list` 预览回归范围，去掉 `--list` 执行。地图列出可运行的测试；当次结果以执行记录为准。
+
 ## 怎么读
 
 | 块 | 路径 | 谁维护 | 回答什么 |

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 463,
+    "implemented": 464,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -20,6 +20,13 @@
       "requirement": "Agent-as-folder + eval default-on minimal mergeable PR from origin/main.",
       "verificationStage": "software",
       "file": "acceptance/agent-as-folder-eval.yaml"
+    },
+    {
+      "id": "agent-feature-map",
+      "title": "从用户说法查找功能实现和验证入口",
+      "requirement": "产品功能的Map，用来同步一些信息，让各种coding-agent能更好的理解和修改项目\n就是这个自动化测试的工具\n功能地图，太简陋了吧？我之前没有完整功能的prd的文档列表吗？",
+      "verificationStage": "software",
+      "file": "acceptance/agent-feature-map.yaml"
     },
     {
       "id": "agent-learning-governance",

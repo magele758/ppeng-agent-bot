@@ -1954,6 +1954,13 @@
       ]
     },
     {
+      "id": "agent-feature-map",
+      "title": "从用户说法查找功能实现和验证入口",
+      "tests": [
+        "scripts/prd/feature-map.test.mjs"
+      ]
+    },
+    {
       "id": "agent-learning-governance",
       "title": "纠错评测、技能验证、输入授权与事件调度",
       "tests": [

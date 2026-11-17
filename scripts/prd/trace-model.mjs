@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadCoreCases, validateCoreCases } from './core-cases-plan.mjs';
+import { validateLocations } from './feature-map-model.mjs';
 import { indexActiveTests } from './test-index.mjs';
 
 const GENERATED = '<!-- 本文件由 scripts/prd/build-catalog.mjs 生成，不要手改。改验收规格、现状章节的依据或核心用例后重新运行该脚本。 -->';
@@ -168,6 +169,10 @@ function renderCoreCases(root, doc, specsById) {
   ];
   for (const item of doc.cases) {
     lines.push(`## ${item.title}`, '', `\`${item.id}\``, '');
+    lines.push(`入口 \`${item.route}\` · 常用叫法 ${item.aliases.join('、')}`, '');
+    lines.push('实现入口 ' + item.sources.map(file => `[${file}](../../${file})`).join('、'), '');
+    lines.push(`回归 \`node scripts/prd/core-cases.mjs --case ${item.id}\``, '');
+    if (item.exploration) lines.push(`探索 \`pnpm run ${item.exploration}\``, '');
     if (item.chapters.length) {
       const links = item.chapters.map((stem) => `[${chapterTitle(root, stem)}](current/${stem}.md)`);
       lines.push(`对应现状：${links.join('、')}`, '');
@@ -186,6 +191,7 @@ export function writeTraceAndCoreCases(root, specs) {
   let doc;
   try {
     doc = loadCoreCases(root);
+    validateLocations(root, doc.cases);
   } catch (error) {
     return [error.message];
   }

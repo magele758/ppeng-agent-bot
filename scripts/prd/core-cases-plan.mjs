@@ -14,6 +14,10 @@ export function loadCoreCases(root, file = join(root, 'doc/prd/core-cases.yaml')
     return {
       id: typeof item.id === 'string' ? item.id.trim() : '',
       title: typeof item.title === 'string' ? item.title.trim() : '',
+      route: item.route,
+      aliases: item.aliases,
+      sources: item.sources,
+      exploration: item.exploration,
       chapters: Array.isArray(item.chapters) ? item.chapters.map((chapter) => String(chapter).trim()) : [],
       specs: Array.isArray(item.specs) ? item.specs.map((id) => String(id).trim()).filter(Boolean) : [],
     };
@@ -62,10 +66,15 @@ export function validateCoreCases(cases, index) {
   return { ok: errors.length === 0, errors, files: [...files].sort() };
 }
 
-export function planCoreRun(cases, index) {
+export function planCoreRun(cases, index, caseId) {
   const checked = validateCoreCases(cases, index);
   const byRunner = { unit: [], vitest: [], e2e: [] };
   if (!checked.ok) return { ...checked, byRunner };
+  if (caseId !== undefined) {
+    const selected = cases.find(item => item.id === caseId);
+    if (!selected) return { ok: false, errors: ['unknown core case: ' + caseId], files: [], byRunner };
+    checked.files = [...new Set(selected.specs.flatMap(id => index.testsBySpec.get(id)))].sort();
+  }
   const errors = [];
   for (const file of checked.files) {
     const runner = index.runnerByFile?.get(file);
