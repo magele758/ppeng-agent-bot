@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-16T12:41:22.730Z",
-  "reviewNote": "The read-only attachment tool runs through existing tool calls and results. Raw image results use existing media handling. No new tool-wave transition.",
+  "reviewedAt": "2026-11-17T08:42:34.154Z",
+  "reviewNote": "Reviewed migration v40 registration against 602a5ca7 and its sidechat upgrade: adds grasp, note and note_revision defaults plus an optional title FTS trigger. Existing migration transactions and session, approval, inbox and tool-wave transitions are preserved.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -421,7 +421,7 @@
     "packages/core/src/turn/prepare-turn-input.ts": "583a15261fca39b1233eb9a71d18e30fef864604f1ab44212b3c7ea2a7872b79",
     "packages/core/src/session/inbox-overflow.ts": "0b7b76fbe2dbd5c8cbcf80766dd44eefd3237673aa57d594ad200c41e8abfccc",
     "packages/agent-loop/src/session/inbox-overflow.ts": "031b689482934c60d94c79fcbcb199976e02af4a6580bf4be085fcbb1a37595a",
-    "packages/core/src/stores/migrations/index.ts": "f842f7ea700a3904527447b6e4f4d84e4f908cc58aab9be1c73ad2319a9439ee",
+    "packages/core/src/stores/migrations/index.ts": "d15f510e19e52cbc0092f8c38cb41ce07fa307de8e3fb702e53178ade4e282f6",
     "packages/core/src/sandbox/model-isolation.ts": "4b706b09281996636c2949b0881769fe0c516ca90a1a2bc54acf5ce9f78e7eae",
     "packages/core/src/runtime/spawn-host.ts": "17b8402661b2044641d9c2bc0750e979cd179730643ea3848f649856f90c816e",
     "packages/core/test/model-sandbox-isolation.test.js": "8876a267194eef04bb632daeb08fc454c6c6e6ae894d91303d63c3741dd7c560",
