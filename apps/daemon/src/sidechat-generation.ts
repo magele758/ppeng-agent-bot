@@ -1,6 +1,7 @@
 import {
   createLogger,
   NotFoundError,
+  ValidationError,
   resolveModelRoute,
   type ModelAdapter,
   type ModelStreamChunk,
@@ -11,6 +12,7 @@ import {
 import type { SidechatDetail, SidechatMessage } from '@ppeng/api-types';
 
 const log = createLogger('sidechat');
+const DISTILL_ASK = '请把这条旁注讨论凝练成一句话批注，只输出这一句话，不要标题或解释。';
 
 type TurnInput = Parameters<ModelAdapter['runTurn']>[0];
 type Flight = { controller: AbortController; text: string; checkpoint: number };
@@ -51,6 +53,13 @@ export function readSidechatSource(runtime: RawAgentRuntime, sessionId: string, 
   return { answer, question: messageText(previous) };
 }
 
+function stopFlight(flights: Map<string, Flight>, runId: string | undefined): void {
+  if (!runId) return;
+  const flight = flights.get(runId);
+  if (!flight) return;
+  flight.controller.abort();
+}
+
 function sourceWindow(text: string, quote: string, offset?: number): string {
   const budget = 12000;
   if (text.length <= budget) return text;
@@ -76,6 +85,22 @@ function history(thread: SidechatDetail): SessionMessage[] {
     remaining -= text.length;
   }
   return turns.reverse();
+}
+
+function completedAnswer(message: SidechatMessage): boolean {
+  return message.role === 'assistant' && message.status === 'complete' && Boolean(message.text.trim());
+}
+
+function hasCompletedAnswer(thread: SidechatDetail): boolean {
+  return thread.messages.some(completedAnswer);
+}
+
+function distillTurn(id: string): SidechatMessage {
+  return { id: id + '-note', role: 'user', text: DISTILL_ASK, requestId: id + '-note', status: 'complete', createdAt: '' };
+}
+
+function firstLine(text: string): string {
+  return [...(text.trim().split('\n')[0]?.trim() ?? '')].slice(0, 300).join('');
 }
 
 function sidechatMessage(sessionId: string, message: SidechatMessage, text: string): SessionMessage {
@@ -125,6 +150,7 @@ function sidechatInput(
 
 export class SidechatGeneration {
   private readonly flights = new Map<string, Flight>();
+  private readonly distillations = new Map<AbortController, string>();
 
   constructor(
     private readonly runtime: RawAgentRuntime,
@@ -141,6 +167,27 @@ export class SidechatGeneration {
       );
   }
 
+  discard(thread: SidechatDetail): void {
+    for (const message of thread.messages) stopFlight(this.flights, message.generationId);
+    for (const [controller, threadId] of this.distillations) {
+      if (threadId === thread.id) controller.abort();
+    }
+  }
+
+  async distill(thread: SidechatDetail, session: SessionRecord, source: Source | undefined): Promise<string> {
+    if (!hasCompletedAnswer(thread)) throw new ValidationError('sidechat_note_needs_reply');
+    const controller = new AbortController();
+    this.distillations.set(controller, thread.id);
+    try {
+      const text = await this.oneSentence(thread, session, source, controller.signal);
+      controller.signal.throwIfAborted();
+      if (!text) throw new ValidationError('sidechat_note_empty');
+      return text;
+    } finally {
+      this.distillations.delete(controller);
+    }
+  }
+
   stop(thread: SidechatDetail, requestId: string, generationId: string): void {
     const store = this.runtime.store.sidechats;
     const runId = store.activeRun(thread.id, requestId);
@@ -149,6 +196,24 @@ export class SidechatGeneration {
     const saved = thread.messages.find((m) => m.requestId === requestId && m.role === 'assistant');
     store.finish(thread.id, runId, 'stopped', flight?.text ?? saved?.text ?? '');
     flight?.controller.abort();
+  }
+
+  private async oneSentence(
+    thread: SidechatDetail,
+    session: SessionRecord,
+    source: Source | undefined,
+    signal: AbortSignal
+  ): Promise<string> {
+    const { primary: adapter } = resolveModelRoute({
+      store: this.runtime.store,
+      session,
+      env: this.env,
+      fallbackAdapter: this.runtime.modelAdapter
+    });
+    const input = sidechatInput(this.runtime, thread, source, signal);
+    input.messages.push(sidechatMessage(thread.id, distillTurn(thread.id), DISTILL_ASK));
+    const result = await adapter.runTurn(input);
+    return firstLine(messageText({ parts: result.assistantParts }));
   }
 
   private async generate(

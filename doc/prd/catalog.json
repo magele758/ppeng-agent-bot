@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 460,
+    "implemented": 463,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2869,6 +2869,27 @@
       "requirement": "我想要开发一个功能，叫sidechat的能力，主要针对场景是模型返回的内容里有一部分，或者有一些词，是我不理解的，但是又不想新开一轮会话来影响我看当前轮返回的内容，这个可以在右侧有一个专门管理类似的会话的列表，可以多个会话，可以新增一个当前bot或者session流里的裂变的UI，你理解我要做一个什么样的东西吗？有点类似论文或者文档的批注的能力，针对某一个内容的扩写，以后又可以看到当时在这个地方的扩展思考，这样我觉得挺方便学习使用的\n你把跨会话查找也补到视觉稿里，用两个会话举个例子，我想实际点一下，看看从当前批注找到以前的讨论、再回到原文的体验。\n对话和bot都要有这个能力，这是这么设计的吧？",
       "verificationStage": "software",
       "file": "acceptance/sidechat.yaml"
+    },
+    {
+      "id": "sidechat-concurrency",
+      "title": "侧聊凝练和删除期间保持用户的最新操作",
+      "requirement": "重新review下，看看这些问题是否真实存在，如果确实有问题，分多个agent去解决问题，提交合并",
+      "verificationStage": "software",
+      "file": "acceptance/sidechat-concurrency.yaml"
+    },
+    {
+      "id": "sidechat-delete",
+      "title": "删除会话中的侧聊批注",
+      "requirement": "会话中的侧聊批注，要能够删除",
+      "verificationStage": "software",
+      "file": "acceptance/sidechat-delete.yaml"
+    },
+    {
+      "id": "sidechat-learning",
+      "title": "侧聊的掌握、一句话批注和引用回主线",
+      "requirement": "你参考下 open-chrome-ai针对侧聊新增的哪些能力，都补齐一下，那边的产品功能推进的更多点，你可以参考下",
+      "verificationStage": "software",
+      "file": "acceptance/sidechat-learning.yaml"
     },
     {
       "id": "single-host-bot-completion",

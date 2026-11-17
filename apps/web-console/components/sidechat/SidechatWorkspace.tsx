@@ -26,6 +26,7 @@ import {
 import { SourceBindings } from './SourceBindings';
 import { SourceContext } from './SourceContext';
 import { restoreTop, revealReadingSpot, type Chat, type Destination, type ReadingSpot } from './reading-position';
+import { appendCitation } from '@/lib/sidechat-learning';
 import './source.css';
 
 const DockContext = createContext<ReactNode>(null);
@@ -156,6 +157,13 @@ function SessionWorkspace({ sessionId, chat, onNavigate, children }: Props & { s
     setBackstack((prev) => prev.slice(0, -1));
     void visit(parent, { sessionId: parent.sessionId, spot: parent.spot });
   }
+  function cite(answer: string) {
+    const title = citationTitle(list.threads, activeId(visible, model.current), t('sidechat.name'));
+    chat.setPlayInput(appendCitation(chat.playInput, t('sidechat.citationHeading', { title }), answer));
+    setNotice(t('sidechat.cited'));
+    if (drawerCoversFeed()) setScreen(null);
+    requestAnimationFrame(() => document.getElementById('playInput')?.focus());
+  }
   function newDraft() {
     const id = sourceOfView(model.current, list.threads);
     const held = liveReplyHoldIndex(chat.sessionMessages, chat);
@@ -193,6 +201,7 @@ function SessionWorkspace({ sessionId, chat, onNavigate, children }: Props & { s
         onOpenSource={openSource}
         onReturn={actions.back}
         onViewChange={onViewChange}
+        onCite={cite}
       />
     </aside>
   ) : null;
@@ -264,6 +273,10 @@ function preferredLine(feed: HTMLElement, view: SidechatPanelRequest | undefined
   return messageRange(feed, source);
 }
 
+function citationTitle(threads: SidechatThread[], id: string | null, fallback: string) {
+  const title = threads.find((thread) => thread.id === id)?.title;
+  return title || fallback;
+}
 function activeId(visible: boolean, request: SidechatPanelRequest) {
   return visible && request.kind === 'thread' ? request.threadId : null;
 }

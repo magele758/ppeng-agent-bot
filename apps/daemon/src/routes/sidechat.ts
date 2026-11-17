@@ -3,6 +3,7 @@ import { checkOwnerRef } from '../access/enforce.js';
 import { guardSession, listedSessions } from '../session-guard.js';
 import {
   canonicalBotIdFromSession,
+  ConflictError,
   NotFoundError,
   ValidationError,
   type RawAgentRuntime,
@@ -13,6 +14,7 @@ import type { SidechatAnchor, SidechatDetail } from '@ppeng/api-types';
 import { json } from '../http-utils.js';
 import type { RouteContext, RouteSpec } from '../routing.js';
 import { readSidechatSource, SidechatGeneration, sidechatSourceSeq } from '../sidechat-generation.js';
+import { graspQuery, learningPatch } from '../sidechat-learning.js';
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ValidationError('Expected an object');
@@ -62,6 +64,13 @@ function respond(ctx: RouteContext, detail: SidechatDetail, sourceAvailable: boo
   json(ctx.response, 200, { thread, messages, sourceAvailable });
 }
 
+function removeSidechat(runtime: RawAgentRuntime, generation: SidechatGeneration, ctx: RouteContext) {
+  const current = detail(runtime, ctx);
+  if (!runtime.store.sidechats.remove(owner(ctx.auth), current.id)) throw new NotFoundError('Sidechat');
+  generation.discard(current);
+  json(ctx.response, 200, { deleted: true });
+}
+
 function currentDetail(runtime: RawAgentRuntime, ctx: RouteContext) {
   const current = detail(runtime, ctx);
   respond(ctx, current, sidechatSourceSeq(runtime, current.sessionId, current.messageId) !== undefined);
@@ -90,6 +99,8 @@ function list(runtime: RawAgentRuntime, ctx: RouteContext) {
     botId: q.get('botId') || undefined,
     from: q.get('from') || undefined,
     to: q.get('to') || undefined,
+    grasp: graspQuery(q.get('grasp')),
+    noted: q.get('noted') === '1',
     offset,
     limit: limit + 1
   });
@@ -103,6 +114,25 @@ function latestQuestion(thread: SidechatDetail, requestId: string): string {
   if (!msg) throw new NotFoundError('Sidechat question');
   return msg.text;
 }
+function patchLearning(runtime: RawAgentRuntime, ctx: RouteContext, body: Record<string, unknown>) {
+  const current = detail(runtime, ctx);
+  const patch = learningPatch(body);
+  if (!runtime.store.sidechats.revise(owner(ctx.auth), current.id, patch)) throw new NotFoundError('Sidechat');
+  currentDetail(runtime, ctx);
+}
+
+async function distillNote(runtime: RawAgentRuntime, generation: SidechatGeneration, ctx: RouteContext) {
+  const current = detail(runtime, ctx);
+  const session = guardSession(runtime, current.sessionId, ctx.auth)!;
+  const revision = runtime.store.sidechats.beginNote(owner(ctx.auth), current.id);
+  const note = await generation.distill(current, session, readSidechatSource(runtime, session.id, current.messageId));
+  detail(runtime, ctx);
+  if (!runtime.store.sidechats.finishNote(owner(ctx.auth), current.id, revision, note)) {
+    throw new ConflictError('Sidechat note changed during generation');
+  }
+  currentDetail(runtime, ctx);
+}
+
 function sourceBotId(runtime: RawAgentRuntime, source: SessionRecord) {
   return runtime.findBotBySessionId(source.id)?.id ?? canonicalBotIdFromSession(source);
 }
@@ -162,6 +192,21 @@ export function sidechatRoutes(runtime: RawAgentRuntime, env: NodeJS.ProcessEnv 
   return [
     { method: 'GET', pattern: '/api/sidechats', handler: (ctx) => list(runtime, ctx) },
     { method: 'GET', pattern: '/api/sidechats/:id', handler: (ctx) => currentDetail(runtime, ctx) },
+    {
+      method: 'DELETE',
+      pattern: '/api/sidechats/:id',
+      handler: (ctx) => removeSidechat(runtime, generation, ctx)
+    },
+    {
+      method: 'PATCH',
+      pattern: '/api/sidechats/:id',
+      handler: async (ctx) => patchLearning(runtime, ctx, record(await ctx.readBody()))
+    },
+    {
+      method: 'POST',
+      pattern: '/api/sidechats/:id/note',
+      handler: (ctx) => distillNote(runtime, generation, ctx)
+    },
     submission('/api/sidechats', 'create'),
     submission('/api/sidechats/:id/messages', 'send'),
     submission('/api/sidechats/:id/retry', 'retry'),

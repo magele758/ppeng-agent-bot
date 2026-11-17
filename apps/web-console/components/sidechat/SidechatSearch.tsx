@@ -6,7 +6,7 @@ import { searchSidechats, type SidechatPage, type SidechatQuery } from '@/lib/si
 import { Loading, LoadError, SidechatMessages, SourceLink } from './SidechatMessages';
 import { useSidechatDetail } from './useSidechats';
 
-type Filter = { scope?: string; bot?: string; from?: string; to?: string };
+type Filter = { scope?: string; bot?: string; from?: string; to?: string; grasp?: string; noted?: string };
 type SearchProps = {
   sessionId: string;
   quote?: string;
@@ -105,7 +105,9 @@ export function SidechatSearch(props: SearchProps) {
         sessionId: filter.scope,
         botId: filter.bot,
         from: dateBoundary(filter.from, false),
-        to: dateBoundary(filter.to, true)
+        to: dateBoundary(filter.to, true),
+        grasp: filter.grasp,
+        noted: filter.noted
       };
   const search = useSearchPage(query);
   function backToResults() {
@@ -152,6 +154,9 @@ export function SidechatSearch(props: SearchProps) {
 function searchHeading(related: boolean) {
   return related ? 'sidechat.related' : 'sidechat.all';
 }
+function fieldValue(value: string | undefined) {
+  return value ?? '';
+}
 function SearchFilters({
   known,
   filter,
@@ -196,6 +201,21 @@ function SearchFilters({
       <label>
         {t('sidechat.until')}
         <input type="date" value={filter.to ?? ''} onChange={(e) => update('to', e.target.value)} />
+      </label>
+      <label>
+        {t('sidechat.learning')}
+        <select aria-label={t('sidechat.learning')} value={fieldValue(filter.grasp)} onChange={(e) => update('grasp', e.target.value)}>
+          <option value="">{t('sidechat.filterAll')}</option>
+          <option value="thinking">{t('sidechat.filterThinking')}</option>
+          <option value="mastered">{t('sidechat.filterMastered')}</option>
+        </select>
+      </label>
+      <label>
+        {t('sidechat.notedOnly')}
+        <select aria-label={t('sidechat.notedOnly')} value={fieldValue(filter.noted)} onChange={(e) => update('noted', e.target.value)}>
+          <option value="">{t('sidechat.filterAll')}</option>
+          <option value="1">{t('sidechat.filterNoted')}</option>
+        </select>
       </label>
     </details>
   );

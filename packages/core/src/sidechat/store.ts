@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { tryAcquireFdLock, type HeldFdLock } from '../teams/fd-lock.js';
 import { isDeepStrictEqual } from 'node:util';
-import type { SidechatAnchor, SidechatDetail, SidechatStatus } from '@ppeng/api-types';
+import type { SidechatAnchor, SidechatDetail, SidechatGrasp, SidechatStatus } from '@ppeng/api-types';
 import { ConflictError, NotFoundError, ValidationError } from '../errors.js';
 import { createId, nowIso } from '../id.js';
 import { readMessages, readThread, threadColumns, type ThreadRow, type TurnRow } from './rows.js';
@@ -18,6 +18,25 @@ export interface StartSidechatTurn {
   threadId?: string;
   retry?: boolean;
   attemptId?: string;
+}
+
+function assignRevision(
+  sets: string[],
+  args: Array<string | null>,
+  patch: { grasp?: SidechatGrasp; note?: string; title?: string }
+): void {
+  if (patch.grasp) {
+    sets.push('grasp=?');
+    args.push(patch.grasp);
+  }
+  if (patch.note !== undefined) {
+    sets.push('note=?', 'note_revision=note_revision+1');
+    args.push(patch.note);
+  }
+  if (patch.title !== undefined) {
+    sets.push('title=?');
+    args.push(patch.title);
+  }
 }
 
 export class SidechatStore {
@@ -269,6 +288,41 @@ export class SidechatStore {
       this.db.exec('ROLLBACK');
       throw cause;
     }
+  }
+
+  revise(
+    owner: string,
+    id: string,
+    patch: { grasp?: SidechatGrasp; note?: string; title?: string }
+  ): boolean {
+    const sets: string[] = [];
+    const args: Array<string | null> = [];
+    assignRevision(sets, args, patch);
+    if (!sets.length) return false;
+    sets.push('updated=?');
+    args.push(nowIso(), owner, id);
+    return (
+      this.db.prepare(`UPDATE sidechat_threads SET ${sets.join(', ')} WHERE owner=? AND id=?`).run(...args)
+        .changes === 1
+    );
+  }
+
+  beginNote(owner: string, id: string): number {
+    const row = this.db.prepare(`UPDATE sidechat_threads SET note_revision=note_revision+1
+      WHERE owner=? AND id=? RETURNING note_revision`).get(owner, id);
+    if (!row) throw new NotFoundError('Sidechat');
+    return Number(row.note_revision);
+  }
+
+  finishNote(owner: string, id: string, revision: number, note: string): boolean {
+    return this.db.prepare(`UPDATE sidechat_threads SET note=?, updated=?, note_revision=note_revision+1
+      WHERE owner=? AND id=? AND note_revision=?`).run(note, nowIso(), owner, id, revision).changes === 1;
+  }
+
+  remove(owner: string, id: string): boolean {
+    return (
+      this.db.prepare('DELETE FROM sidechat_threads WHERE owner = ? AND id = ?').run(owner, id).changes === 1
+    );
   }
 
   /** Run at daemon startup. A live connection keeps its slot across concurrent daemon starts. */

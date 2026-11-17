@@ -76,6 +76,8 @@ test('手机侧栏停止正在展示的回复并重试，草稿和主回答保�
         title: body.question,
         anchor: body.anchor,
         status: 'generating',
+        grasp: 'thinking',
+        note: '',
         createdAt: at,
         updatedAt: at
       },

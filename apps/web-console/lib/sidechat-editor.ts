@@ -1,7 +1,7 @@
 import type { SidechatAnchor } from '@ppeng/api-types';
 
 export type SidechatPanelRequest =
-  | { kind: 'draft'; anchor: SidechatAnchor; messageId: string }
+  | { kind: 'draft'; anchor: SidechatAnchor; messageId: string; autoAsk?: string }
   | { kind: 'thread'; threadId: string }
   | { kind: 'list'; threadIds?: string[] };
 

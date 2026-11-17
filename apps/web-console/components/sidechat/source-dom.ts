@@ -63,8 +63,24 @@ function markSlice(
   span.setAttribute('role', 'button');
   const quotes = [...new Set(hits.map((hit) => hit.thread.anchor.quote.slice(0, 100)))].join(' / ');
   span.setAttribute('aria-label', label(quotes, hits.length));
+  decorateMark(span, hits);
   span.tabIndex = showNumber ? 0 : -1;
   range.surroundContents(span);
+}
+function decorateMark(span: HTMLElement, hits: MarkRange[]) {
+  const note = firstNote(hits);
+  if (note) span.title = note;
+  if (hits.some(masteredHit)) span.dataset.sidechatGrasp = 'mastered';
+}
+function firstNote(hits: MarkRange[]) {
+  for (const hit of hits) {
+    const note = (hit.thread.note ?? '').trim();
+    if (note) return note;
+  }
+  return '';
+}
+function masteredHit(hit: MarkRange) {
+  return hit.thread.grasp === 'mastered';
 }
 function markNode(node: Text, offset: number, ranges: MarkRange[], label: MarkLabel) {
   const end = offset + node.length;

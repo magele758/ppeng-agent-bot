@@ -223,6 +223,9 @@ function bodyRefCases(f) {
 /** Self-filtered writes that need a request shaped around A's data. */
 function selfFilteredWriteCases(f) {
   return {
+    'DELETE /api/sidechats/:id': {},
+    'PATCH /api/sidechats/:id': {grasp:'mastered'},
+    'POST /api/sidechats/:id/note': {},
     'POST /api/sidechats/:id/messages': {question:'follow-up',requestId:'r1'},
     'POST /api/sidechats/:id/retry': {requestId:'r1',attemptId:'retry1'},
     'POST /api/sidechats/:id/stop': {requestId:'r1'},

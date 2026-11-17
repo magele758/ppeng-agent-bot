@@ -71,6 +71,21 @@
   background: var(--ui-surface);
   border-color: var(--ui-border);
 }
+.sc-tabs,
+.sc-chips,
+.sc-lens,
+.sc-reply-actions,
+.sc-saved-learning,
+.sc-note-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.sc-thread-note {
+  display: block;
+  font-style: normal;
+}
 .sc-tabs {
   display: flex;
   gap: 2px;
@@ -135,6 +150,15 @@
   line-height: 1.5;
 }
 .sc-error {
+  color: var(--ui-danger);
+}
+.sc-source-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.sc-delete {
   color: var(--ui-danger);
 }
 .sc-source {
