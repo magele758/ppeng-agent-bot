@@ -3527,6 +3527,14 @@
       ]
     },
     {
+      "id": "library-icloud-config",
+      "title": "iCloud 知识库目录可以保存，不存在的目录要说明找不到",
+      "tests": [
+        "apps/web-console/components/sections/knowledge/library-icloud-config.test.ts",
+        "packages/core/test/library-icloud-config.test.js"
+      ]
+    },
+    {
       "id": "library-index-keeps-serving",
       "title": "资料目录很多时保存和健康检查仍然能返回",
       "tests": [

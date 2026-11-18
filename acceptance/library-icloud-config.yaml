@@ -1,0 +1,17 @@
+id: library-icloud-config
+title: iCloud 知识库目录可以保存，不存在的目录要说明找不到
+status: implemented
+requirement: |
+  知识库里配置了 iCloud 中的 Obsidian 目录，用户说是 mac-knowlodge，一保存就直接报错。用户认为就是这次配置把服务搞挂的。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  用户实际保存的是知识库里的本地资料目录，不是 Obsidian 保存位置。存在的库可以保存并显示成功；不存在的名字显示找不到，而不是不允许。
+criteria:
+  - id: AC-1
+    given: 知识库里要添加的文件夹真实存在，并且不是系统禁止访问的位置，包括这台电脑 iCloud 里带库标记的 Obsidian 库根
+    when: 保存这个文件夹
+    then: 保存成功，界面显示已保存。保存后的路径和原来一样，或者索引还在后台进行，也不显示没保存或保存失败
+  - id: AC-2
+    given: 要添加的文件夹名字并不存在，例如把库名拼错
+    when: 保存，或用选择文件夹选到这个路径
+    then: 界面说明文件夹不存在，而不是说不允许。读不到文件夹和系统禁止访问是两种不同的说明

@@ -449,6 +449,11 @@ Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Compute
 
 按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动
 
+## library-icloud-config
+iCloud 知识库目录可以保存，不存在的目录要说明找不到
+
+知识库里配置了 iCloud 中的 Obsidian 目录，用户说是 mac-knowlodge，一保存就直接报错。用户认为就是这次配置把服务搞挂的。
+
 ## library-index-keeps-serving
 资料目录很多时保存和健康检查仍然能返回
 

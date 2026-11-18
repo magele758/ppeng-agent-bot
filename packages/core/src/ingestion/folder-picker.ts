@@ -49,7 +49,7 @@ export type FolderPickResult =
   | { status: 'selected'; path: string }
   | { status: 'cancelled' }
   | { status: 'unavailable' }
-  | { status: 'rejected' };
+  | { status: 'rejected'; reason: string };
 
 export interface FolderPickerChild {
   stdout: { on(event: 'data', listener: (chunk: Buffer | string) => void): void } | null;
@@ -229,7 +229,7 @@ function interpretPick(output: ChildOutput, home: string): FolderPickResult {
   const path = stripTrailingSlash(first);
   if (output.failedToStart || output.code !== 0 || !path.startsWith('/')) return { status: 'unavailable' };
   const checked = checkLibraryDir(path, home);
-  if (!checked.ok) return { status: 'rejected' };
+  if (!checked.ok) return { status: 'rejected', reason: checked.code };
   return { status: 'selected', path: checked.path };
 }
 

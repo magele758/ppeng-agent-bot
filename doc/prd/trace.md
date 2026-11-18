@@ -3105,6 +3105,13 @@ Langfuse 实际上报状态与超时
 - `packages/agent-loop/src/runtime/tool-loop.test.ts`
 - `packages/core/test/lcu-computer-use.test.js`
 
+### library-icloud-config
+
+iCloud 知识库目录可以保存，不存在的目录要说明找不到
+
+- `apps/web-console/components/sections/knowledge/library-icloud-config.test.ts`
+- `packages/core/test/library-icloud-config.test.js`
+
 ### library-index-keeps-serving
 
 资料目录很多时保存和健康检查仍然能返回
