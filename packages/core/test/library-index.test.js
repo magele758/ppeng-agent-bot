@@ -252,6 +252,28 @@ test('不存在的资料目录会说明找不到，而不是不允许 [AC:librar
   }
 });
 
+test('关闭数据库后后台索引不会留下未处理的拒绝', async () => {
+  const env = openStore();
+  const dir = folder(env.dir);
+  writeFileSync(join(dir, 'close.md'), 'closefencequartz');
+  writeIngestionSettings(env.store, { libraryDirs: [dir] });
+  const watcher = new LibraryIndexWatcher(env.store);
+  const rejections = [];
+  const onReject = (error) => {
+    rejections.push(error);
+  };
+  process.on('unhandledRejection', onReject);
+  try {
+    watcher.start();
+    env.store.db.close();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(rejections.length, 0);
+  } finally {
+    process.off('unhandledRejection', onReject);
+    watcher.stop();
+  }
+});
+
 test('真实存在的资料目录可以保存 [AC:library-index-keeps-serving#AC-3]', () => {
   const env = openStore();
   const dir = folder(env.dir);

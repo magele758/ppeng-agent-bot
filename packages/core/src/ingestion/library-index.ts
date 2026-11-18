@@ -348,6 +348,19 @@ export class LibraryIndexWatcher {
     settings: IngestionSettings,
     roots: string[]
   ): Promise<void> {
+    try {
+      await this.scanOnce(token, home, settings, roots);
+    } catch {
+      /* a closed store or a bad file must not reject after the caller moved on */
+    }
+  }
+
+  private async scanOnce(
+    token: number,
+    home: string,
+    settings: IngestionSettings,
+    roots: string[]
+  ): Promise<void> {
     await yieldToLoop();
     if (!this.still(token)) return;
     const memory = this.store.agentMemory();
