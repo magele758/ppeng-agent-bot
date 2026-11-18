@@ -341,6 +341,7 @@
 
 需求正文见 [console](console.md)。
 
+- `console-bot-visual` Bot 页视觉与列表状态
 - `console-font-size-preference` 控制台字体大小偏好
 - `console-home-shell` 控制台视觉与外壳
 - `console-knowledge` 知识与记忆：分层记忆、搜索与摄取设置

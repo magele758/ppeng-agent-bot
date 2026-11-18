@@ -1,5 +1,10 @@
 <!-- 本文件由 scripts/prd/build-catalog.mjs 生成，不要手改。改验收规格或技能说明后重新运行该脚本。 -->
 
+## console-bot-visual
+Bot 页视觉与列表状态
+
+Implement the approved console redesign, Bot page only. User approved the v2 Bot structure exactly: pinned (bots and rooms mixed), unpinned rooms, functional groups, ungrouped, shared info; row menu to pin and move group; + creates bot, room, functional group. Do not regroup. Visual only plus matching empty/loading/error states. Sage green, and respect light/dark CSS variables if the shell PR has not landed yet — do not invent a second theme system and do not edit the shell, styles/tokens, or nav.
+
 ## console-font-size-preference
 控制台字体大小偏好
 

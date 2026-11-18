@@ -16,6 +16,7 @@ import {
 } from '@/lib/bot-detail-menu';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import styles from './BotDetailMenu.module.css';
+import './bot-home.css';
 
 type Section = 'routines' | 'tasks' | 'files' | 'memory' | 'skills';
 type LoadedSection = 'routines' | 'files' | 'memory';
@@ -62,9 +63,14 @@ export type BotDetailPreview = {
 
 function DetailSectionState({ loading, failed, count, emptyKey }: { loading: boolean; failed: boolean; count: number; emptyKey: MessageKey }) {
   const { t } = useI18n();
-  if (failed) return <p className={styles.alert} role="alert">{t('play.botDetail.loadFailed')}</p>;
-  if (loading || count > 0) return null;
-  return <p className={styles.empty}>{t(emptyKey)}</p>;
+  if (failed) return <p className={styles.alert} role="alert" data-testid="bot-detail-error">{t('play.botDetail.loadFailed')}</p>;
+  if (loading) return <DetailLoading />;
+  if (count > 0) return null;
+  return <p className={styles.empty} data-testid="bot-detail-empty">{t(emptyKey)}</p>;
+}
+function DetailLoading() {
+  const { t } = useI18n();
+  return <div className={styles.skel} data-testid="bot-detail-loading" role="status" aria-busy="true"><span className="sr-only">{t('play.botHome.loading')}</span></div>;
 }
 function DetailNextRun({ when }: { when?: string }) {
   const { t } = useI18n();
@@ -325,7 +331,7 @@ export function BotDetailMenu({
   return (
     <aside
       {...detailMenuLayout(recordsOnly).attributes}
-      className={`bot-detail-menu ${styles.panel}`}
+      className={`bot-detail-menu bot-home ${styles.panel}`}
       data-bot-id={botId}
       aria-label={t('play.botDetail.aria')}
     >
@@ -381,7 +387,7 @@ export function BotDetailPane({ visible, botId, botName, agentId, onClose, child
   const {t} = useI18n();
   const bot = bots.find(bot=>bot.id===botId);
   if (!visible || !bot) return null;
-  return <aside id="bot-detail-panel" className={`bot-detail-menu ${styles.panel}`} data-testid="bot-detail-panel" data-bot-id={botId}>
+  return <aside id="bot-detail-panel" className={`bot-detail-menu bot-home ${styles.panel}`} data-testid="bot-detail-panel" data-bot-id={botId}>
     <div className={styles.head}><h3>{t('botSettings.settings')}</h3><button className={styles.close} data-testid="bot-detail-close" aria-label={t('play.botDetail.close')} onClick={onClose}>×</button></div>
     <div className={styles.body} data-testid="bot-detail-scroll">
       <BotDetail key={botId} bot={bot} embedded records={<BotDetailMenu recordsOnly botId={botId} botName={botName} agentId={agentId} initialSection="files" childTasks={childTasks} onOpenChildTask={onOpenChildTask}/>}/>

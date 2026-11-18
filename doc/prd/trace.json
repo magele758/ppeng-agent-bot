@@ -2880,6 +2880,13 @@
       ]
     },
     {
+      "id": "console-bot-visual",
+      "title": "Bot 页视觉与列表状态",
+      "tests": [
+        "apps/web-console/components/bot-home.visual.test.ts"
+      ]
+    },
+    {
       "id": "console-font-size-preference",
       "title": "控制台字体大小偏好",
       "tests": [

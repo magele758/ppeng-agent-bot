@@ -2537,6 +2537,12 @@ Lab connector authorization states and SecretVault grant
 - `apps/web-console/lib/connectors-grant.test.ts`
 - `packages/core/test/connector-registry.test.js`
 
+### console-bot-visual
+
+Bot 页视觉与列表状态
+
+- `apps/web-console/components/bot-home.visual.test.ts`
+
 ### console-font-size-preference
 
 控制台字体大小偏好

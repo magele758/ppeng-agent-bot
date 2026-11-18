@@ -10,6 +10,8 @@ import type { SidebarRoom } from './play-group/PlayBotGroupList';
 import './BotRowMenu.css';
 import { BotEntryDialog } from './BotEntryDialog';
 import { BotDetailMenu } from './BotDetailMenu';
+import { BotPinMenuItem } from './BotRowActions';
+import type { PinRosterBot } from '@/lib/bot-pin-area';
 
 type Destination = { id: string; name: string };
 type Picker = 'group' | 'room';
@@ -23,7 +25,7 @@ async function destinations(kind: Picker, botId: string): Promise<Destination[]>
   return rooms.filter(room => room.status !== 'paused' && !room.botIds.includes(botId)).map(room => ({id:room.id, name:room.title}));
 }
 
-export function BotRowMenu({bot, details, remove, onDeleted}: {bot:BotInfo; details:()=>void; remove:()=>void; onDeleted:()=>void}) {
+export function BotRowMenu({bot, roster = [], details, remove, onDeleted}: {bot:BotInfo; roster?: readonly PinRosterBot[]; details:()=>void; remove:()=>void; onDeleted:()=>void}) {
   const { t } = useI18n();
   const id = useId();
   const pop = useRef<HTMLDivElement>(null);
@@ -70,6 +72,7 @@ export function BotRowMenu({bot, details, remove, onDeleted}: {bot:BotInfo; deta
       }}>⋯</button>
     <div id={id} ref={pop} popover="auto" className="bot-row-pop" data-testid="bot-row-actions">
       <button onClick={()=>{closeMenu(); details();}}>{t('play.rowMenu.details')}</button>
+      <BotPinMenuItem botId={bot.id} roster={roster} />
       <button onClick={()=>{closeMenu(); setView('cron');}}>{t('play.rowMenu.cron')}</button>
       <button onClick={()=>void choose('group')}>{t('play.rowMenu.group')}</button>
       <button onClick={()=>void choose('room')}>{t('play.rowMenu.room')}</button>

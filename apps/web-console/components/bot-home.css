@@ -1,0 +1,113 @@
+/* Bot page colors come from the shell palette. Hex values apply only when a token is absent. */
+.bot-home,
+.play-sidebar:has(.bot-home) {
+  color: var(--ui-home-text, light-dark(#1A201B, #E7ECE7));
+  background: var(--ui-home-panel, light-dark(#FAFAF8, #161A16));
+  color-scheme: light dark;
+}
+
+html[data-theme="light"] .bot-home { color-scheme: light; }
+html[data-theme="dark"] .bot-home { color-scheme: dark; }
+
+.bot-home :focus-visible {
+  outline: 2px solid var(--ui-home-accent, light-dark(#3D6A4D, #82BD95));
+  outline-offset: 1px;
+}
+
+.bot-list-status {
+  margin: 8px;
+  padding: 16px 12px;
+  border: 1px solid var(--ui-home-line, light-dark(#E1E4DD, #283028));
+  border-radius: 12px;
+  background: var(--ui-home-surface, light-dark(#FFFFFF, #1C211C));
+  text-align: center;
+}
+
+.bot-list-status__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.bot-list-status__hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ui-home-text-secondary, light-dark(#556057, #A2ADA4));
+}
+
+.bot-list-status button {
+  margin-top: 10px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-home-accent, light-dark(#3D6A4D, #82BD95));
+  border-radius: 8px;
+  background: var(--ui-home-accent, light-dark(#3D6A4D, #82BD95));
+  color: var(--ui-home-on-accent, light-dark(#FFFFFF, #0D150F));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.bot-list-status--error,
+.bot-list-status.is-kept {
+  text-align: start;
+  background: var(--ui-home-danger-soft, light-dark(#F9E6E1, #371C17));
+  border-color: var(--ui-home-danger, light-dark(#B53C2A, #EE8B78));
+  color: var(--ui-home-danger, light-dark(#B53C2A, #EE8B78));
+}
+
+.bot-list-status--error .bot-list-status__hint,
+.bot-list-status.is-kept .bot-list-status__hint { color: inherit; }
+
+.bot-list-status--loading {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  padding: 8px;
+}
+
+.bot-list-skel {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.bot-list-skel i,
+.bot-list-skel b {
+  display: block;
+  border-radius: 8px;
+  background: var(--ui-home-sunk, light-dark(#ECEEE9, #0C0F0C));
+}
+
+.bot-list-skel i { width: 32px; height: 32px; border-radius: 10px; flex: none; }
+.bot-list-skel b { height: 10px; flex: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .bot-list-skel i,
+  .bot-list-skel b { animation: bot-list-pulse 1.2s ease-in-out infinite; }
+}
+
+@keyframes bot-list-pulse {
+  50% { opacity: 0.35; }
+}
+
+.bot-home .list-item.selected,
+.bot-home .list-item--session.selected {
+  background: var(--ui-home-hover, light-dark(#ECEEE9, #0C0F0C));
+}
+
+.bot-home .bot-row-pop {
+  border: 1px solid var(--ui-home-line-strong, light-dark(#C9CFC4, #3B453C));
+  border-radius: 12px;
+  background: var(--ui-home-surface, light-dark(#FFFFFF, #1C211C));
+  color: var(--ui-home-text, light-dark(#1A201B, #E7ECE7));
+}
+
+.bot-home .bot-row-pop button:hover {
+  background: var(--ui-home-hover, light-dark(#ECEEE9, #0C0F0C));
+}

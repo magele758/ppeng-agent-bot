@@ -141,7 +141,7 @@ export const play = {
     saveFailed: 'Reply mode was not saved',
     saved: 'Saved',
   },
-  rowMenu: { delete: 'Delete Bot', deleteConfirm: 'Delete {name} and its scheduled tasks? Conversation and group chat history will be preserved. This cannot be undone.', loading: 'Loading…', advanced: 'Advanced settings and usage', label: 'More actions for {name}', details: 'View details', cron: 'View scheduled tasks', group: 'Join a group', room: 'Join a group chat', remove: 'Hide Bot', empty: 'No available destinations' },
+  rowMenu: { delete: 'Delete Bot', deleteConfirm: 'Delete {name} and its scheduled tasks? Conversation and group chat history will be preserved. This cannot be undone.', loading: 'Loading…', advanced: 'Advanced settings and usage', label: 'More actions for {name}', details: 'View details', pin: 'Pin', unpin: 'Unpin', moveTo: 'Move to “{name}”', moveOut: 'Remove from group', cron: 'View scheduled tasks', group: 'Join a group', room: 'Join a group chat', remove: 'Hide Bot', empty: 'No available destinations' },
   entry: { new: 'New', remove: 'Remove', confirmRemove: 'Confirm remove', removeBot: 'Remove Bot “{name}”', removeBotConfirm: 'Remove Bot “{name}”? It will be hidden from the Bot list. Existing conversations, group chats and tasks are kept; this does not delete conversations.', removeFailed: 'Removal failed: {error}' },
   groupModel: {
     settings: "Default model",
@@ -183,6 +183,14 @@ export const play = {
     title: "Pinned",
     empty: "Drag a Bot or group chat here to pin it",
     hint: "Drag a Bot or group chat out of this area to unpin it"
+  },
+  botHome: {
+    loading: "Loading bots",
+    emptyTitle: "No bots",
+    emptyHint: "Use New above to create your first bot.",
+    errorTitle: "Couldn’t load the bot list",
+    errorHint: "The service is not responding. What is already shown stays, and a failure is not shown as an empty list.",
+    retry: "Retry"
   },
   send: 'Send',
   add: 'New',

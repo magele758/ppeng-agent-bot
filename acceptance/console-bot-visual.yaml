@@ -1,0 +1,31 @@
+id: console-bot-visual
+title: Bot 页视觉与列表状态
+status: implemented
+requirement: |
+  Implement the approved console redesign, Bot page only. User approved the v2 Bot structure exactly: pinned (bots and rooms mixed), unpinned rooms, functional groups, ungrouped, shared info; row menu to pin and move group; + creates bot, room, functional group. Do not regroup. Visual only plus matching empty/loading/error states. Sage green, and respect light/dark CSS variables if the shell PR has not landed yet — do not invent a second theme system and do not edit the shell, styles/tokens, or nav.
+notes: 'assumedApproval: standing-order-2026-10-22; v2 Bot structure approved with the design'
+criteria:
+  - id: AC-1
+    given: Bot 页已有 Bot 和群聊
+    when: 查看左侧列表
+    then: 顺序仍是置顶（Bot 与群聊混排）、未置顶的群聊、功能分组、未分组、共享信息，分组方式不变
+  - id: AC-2
+    given: Bot 列表正在加载
+    when: 分组还没返回
+    then: 显示加载骨架，不把这一页显示成没有 Bot
+  - id: AC-3
+    given: Bot 列表加载失败
+    when: 查看列表
+    then: 显示错误和重试，已有内容保留，失败不会被显示成空列表
+  - id: AC-4
+    given: 没有任何 Bot、群聊和功能分组
+    when: 列表已经加载完成
+    then: 显示无 Bot 的空状态，并提示用上方的新建来创建
+  - id: AC-5
+    given: 列表里有 Bot 或群聊
+    when: 打开这一行的更多菜单
+    then: 可以置顶或取消置顶，也可以移动到功能分组；顶部的新建仍可创建 Bot、群聊和功能分组
+  - id: AC-6
+    given: 界面是浅色或深色
+    when: 查看 Bot 列表、行菜单和详情
+    then: 强调色是鼠尾草绿，并跟随已有的浅色深色变量；没有另一套主题开关

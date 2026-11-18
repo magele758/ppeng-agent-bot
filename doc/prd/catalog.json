@@ -1436,6 +1436,13 @@
       "file": "acceptance/connector-authorization.yaml"
     },
     {
+      "id": "console-bot-visual",
+      "title": "Bot 页视觉与列表状态",
+      "requirement": "Implement the approved console redesign, Bot page only. User approved the v2 Bot structure exactly: pinned (bots and rooms mixed), unpinned rooms, functional groups, ungrouped, shared info; row menu to pin and move group; + creates bot, room, functional group. Do not regroup. Visual only plus matching empty/loading/error states. Sage green, and respect light/dark CSS variables if the shell PR has not landed yet — do not invent a second theme system and do not edit the shell, styles/tokens, or nav.",
+      "verificationStage": "software",
+      "file": "acceptance/console-bot-visual.yaml"
+    },
+    {
       "id": "console-font-size-preference",
       "title": "控制台字体大小偏好",
       "requirement": "现在字体又太大了，你在设置里给我加一个字体大小选择的，尺寸参考macos的字体选择吧",
