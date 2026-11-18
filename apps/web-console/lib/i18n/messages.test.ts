@@ -41,6 +41,10 @@ test('知识库目录文案中英文使用同一套条目 [AC:knowledge-library-
     'cancelled',
     'unavailable',
     'rejected',
+    'missing',
+    'unreadable',
+    'denied',
+    'notFolder',
     'saveFailed',
     'loadFailed',
     'pickFailed'
