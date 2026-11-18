@@ -3118,6 +3118,13 @@ iCloud 知识库目录可以保存，不存在的目录要说明找不到
 
 - `packages/core/test/library-index.test.js`
 
+### library-index-yield
+
+保存知识库目录不堵住访问
+
+- `apps/daemon/test/library-index-yield.test.ts`
+- `packages/core/test/library-index.test.js`
+
 ### live-bot-quality
 
 真实 Bot 任务评估与版本准入
