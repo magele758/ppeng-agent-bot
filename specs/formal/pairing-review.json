@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-18T02:40:00.000Z",
-  "reviewNote": "Reviewed the runtime.ts library-index scheduling change. refreshLibraryIndex returns before any directory walk, and shutdown cancels a scan that has not started. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-18T16:18:00.000Z",
+  "reviewNote": "Reviewed the placeholder substitution in steer-tools.ts and the related core tests. Only an example machine name inside the steer judge prompt text and test fixture strings was replaced with a placeholder; no code path changed. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -492,8 +492,8 @@
     "packages/core/src/runtime.ts": "c794eaacb7ac334183414c677437a00064761cf9dc838a73f505351435e289fa",
     "packages/core/src/runtime/l5-bindings.ts": "eebc7ce1d15f3ef439dde9847f85c32c3334ce10131f41b0ee848eb8fb44fdc4",
     "packages/core/src/bots/strict-output.ts": "892f0f7347b6bf134c1f4d66d97e8f9a0677afaff69b5fc812d1ecf117d7aeb2",
-    "packages/core/src/runtime/steer-tools.ts": "26d586ab2ecab82adb4d8973048b8e52423d96d420dce84104cdd7cb6f49f822",
-    "packages/core/test/steer-tool-continuity.test.js": "4a33f5ed3e2757b695e4f503bb3b96871ca687ae777215df0faea56cb5c24c98",
+    "packages/core/src/runtime/steer-tools.ts": "5fd2b787f41943c947322525b2dd8c0b5f9fb516aa371142e441ae65cf6990bc",
+    "packages/core/test/steer-tool-continuity.test.js": "4ae0b8876808936524d7ab75b9cec59990c9eb9bb611793f185e682a6eeb9e9d",
     "packages/core/src/learning/sources.ts": "dc39b94026833c515e560607af9e241d0ed0aca11a929fbb41c6289bfdb93a29",
     "packages/core/src/cron/routine-runtime.ts": "751349566b4c78fe1e178d650504fa681ab76765e7a238af16438894bdd2bb4b",
     "packages/core/src/runtime/scheduler-host.ts": "2173ab9c09ce3ffd6bacd51ec3bb21786030ca98fe1b46824f8a185613997ce5",
