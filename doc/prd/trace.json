@@ -2676,6 +2676,13 @@
       ]
     },
     {
+      "id": "chat-page-redesign",
+      "title": "会话页按已批准的设计稿改版",
+      "tests": [
+        "apps/web-console/lib/chat-page-redesign.test.ts"
+      ]
+    },
+    {
       "id": "chat-reading",
       "title": "会话正文阅读节奏",
       "tests": [

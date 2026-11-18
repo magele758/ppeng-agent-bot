@@ -82,6 +82,7 @@ import {
   toolResultSummaryPillSpecs,
   type ToolResultSummaryPillSpec
 } from '@/lib/tool-result-fold';
+import { reasoningFoldProps } from '@/lib/chat-page-redesign';
 import {
   chatImageRef,
   chatImageSrc,
@@ -215,7 +216,7 @@ function ReasoningFold({ text, streaming }: { text: string; streaming?: boolean 
   return (
     <details
       className="chat-tool-fold chat-tool-fold--compact chat-tool-fold--reasoning"
-      {...(streaming ? { open: true } : {})}
+      {...reasoningFoldProps(Boolean(streaming))}
     >
       <summary className="chat-tool-fold__summary">
         <span className="chat-tool-fold__pill chat-tool-fold__pill--reasoning">{t('play.thinking')}</span>

@@ -101,8 +101,8 @@
   max-height: min(60vh, 560px);
   gap: var(--ui-space-3);
   padding: var(--ui-space-4);
-  border-radius: var(--ui-radius-md);
-  box-shadow: var(--ui-shadow-md);
+  border-radius: var(--ui-home-radius-card, 12px);
+  box-shadow: var(--ui-home-shadow, none);
 }
 
 .session-settings__head {
@@ -124,9 +124,35 @@
 }
 
 .session-settings__fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--ui-space-3);
+}
+
+.session-settings__seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--ui-home-radius-control, 8px);
+  background: var(--ui-home-sunk, #ECEEE9);
+}
+
+.session-settings__seg button {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--ui-home-radius-tag, 6px);
+  background: transparent;
+  color: var(--ui-home-text-secondary, #556057);
+  font: inherit;
+  font-size: var(--ui-home-hint, 12px);
+  cursor: pointer;
+}
+
+.session-settings__seg button.is-selected {
+  background: var(--ui-home-surface, #FFFFFF);
+  color: var(--ui-home-text, #1A201B);
+  font-weight: 600;
 }
 
 .session-settings__field {
@@ -776,4 +802,137 @@ html[data-chat-width="full"] .chat-panel-body {
     position: static;
     width: 100%;
   }
+}
+
+/* 会话页沿用外壳的 --ui-home-*。括号里的色值只在变量缺失时生效。 */
+html .lab-shell .play-layout[data-play-surface="chat"] {
+  background: var(--ui-home-bg, #F4F5F2);
+}
+
+html .lab-shell .play-layout[data-play-surface="chat"] > .play-sidebar {
+  background: var(--ui-home-panel, #FAFAF8);
+  border-color: var(--ui-home-line, #E1E4DD);
+  box-shadow: var(--ui-home-shadow, none);
+}
+
+html .lab-shell .play-layout[data-play-surface="chat"] > .play-main {
+  background: var(--ui-home-bg, #F4F5F2);
+}
+
+html .lab-shell .play-layout[data-play-surface="chat"] .chat-panel-body .chat-turn--user .chat-bubble {
+  background: var(--ui-home-accent-soft, #E1ECE4);
+  color: var(--ui-home-text, #1A201B);
+  border: 0;
+  border-radius: 14px 14px 4px 14px;
+  box-shadow: var(--ui-home-shadow, none);
+}
+
+.play-layout[data-play-surface="chat"] .chat-send-btn:not(.chat-send-btn--steer) {
+  background: var(--ui-home-accent, #3D6A4D);
+  border-color: var(--ui-home-accent, #3D6A4D);
+  color: var(--ui-home-on-accent, #FFFFFF);
+  border-radius: var(--ui-home-radius-control, 8px);
+  box-shadow: var(--ui-home-shadow, none);
+}
+
+.play-layout[data-play-surface="chat"] .session-date-group__label {
+  padding: 10px 8px 4px;
+  font-size: var(--ui-home-label, 11px);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--ui-home-text-tertiary, #879088);
+}
+
+.play-layout[data-play-surface="chat"] .session-item__title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.play-layout[data-play-surface="chat"] .session-item__title-row .session-item__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play-layout[data-play-surface="chat"] .session-item__when {
+  flex: none;
+  font-size: var(--ui-home-label, 11px);
+  color: var(--ui-home-text-tertiary, #879088);
+}
+
+.play-layout[data-play-surface="chat"] .list-item--session.selected {
+  background: var(--ui-home-hover, #E6E9E3);
+  border-radius: var(--ui-home-radius-control, 8px);
+}
+
+.play-layout[data-play-surface="chat"] .chat-composer {
+  background: var(--ui-home-surface, #FFFFFF);
+  border: 1px solid var(--ui-home-line-strong, #C9CFC4);
+  border-radius: var(--ui-home-radius-dialog, 14px);
+  box-shadow: var(--ui-home-shadow, none);
+}
+
+.play-layout[data-play-surface="chat"] .chat-panel-header__quiet {
+  margin: 0;
+  font-size: var(--ui-home-hint, 12px);
+  color: var(--ui-home-text-secondary, #556057);
+}
+
+html[data-theme="dark"] .lab-shell .play-layout[data-play-surface="chat"] {
+  background: var(--ui-home-bg, #111411);
+}
+
+html[data-theme="dark"] .lab-shell .play-layout[data-play-surface="chat"] > .play-sidebar {
+  background: var(--ui-home-panel, #161A16);
+  border-color: var(--ui-home-line, #283028);
+}
+
+html[data-theme="dark"] .lab-shell .play-layout[data-play-surface="chat"] > .play-main {
+  background: var(--ui-home-bg, #111411);
+}
+
+html[data-theme="dark"] .lab-shell .play-layout[data-play-surface="chat"] .chat-panel-body .chat-turn--user .chat-bubble {
+  background: var(--ui-home-accent-soft, #1F2F25);
+  color: var(--ui-home-text, #E7ECE7);
+}
+
+html[data-theme="dark"] .play-layout[data-play-surface="chat"] .chat-send-btn:not(.chat-send-btn--steer) {
+  background: var(--ui-home-accent, #82BD95);
+  border-color: var(--ui-home-accent, #82BD95);
+  color: var(--ui-home-on-accent, #0D150F);
+}
+
+html[data-theme="dark"] .play-layout[data-play-surface="chat"] .session-date-group__label,
+html[data-theme="dark"] .play-layout[data-play-surface="chat"] .session-item__when {
+  color: var(--ui-home-text-tertiary, #6E7A70);
+}
+
+html[data-theme="dark"] .play-layout[data-play-surface="chat"] .list-item--session.selected {
+  background: var(--ui-home-hover, #262D27);
+}
+
+html[data-theme="dark"] .play-layout[data-play-surface="chat"] .chat-composer {
+  background: var(--ui-home-surface, #1C211C);
+  border-color: var(--ui-home-line-strong, #3B453C);
+}
+
+html[data-theme="dark"] .play-layout[data-play-surface="chat"] .chat-panel-header__quiet {
+  color: var(--ui-home-text-secondary, #A2ADA4);
+}
+
+html[data-theme="dark"] .session-settings__seg {
+  background: var(--ui-home-sunk, #0C0F0C);
+}
+
+html[data-theme="dark"] .session-settings__seg button {
+  color: var(--ui-home-text-secondary, #A2ADA4);
+}
+
+html[data-theme="dark"] .session-settings__seg button.is-selected {
+  background: var(--ui-home-surface, #1C211C);
+  color: var(--ui-home-text, #E7ECE7);
 }

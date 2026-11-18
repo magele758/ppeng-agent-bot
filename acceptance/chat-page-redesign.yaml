@@ -1,0 +1,25 @@
+id: chat-page-redesign
+title: 会话页按已批准的设计稿改版
+status: implemented
+requirement: |
+  Implement the approved console redesign, chat (会话) page only. Keep 会话 as its own top-level item, separate from Bot. Keep existing chat behavior from AGENTS.md: optimistic user bubble and assistant placeholder, clear composer on send, thinking collapsed in history and open while streaming, tool results collapsed, Markdown body. Restyle to the design, including session settings and date grouping if the design shows them and the app already has that data. Sage green via existing or forthcoming CSS variables. Do not implement 「本会话始终允许」.
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  用户于 2026-11-17 批准界面设计第 2 版，并要求完成会话页。会话列表的日期与收藏分组、会话设置使用现有数据。加载中与出错没有单独的会话列表状态，不新造。
+criteria:
+  - id: AC-1
+    given: 会话页里有普通会话，更新时间分别落在今天、昨天、近 7 天和近 30 天，其中一场已收藏
+    when: 查看左侧会话列表，或只看收藏
+    then: 已收藏的在「收藏」里；其余按今天、昨天、近 7 天、近 30 天分组。今天显示钟点，昨天显示「昨天」。只看收藏时其余会话不出现；一场收藏都没有时说明没有收藏的会话
+  - id: AC-2
+    given: 打开一场不绑定 Bot 的会话
+    when: 打开输入框下的会话设置
+    then: 能改执行模式（通用对话、任务工区、主控编排）、Agent 和验收条件，并说明只影响当前会话。看不到「本会话始终允许」
+  - id: AC-3
+    given: 在会话页发出一条消息，助手开始回复
+    when: 看对话流
+    then: 用户的话立刻出现在鼠尾草绿浅底气泡里，助手先显示占位，输入框被清空。历史里的思考默认折叠，正在输出时展开。工具结果默认折叠。助手正文用 Markdown 显示
+  - id: AC-4
+    given: 选中一场不绑定 Bot 的会话
+    when: 看对话区顶栏
+    then: 能看到助手名称、标识，以及空闲或正在工作。这场会话仍在会话页，不带 Bot 的身份和右侧详情

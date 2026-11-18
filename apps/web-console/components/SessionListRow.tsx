@@ -4,7 +4,9 @@ import type { CSSProperties, ReactNode } from 'react';
 import { botFaceIdleDelay } from '@/lib/bot-face';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
-import { sessionRowCopy, sessionWorkBotId } from '@/lib/session-row';
+import { sessionListWhen, sessionListWhenText } from '../lib/chat-page-redesign';
+import { sessionActivityAt } from '../lib/session-groups';
+import { rowSubtitleText, sessionRowCopy, sessionWorkBotId } from '@/lib/session-row';
 import { useVisibleQuestion } from './useBotSessionQuestions';
 import { BotFace } from './BotFace';
 import { useBotWorkMood } from './bot-work/BotWorkState';
@@ -64,6 +66,7 @@ export function SessionListRow({
   selectMode,
   deleting,
   status,
+  showWhen = false,
   onOpen,
   onToggleChecked,
   onDelete,
@@ -80,6 +83,7 @@ export function SessionListRow({
   deleting: boolean;
   rowActions?: ReactNode;
   status: ReactNode;
+  showWhen?: boolean;
   onOpen: () => void;
   onToggleChecked: (checked: boolean) => void;
   onDelete?: (title: string) => void;
@@ -98,6 +102,7 @@ export function SessionListRow({
     unnamed: t('play.unnamed')
   });
   const view = sessionRowPresentation(copy, (name) => t('play.childTask.owner', { name }));
+  const subtitle = rowSubtitleText(copy.kind, view.title, preview.text, view.subtitle);
   const botId = sessionWorkBotId(session, bots);
   const mood = useBotWorkMood(botId);
 
@@ -140,10 +145,16 @@ export function SessionListRow({
         </span>
       ) : null}
       <div className="session-item__body">
-        <div className="session-item__title">{view.title}</div>
+        <PlainSessionTitle
+          kind={copy.kind}
+          title={view.title}
+          showWhen={showWhen}
+          updatedAt={session.updatedAt}
+          createdAt={session.createdAt}
+        />
         <div className="session-item__meta">
           {status}
-          <SessionRowSubtitle bot={view.bot} subtitle={view.subtitle} hasQuestion={view.hasQuestion} agentId={session.agentId} owner={view.owner} />
+          <SessionRowSubtitle bot={view.bot} subtitle={subtitle} hasQuestion={view.hasQuestion} agentId={session.agentId} owner={view.owner} />
         </div>
       </div>
       {rowActions}
@@ -191,6 +202,40 @@ function SessionRowDelete(props: DeleteLabels & {
   </button>;
 }
 
+function PlainSessionTitle({
+  kind,
+  title,
+  showWhen,
+  updatedAt,
+  createdAt
+}: {
+  kind: string;
+  title: string;
+  showWhen: boolean;
+  updatedAt?: string;
+  createdAt?: string;
+}) {
+  const { t } = useI18n();
+  if (kind !== 'plain' || !showWhen) return <div className="session-item__title">{title}</div>;
+  const when = sessionListWhenText(sessionListWhen(sessionActivityAt({ updatedAt, createdAt })), t);
+  return (
+    <div className="session-item__title-row">
+      <div className="session-item__title">{title}</div>
+      {when ? <time className="session-item__when" dateTime={updatedAt || createdAt}>{when}</time> : null}
+    </div>
+  );
+}
+
+function PlainSessionMeta({ subtitle, agentId }: { subtitle: string; agentId?: string }) {
+  if (!subtitle) return <SessionRowAgentId agentId={agentId} />;
+  return (
+    <>
+      <span className="session-item__question-text" data-testid="session-plain-preview">{subtitle}</span>
+      <SessionRowAgentId agentId={agentId} />
+    </>
+  );
+}
+
 function SessionRowAgentId({ agentId }: { agentId?: string }) {
   if (!agentId || isCoreExecAgent(agentId)) return null;
   return <span className="session-item__agent">{agentId}</span>;
@@ -200,7 +245,7 @@ function SessionRowSubtitle({ bot, subtitle, hasQuestion, agentId, owner }: { bo
   if (owner) {
     return <span className="session-item__agent session-item__owner" data-testid="session-child-task-owner">{owner}</span>;
   }
-  if (!bot) return <SessionRowAgentId agentId={agentId} />;
+  if (!bot) return <PlainSessionMeta subtitle={subtitle} agentId={agentId} />;
   const questionClass = hasQuestion ? 'session-item__question is-question' : 'session-item__question';
   return (
     <div className={questionClass}>

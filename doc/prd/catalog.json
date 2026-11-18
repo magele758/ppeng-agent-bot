@@ -1268,6 +1268,13 @@
       "file": "acceptance/chat-more-menu-on-top.yaml"
     },
     {
+      "id": "chat-page-redesign",
+      "title": "会话页按已批准的设计稿改版",
+      "requirement": "Implement the approved console redesign, chat (会话) page only. Keep 会话 as its own top-level item, separate from Bot. Keep existing chat behavior from AGENTS.md: optimistic user bubble and assistant placeholder, clear composer on send, thinking collapsed in history and open while streaming, tool results collapsed, Markdown body. Restyle to the design, including session settings and date grouping if the design shows them and the app already has that data. Sage green via existing or forthcoming CSS variables. Do not implement 「本会话始终允许」.",
+      "verificationStage": "software",
+      "file": "acceptance/chat-page-redesign.yaml"
+    },
+    {
       "id": "chat-reading",
       "title": "会话正文阅读节奏",
       "requirement": "我总觉得当前项目的web里面的对话的内容看起来很累，内容很挤，然后密密麻麻的，看起来不适合阅读，你看看怎么优化下会话里的对话内容展示，现在是markdown的渲染，有什么最佳的渲染实践吗？帮我先搜索研究一下，然后分多个agent去完成这块ui的提升",

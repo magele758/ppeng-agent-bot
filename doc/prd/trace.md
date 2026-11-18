@@ -2357,6 +2357,12 @@ permissionMode=bypass 视为用户显式授权，不再被来源范围拦截
 
 - `apps/web-console/styles/chat-more-menu.test.ts`
 
+### chat-page-redesign
+
+会话页按已批准的设计稿改版
+
+- `apps/web-console/lib/chat-page-redesign.test.ts`
+
 ### chat-reading
 
 会话正文阅读节奏
