@@ -2,10 +2,45 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { useI18n } from '@/lib/i18n';
+import { useI18n, type I18nContextValue } from '@/lib/i18n';
 import { SettingsGroup } from '../../ui';
-import { applyLibraryPick, withoutLibraryDir } from './library-dirs-model';
+import {
+  applyLibraryPick,
+  errorText,
+  libraryDirsFromBody,
+  libraryIndexRunning,
+  libraryRejectKey,
+  librarySaveFailureView,
+  librarySaveView,
+  withoutLibraryDir,
+  type LibrarySaveView
+} from './library-dirs-model';
 import styles from './knowledge.module.css';
+
+function showLibrarySave(
+  view: LibrarySaveView,
+  t: I18nContextValue['t'],
+  setDirs: (dirs: string[]) => void,
+  setMsg: (msg: string | null) => void,
+  setErr: (err: string | null) => void
+) {
+  if (view.kind === 'message') {
+    setDirs(view.dirs);
+    setMsg(t(view.messageKey));
+    setErr(null);
+    return;
+  }
+  setMsg(null);
+  setErr(view.error === undefined ? t(view.errorKey) : t(view.errorKey, { error: view.error }));
+}
+
+async function savedLibraryDirs(): Promise<string[] | null> {
+  try {
+    return libraryDirsFromBody(await api('/api/ingestion/settings'));
+  } catch {
+    return null;
+  }
+}
 
 interface IngestionSettings {
   libraryDirs?: string[];
@@ -39,20 +74,36 @@ export function LibraryDirsCard() {
     setMsg(null);
     setErr(null);
     try {
-      const data = (await api('/api/ingestion/settings', {
+      const data = await api('/api/ingestion/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ libraryDirs: next })
-      })) as { settings?: IngestionSettings };
-      const saved = data.settings?.libraryDirs ?? [];
-      setDirs(saved);
-      if (saved.join('\n') === dirs.join('\n')) {
-        setErr(t('knowledge.library.saveFailed', { error: 'not saved' }));
-        return;
-      }
-      setMsg(t(kind === 'saved' ? 'knowledge.library.saved' : 'knowledge.library.removed'));
-    } catch (e) {
-      setErr(t('knowledge.library.saveFailed', { error: e instanceof Error ? e.message : String(e) }));
+      });
+      showLibrarySave(
+        librarySaveView({
+          action: kind,
+          previous: dirs,
+          returnedDirs: libraryDirsFromBody(data),
+          indexRunning: libraryIndexRunning(data)
+        }),
+        t,
+        setDirs,
+        setMsg,
+        setErr
+      );
+    } catch (error) {
+      showLibrarySave(
+        librarySaveFailureView({
+          action: kind,
+          intended: next,
+          errorMessage: errorText(error),
+          loaded: await savedLibraryDirs()
+        }),
+        t,
+        setDirs,
+        setMsg,
+        setErr
+      );
     } finally {
       setBusy(false);
     }
@@ -83,7 +134,7 @@ export function LibraryDirsCard() {
           setErr(t('knowledge.library.unavailable'));
           return;
         case 'rejected':
-          setErr(t('knowledge.library.rejected'));
+          setErr(t(libraryRejectKey(applied.reason)));
           return;
         case 'ignore':
           setErr(t('knowledge.library.pickFailed', { error: 'empty' }));

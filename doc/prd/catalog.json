@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 467,
+    "implemented": 470,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2050,6 +2050,13 @@
       "requirement": "按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动",
       "verificationStage": "software",
       "file": "acceptance/lean-default-skills.yaml"
+    },
+    {
+      "id": "library-icloud-config",
+      "title": "iCloud 知识库目录可以保存，不存在的目录要说明找不到",
+      "requirement": "知识库里配置了 iCloud 中的 Obsidian 目录，用户说是 mac-knowlodge，一保存就直接报错。用户认为就是这次配置把服务搞挂的。",
+      "verificationStage": "software",
+      "file": "acceptance/library-icloud-config.yaml"
     },
     {
       "id": "literal-tool-identifiers",

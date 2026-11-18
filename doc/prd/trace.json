@@ -3527,6 +3527,14 @@
       ]
     },
     {
+      "id": "library-icloud-config",
+      "title": "iCloud 知识库目录可以保存，不存在的目录要说明找不到",
+      "tests": [
+        "apps/web-console/components/sections/knowledge/library-icloud-config.test.ts",
+        "packages/core/test/library-icloud-config.test.js"
+      ]
+    },
+    {
       "id": "live-bot-quality",
       "title": "真实 Bot 任务评估与版本准入",
       "tests": [
