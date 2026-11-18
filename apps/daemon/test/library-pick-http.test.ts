@@ -145,13 +145,22 @@ test('选择的文件夹会追加保存并索引，重复路径不加两次 [AC:
     const search = (query: string) =>
       env.runtime.store.agentMemory().search({ scope: 'library', query, limit: 10 });
 
+    const waitSearch = async (query: string, count: number) => {
+      const start = Date.now();
+      while (Date.now() - start < 4000) {
+        if (search(query).length === count) return;
+        await new Promise((resolve) => setTimeout(resolve, 15));
+      }
+      assert.equal(search(query).length, count, query);
+    };
+
     let dirs = await readSettings(env.root);
     assert.deepEqual(dirs, []);
     const one = applyLibraryPick(dirs, await choose());
     assert.equal(one.action, 'save');
     if (one.action === 'save') dirs = await save(one.dirs);
     assert.deepEqual(dirs, [first]);
-    assert.equal(search('pickbeaconone').length, 1);
+    await waitSearch('pickbeaconone', 1);
     assert.equal(search(SECRET).length, 0);
     assert.equal(search(OUTSIDE).length, 0);
 
@@ -159,7 +168,7 @@ test('选择的文件夹会追加保存并索引，重复路径不加两次 [AC:
     assert.equal(two.action, 'save');
     if (two.action === 'save') dirs = await save(two.dirs);
     assert.deepEqual(dirs, [first, second]);
-    assert.equal(search('pickbeacontwo').length, 1);
+    await waitSearch('pickbeacontwo', 1);
     assert.equal(search('pickbeaconone').length, 1);
 
     const again = applyLibraryPick(dirs, await choose());
@@ -169,11 +178,11 @@ test('选择的文件夹会追加保存并索引，重复路径不加两次 [AC:
 
     dirs = await save(withoutLibraryDir([first, second], second));
     assert.deepEqual(dirs, [first]);
-    assert.equal(search('pickbeacontwo').length, 0);
+    await waitSearch('pickbeacontwo', 0);
     assert.equal(search('pickbeaconone').length, 1);
 
     assert.deepEqual(await save([]), []);
-    assert.equal(search('pickbeaconone').length, 0);
+    await waitSearch('pickbeaconone', 0);
     assert.equal(picks, 3);
   } finally {
     await env.close();

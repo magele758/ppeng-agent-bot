@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-17T16:18:00.537Z",
-  "reviewNote": "Reviewed session tool grants against the current probes: checkToolApprovals skips a new card only when this session already lists the same tool name and isolation mode and that exact call was not rejected. Probe sessions have no grant, so approval wait, rejection, pairing, resume, restart and writer contention stay as specified. Direct-isolation and source-scope holds drop only covered calls. Approve with an empty body is unchanged; sessionGrant and PATCH sessionToolGrants persist or revoke on that session only. Pairing, lifecycle and restart probes and mutations passed while fingerprints were needs-review. No property, case or threshold was weakened.",
+  "reviewedAt": "2026-11-18T02:40:00.000Z",
+  "reviewNote": "Reviewed the runtime.ts library-index scheduling change. refreshLibraryIndex returns before any directory walk, and shutdown cancels a scan that has not started. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -489,7 +489,7 @@
     "packages/core/src/bots/goals/intake.ts": "13610b1ac83589a0c92ea772e0fd9a9570cd3f9f6137cf6508c2dca0bb6c9d78",
     "packages/core/src/bots/goals/settings.ts": "d356dd1c14289de9c8f79db89558e614025f37897735d841e26e0994429007a0",
     "packages/core/src/bots/goals/completion-evidence.ts": "744fad416149d739f38023cc13f50cd58c83dc084e12589232a919b12ef274c3",
-    "packages/core/src/runtime.ts": "8c2b1b3b085fbdd75a5d6c2277c311b0f5cb69ac4426563aaf585b34a699ca2d",
+    "packages/core/src/runtime.ts": "c794eaacb7ac334183414c677437a00064761cf9dc838a73f505351435e289fa",
     "packages/core/src/runtime/l5-bindings.ts": "eebc7ce1d15f3ef439dde9847f85c32c3334ce10131f41b0ee848eb8fb44fdc4",
     "packages/core/src/bots/strict-output.ts": "892f0f7347b6bf134c1f4d66d97e8f9a0677afaff69b5fc812d1ecf117d7aeb2",
     "packages/core/src/runtime/steer-tools.ts": "26d586ab2ecab82adb4d8973048b8e52423d96d420dce84104cdd7cb6f49f822",
