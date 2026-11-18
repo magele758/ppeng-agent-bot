@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, realpathSync, statSync, watch, type FSWatcher } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
 import { MemorySuppressedError } from '../memory/deletion-suppression.js';
@@ -56,6 +57,15 @@ function fileText(abs: string, settings: IngestionSettings, home: string): { tex
   } catch {
     return undefined;
   }
+  return libraryDocumentText(name, raw, settings, stamp);
+}
+
+function libraryDocumentText(
+  name: string,
+  raw: Buffer,
+  settings: IngestionSettings,
+  stamp: string
+): { text: string; stamp: string } | undefined {
   const ooxml = ooxmlKindOf(name);
   let text = '';
   if (ooxml) {
@@ -71,6 +81,62 @@ function fileText(abs: string, settings: IngestionSettings, home: string): { tex
   if (!trimmed) return undefined;
   const cap = settings.inlineTextMaxBytes;
   return { text: trimmed.length > cap ? trimmed.slice(0, cap) : trimmed, stamp };
+}
+
+function yieldToLoop(): Promise<void> {
+  return new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
+async function indexLibraryFile(
+  memory: AgentMemoryStore,
+  settings: IngestionSettings,
+  home: string,
+  root: string,
+  file: string,
+  keys: Set<string>,
+  alive: () => boolean
+): Promise<boolean> {
+  const key = relKey(root, file);
+  if (!key || sensitiveReadRefusal(file, home, 'file')) return true;
+  let stamp = '';
+  try {
+    const st = statSync(file);
+    stamp = `${Math.trunc(st.mtimeMs)}:${st.size}`;
+  } catch {
+    return true;
+  }
+  const existing = memory.search({ scope: LIBRARY_SCOPE, namespace: root, key, limit: 1 })[0];
+  if (existing?.source === stamp) {
+    keys.add(key);
+    return true;
+  }
+  let raw: Buffer;
+  try {
+    raw = await readFile(file);
+  } catch {
+    return true;
+  }
+  if (!alive()) return true;
+  const extracted = libraryDocumentText(basename(file), raw, settings, stamp);
+  if (!extracted) return true;
+  try {
+    memory.set({
+      scope: LIBRARY_SCOPE,
+      namespace: root,
+      key,
+      value: extracted.text,
+      source: extracted.stamp,
+      importance: 0.8,
+      confidence: 'high'
+    });
+    keys.add(key);
+    return true;
+  } catch (error) {
+    if (error instanceof MemorySuppressedError) return true;
+    return false;
+  }
 }
 
 interface WalkState {
@@ -232,27 +298,98 @@ export class LibraryIndexWatcher {
   private watchers: FSWatcher[] = [];
   private timer: ReturnType<typeof setTimeout> | undefined;
   private stopped = true;
+  private scanToken = 0;
 
   constructor(
     private readonly store: LibraryIndexStore,
     private readonly options?: { home?: string; debounceMs?: number }
   ) {}
 
+  /**
+   * Arm watches and return before the folder walk. The scan continues between
+   * event-loop turns so a large iCloud vault cannot freeze health checks.
+   */
   start(): LibrarySyncStats {
     this.stopped = false;
     this.stopWatchers();
-    const stats = syncLibraryIndex(this.store, { home: this.options?.home });
-    for (const root of stats.roots) {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
+    const token = ++this.scanToken;
+    const home = canonicalHome(this.options?.home ?? homedir());
+    const settings = readIngestionSettings(this.store);
+    const roots: string[] = [];
+    for (const dir of settings.libraryDirs) {
+      const root = resolveRoot(dir, home);
+      if (root && !roots.includes(root)) roots.push(root);
+    }
+    for (const root of roots) this.arm(root);
+    void this.scan(token, home, settings, roots);
+    return { indexed: 0, removed: 0, roots };
+  }
+
+  private arm(root: string): void {
+    try {
+      const watcher = watch(root, { recursive: true }, () => this.schedule());
+      watcher.on('error', () => undefined);
+      watcher.unref();
+      this.watchers.push(watcher);
+    } catch {
+      /* folder vanished between the scan and the watch */
+    }
+  }
+
+  private still(token: number): boolean {
+    return !this.stopped && token === this.scanToken;
+  }
+
+  private async scan(
+    token: number,
+    home: string,
+    settings: IngestionSettings,
+    roots: string[]
+  ): Promise<void> {
+    await yieldToLoop();
+    if (!this.still(token)) return;
+    const memory = this.store.agentMemory();
+    const seen = new Map<string, Set<string>>();
+    const incomplete = new Set<string>();
+    for (const root of roots) {
+      if (!this.still(token)) return;
+      const keys = new Set<string>();
+      seen.set(root, keys);
+      const state: WalkState = { files: 0, complete: true };
+      const files: string[] = [];
       try {
-        const watcher = watch(root, { recursive: true }, () => this.schedule());
-        watcher.on('error', () => undefined);
-        watcher.unref();
-        this.watchers.push(watcher);
+        walk(root, root, 0, home, new Set<string>(), state, (file) => {
+          files.push(file);
+        });
       } catch {
-        /* folder vanished between the scan and the watch */
+        state.complete = false;
+      }
+      if (!state.complete) incomplete.add(root);
+      for (const file of files) {
+        if (!this.still(token)) return;
+        const ok = await indexLibraryFile(memory, settings, home, root, file, keys, () => this.still(token));
+        if (!this.still(token)) return;
+        if (!ok) {
+          incomplete.add(root);
+          break;
+        }
+        await yieldToLoop();
       }
     }
-    return stats;
+    if (!this.still(token)) return;
+    const rows = memory.search({ scope: LIBRARY_SCOPE, limit: 20000 });
+    for (const row of rows) {
+      if (!this.still(token)) return;
+      const keys = seen.get(row.namespace);
+      if (!keys) {
+        memory.delete(row.id);
+        continue;
+      }
+      if (incomplete.has(row.namespace)) continue;
+      if (!keys.has(row.key)) memory.delete(row.id);
+    }
   }
 
   stop(): void {

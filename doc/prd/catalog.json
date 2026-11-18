@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 467,
+    "implemented": 470,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2050,6 +2050,13 @@
       "requirement": "按刚才的建议把默认的 skill 精简一下，重复的合并，其他的保留搜索加载入口，bot 自己创建的 skill 不要动",
       "verificationStage": "software",
       "file": "acceptance/lean-default-skills.yaml"
+    },
+    {
+      "id": "library-index-keeps-serving",
+      "title": "资料目录很多时保存和健康检查仍然能返回",
+      "requirement": "服务挂了。知识库里配置了 iCloud 里的 Obsidian 目录，一保存就直接报错，服务也不再应答。\n保存一个文件很多的资料目录后，保存要先返回；索引还在进行时，健康检查仍然能返回。索引做完后，这些文档要能检索到。\n填了一个并不存在的目录名时，要说明找不到文件夹，不要说成不允许访问。真实存在、且不是密钥位置的文件夹可以保存。",
+      "verificationStage": "software",
+      "file": "acceptance/library-index-keeps-serving.yaml"
     },
     {
       "id": "literal-tool-identifiers",

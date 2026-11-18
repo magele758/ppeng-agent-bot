@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 467 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 470 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -338,7 +338,7 @@
 
 - `connector-authorization` Lab connector authorization states and SecretVault grant
 
-## console（9）
+## console（10）
 
 需求正文见 [console](console.md)。
 
@@ -609,6 +609,12 @@
 需求正文见 [other](other.md)。
 
 - `lean-default-skills` 精简默认技能并保留按需发现
+
+## library（1）
+
+需求正文见 [other](other.md)。
+
+- `library-index-keeps-serving` 资料目录很多时保存和健康检查仍然能返回
 
 ## literal（1）
 

@@ -3105,6 +3105,12 @@ Langfuse 实际上报状态与超时
 - `packages/agent-loop/src/runtime/tool-loop.test.ts`
 - `packages/core/test/lcu-computer-use.test.js`
 
+### library-index-keeps-serving
+
+资料目录很多时保存和健康检查仍然能返回
+
+- `packages/core/test/library-index.test.js`
+
 ### live-bot-quality
 
 真实 Bot 任务评估与版本准入

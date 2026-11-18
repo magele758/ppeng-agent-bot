@@ -126,7 +126,7 @@ test('目录里的文件修改或删除后检索跟上，不必改环境变量 [
   try {
     writeIngestionSettings(env.store, { libraryDirs: [dir] });
     watcher.start();
-    assert.equal((await search(env.store, 'oldquartzbeacon')).matches.length, 1);
+    await waitFor(async () => (await search(env.store, 'oldquartzbeacon')).matches.length === 1);
 
     writeFileSync(file, 'newquartzbeacon after the edit');
     await waitFor(async () => (await search(env.store, 'newquartzbeacon')).matches.length === 1);
@@ -191,6 +191,74 @@ test('library symlinks index canonical in-root documents once and tolerate cycle
     unlinkSync(join(nested, 'document.md'));
     syncLibraryIndex(env.store);
     assert.equal((await search(env.store, 'symlinkquartzbeacon')).matches.length, 0);
+  } finally {
+    env.close();
+  }
+});
+
+function libraryCount(store, root) {
+  return store.agentMemory().search({ scope: 'library', namespace: root, limit: 100 }).length;
+}
+
+test('很多文档开始索引时调用先返回，结束后仍能检索 [AC:library-index-keeps-serving#AC-1]', async (t) => {
+  const env = openStore();
+  const dir = folder(env.dir);
+  const total = 24;
+  for (let i = 0; i < total; i += 1) writeFileSync(join(dir, `note-${i}.md`), `yieldquartzbeacon ${i}`);
+  const watcher = new LibraryIndexWatcher(env.store, { debounceMs: 40 });
+  t.after(() => watcher.stop());
+  try {
+    writeIngestionSettings(env.store, { libraryDirs: [dir] });
+    watcher.start();
+    assert.equal(libraryCount(env.store, dir), 0);
+    let sawPartial = false;
+    await new Promise((resolve, reject) => {
+      const deadline = Date.now() + 5000;
+      const watch = () => {
+        const n = libraryCount(env.store, dir);
+        if (n > 0 && n < total) sawPartial = true;
+        if (n >= total) {
+          resolve(undefined);
+          return;
+        }
+        if (Date.now() > deadline) {
+          reject(new Error(`indexed ${n} of ${total}`));
+          return;
+        }
+        setImmediate(watch);
+      };
+      setImmediate(watch);
+    });
+    assert.equal(sawPartial, true);
+    assert.equal((await search(env.store, 'yieldquartzbeacon 0')).matches.length, 1);
+    assert.equal((await search(env.store, 'yieldquartzbeacon 23')).matches.length, 1);
+  } finally {
+    watcher.stop();
+    env.close();
+  }
+});
+
+test('不存在的资料目录会说明找不到，而不是不允许 [AC:library-index-keeps-serving#AC-2]', () => {
+  const env = openStore();
+  try {
+    writeIngestionSettings(env.store, { libraryDirs: [join(env.dir, 'mac-knowlodge-missing')] });
+    assert.fail('missing folder was saved');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    assert.match(message, /Folder does not exist/);
+    assert.equal(message.includes('not allowed'), false);
+  } finally {
+    env.close();
+  }
+});
+
+test('真实存在的资料目录可以保存 [AC:library-index-keeps-serving#AC-3]', () => {
+  const env = openStore();
+  const dir = folder(env.dir);
+  try {
+    const saved = writeIngestionSettings(env.store, { libraryDirs: [dir] });
+    assert.deepEqual(saved.libraryDirs, [dir]);
+    assert.deepEqual(readIngestionSettings(env.store).libraryDirs, [dir]);
   } finally {
     env.close();
   }
