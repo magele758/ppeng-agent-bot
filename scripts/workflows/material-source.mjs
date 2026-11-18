@@ -38,12 +38,16 @@ async function cube(){
  let prev=JSON.parse(read(file)||'{}');
  const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',hourCycle:'h23'}).format(now)),slot=date+'-'+Math.floor(hour/4);
  if(prev.slot===slot)return prev;
- const ssh=['-oBatchMode=yes','-oConnectTimeout=4','ubuntu1'];
- const jumpHttp=await command('/usr/bin/ssh',[...ssh,'curl -s --max-time 2 -o /dev/null -w "%{http_code}" http://10.1.20.87:3000/health']);
- const direct=await command('/usr/bin/curl',['-s','--max-time','3','-o','/dev/null','-w','%{http_code}','http://10.1.20.87:3000/health']);
- const pings=await command('/usr/bin/ssh',[...ssh,'for h in 87 88 89; do if ping -c 1 -W 1 10.1.20.$h >/dev/null; then echo "$h up"; else echo "$h down"; fi; done']);
+ const {jumpHost,healthUrl,pingPrefix,pingHosts}=cfg.cube??{};
+ if(!jumpHost||!healthUrl||!pingPrefix||!pingHosts?.length)throw Error('workflows.json needs cube.jumpHost, cube.healthUrl, cube.pingPrefix and cube.pingHosts');
+ const [self,...peers]=pingHosts;
+ const ssh=['-oBatchMode=yes','-oConnectTimeout=4',jumpHost];
+ const jumpHttp=await command('/usr/bin/ssh',[...ssh,`curl -s --max-time 2 -o /dev/null -w "%{http_code}" ${healthUrl}`]);
+ const direct=await command('/usr/bin/curl',['-s','--max-time','3','-o','/dev/null','-w','%{http_code}',healthUrl]);
+ const pings=await command('/usr/bin/ssh',[...ssh,`for h in ${pingHosts.join(' ')}; do if ping -c 1 -W 1 ${pingPrefix}$h >/dev/null; then echo "$h up"; else echo "$h down"; fi; done`]);
  const good=/^2\d\d$/.test(jumpHttp.text)||/^2\d\d$/.test(direct.text);
- const down=pings.ok&&pings.text.includes('87 down')&&/8[89] up/.test(pings.text)&&!direct.ok;
+ const lines=pings.text.split('\n');
+ const down=pings.ok&&lines.includes(self+' down')&&peers.some(h=>lines.includes(h+' up'))&&!direct.ok;
  const snapshot={slot,at:now.toISOString(),...transition(prev,good,down,now),jump:pings.ok?pings.text:'unavailable',service:direct.ok?direct.text:'unavailable'};
  save(file,snapshot);return snapshot;
 }

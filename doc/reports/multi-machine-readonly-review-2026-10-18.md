@@ -25,7 +25,7 @@
 
 | 机器 | 任务编号 | 分支 | 实际提交 |
 |---|---|---|---|
-| ubuntu1 | factory_8c88a3a8-2418-4467-9495-208ca02058fb | main | 94159664aa22457b1133afc42ad1113c3e42ab60 |
+| my-server | factory_8c88a3a8-2418-4467-9495-208ca02058fb | main | 94159664aa22457b1133afc42ad1113c3e42ab60 |
 | ubuntu2 | factory_4895e93e-d1bc-47f9-b61a-9303f6e66a7e | main | a5c9b0b50e84bcd684541da911a4f9369ada23a5 |
 
 两台物理机器身份摘要不同；工厂回执与独立 SSH 读取一致；执行前后分支、SHA、工作区状态和改动内容摘要一致。完整证据保存在本机 `.agent-state/factory-pilot/review-final/evidence.json`，未提交真实连接信息或个人路径。

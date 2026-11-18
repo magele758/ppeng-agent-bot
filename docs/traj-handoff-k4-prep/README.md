@@ -2,7 +2,7 @@
 
 - 性质：隔离 worktree 内的**未提交**预备材料。不是冻结契约，不是第四刀实现，不打开生产飞轮入口，不接线飞轮来源，不改名或替换飞轮 Orchestrator。
 - 起草：2026-11-14 17:10 Asia/Shanghai。
-- 工作树：`/home/shinemo/wt/traj-handoff-k4-prep-c67112bc`
+- 工作树：`/home/<user>/wt/traj-handoff-k4-prep-c67112bc`
 - 分支：`feat/traj-handoff-k4-prep-c67112bc`
 - 基线 HEAD：`c67112bc5de284d3806bc399cf7289458021044f`（#533 squash，单父 `ffe7556a`，提交时间 16:58:12 Asia/Shanghai）。本预备**不得**移动该 HEAD。
 - 第四刀实现本身仍须等第三刀验收后再开；本目录只准备检查单、评估矩阵、夹具说明与测试骨架。

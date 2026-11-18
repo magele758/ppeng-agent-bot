@@ -481,7 +481,7 @@ test('activity cards name only their own conversation [AC:bot-activity-open-sess
     background: true,
     metadata: { canonicalBotChat: false }
   });
-  const command = 'cd /Users/penglei/xunmengkeji/agent-group-for-tango/ai-agent-node && grok --prompt-file plan.md';
+  const command = 'cd /Users/example/work/my-project && grok --prompt-file plan.md';
   const items = assembleBotActivity({
     focus,
     sessions: [focus, child],

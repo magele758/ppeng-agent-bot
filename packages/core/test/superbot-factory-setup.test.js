@@ -111,9 +111,9 @@ function tool(bundle, name) {
 
 function machine(workerId, extra = {}) {
   return {
-    id: "ubuntu1",
-    name: "Ubuntu 1",
-    sshAlias: "ubuntu1",
+    id: "my-server",
+    name: "My Server",
+    sshAlias: "my-server",
     capacity: 2,
     botIds: [workerId],
     repositories: [{ id: "core", path: "/srv/app" }],
@@ -169,7 +169,7 @@ test("saved factory settings belong only to the chatting principal [AC:superbot-
   const saved = f.service.settings(f.principal);
   assert.equal(saved.owner.userId, "alice");
   assert.equal(saved.owner.tenantId, "team");
-  assert.equal(saved.machines[0].sshAlias, "ubuntu1");
+  assert.equal(saved.machines[0].sshAlias, "my-server");
   assert.equal(saved.machines[0].capacity, 2);
   assert.deepEqual(saved.machines[0].botIds, [f.worker.id]);
   assert.equal(saved.coordinatorBotId, f.superBot.id);
@@ -197,7 +197,7 @@ test("login off writes the installation factory row only [AC:superbot-factory-se
   const saved = f.service.settings(installation);
   assert.equal(saved.owner.userId, installation.userId);
   assert.equal(saved.owner.tenantId, undefined);
-  assert.equal(saved.machines[0].sshAlias, "ubuntu1");
+  assert.equal(saved.machines[0].sshAlias, "my-server");
   assert.equal(JSON.stringify(f.service.settings(bob)), bobBefore);
   assert.equal(f.store.getDaemonControl(settingsKey(bob)).machines[0].sshAlias, "otherhost");
 });
@@ -252,9 +252,9 @@ test("omitted dispatch list is the chatting user and that user can probe [AC:sup
   assert.equal(result.ok, true, result.content);
   const saved = f.service.settings(f.principal);
   assert.deepEqual(saved.machines[0].allowedUserIds, [f.principal.userId]);
-  const probe = await f.service.probe(f.principal, "ubuntu1");
+  const probe = await f.service.probe(f.principal, "my-server");
   assert.equal(probe.online, true);
-  assert.deepEqual(f.probes, ["ubuntu1"]);
+  assert.deepEqual(f.probes, ["my-server"]);
 });
 
 test("a new factory save leaves patrol off [AC:superbot-factory-setup#AC-6]", async (t) => {
@@ -339,10 +339,10 @@ test("one discovered checkout is stored when the user asks to fill the repositor
   }), "factory_settings_save");
   const result = await save.execute(
     { session: f.session },
-    { machines: [{ id: "ubuntu1", name: "Ubuntu 1", sshAlias: "ubuntu1", capacity: 2, botIds: [f.worker.id], fillRepository: true }] },
+    { machines: [{ id: "my-server", name: "My Server", sshAlias: "my-server", capacity: 2, botIds: [f.worker.id], fillRepository: true }] },
   );
   assert.equal(result.ok, true, result.content);
-  assert.deepEqual(seen, ["ubuntu1"]);
+  assert.deepEqual(seen, ["my-server"]);
   assert.deepEqual(f.service.settings(f.principal).machines[0].repositories, [{ id: "repo", path: "/only/repo" }]);
 });
 
@@ -353,7 +353,7 @@ test("several discovered checkouts are not written into factory settings", async
   }), "factory_settings_save");
   const result = await save.execute(
     { session: f.session },
-    { machines: [{ sshAlias: "ubuntu1", capacity: 2, botIds: [f.worker.id], fillRepository: true }] },
+    { machines: [{ sshAlias: "my-server", capacity: 2, botIds: [f.worker.id], fillRepository: true }] },
   );
   assert.equal(result.ok, false);
   assert.equal(f.store.getDaemonControl(settingsKey(f.principal)), undefined);
@@ -385,11 +385,11 @@ test("factory_list_repos calls listGitCheckouts for the saved alias and does not
   const save = tool(createFactoryTools(f.store, f.rooms, f.service, deps), "factory_settings_save");
   assert.equal((await save.execute({ session: f.session }, { machines: [machine(f.worker.id)] })).ok, true);
   const list = tool(createFactoryTools(f.store, f.rooms, f.service, deps), "factory_list_repos");
-  const result = await list.execute({ session: f.session }, { machineId: "ubuntu1", sshAlias: "elsewhere" });
+  const result = await list.execute({ session: f.session }, { machineId: "my-server", sshAlias: "elsewhere" });
   assert.equal(result.ok, false, result.content);
-  const listed = await list.execute({ session: f.session }, { machineId: "ubuntu1" });
+  const listed = await list.execute({ session: f.session }, { machineId: "my-server" });
   assert.equal(listed.ok, true, listed.content);
-  assert.deepEqual(JSON.parse(listed.content).paths, ["/only/ubuntu1", "/also/ubuntu1"]);
+  assert.deepEqual(JSON.parse(listed.content).paths, ["/only/my-server", "/also/my-server"]);
   assert.equal(listed.content.includes(TOKEN), false);
   assert.equal(spawned.length, 0);
   assert.equal(JSON.stringify(f.service.settings(f.principal)).includes(TOKEN), false);
