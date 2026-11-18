@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, closeSync, ftruncateSync, mkdtempSync, mkdirSync, openSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { realpathSync } from 'node:fs';
@@ -71,20 +71,20 @@ test('保存的资料目录能读回，移除后文档不再被检索 [AC:knowle
     const saved = writeIngestionSettings(env.store, { libraryDirs: [keep, drop] });
     assert.deepEqual(saved.libraryDirs, [keep, drop]);
     assert.deepEqual(readIngestionSettings(env.store).libraryDirs, [keep, drop]);
-    syncLibraryIndex(env.store);
+    await syncLibraryIndex(env.store);
     assert.equal((await search(env.store, 'keepquartzbeacon')).matches.length, 1);
     assert.equal((await search(env.store, 'dropquartzbeacon')).matches.length, 1);
 
     const left = writeIngestionSettings(env.store, { libraryDirs: [keep] });
     assert.deepEqual(left.libraryDirs, [keep]);
-    syncLibraryIndex(env.store);
+    await syncLibraryIndex(env.store);
     assert.equal((await search(env.store, 'dropquartzbeacon')).matches.length, 0);
     assert.equal((await search(env.store, 'keepquartzbeacon')).matches.length, 1);
 
     const cleared = writeIngestionSettings(env.store, { libraryDirs: [] });
     assert.deepEqual(cleared.libraryDirs, []);
     assert.deepEqual(readIngestionSettings(env.store).libraryDirs, []);
-    syncLibraryIndex(env.store);
+    await syncLibraryIndex(env.store);
     assert.equal((await search(env.store, 'keepquartzbeacon')).matches.length, 0);
   } finally {
     env.close();
@@ -98,7 +98,7 @@ test('对话检索能命中资料目录里的文档并读到原文 [AC:knowledge
   writeFileSync(join(dir, 'notes', 'deep.md'), 'libraryquartzbeacon lives in the folder note');
   try {
     writeIngestionSettings(env.store, { libraryDirs: [dir] });
-    syncLibraryIndex(env.store);
+    await syncLibraryIndex(env.store);
     const group = toolGroup('memory_search');
     assert.equal(group.id, 'memory');
     assert.equal(group.tier, 1);
@@ -125,7 +125,7 @@ test('目录里的文件修改或删除后检索跟上，不必改环境变量 [
   t.after(() => watcher.stop());
   try {
     writeIngestionSettings(env.store, { libraryDirs: [dir] });
-    watcher.start();
+    await watcher.start();
     assert.equal((await search(env.store, 'oldquartzbeacon')).matches.length, 1);
 
     writeFileSync(file, 'newquartzbeacon after the edit');
@@ -158,7 +158,7 @@ test('密钥文件、未添加目录和禁止访问的路径不会进入检索 [
     assert.throws(() => writeIngestionSettings(env.store, { libraryDirs: [join(home, '.ssh')] }, home), /not allowed/);
     writeIngestionSettings(env.store, { libraryDirs: [dir] }, home);
     assert.deepEqual(readIngestionSettings(env.store).libraryDirs, [dir]);
-    syncLibraryIndex(env.store, { home });
+    await syncLibraryIndex(env.store, { home });
     assert.equal((await search(env.store, 'okquartzbeacon')).matches.length, 1);
     for (const token of ['envquartzbeacon', 'rsaquartzbeacon', 'credquartzbeacon', 'outsidequartzbeacon', 'sshquartzbeacon']) {
       assert.equal((await search(env.store, token)).matches.length, 0, token);
@@ -183,15 +183,66 @@ test('library symlinks index canonical in-root documents once and tolerate cycle
   symlinkSync(outside, join(dir, 'outside-link.md'));
   try {
     writeIngestionSettings(env.store, { libraryDirs: [dir] });
-    syncLibraryIndex(env.store);
+    await syncLibraryIndex(env.store);
     const found = await search(env.store, 'symlinkquartzbeacon');
     assert.equal(found.matches.length, 1);
     assert.equal(found.matches[0].key, 'notes/document.md');
     assert.equal((await search(env.store, 'outsidelinkquartzbeacon')).matches.length, 0);
     unlinkSync(join(nested, 'document.md'));
-    syncLibraryIndex(env.store);
+    await syncLibraryIndex(env.store);
     assert.equal((await search(env.store, 'symlinkquartzbeacon')).matches.length, 0);
   } finally {
+    env.close();
+  }
+});
+
+test('索引很多文件时会在文件之间让出事件循环 [AC:library-index-yield#AC-1]', async () => {
+  const env = openStore();
+  const dir = folder(env.dir);
+  const total = 24;
+  try {
+    for (let i = 0; i < total; i += 1) writeFileSync(join(dir, `n${i}.md`), `yieldquartz${i} note`);
+    writeIngestionSettings(env.store, { libraryDirs: [dir] });
+    const pending = syncLibraryIndex(env.store);
+    const seen = new Set();
+    for (let turn = 0; turn < total + 10; turn += 1) {
+      await new Promise((resolve) => setImmediate(resolve));
+      seen.add(env.store.agentMemory().search({ scope: 'library', limit: 100 }).length);
+      if (seen.has(total)) break;
+    }
+    await pending;
+    assert.equal(env.store.agentMemory().search({ scope: 'library', limit: 100 }).length, total);
+    assert.equal([...seen].some((count) => count > 0 && count < total), true);
+  } finally {
+    env.close();
+  }
+});
+
+test('元数据目录、云端占位和读不出来的文件不会挡住笔记 [AC:library-index-yield#AC-3]', async () => {
+  const env = openStore();
+  const dir = folder(env.dir);
+  const meta = join(dir, '.obsidian');
+  mkdirSync(meta);
+  writeFileSync(join(meta, 'app.md'), 'obsidianquartz hidden in metadata');
+  writeFileSync(join(dir, 'note.md'), 'visiblequartz lives in the note');
+  const blocked = join(dir, 'blocked.md');
+  writeFileSync(blocked, 'blockedquartz cannot be read');
+  chmodSync(blocked, 0);
+  const placeholder = join(dir, 'placeholder.md');
+  const fd = openSync(placeholder, 'w');
+  ftruncateSync(fd, 4096);
+  closeSync(fd);
+  const before = statSync(placeholder).atimeMs;
+  try {
+    writeIngestionSettings(env.store, { libraryDirs: [dir] });
+    await syncLibraryIndex(env.store);
+    assert.equal((await search(env.store, 'visiblequartz')).matches.length, 1);
+    assert.equal((await search(env.store, 'obsidianquartz')).matches.length, 0);
+    assert.equal((await search(env.store, 'blockedquartz')).matches.length, 0);
+    assert.equal(statSync(placeholder).atimeMs, before);
+    assert.equal(statSync(placeholder).blocks, 0);
+  } finally {
+    chmodSync(blocked, 0o644);
     env.close();
   }
 });

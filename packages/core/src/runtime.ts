@@ -374,6 +374,7 @@ export class RawAgentRuntime {
   readonly externalAgents: ExternalAgentConnections;
   readonly rooms: BotRoomService;
   private libraryIndex?: LibraryIndexWatcher;
+  private libraryIndexKick?: NodeJS.Immediate;
   readonly factory: FactoryService;
   private loadedPlugins: LoadedPlugin[] = [];
   private connectorToolNames = new Set<string>();
@@ -861,13 +862,31 @@ export class RawAgentRuntime {
     this.refreshLibraryIndex();
   }
 
-  /** Reindex saved knowledge folders and watch them. Safe to call after a settings save. */
+  /** Drop a not-yet-started index so shutdown cannot scan after the store closes. */
+  private cancelLibraryIndexKick(): void {
+    if (!this.libraryIndexKick) return;
+    clearImmediate(this.libraryIndexKick);
+    this.libraryIndexKick = undefined;
+  }
+
+  /**
+   * Reindex saved knowledge folders and watch them.
+   * Returns before any directory is walked so a settings save and process
+   * startup can answer requests while the index continues in the background.
+   */
   refreshLibraryIndex(): void {
-    try {
-      this.libraryIndex?.start();
-    } catch (error) {
-      this.log.warn('library index refresh failed', { error: error instanceof Error ? error.message : String(error) });
-    }
+    const watcher = this.libraryIndex;
+    if (!watcher || this.libraryIndexKick) return;
+    this.libraryIndexKick = setImmediate(() => {
+      this.libraryIndexKick = undefined;
+      if (this.libraryIndex !== watcher) return;
+      void watcher.start().catch((error: unknown) => {
+        this.log.warn('library index refresh failed', {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
+    });
+    this.libraryIndexKick.unref();
   }
 
   /** Tick due cron jobs: append prompt to owning session and enqueue a run. */
@@ -2230,8 +2249,9 @@ export class RawAgentRuntime {
 
   /** Gracefully shut down all in-flight work, MCP sessions, and release SQLite. */
   async destroy(): Promise<void> {
-    await stopBotSummaries(this.store);
+    this.cancelLibraryIndexKick();
     this.libraryIndex?.stop();
+    await stopBotSummaries(this.store);
     await this.daydreamHost?.close();
     await this.skillCaptures.close();
     await this.skillManagement.close();
