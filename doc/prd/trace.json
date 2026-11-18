@@ -3535,6 +3535,21 @@
       ]
     },
     {
+      "id": "library-index-keeps-serving",
+      "title": "资料目录很多时保存和健康检查仍然能返回",
+      "tests": [
+        "packages/core/test/library-index.test.js"
+      ]
+    },
+    {
+      "id": "library-index-yield",
+      "title": "保存知识库目录不堵住访问",
+      "tests": [
+        "apps/daemon/test/library-index-yield.test.ts",
+        "packages/core/test/library-index.test.js"
+      ]
+    },
+    {
       "id": "live-bot-quality",
       "title": "真实 Bot 任务评估与版本准入",
       "tests": [

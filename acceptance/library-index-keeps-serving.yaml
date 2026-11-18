@@ -1,0 +1,22 @@
+id: library-index-keeps-serving
+title: 资料目录很多时保存和健康检查仍然能返回
+status: implemented
+requirement: |
+  服务挂了。知识库里配置了 iCloud 里的 Obsidian 目录，一保存就直接报错，服务也不再应答。
+  保存一个文件很多的资料目录后，保存要先返回；索引还在进行时，健康检查仍然能返回。索引做完后，这些文档要能检索到。
+  填了一个并不存在的目录名时，要说明找不到文件夹，不要说成不允许访问。真实存在、且不是密钥位置的文件夹可以保存。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 已保存的资料目录里有很多份文档
+    when: 开始为这个目录建索引
+    then: 调用返回时索引还没做完，期间其它检查仍能继续；索引结束后这些文档都能检索到
+  - id: AC-2
+    given: 用户要加入一个资料目录
+    when: 路径并不存在
+    then: 保存失败，原因是找不到该文件夹，而不是不允许访问
+  - id: AC-3
+    given: 用户要加入一个资料目录
+    when: 文件夹真实存在，而且不是密钥位置
+    then: 目录被保存下来

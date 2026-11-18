@@ -3112,6 +3112,19 @@ iCloud 知识库目录可以保存，不存在的目录要说明找不到
 - `apps/web-console/components/sections/knowledge/library-icloud-config.test.ts`
 - `packages/core/test/library-icloud-config.test.js`
 
+### library-index-keeps-serving
+
+资料目录很多时保存和健康检查仍然能返回
+
+- `packages/core/test/library-index.test.js`
+
+### library-index-yield
+
+保存知识库目录不堵住访问
+
+- `apps/daemon/test/library-index-yield.test.ts`
+- `packages/core/test/library-index.test.js`
+
 ### live-bot-quality
 
 真实 Bot 任务评估与版本准入

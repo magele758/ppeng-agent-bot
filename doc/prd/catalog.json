@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 470,
+    "implemented": 472,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2057,6 +2057,20 @@
       "requirement": "知识库里配置了 iCloud 中的 Obsidian 目录，用户说是 mac-knowlodge，一保存就直接报错。用户认为就是这次配置把服务搞挂的。",
       "verificationStage": "software",
       "file": "acceptance/library-icloud-config.yaml"
+    },
+    {
+      "id": "library-index-keeps-serving",
+      "title": "资料目录很多时保存和健康检查仍然能返回",
+      "requirement": "服务挂了。知识库里配置了 iCloud 里的 Obsidian 目录，一保存就直接报错，服务也不再应答。\n保存一个文件很多的资料目录后，保存要先返回；索引还在进行时，健康检查仍然能返回。索引做完后，这些文档要能检索到。\n填了一个并不存在的目录名时，要说明找不到文件夹，不要说成不允许访问。真实存在、且不是密钥位置的文件夹可以保存。",
+      "verificationStage": "software",
+      "file": "acceptance/library-index-keeps-serving.yaml"
+    },
+    {
+      "id": "library-index-yield",
+      "title": "保存知识库目录不堵住访问",
+      "requirement": "保存知识库目录后，设置接口马上返回。索引在后台继续，不能挡住 /api/health。\n进程刚开始听端口时也不能先把整库扫完。\n扫描在文件之间把事件循环让出去。禁止在调用栈上同步读完整棵大目录。\n跳过 .obsidian 元数据目录。能不下载就认出来的 iCloud 占位文件不要 readFileSync 把它们拉下来；认不出来就跳过该文件并继续，不要让一次读卡住后面的请求。\n现有 5000 文件 / 深度 24 的上限保持。小目录的现有索引测试必须继续通过：内容仍会进 library scope，删掉的目录仍会清掉索引。\n不要新增 RAW_AGENT_* 或任何功能开关环境变量。",
+      "verificationStage": "software",
+      "file": "acceptance/library-index-yield.yaml"
     },
     {
       "id": "literal-tool-identifiers",

@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 470 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 472 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -610,11 +610,13 @@
 
 - `lean-default-skills` 精简默认技能并保留按需发现
 
-## library（1）
+## library（3）
 
 需求正文见 [other](other.md)。
 
 - `library-icloud-config` iCloud 知识库目录可以保存，不存在的目录要说明找不到
+- `library-index-keeps-serving` 资料目录很多时保存和健康检查仍然能返回
+- `library-index-yield` 保存知识库目录不堵住访问
 
 ## literal（1）
 
