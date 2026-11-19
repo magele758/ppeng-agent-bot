@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-19T10:00:09.114Z",
-  "reviewNote": "The release HTTP job adds a Lab performance check. Quick CI adds tests for the performance gate and its workflow wiring. The formal job continues to verify lifecycle transitions through the public runtime and SQLite with existing mutation controls.",
+  "reviewedAt": "2026-11-19T15:41:59.142Z",
+  "reviewNote": "Reviewed the Bot pin permission fix. sessions.ts now asks the shared Bot pin rule (core permittedBotPinPatch through apps/daemon/src/bot-pin-guard.ts) before opening a Bot chat with metadata pins, before creating a session whose metadata names a Bot, and before a /model chat command reaches handleBotChatCommand; replyBotChatCommand only gains the request auth for that check, and a refused change throws before any session is created or metadata is written. product-admin-tools.ts passes the bot_update patch through permittedToolBotPins before updateBot, which only drops or rejects model / thinking effort pin fields. No turn, tool-call, approval, writer-claim, restart or session lifecycle code path changed. Pairing, lifecycle, restart and concurrency models, real source probes and mutations passed while fingerprints were needs-review. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -488,7 +488,7 @@
     "packages/core/test/human-continuation.test.js": "aa7c22e3cfae700ce93f743e764b0393644450b833fadfd866c5fe0b0421ad8a",
     "packages/agent-loop/src/session/step-inbox-context.test.ts": "3c6ab63684e0cff31ea32a1eef6408afee2a208ab74355f2e9c1f001876a84b4",
     "packages/agent-loop/src/session/apply-claimed-inbox.test.ts": "15cc1445fc4c8ebf53ac8d4c056567287249908a90cce4b91afe0e49645979c2",
-    "apps/daemon/src/routes/sessions.ts": "1877d86c0662dea9a3742ee02c9cdc33e5a53d57638cb76ee092b7ffbb24ea23",
+    "apps/daemon/src/routes/sessions.ts": "344c04f686c9265bbd2314aea4e01807ab66be5abd9dea33d6d7530b40805d03",
     "packages/core/src/session/session-fork.ts": "4f35397b2641885ac71b044828793b84d461c0266c7892ef394d7b4b6ed0e1e4",
     "packages/core/src/bots/shared-context-isolation.ts": "d7adbfde162699e0b82e7b4b377bda6e027b73f78bfac7313b71a854295e3857",
     "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
@@ -512,7 +512,7 @@
     "packages/core/src/skill-proposals/management.ts": "f6c41cfdfe1576c5916487f97eb85e5ee36011ee4383dc7d9b42a394895f2b5f",
     "packages/core/src/runtime/spawn-policy.ts": "5d11fc2b7d42a1d818db046bf50e00a3e4893e40d004b48047ee391024e668f7",
     "packages/core/src/memory/bot-memory-scope.ts": "bffdcf6cf3e848ea1f2fcc5059b54345d3ee9d49ff98b3a57e917e88593d50c9",
-    "packages/core/src/tools/product-admin-tools.ts": "5f83d7a8a1f1419190ae2a59eb80c412f6fddc230b3a8f015eb5946558f7b147",
+    "packages/core/src/tools/product-admin-tools.ts": "090c1a3ec63f074ba03eb4de850b0b9f50dcbe32f254a67dd33d530dc6a0a829",
     "packages/core/src/bots/goals/runtime-host.ts": "bbc7b1393dc65d4c702a99e0a0da02646904ccccae3e5d282eb855f63acf03e0",
     "packages/core/src/bots/goals/runtime-dispatch.ts": "a4c764dd437033a9363bbf96e1354bc391450f36294d171f3441d55f5ef655c1",
     "packages/core/src/bots/goals/tool-gateway.ts": "713852550276157a250c8c26670f1fffbdc4d996e34ecfa16acf46fb74e96921",
