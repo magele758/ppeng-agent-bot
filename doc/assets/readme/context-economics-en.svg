@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 488" role="img" aria-labelledby="context-economics-en-title context-economics-en-desc">
+  <title id="context-economics-en-title">Hippocampal Context Compiler &amp; Byte-Stable KV Cache Economics</title>
+  <desc id="context-economics-en-desc">Storage Truth ≠ Folded Transcript ≠ Per-Turn Model View · -64.2% Uncached Input on Live Multi-Hop Tool Waves</desc>
+  <defs>
+    <marker id="context-economics-en-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#4A564D"/>
+    </marker>
+    <marker id="context-economics-en-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#2F6846"/>
+    </marker>
+    <marker id="context-economics-en-arrow-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#2A69A4"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="488" rx="10" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="1"/>
+
+  <text x="32" y="34" fill="#2F6846" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.12em">PILLAR 01 · CONTEXT COMPILER &amp; CACHE ECONOMICS</text>
+  <text x="32" y="60" fill="#1A201B" font-size="20" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Hippocampal Context Compiler &amp; Byte-Stable KV Cache Economics</text>
+  <text x="32" y="80" fill="#4A564D" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Storage Truth ≠ Folded Transcript ≠ Per-Turn Model View · -64.2% Uncached Input on Live Multi-Hop Tool Waves</text>
+
+  <!-- LEFT ZONE -->
+  <rect x="32" y="96" width="568" height="336" rx="8" fill="#FAFAF8" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="48" y="118" fill="#738076" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">A. HIPPOCAMPAL COMPILATION PIPELINE (WAL ≠ FOLD ≠ VIEW)</text>
+
+  <!-- Connectors -->
+  <line x1="196" y1="176" x2="228" y2="176" stroke="#4A564D" stroke-width="1.3" marker-end="url(#context-economics-en-arrow)"/>
+  <line x1="388" y1="176" x2="420" y2="176" stroke="#2F6846" stroke-width="1.4" marker-end="url(#context-economics-en-arrow-accent)"/>
+  <line x1="502" y1="218" x2="502" y2="266" stroke="#2F6846" stroke-width="1.4" marker-end="url(#context-economics-en-arrow-accent)"/>
+  <path d="M 456,218 V 242 Q 456,250 448,250 H 124 Q 116,250 116,218" fill="none" stroke="#2A69A4" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#context-economics-en-arrow-blue)"/>
+  <rect x="218" y="230" width="136" height="14" rx="2" fill="#FAFAF8"/>
+  <text x="286" y="240" fill="#2A69A4" font-size="9" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">retrieve_tool_result</text>
+
+  <!-- Box 1 -->
+  <rect x="48" y="134" width="148" height="84" rx="6" fill="#FFFFFF" stroke="#B7C3B9" stroke-width="1"/>
+  <text x="60" y="152" fill="#738076" font-size="9" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">STORAGE TRUTH</text>
+  <text x="60" y="172" fill="#1A201B" font-size="13" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">SQLite Append WAL</text>
+  <text x="60" y="190" fill="#4A564D" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">1M msgs · p95 0.61ms</text>
+  <text x="60" y="206" fill="#738076" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Full raw tool_result kept</text>
+
+  <!-- Box 2 -->
+  <rect x="228" y="134" width="160" height="84" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="240" y="152" fill="#738076" font-size="9" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">SURFACE FOLD</text>
+  <text x="240" y="172" fill="#1A201B" font-size="13" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">foldMessages()</text>
+  <text x="240" y="190" fill="#4A564D" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">50% struct / 85% hygiene</text>
+  <text x="240" y="206" fill="#738076" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Single compact-summary key</text>
+
+  <!-- Box 3 -->
+  <rect x="420" y="134" width="164" height="84" rx="6" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.4"/>
+  <text x="432" y="152" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">MODEL VIEW</text>
+  <text x="432" y="172" fill="#1A201B" font-size="13" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">prepareTurnInput()</text>
+  <text x="432" y="190" fill="#2F6846" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">msg=&lt;id&gt; part=&lt;n&gt; stub</text>
+  <text x="432" y="206" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Keep call cue · drop dump</text>
+
+  <!-- Wire Layout Anatomy Strip -->
+  <rect x="48" y="266" width="536" height="150" rx="6" fill="#FFFFFF" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="64" y="288" fill="#1A201B" font-size="12" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Wire Byte Layout: Frozen Prefix (≥90% KV Cache Hit) + User-Side Churn Only</text>
+
+  <rect x="64" y="300" width="144" height="44" rx="4" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="136" y="319" fill="#2F6846" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">Stable System v18</text>
+  <text x="136" y="334" fill="#4A564D" font-size="9.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">SHA-256 + sorted tools[]</text>
+
+  <rect x="212" y="300" width="184" height="44" rx="4" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="304" y="319" fill="#2F6846" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">Canonical History</text>
+  <text x="304" y="334" fill="#4A564D" font-size="9.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">Key-sorted JSON · no CoT</text>
+
+  <rect x="400" y="300" width="168" height="44" rx="4" fill="#FBF3E4" stroke="#93650F" stroke-width="1.2"/>
+  <text x="484" y="319" fill="#93650F" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">Latest User Turn</text>
+  <text x="484" y="334" fill="#4A564D" font-size="9.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">&lt;runtime_context&gt; + RRF</text>
+
+  <line x1="64" y1="356" x2="396" y2="356" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="230" y="374" fill="#2F6846" font-size="10.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">▲ Byte-Identical KV Cache Hit Zone ($0.30 → $0.057 @ 100k, -81%)</text>
+  <text x="230" y="394" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">Zero dynamic state inside leading system prompt</text>
+  <text x="484" y="374" fill="#93650F" font-size="10.5" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">▲ Only Mutating Tail</text>
+  <text x="484" y="394" fill="#738076" font-size="9.8" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">4-slot capped appendix</text>
+
+  <!-- RIGHT ZONE -->
+  <rect x="616" y="96" width="552" height="336" rx="8" fill="#FAFAF8" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="632" y="118" fill="#738076" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">B. CONTROLLED A/B EXPERIMENTS &amp; FALSIFIED HYPOTHESES</text>
+
+  <rect x="632" y="132" width="520" height="134" rx="6" fill="#FFFFFF" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="648" y="154" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Exp 1 · Live 3-Hop read_file Prefix Rollout (codex/gpt-6.1-sol, 2026-11-13)</text>
+
+  <text x="648" y="182" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Baseline A (Fence busts prefix)</text>
+  <rect x="828" y="169" width="224" height="19" rx="3" fill="#F9ECE9" stroke="#B53C2A" stroke-width="1"/>
+  <text x="1060" y="183" fill="#B53C2A" font-size="11" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">20,278 tok</text>
+  <text x="836" y="182" fill="#B53C2A" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">cached frozen: 8,704 → 8,704 → 8,704</text>
+
+  <text x="648" y="214" fill="#1A201B" font-size="11" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Candidate C (Append-only wire)</text>
+  <rect x="828" y="201" width="80" height="19" rx="3" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="916" y="215" fill="#2F6846" font-size="11" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">7,261 tok (-64.2%)</text>
+  <text x="648" y="246" fill="#4A564D" font-size="10.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Cached tokens climb monotonically: 10,496 → 12,800 → 15,104 · Guarded live by Magpie</text>
+
+  <rect x="632" y="278" width="520" height="138" rx="6" fill="#FFFFFF" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="648" y="300" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Exp 2 · 5-Policy × 7-Case Tool-Result Eviction Matrix (tool_streak chain)</text>
+
+  <rect x="648" y="314" width="156" height="86" rx="5" fill="#F9ECE9" stroke="#B53C2A" stroke-width="1"/>
+  <text x="658" y="332" fill="#B53C2A" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">keep_recent = 0</text>
+  <text x="658" y="350" fill="#1A201B" font-size="11" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">-92.6% tok · 0/2 facts</text>
+  <text x="658" y="368" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">[×] Wipes unconsumed out</text>
+  <text x="658" y="385" fill="#B53C2A" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">FALSIFIED</text>
+
+  <rect x="814" y="314" width="156" height="86" rx="5" fill="#FBF3E4" stroke="#93650F" stroke-width="1"/>
+  <text x="824" y="332" fill="#93650F" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">after_any_asst</text>
+  <text x="824" y="350" fill="#1A201B" font-size="11" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">-53.3% tok · 1/2 facts</text>
+  <text x="824" y="368" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">[×] Drops ls mid-wave</text>
+  <text x="824" y="385" fill="#93650F" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">FALSIFIED ON CHAINS</text>
+
+  <rect x="980" y="314" width="156" height="86" rx="5" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="990" y="332" fill="#2F6846" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">after_text + stub</text>
+  <text x="990" y="350" fill="#1A201B" font-size="11" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Chain 2/2 · Follow -88%</text>
+  <text x="990" y="368" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">[OK] Stubs post-prose+pull</text>
+  <text x="990" y="385" fill="#2F6846" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">SHIPPED + MODEL-VIEW</text>
+
+  <!-- Legend Strip -->
+  <line x1="32" y1="448" x2="1168" y2="448" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="32" y="468" fill="#738076" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.1em">LEGEND</text>
+  <rect x="104" y="458" width="12" height="12" rx="2" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="122" y="468" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Byte-stable cache / Shipped winner</text>
+  <rect x="332" y="458" width="12" height="12" rx="2" fill="#FBF3E4" stroke="#93650F" stroke-width="1"/>
+  <text x="350" y="468" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">User-side dynamic tail / Conditional</text>
+  <rect x="572" y="458" width="12" height="12" rx="2" fill="#F9ECE9" stroke="#B53C2A" stroke-width="1"/>
+  <text x="590" y="468" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Falsified naive baseline</text>
+  <text x="1168" y="468" fill="#738076" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="end">Refs: Teyler &amp; DiScenna · Mem0 · arXiv:2603.02473 · openai/codex#27488</text>
+</svg>

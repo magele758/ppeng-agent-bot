@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 488" role="img" aria-labelledby="verification-gates-en-title verification-gates-en-desc">
+  <title id="verification-gates-en-title">&quot;Anti-Theater&quot; Five-Layer Verification Stack &amp; Real Bugs Caught Pre-Release</title>
+  <desc id="verification-gates-en-desc">Line coverage ≠ assertion strength, and 100% sample pass ≠ statistical lift — every gate earned its place by catching real bugs</desc>
+
+  <rect width="1200" height="488" rx="10" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="1"/>
+
+  <text x="32" y="34" fill="#2F6846" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.12em">PILLAR 04 · ANTI-THEATER VERIFICATION &amp; EPISTEMIC DISCIPLINE</text>
+  <text x="32" y="60" fill="#1A201B" font-size="20" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">&quot;Anti-Theater&quot; Five-Layer Verification Stack &amp; Real Bugs Caught Pre-Release</text>
+  <text x="32" y="80" fill="#4A564D" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Line coverage ≠ assertion strength, and 100% sample pass ≠ statistical lift — every gate earned its place by catching real bugs</text>
+
+  <line x1="42" y1="420" x2="42" y2="112" stroke="#2F6846" stroke-width="1.4"/>
+  <polygon points="38,116 42,104 46,116" fill="#2F6846"/>
+  <text x="24" y="268" fill="#738076" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" transform="rotate(-90 24 268)" text-anchor="middle" letter-spacing="0.14em">EPISTEMIC RIGOR</text>
+
+  
+      <rect x="68" y="100" width="1100" height="58" rx="6" fill="#FFFFFF" stroke="#B7C3B9" stroke-width="1"/>
+      <rect x="80" y="110" width="136" height="18" rx="3" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="0.8"/>
+      <text x="148" y="122" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L5 · LIVE STAT A/B</text>
+      <text x="80" y="144" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">≥30 tasks × 3 AB/BA · margin ≤5pp</text>
+
+      <line x1="340" y1="108" x2="340" y2="150" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="124" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Interleaved Live-Model A/B &amp; Wilson-Bonferroni Gate</text>
+      <text x="356" y="144" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Refused to merge PR #251 despite 96/96 (100%) grok-4.7 score: N=32 CI [-19.9%,+29.8%] exceeded 5pp; prompt-injected detour scored 0/3 FAIL</text>
+    
+      <rect x="68" y="166" width="1100" height="58" rx="6" fill="#FAFAF8" stroke="#B7C3B9" stroke-width="1"/>
+      <rect x="80" y="176" width="136" height="18" rx="3" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="0.8"/>
+      <text x="148" y="188" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L4 · LTL UI &amp; PERF</text>
+      <text x="80" y="210" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">4,270 UI states / 90s · 64-Bot load</text>
+
+      <line x1="340" y1="174" x2="340" y2="216" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="190" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Antithesis Bombadil LTL Browser Fuzzing + bench:lab</text>
+      <text x="356" y="210" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Eliminated 192 idle goal writes + 2,688 idle daydream DB writes → 0 across 3 polls; enforces always(transcriptIsIsolated) + 0 prefix drift</text>
+    
+      <rect x="68" y="232" width="1100" height="58" rx="6" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.5"/>
+      <rect x="80" y="242" width="136" height="18" rx="3" fill="#2F6846" stroke="#2F6846" stroke-width="0.8"/>
+      <text x="148" y="254" fill="#FFFFFF" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L3 · MODEL CHECK</text>
+      <text x="80" y="276" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">14,292 states · 31,230 edges · 125 OS</text>
+
+      <line x1="340" y1="240" x2="340" y2="282" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="256" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">4-Suite Explicit-State Model Checkers + OS SIGKILL Probes + Fault Canaries</text>
+      <text x="356" y="276" fill="#2F6846" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">28/43 SIGKILL runs failed initially (caught WRITER_CLAIM_MISMATCH session brick); 38/58 dual-proc runs caught hidden duplicate tool calls (a,a,b,b)</text>
+    
+      <rect x="68" y="298" width="1100" height="58" rx="6" fill="#FAFAF8" stroke="#B7C3B9" stroke-width="1"/>
+      <rect x="80" y="308" width="136" height="18" rx="3" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="0.8"/>
+      <text x="148" y="320" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L2 · AST MUTATION</text>
+      <text x="80" y="342" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">4,284 mutants · 0 disk · policy 100%</text>
+
+      <line x1="340" y1="306" x2="340" y2="348" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="322" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Zero-Dep In-Memory TS AST Mutation Engine (module.registerHooks)</text>
+      <text x="356" y="342" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Caught 3 real bugs: (1) Linux bwrap /tmp mount wiping workspaces, (2) time -p rm -rf / bypass, (3) pre-migration store init disabling FTS5</text>
+    
+      <rect x="68" y="364" width="1100" height="58" rx="6" fill="#FFFFFF" stroke="#B7C3B9" stroke-width="1"/>
+      <rect x="80" y="374" width="136" height="18" rx="3" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="0.8"/>
+      <text x="148" y="386" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L1 · AC &amp; CRAP</text>
+      <text x="80" y="408" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">481 specs · 2,347 [AC:*] · CRAP ≤ 30</text>
+
+      <line x1="340" y1="372" x2="340" y2="414" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="388" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Executable Acceptance Traceability + CRAP Complexity×Coverage Ratchet</text>
+      <text x="356" y="408" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">1,165+ runnable test files; 0%-coverage web-console functions ratcheted at C²+C (zero tolerance for adding branches to C≥6 functions)</text>
+    
+
+  <line x1="32" y1="444" x2="1168" y2="444" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="32" y="466" fill="#738076" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">ANTI-SELF-DECEPTION RULE</text>
+  <text x="220" y="466" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Every formal suite enforces 3–4 live ESM fault-injection canaries (must turn red); simulation runs stay marked not_validated</text>
+</svg>

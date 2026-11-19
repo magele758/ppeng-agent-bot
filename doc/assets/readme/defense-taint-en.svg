@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 456" role="img" aria-labelledby="defense-taint-en-title defense-taint-en-desc">
+  <title id="defense-taint-en-title">Alignment-Grounded Runtime Security: Taint SourceLedger &amp; Zero-Leak UserVault</title>
+  <desc id="defense-taint-en-desc">Separating Model-Provider Training (Anthropic Agentic Misalignment / MSM) from Fail-Closed Host Runtime Controls</desc>
+  <defs>
+    <marker id="defense-taint-en-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#4A564D"/>
+    </marker>
+    <marker id="defense-taint-en-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#2F6846"/>
+    </marker>
+    <marker id="defense-taint-en-arrow-coral" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#B53C2A"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="456" rx="10" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="1"/>
+
+  <text x="32" y="34" fill="#2F6846" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.12em">PILLAR 03 · SECURE PAVED ROAD &amp; COMPENSATING RUNTIME CONTROLS</text>
+  <text x="32" y="60" fill="#1A201B" font-size="20" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Alignment-Grounded Runtime Security: Taint SourceLedger &amp; Zero-Leak UserVault</text>
+  <text x="32" y="80" fill="#4A564D" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Separating Model-Provider Training (Anthropic Agentic Misalignment / MSM) from Fail-Closed Host Runtime Controls</text>
+
+  <rect x="276" y="100" width="892" height="296" rx="8" fill="#FAFAF8" stroke="#2F6846" stroke-width="1.2" stroke-dasharray="5,4"/>
+  <rect x="292" y="92" width="284" height="16" rx="2" fill="#F4F5F2"/>
+  <text x="434" y="103" fill="#2F6846" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.08em">HOST PRIVILEGED ENFORCEMENT BOUNDARY</text>
+
+  <line x1="236" y1="168" x2="304" y2="168" stroke="#2F6846" stroke-width="1.4" marker-end="url(#defense-taint-en-arrow-accent)"/>
+  <line x1="504" y1="168" x2="548" y2="168" stroke="#2F6846" stroke-width="1.4" marker-end="url(#defense-taint-en-arrow-accent)"/>
+  <line x1="748" y1="168" x2="792" y2="168" stroke="#2F6846" stroke-width="1.4" marker-end="url(#defense-taint-en-arrow-accent)"/>
+  <line x1="960" y1="168" x2="996" y2="168" stroke="#2F6846" stroke-width="1.4" marker-end="url(#defense-taint-en-arrow-accent)"/>
+  <line x1="236" y1="308" x2="304" y2="308" stroke="#B53C2A" stroke-width="1.4" stroke-dasharray="5,3" marker-end="url(#defense-taint-en-arrow-coral)"/>
+  <line x1="748" y1="308" x2="792" y2="308" stroke="#2F6846" stroke-width="1.4" marker-end="url(#defense-taint-en-arrow-accent)"/>
+  <line x1="960" y1="308" x2="996" y2="308" stroke="#4A564D" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#defense-taint-en-arrow)"/>
+
+  <rect x="32" y="128" width="204" height="80" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="44" y="148" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">DIRECT USER · PRIO 100</text>
+  <text x="44" y="168" fill="#1A201B" font-size="13" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Direct Human Intent</text>
+  <text x="44" y="186" fill="#4A564D" font-size="10.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Priority aging queue (+10/m)</text>
+  <text x="44" y="201" fill="#738076" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">principal verified</text>
+
+  <rect x="32" y="268" width="204" height="80" rx="6" fill="#F9ECE9" stroke="#B53C2A" stroke-width="1.1"/>
+  <text x="44" y="288" fill="#B53C2A" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">UNTRUSTED «EXTERNAL · PRIO 20</text>
+  <text x="44" y="308" fill="#1A201B" font-size="13" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Web / File / Webhook Data</text>
+  <text x="44" y="326" fill="#B53C2A" font-size="10.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Prompt injection / exfil risk</text>
+  <text x="44" y="341" fill="#738076" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">tainted session ancestry</text>
+
+  <rect x="304" y="128" width="200" height="80" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="316" y="148" fill="#738076" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">1. SOURCE LEDGER</text>
+  <text x="316" y="168" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Provenance Check: PASS</text>
+  <text x="316" y="186" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Exact scope grant matched</text>
+  <text x="316" y="201" fill="#2F6846" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">subagent = narrow-only</text>
+
+  <rect x="304" y="268" width="212" height="96" rx="6" fill="#F9ECE9" stroke="#B53C2A" stroke-width="1.4"/>
+  <text x="316" y="288" fill="#B53C2A" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">[×] BLOCKED: source_scope_denied</text>
+  <text x="316" y="308" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Effectful Tools Fail-Closed</text>
+  <text x="316" y="327" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">• Summaries cannot launder taint</text>
+  <text x="316" y="344" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">• Child snapshots taint (no widen)</text>
+
+  <rect x="548" y="128" width="200" height="80" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="560" y="148" fill="#738076" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">2. SKILL &amp; AUTO-REVIEW</text>
+  <text x="560" y="168" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Skill Gate + Auto-Review</text>
+  <text x="560" y="186" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Even bypass cannot skip review</text>
+  <text x="560" y="201" fill="#738076" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">sess × tool × sandboxMode</text>
+
+  <rect x="792" y="128" width="168" height="80" rx="6" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.3"/>
+  <text x="804" y="148" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">3. OS SANDBOX</text>
+  <text x="804" y="168" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">seatbelt / bwrap</text>
+  <text x="804" y="186" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Blocks ~/.ssh · clean env</text>
+  <text x="804" y="201" fill="#2F6846" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">sanitizeSpawnEnv()</text>
+
+  <rect x="996" y="128" width="152" height="80" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="1008" y="148" fill="#738076" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">4. AUDIT &amp; REDACT</text>
+  <text x="1008" y="168" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Redacted Output</text>
+  <text x="1008" y="186" fill="#4A564D" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">[REDACTED:NAME]</text>
+  <text x="1008" y="201" fill="#738076" font-size="9.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Blocks .env / id_rsa</text>
+
+  <rect x="548" y="268" width="200" height="96" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="560" y="288" fill="#2A69A4" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">ZERO-LEAK USER VAULT</text>
+  <text x="560" y="308" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Model Holds uvref: Only</text>
+  <text x="560" y="327" fill="#4A564D" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">vault_fill({ ref: "uvref:…" })</text>
+  <text x="560" y="346" fill="#738076" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Passwords/cards write-only</text>
+
+  <rect x="792" y="268" width="168" height="96" rx="6" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.3"/>
+  <text x="804" y="288" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">ISOLATED DOM FILL</text>
+  <text x="804" y="308" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Runtime Fills Target</text>
+  <text x="804" y="327" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Plaintext stays inside host</text>
+  <text x="804" y="346" fill="#2F6846" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">≠ connector SecretVault</text>
+
+  <rect x="996" y="268" width="152" height="96" rx="6" fill="#FFFFFF" stroke="#B7C3B9" stroke-width="1"/>
+  <text x="1008" y="288" fill="#738076" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">MODEL RECEIPT</text>
+  <text x="1008" y="308" fill="#1A201B" font-size="12" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">0-Plaintext Receipt</text>
+  <text x="1008" y="327" fill="#4A564D" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">refs + selectors only</text>
+  <text x="1008" y="346" fill="#738076" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">0 secrets in LLM/trace</text>
+
+  <line x1="32" y1="414" x2="1168" y2="414" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="32" y="435" fill="#738076" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">ALIGNMENT LINEAGE</text>
+  <text x="168" y="435" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Grounded in Anthropic Agentic Misalignment (arXiv:2510.05179) &amp; MSM: prompts advise, host state machines enforce</text>
+</svg>
