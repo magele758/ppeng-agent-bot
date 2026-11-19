@@ -3,7 +3,7 @@ import { AssistantNameContext } from './AssistantNameContext';
 import { transcriptBotName } from '@/lib/assistant-name';
 import { UserMessageActionsContext } from './UserMessageActions';
 
-import { useMemo, type ReactNode } from 'react';
+import { Fragment, useMemo, type ReactNode } from 'react';
 import type { ApprovalItem, ChatMessage } from '@/lib/types';
 import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
@@ -98,7 +98,7 @@ function renderReplySlot(slot: FeedSlot, render: (child: FeedSlot) => ReactNode)
   if (!slot.replyRun) return render(slot);
   return <ReplyRunContext.Provider value={slot.replyRun}>
     <div className="chat-reply-run">
-      {slot.folded?.map(child => <div key={child.key}>{render(child)}</div>)}
+      {slot.folded?.map(child => <Fragment key={child.key}>{render(child)}</Fragment>)}
     </div>
   </ReplyRunContext.Provider>;
 }

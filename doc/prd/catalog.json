@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 475,
+    "implemented": 476,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1413,6 +1413,13 @@
       "requirement": "这个界面太臃肿了，核心信息全部被档到下面，定时任务新增应该要隐藏到二次弹窗里，已有的定时任务和基本信息在第一个tab里前置展示，其他的配置，非必要就隐藏或者折叠起来",
       "verificationStage": "software",
       "file": "acceptance/compact-bot-settings.yaml"
+    },
+    {
+      "id": "compact-reply-spacing",
+      "title": "同一次回复中的相邻段落保持紧凑",
+      "requirement": "这个会话一直看着很难受，怎么空行这么大，帮我优化一下这个对话流的界面",
+      "verificationStage": "software",
+      "file": "acceptance/compact-reply-spacing.yaml"
     },
     {
       "id": "composer-draft-per-session",
