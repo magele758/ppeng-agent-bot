@@ -43,10 +43,10 @@
 
 ## 本预备刻意不碰的树与文件
 
-- `/home/shinemo/wt/traj-handoff-knife2-ffe7556a`（#532 写者）
-- `/home/shinemo/wt/traj-handoff-k3-prep-c67112bc`（第三刀准备池）
-- `/home/shinemo/wt/traj-handoff-k34-prep-c67112bc`（已退役合并树，保持停放）
-- 旧只读树与主仓 `/home/shinemo/penglei/ppeng-agent-core`（须保持 detached `71f752657e7e7ae04dc3b8ae18863a6d95c587f6`）
+- `/home/<user>/wt/traj-handoff-knife2-ffe7556a`（#532 写者）
+- `/home/<user>/wt/traj-handoff-k3-prep-c67112bc`（第三刀准备池）
+- `/home/<user>/wt/traj-handoff-k34-prep-c67112bc`（已退役合并树，保持停放）
+- 旧只读树与主仓 `/home/<user>/penglei/ppeng-agent-core`（须保持 detached `71f752657e7e7ae04dc3b8ae18863a6d95c587f6`）
 - `packages/core/src/quality/gate.ts`、`packages/core/src/orchestrator/engine.ts`、`packages/core/src/runtime/collaborators.ts`、`packages/core/src/swarm/executor.ts`、Formal / verifier / `#516` yaml 口径
 
 上述工作树与文件保持不碰。本文不授权生产编辑。

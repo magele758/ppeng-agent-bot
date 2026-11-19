@@ -91,8 +91,8 @@ describe('shell-policy history gating', () => {
   });
 
   it('does not treat ssh payloads as local browsing [AC:bypass-remote-shell#AC-3]', () => {
-    const heredoc = "ssh -o BatchMode=yes Win4090 \"wsl -d Ubuntu -e bash --norc --noprofile\" <<'EOF'\nfind /home/shinemo -type d\nEOF";
-    const quoted = 'ssh -o BatchMode=yes Win4090 "find /home/shinemo -iname agent"';
+    const heredoc = "ssh -o BatchMode=yes Win4090 \"wsl -d Ubuntu -e bash --norc --noprofile\" <<'EOF'\nfind /home/user -type d\nEOF";
+    const quoted = 'ssh -o BatchMode=yes Win4090 "find /home/user -iname agent"';
     const history = Array.from({ length: 12 }, () => bash(heredoc));
     expect(isUnboundedFsWalk(heredoc)).toBe(false);
     expect(isDirectoryBrowseCommand(heredoc)).toBe(false);

@@ -210,7 +210,7 @@ async function modelFlightFixture(t, judge) {
 
 test('model-flight redirection cancels obsolete tools before launch [AC:steer-model-flight#AC-1]', { timeout: 15000 }, async t => {
   const f = await modelFlightFixture(t, async () => '{"cancelToolCallIds":["install-1"],"reason":"User switched installation to claude-m"}');
-  const note = '你可以用ubuntu1机器上的claude-m干这个';
+  const note = '你可以用my-server机器上的claude-m干这个';
   f.rt.enqueueSteer(f.session.id, note, { target: 'next-step' });
   const before = messagesWith(f.rt, f.session.id, note);
   assert.equal(before.length, 1);

@@ -14,8 +14,8 @@ import {
 
 test('resolveMicrovmRemoteUrl prefers MICROVM_URL', () => {
   assert.equal(
-    resolveMicrovmRemoteUrl({ MICROVM_URL: 'http://100.108.223.41:18081/' }),
-    'http://100.108.223.41:18081'
+    resolveMicrovmRemoteUrl({ MICROVM_URL: 'http://100.64.0.1:18081/' }),
+    'http://100.64.0.1:18081'
   );
   assert.equal(
     resolveMicrovmRemoteUrl({

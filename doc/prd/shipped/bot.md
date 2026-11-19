@@ -410,7 +410,7 @@ Bot 模式默认支持 steering。Bot 回合还在跑时，在对话输入框里
 ## bot-input-suggestion
 Bot 输入框下一句建议
 
-开发 /home/shinemo/wt/ppeng-input-suggestion（分支 feat/ppeng-input-suggestion，基线 origin/main 665d041c）：实现「bot 模式输入框下一句建议（ghost text + Tab 提交）」新功能。
+开发 /home/user/wt/ppeng-input-suggestion（分支 feat/ppeng-input-suggestion，基线 origin/main 665d041c）：实现「bot 模式输入框下一句建议（ghost text + Tab 提交）」新功能。
 
 功能需求：
 1. 在 bot 会话/Agent Lab 输入框实现下一句建议：输入框内显示淡色建议文本（ghost text），视觉上明显区别于真实输入，不占真实值。

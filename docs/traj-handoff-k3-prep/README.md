@@ -1,6 +1,6 @@
 # 第三刀（Swarm）预备稿 — 仅测试 / 评估 / 回退准备
 
-- 工作树：`/home/shinemo/wt/traj-handoff-k3-prep-c67112bc`
+- 工作树：`/home/<user>/wt/traj-handoff-k3-prep-c67112bc`
 - 分支：`feat/traj-handoff-k3-prep-c67112bc`
 - 钉死 HEAD（本预备不得移动 tip）：`c67112bc5de284d3806bc399cf7289458021044f`（#533，单父 `ffe7556a`，作者时间 2026-11-14 08:58:12 +0000 = 16:58:12 Asia/Shanghai）
 - 性质：隔离树未提交草稿。不是第三刀实现，不打开生产 Swarm 入口，不含 Pattern B 任何代码（包括入口关闭基础原语），不改冻结契约，不推仓、不开 PR。

@@ -2,10 +2,10 @@
 
 ## Lifecycle (control plane)
 
-Point `MICROVM_URL` at the in-house control plane (Ubuntu1 lab: `:18081`).
+Point `MICROVM_URL` at the in-house control plane (`<microvm-host>:18081`).
 
 ```sh
-export MICROVM_URL=http://100.108.223.41:18081
+export MICROVM_URL=http://<microvm-host>:18081
 export MICROVM_API_KEY=e2b_devkey          # or BOOTSTRAP_API_KEY
 export MICROVM_INTERNAL_TOKEN=dev-internal-token  # for guest route lookup
 node --import tsx packages/core/scripts/microvm-smoke.mjs
@@ -14,7 +14,7 @@ node --import tsx packages/core/scripts/microvm-smoke.mjs
 
 Smoke evidence expected: create HTTP 201 (`sbx_…`), guest `/health` 200 `{"status":"ok"}`, delete HTTP 204.
 
-Guest `/health` is on the microVM private IP (e.g. `172.16.0.x:49983`) and is reachable from the Ubuntu1 node host; remote callers need edge or host-local smoke.
+Guest `/health` is on the microVM private IP (e.g. `172.16.0.x:49983`) and is reachable from the `<microvm-host>` node; remote callers need edge or host-local smoke.
 
 
 ## `/exec` (command adapter)

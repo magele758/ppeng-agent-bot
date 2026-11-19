@@ -26,7 +26,7 @@ test("factory Lab saves configuration, probes and shows unified task progress [A
           ? [
             {
               id: "factory-test",
-              machineId: "ubuntu1",
+              machineId: "my-server",
               status: completed ? "succeeded" : "running",
               updatedAt: new Date().toISOString(),
               history: [],
@@ -50,9 +50,9 @@ test("factory Lab saves configuration, probes and shows unified task progress [A
   await page.goto("/#/settings/ops/factory");
   await expect(page.getByTestId("factory-panel")).toBeVisible();
   await page.getByTestId("factory-add-machine").click();
-  await page.getByTestId("factory-machine-id").fill("ubuntu1");
-  await page.getByTestId("factory-machine-name").fill("Ubuntu1");
-  await page.getByTestId("factory-machine-alias").fill("ubuntu1");
+  await page.getByTestId("factory-machine-id").fill("my-server");
+  await page.getByTestId("factory-machine-name").fill("My Server");
+  await page.getByTestId("factory-machine-alias").fill("my-server");
   await page.getByTestId("factory-machine-capacity").fill("2");
   await page.getByTestId("factory-machine-users").fill("owner");
   await page.getByTestId("factory-machine-bots").selectOption(["bot"]);
@@ -60,7 +60,7 @@ test("factory Lab saves configuration, probes and shows unified task progress [A
   await page.getByTestId("factory-coordinator").selectOption("bot");
   await page.getByTestId("factory-save").click();
   await expect(page.getByText("factory-test", { exact: true })).toBeVisible();
-  await page.getByTestId("factory-probe-ubuntu1").click();
+  await page.getByTestId("factory-probe-my-server").click();
   await expect(
     page.getByText("verified-machine", { exact: false }),
   ).toBeVisible();
@@ -82,7 +82,7 @@ async function mockConfiguredFactory(page: import("@playwright/test").Page, boar
           owner: { userId: "owner" },
           roomId: "room", coordinatorBotId: "bot",
           patrol: { enabled: false, timezone: "Asia/Shanghai" },
-          machines: [{ id: "ubuntu1", name: "Ubuntu1", sshAlias: "ubuntu1", capacity: 2, botIds: ["bot"], allowedUserIds: ["owner"], repositories: [{ id: "core", path: "/repo" }] }],
+          machines: [{ id: "my-server", name: "My Server", sshAlias: "my-server", capacity: 2, botIds: ["bot"], allowedUserIds: ["owner"], repositories: [{ id: "core", path: "/repo" }] }],
         }
       }
     });
@@ -91,12 +91,12 @@ async function mockConfiguredFactory(page: import("@playwright/test").Page, boar
   await page.route("**/api/bots", route => route.fulfill({ json: { bots: [{ id: "bot", name: "Coordinator" }] } }));
   await page.route("**/api/bot-rooms", route => route.fulfill({ json: { rooms: [{ id: "room", title: "Factory Room", botIds: [] }, { id: "other", title: "Other Room", botIds: [] }] } }));
   await page.goto("/#/settings/ops/factory");
-  await expect(page.getByTestId("factory-machine-name")).toHaveValue("Ubuntu1");
+  await expect(page.getByTestId("factory-machine-name")).toHaveValue("My Server");
 }
 
 const boardFor = (status: string) => ({
   machines: [], tasks: [{
-    id: "factory-order", machineId: "ubuntu1", status,
+    id: "factory-order", machineId: "my-server", status,
     updatedAt: "2026-10-18T04:00:00.000Z", history: [],
     identity: "verified-host", startedAt: "2026-10-18T03:59:00.000Z",
     finishedAt: status === "succeeded" ? "2026-10-18T04:00:00.000Z" : undefined,

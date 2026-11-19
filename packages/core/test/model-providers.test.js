@@ -241,7 +241,7 @@ test('global default is hot, persistent, and explicit pins survive until cleared
     const unreachable = upsertProvider(store, {
       name: 'Unreachable',
       kind: 'openai-compatible',
-      baseUrl: 'http://10.1.20.68:3426/v1',
+      baseUrl: 'http://10.0.0.1:3426/v1',
       apiKey: 'test',
       models: [{ id: 'grok-4.7-build-fast@500k', enabled: true }],
       scanError: 'fetch failed'

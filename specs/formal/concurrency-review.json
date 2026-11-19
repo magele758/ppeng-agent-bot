@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-18T02:40:00.000Z",
-  "reviewNote": "Reviewed the runtime.ts library-index scheduling change. refreshLibraryIndex returns before any directory walk, and shutdown cancels a scan that has not started. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-18T16:18:00.000Z",
+  "reviewNote": "Reviewed the placeholder substitution in steer-tools.ts and the related core tests. Only an example machine name inside the steer judge prompt text and test fixture strings was replaced with a placeholder; no code path changed. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Production runtime startup and writer surfaces, cancellation and approval decisions; actual OS process probes",
@@ -510,7 +510,7 @@
     "packages/core/test/approval-admission-race.test.js": "dab20c591f2b2d5b4e911ab24100aaa6cdb811c9b836bdb8bee449ceba126146",
     "scripts/ci/verification-evidence.mjs": "123bb1b4a56dd699837bf699c3af2a6a3d6c1951332dd790aed8760f2fc70a08",
     "packages/core/src/factory/tools.ts": "4f01ec639c6b1aab3a474e629c793aed290bbc30b94858be28daf79260a02b7f",
-    "packages/core/test/superbot-factory-setup.test.js": "a2d5a5f3efe63ae668a1cc147e6e077ee06245081b619db64d61bf17a95e941b",
+    "packages/core/test/superbot-factory-setup.test.js": "1483b75270b03b808ef7ecddd11eb9b6d3ebfaffc75dff7dc114b7d612c0494d",
     "packages/core/src/reply-quote.ts": "e3551eb81ae046f631824c896a67b231052314068ef84c7d472c7a5069084234",
     "packages/core/src/session/reply-quote.ts": "945f595cb0004dac6b35d66b820a5cd6ba865d41bc86f1363ecdde5dc9c42b27",
     "packages/core/src/rooms/index.ts": "40762fea04eba116c534e486a94cb524aa8fef3a1082f8426ac28b9cf5859b10",
@@ -584,8 +584,8 @@
     "packages/core/src/session/task-contract.ts": "9016c9dfde30fe957331ad721804bad66850351e1035921cc97d1feb10cd366d",
     "packages/core/src/session/cache-diagnostics.ts": "ff28f1f7f080a417834c7b47d0307eeaf4644cdafc40a5eaab0e61b5509b705e",
     "packages/core/src/cron/notification-decision.ts": "d38f37ac59af2ce06c389902620da4f172884b319cc45b2e851c0a77bc9eec05",
-    "packages/core/src/runtime/steer-tools.ts": "26d586ab2ecab82adb4d8973048b8e52423d96d420dce84104cdd7cb6f49f822",
-    "packages/core/test/steer-tool-continuity.test.js": "4a33f5ed3e2757b695e4f503bb3b96871ca687ae777215df0faea56cb5c24c98",
+    "packages/core/src/runtime/steer-tools.ts": "5fd2b787f41943c947322525b2dd8c0b5f9fb516aa371142e441ae65cf6990bc",
+    "packages/core/test/steer-tool-continuity.test.js": "4ae0b8876808936524d7ab75b9cec59990c9eb9bb611793f185e682a6eeb9e9d",
     "packages/core/src/learning/sources.ts": "dc39b94026833c515e560607af9e241d0ed0aca11a929fbb41c6289bfdb93a29",
     "packages/core/src/cron/routine-runtime.ts": "751349566b4c78fe1e178d650504fa681ab76765e7a238af16438894bdd2bb4b",
     "packages/core/src/runtime/scheduler-host.ts": "2173ab9c09ce3ffd6bacd51ec3bb21786030ca98fe1b46824f8a185613997ce5",

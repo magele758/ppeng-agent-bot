@@ -11,9 +11,9 @@
 | 角色 | 职责 |
 |---|---|
 | **4090 bot（协调者/我）** | 写需求 prompt、启动/盯任务、读复审结论、做合入/push/清理决策。**不自己读 ppeng 源码**（源码阅读只由 claude-m 做）、不直接改代码 |
-| **claude-m**（`/home/shinemo/bin/claude-m`） | 开发、只读复审、修复、冲突解决。全部经 `ssh Win4090` 远程执行 |
+| **claude-m**（`$HOME/bin/claude-m`） | 开发、只读复审、修复、冲突解决。全部经 `ssh Win4090` 远程执行 |
 
-- 仓库：`/home/shinemo/penglei/ppeng-agent-core`（**主干 main**）
+- 仓库：`$HOME/penglei/ppeng-agent-core`（**主干 main**）
 - ai-agent-node 是吸收方（主干 feat/3.6.0）；ppeng 开发出的能力可随后被 ai-agent-node 吸收（走 ai-agent-node 自己的 SOP，独立流水线）
 
 ## 1. 仓库/分支/worktree 约定
@@ -22,7 +22,7 @@
 |---|---|
 | 主干 | `main`（集成分支，唯一 push 目标） |
 | 特性分支 | `feat/ppeng-<name>`，从 main 切出 |
-| worktree | `/home/shinemo/wt/ppeng-<name>` |
+| worktree | `$HOME/wt/ppeng-<name>` |
 | 受保护 worktree | 不动 `typecheck-cleanup`、`baseline-feat360`、`csr-rebase-tmp`、`summary-reply-e2e`（都在 ai-agent-node 侧，别跨仓库误碰）；ppeng 侧现有 `fix/evolution-surface-guard-env` 也不动 |
 | 基线 | 开发前先 `git fetch origin main`，以 `origin/main` 为基线（当前 665d041c） |
 
@@ -39,7 +39,7 @@
 
 ### step1 开发
 - 写 `/tmp/ppeng-dev-<name>.prompt.md`：需求、验收点、禁止项
-- 启动：`ssh Win4090 → wsl -d Ubuntu -- bash --norc --noprofile`，`PATH=$HOME/.local/bin:$HOME/bin:$PATH`，unset 全部 `ANTHROPIC_*`，`cd /home/shinemo/wt/ppeng-<name>`，`setsid bash --norc --noprofile /tmp/gap2-run.sh /tmp/ppeng-dev-<name> >out 2>err &`
+- 启动：`ssh Win4090 → wsl -d Ubuntu -- bash --norc --noprofile`，`PATH=$HOME/.local/bin:$HOME/bin:$PATH`，unset 全部 `ANTHROPIC_*`，`cd $HOME/wt/ppeng-<name>`，`setsid bash --norc --noprofile /tmp/gap2-run.sh /tmp/ppeng-dev-<name> >out 2>err &`
 - 完成判据：**包装 pid 退出 ≠ 完成**。看 claude 子进程（`pgrep` 精确匹配目录名）+ rc + 结果 md。子进程还在就不启动第二个
 - 要求 claude-m：改完跑相关测试/typecheck 自查，**提交到当前分支**，输出 md（思路/文件/验证/提交 sha）
 
@@ -63,7 +63,7 @@
 - push 前必先 fetch + 整合外部提交（外部提交会持续出现）
 
 ### step6 清理 worktree
-- 分支已是 `origin/main` 祖先 **且** 目录无 claude 子进程 → `git worktree remove --force /home/shinemo/wt/ppeng-<name>`
+- 分支已是 `origin/main` 祖先 **且** 目录无 claude 子进程 → `git worktree remove --force $HOME/wt/ppeng-<name>`
 - 没推送成功的不删；**不删除分支**
 
 ## 4. 并发与硬约束
