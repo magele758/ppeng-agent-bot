@@ -25,13 +25,13 @@ async function files(t) {
   await mkdir(join(traceDir,'chat'),{recursive:true});
   return {
     async usage(rows, name = 'usage.jsonl') {
-      const text = lines(rows);
+      const text = typeof rows === 'string' ? rows : lines(rows);
       await writeFile(join(magpieDir,name), name.endsWith('.gz') ? gzipSync(text) : text);
     },
     async corruptArchive() { await writeFile(join(magpieDir,'usage.2020-11-19.jsonl.gz'),'invalid gzip bytes'); },
     async trace(rows, id = 'chat') {
       await mkdir(join(traceDir,id),{recursive:true});
-      await writeFile(join(traceDir,id,'events.jsonl'),lines(rows));
+      await writeFile(join(traceDir,id,'events.jsonl'),typeof rows === 'string' ? rows : lines(rows));
     },
     run: (options = {}) => collectMagpieCacheSource({magpieDir,traceDir,startMs,endMs,...options}),
   };
@@ -150,4 +150,35 @@ test('a proxy-billed call without SDK usage stays in its first completion window
   const next = await f.run({timeBasis:'completed',startMs:endMs,endMs:endMs+1800000});
   assert.deepEqual(next.records,[]);
   assert.deepEqual(next.coverage.incompleteIntervals,[]);
+});
+
+test('reads LF-delimited UTF-8 JSON from plain and gzip logs across chunks and preserves Unicode line separators [AC:magpie-cache-monitor#AC-1]', async t => {
+  const f = await files(t);
+  const row = {...turn('这-id',100),payload:{padding:'PAD',note:'a\u2028b\u2029c',requestId:'这-id'}};
+  const template = JSON.stringify(row).replace('PAD','');
+  // Split the first character of the join ID across the 64 KiB file read boundary.
+  const offset = Buffer.byteLength(template.slice(0,template.indexOf('这')));
+  const first = JSON.stringify(row).replace('PAD','a'.repeat(65535-offset));
+  const second = JSON.stringify(turn('second',200));
+  await f.trace(first+'\r\n'+second);
+  await f.usage([
+    proxy({rid:'这-id',details:'a\u2028b\u2029c'}),
+    proxy({rid:'second',response_id:'second',route_id:'two',cache_read:0}),
+  ].map(row => JSON.stringify(row)).join('\r\n'),'usage.jsonl.1.gz');
+
+  const {records,coverage} = await f.run({timeBasis:'completed'});
+  assert.deepEqual(records.map(row => [row.time,row.cached]),[[startMs+100,60],[startMs+200,0]]);
+  assert.equal(coverage.invalid,0);
+  assert.equal(coverage.sourceAvailable,true);
+  assert.deepEqual(coverage.incompleteIntervals,[]);
+});
+
+test('malformed trace records with an identifiable timestamp only block their own window [AC:magpie-cache-monitor#AC-1]', async t => {
+  const f = await files(t);
+  const damaged = offset => '{"ts":"'+stamp(offset)+'","kind":"turn_end","payload":';
+  await f.trace([damaged(-500),damaged(200),turn('up-id',300)]);
+  await f.usage([proxy()]);
+  const {records,coverage} = await f.run({timeBasis:'completed'});
+  assert.equal(records.length,1);
+  assert.deepEqual(coverage.incompleteIntervals,[{startMs:startMs+200,endMs:startMs+201,reason:'invalidTraceJson'}]);
 });

@@ -2,7 +2,6 @@ import { createReadStream } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createInterface } from 'node:readline';
 import { createGunzip } from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
 
@@ -38,6 +37,10 @@ function readJson(line, context, reason, time) {
   }
 }
 
+function consumeJsonLine(line, consume) {
+  if (!/^[ \t\r]*$/.test(line)) consume(line);
+}
+
 // The archive may contain replayed entries in non-chronological order. Date ranges filter rows, never terminate a file scan early.
 async function readLines(file, consume, coverage) {
   const raw = createReadStream(file);
@@ -45,13 +48,23 @@ async function readLines(file, consume, coverage) {
   // Propagate both input and decompressor failures to this scan.
   const pumping = stream !== raw ? pipeline(raw,stream) : undefined;
   pumping?.catch(() => {});
-  const lines = createInterface({input:stream, crlfDelay:Infinity});
+  // JSONL separates records with LF. U+2028 and U+2029 are legal inside JSON strings.
+  stream.setEncoding('utf8');
+  let remainder = '';
   try {
-    for await (const line of lines) if (line.trim()) consume(line);
+    for await (const chunk of stream) {
+      let start = 0;
+      for (let lf = chunk.indexOf('\n'); lf !== -1; lf = chunk.indexOf('\n',start)) {
+        consumeJsonLine(remainder+chunk.slice(start,lf),consume);
+        remainder = '';
+        start = lf+1;
+      }
+      remainder += chunk.slice(start);
+    }
+    consumeJsonLine(remainder,consume);
     await pumping;
   } finally {
     coverage.bytesRead += raw.bytesRead;
-    lines.close();
     raw.destroy();
     if (stream !== raw) stream.destroy();
   }
