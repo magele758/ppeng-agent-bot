@@ -14,6 +14,7 @@ import {
   readGlobalThinkingEffort,
   type BotThinkingEffort
 } from '@/lib/bot-thinking-effort';
+import { botPinErrorText } from '@/lib/bot-pin-error';
 import { ConfigGroup, FieldLabel } from './ConfigGroup';
 
 const GLOBAL_EFFORT_PATH = '/api/thinking-effort/settings';
@@ -58,7 +59,7 @@ export function BotThinkingEffortSetting({
     try {
       await onSave(botEffortFromSelect(value));
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(botPinErrorText(t, e, e instanceof Error ? e.message : String(e)));
     } finally {
       setBusy(false);
     }

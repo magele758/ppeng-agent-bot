@@ -2,6 +2,8 @@ import { AuthorizationError, NotFoundError } from '../errors.js';
 import { ResourceOwnerStore } from '../auth/resource-owners.js';
 import type { RequestAuth } from '../auth/types.js';
 import { principalFromSession, resolveBotPrincipal, sameBotPrincipal } from '../bots/bot-identity.js';
+import { permittedBotPinPatch } from '../bots/bot-pin-access.js';
+import type { UpdateBotInput } from '../bots/types.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { SessionRecord } from '../types.js';
 
@@ -30,6 +32,14 @@ function visible(store: SqliteStateStore, owners: ResourceOwnerStore, kind: stri
   }
   const owner = owners.ownerOf(kind, id);
   return owner === undefined ? auth.admin === true : owner === auth.user?.id;
+}
+
+/** Model / thinking effort pins follow the Lab rule: the Bot's owner or an administrator. */
+export function permittedToolBotPins<T extends UpdateBotInput>(
+  store: SqliteStateStore, session: SessionRecord, botId: string, patch: T
+): T {
+  const auth = caller(store, session);
+  return permittedBotPinPatch(store, botId, patch, { userId: auth.user?.id, admin: auth.admin === true });
 }
 
 /** Apply the same administrator/owner boundaries as the Lab HTTP entry points. */

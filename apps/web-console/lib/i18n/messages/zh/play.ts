@@ -652,6 +652,10 @@ export const play = {
     hint: '下一轮对话生效。子代理和队友沿用这个 Bot 的固定档位。'
   },
 
+  botPin: {
+    forbidden: '只有这个 Bot 的主人或管理员能修改它的模型和思考力度，这次没有做任何改动。'
+  },
+
   botCommand: {
     compacted: '已在当前对话里压缩，没有新开对话。',
     nothingToCompact: '当前对话没有可压缩的内容，仍是同一条对话。',

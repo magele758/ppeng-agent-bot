@@ -35,6 +35,15 @@ export {
   readBotThinkingEffort
 } from './bot-thinking-effort.js';
 export {
+  BOT_PIN_FORBIDDEN,
+  botChatCommandPinPatch,
+  botOwnership,
+  changedBotPins,
+  mayChangeBotPins,
+  permittedBotPinPatch
+} from './bot-pin-access.js';
+export type { BotOwnership, BotPinCaller, BotPinField } from './bot-pin-access.js';
+export {
   BOT_AVATAR_EMOJIS,
   BOT_FACE_COLORS,
   BOT_FACE_SHAPES,

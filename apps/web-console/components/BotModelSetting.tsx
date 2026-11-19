@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
+import { botPinErrorText } from '@/lib/bot-pin-error';
 import {
   BOT_MODEL_FOLLOW_DEFAULT,
   botModelPickable,
@@ -46,7 +47,7 @@ export function BotModelSetting({
     try {
       await onSave(next);
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(botPinErrorText(t, e, e instanceof Error ? e.message : String(e)));
     } finally {
       setBusy(false);
     }
