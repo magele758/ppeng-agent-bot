@@ -10,6 +10,7 @@ import { createProductAdminTools } from '../dist/tools/product-admin-tools.js';
 import { syncBotAgentSpecs } from '../dist/bots/bot-facade.js';
 import { filterToolsForSession } from '../dist/turn/resolve-turn-tools.js';
 import { PromptBuilder } from '../dist/model/prompt-builder.js';
+import { writePromptVariantSettings } from '../dist/model/prompt-variant-settings.js';
 
 function fixture(overrides = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'product-admin-'));
@@ -62,6 +63,40 @@ const GENERAL = {
   instructions: 'hello',
   capabilities: ['chat', 'coding', 'tool-use', 'analysis']
 };
+
+test('new and upgraded Bots receive the direct reply default [AC:bot-concise-replies#AC-1]', async (t) => {
+  const fx = fixture();
+  t.after(() => fx.store.db.close());
+  const { body: { bot } } = await call(fx, 'bot_create', { name: 'Reporter' });
+  const session = fx.store.getSession(bot.canonicalSessionId);
+  const builder = new PromptBuilder({ store: fx.store, repoRoot: fx.dir });
+  const currentAgent = () => fx.store.getAgent(bot.id);
+  assert.match(currentAgent().instructions, /lead with the answer/i);
+
+  fx.store.upsertAgent({ ...currentAgent(), instructions: 'Old instructions' });
+  fx.store.updateSession(session.id, { metadata: { ...session.metadata, persona: 'Review the weekly figures.' } });
+  syncBotAgentSpecs(fx.store);
+  for (const variant of ['legacy', 'anthropic5']) {
+    writePromptVariantSettings(fx.store, { variant });
+    const prefix = builder.buildStablePrefix({ agent: currentAgent(), session, repoRoot: fx.dir });
+    assert.match(prefix, /lead with the answer/i);
+    assert.match(prefix, /one sentence/i);
+    assert.match(prefix, /recaps|repeated summaries/i);
+    assert.match(prefix, /Review the weekly figures/);
+  }
+});
+
+test('Bot reply guidance preserves decision-critical facts and the requested deliverable [AC:bot-concise-replies#AC-2]', async (t) => {
+  const fx = fixture();
+  t.after(() => fx.store.db.close());
+  const { body: { bot } } = await call(fx, 'bot_create', { name: 'Analyst' });
+  const { instructions } = fx.store.getAgent(bot.id);
+  assert.match(instructions, /interpret.*supplied facts/i);
+  assert.match(instructions, /independent verification, perform it before reporting/i);
+  assert.match(instructions, /evidence.*uncertainty.*blockers/i);
+  assert.match(instructions, /requested detail and format/i);
+  assert.match(instructions, /full deliverable/i);
+});
 
 test('create a bot and see it on the roster [AC:bot-product-admin#AC-1]', async () => {
   const fx = fixture();
