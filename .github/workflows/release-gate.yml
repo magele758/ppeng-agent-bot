@@ -441,6 +441,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: TypeScript build
         run: pnpm run build
+      - name: Check Lab performance
+        uses: ./.github/actions/lab-performance
       - name: Allow precheck network namespaces
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then

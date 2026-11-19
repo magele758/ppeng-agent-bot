@@ -25,6 +25,11 @@ markdown, copy /pages/:shareId, rotate share (old link dies), delete
 (gone from list; public HTML 404), and create new pages. Do not clone
 Grok/Canvas UI.
 
+## lab-performance-regression-gate
+固定基准拦截 Lab 性能退化
+
+这次修复挺好的，做一个基准测试，以后如果降级了要能拦截和及时发现
+
 ## lab-poll-crash-diagnostics
 轻量会话列表与客户端异常诊断
 

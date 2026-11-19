@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "referenceRun": "https://github.com/magele758/ppeng-agent-bot/actions/runs/44502280252",
+  "history": [
+    {"name": "history.goal.fullReads", "max": 0, "unit": "rows"},
+    {"name": "history.goal.writes", "max": 0, "unit": "changes"},
+    {"name": "history.goal.tickMedianMs", "reference": 6.61, "max": 40, "unit": "ms"},
+    {"name": "history.goal.tickMaxMs", "max": 150, "unit": "ms"},
+    {"name": "history.daydream.fullReads", "max": 0, "unit": "rows"},
+    {"name": "history.daydream.writes", "max": 0, "unit": "changes"},
+    {"name": "history.daydream.tickMedianMs", "reference": 23.84, "max": 80, "unit": "ms"},
+    {"name": "history.daydream.tickMaxMs", "max": 350, "unit": "ms"}
+  ],
+  "sessions": [
+    {"name": "chat_start_p50_ms", "reference": 24.9, "max": 100, "unit": "ms"},
+    {"name": "bot_start_p50_ms", "reference": 33.1, "max": 100, "unit": "ms"},
+    {"name": "warm_desktop_reconnects", "max": 0, "unit": "connections"},
+    {"name": "responses_prefix_drifts", "max": 0, "unit": "requests"}
+  ],
+  "homepage": [
+    {"name": "homepageDocumentP90Ms", "reference": 20.89, "max": 200, "unit": "ms"},
+    {"name": "homepageAuthP90Ms", "reference": 47.36, "max": 250, "unit": "ms"},
+    {"name": "homepageReadinessP90Ms", "reference": 52.35, "max": 250, "unit": "ms"},
+    {"name": "homepageHistoryP90Ms", "reference": 47.41, "max": 250, "unit": "ms"},
+    {"name": "homepageWorstRequestMs", "max": 2000, "unit": "ms"}
+  ],
+  "browser": [
+    {"name": "homepageInteractiveMedianMs", "max": 1500, "unit": "ms"},
+    {"name": "botTranscriptMedianMs", "max": 2200, "unit": "ms"}
+  ]
+}

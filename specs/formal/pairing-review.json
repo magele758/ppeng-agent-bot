@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-19T09:10:31.000Z",
-  "reviewNote": "Reviewed the per-Bot thinking effort pin on top of the reviewed main manifests (Daydream polling and idle Bot scheduler fingerprints are unchanged). fitProductModelRequest in l5-bindings.ts now passes the session metadata.thinkingEffort (off | low | medium | high) to applyThinkingEffortToTurn, which only sets or removes reasoningEffort on the outgoing model request; messages, tools, the prepared model view and turn outcomes are unchanged. inheritModelOverride in spawn-policy.ts also copies a valid thinkingEffort pin into child metadata next to modelOverride; permission mode, allowlists and the planner exclusion are unchanged. bot_update in product-admin-tools.ts forwards thinkingEffort to updateBot, which validates it before any write, and botView echoes it. sessions.ts validates metadata.thinkingEffort on session create and applies Bot pins through updateBot before openBot, as it already did for modelOverride. Pairing, lifecycle, restart and concurrency probes and mutations passed while fingerprints were needs-review. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-19T10:00:09.114Z",
+  "reviewNote": "The release HTTP regression job runs the Lab performance budget after build. Quick CI adds its result-validation and workflow-wiring tests. The dedicated pairing verifier continues to run its bounded model, real source probes, isolated mutants and negative controls.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -410,7 +410,7 @@
     "scripts/test/tool-call-pairing-verification.test.mjs": "03d587f3bf39d4cc0ad09ff37f84292649206f7181d7db974cf15faebf17f2dd",
     "skills/verify-tool-call-pairing/SKILL.md": "217f27b3b894754e3863dfcf46c60c084bcc9965be0f0acdd2af68884660f9f1",
     "scripts/formal/run-formal-regression.mjs": "f6a9d8e8a45d372115a9e81ca0ab800ff32bac727a349ae73ca6bb35dcd1076d",
-    ".github/workflows/release-gate.yml": "627734b5e304825f29a6c037da6e8b244cc2f30cf6cce55c07e828fe5db09f4b",
+    ".github/workflows/release-gate.yml": "a253118c881ee14051ff2977b8030b7078ab7a56999da59187bf0f8046ac0e17",
     "packages/agent-loop/src/runtime/tool-loop.test.ts": "196a63c5ff2537ed970d5989e03037d03bb2e64edb44412a6a2ac6ffc4a961e5",
     "skills/agent-loop/SKILL.md": "9037fb3024b0d8bbceef43a272384eb96cf6612944829cf0357c281a99549e43",
     "packages/agent-loop/src/turn/host.ts": "9a2cc03321805b3ce46eb797895e695a25509df3492b6471b61afafee083a5f7",
@@ -448,7 +448,7 @@
     "scripts/ci/release-results.mjs": "6396174f7b0ad6fcdf164adb0320e32ee24767220c60133fe17ed4afe680835a",
     "scripts/ci/test-partition.mjs": "d6018aebae05ebc907ddd0de10c6905ee68e0c1ab2406057a7f09bb21b8ed28e",
     "scripts/test/release-workflow-policy.test.mjs": "e628c2587242d6ca9a4cd705117aab90a605061613cd9a49395b6068a11dcad3",
-    "scripts/ci/quick-gate.mjs": "5c1072c45613eeb4ac6b4236e89cf50416e817f3c9ed97a6c8f3d6e26a7a40cd",
+    "scripts/ci/quick-gate.mjs": "12445fdd0999f77aed45405c8fdbe229666ef2e51249bff112dfd5019bb5c973",
     "scripts/ci/validation-artifacts.mjs": "d0da148d709c698ad29e21cf769a84b4a5def4e82e2d636e52d994185ae82b6f",
     "scripts/test/ci-audit.test.mjs": "4939dff9c6b4255f5ffb4e48d539728f90ba8395550a2411c6cf76bb38c77dee",
     "scripts/test/ci-speedup-workflow.test.mjs": "291d702d5da3d0f5c22838acf32c4601a3cf7f4a28b8c81840540427c3eca4a9",

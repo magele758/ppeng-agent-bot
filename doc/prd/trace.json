@@ -2871,7 +2871,10 @@
       "id": "composer-draft-per-session",
       "title": "聊天输入框草稿按会话隔离",
       "tests": [
-        "apps/web-console/lib/composer-draft.test.ts"
+        "apps/web-console/lib/bot-opening-draft.test.ts",
+        "apps/web-console/lib/composer-draft.test.ts",
+        "e2e/bot-opening-draft-isolation.spec.ts",
+        "e2e/lab-startup-draft.spec.ts"
       ]
     },
     {
@@ -3516,6 +3519,19 @@
         "apps/web-console/components/sections/knowledge/LibraryPagesPanel.render.test.ts",
         "apps/web-console/components/sections/knowledge/library-pages-actions.test.ts",
         "apps/web-console/components/sections/knowledge/library-pages-model.test.ts"
+      ]
+    },
+    {
+      "id": "lab-performance-regression-gate",
+      "title": "固定基准拦截 Lab 性能退化",
+      "tests": [
+        "apps/web-console/lib/bot-opening-draft.test.ts",
+        "e2e/bot-opening-draft-isolation.spec.ts",
+        "e2e/lab-startup-draft.spec.ts",
+        "scripts/test/lab-performance-gate.test.mjs",
+        "scripts/test/lab-performance-history.test.mjs",
+        "scripts/test/lab-performance-homepage.test.mjs",
+        "scripts/test/lab-performance-session.test.mjs"
       ]
     },
     {

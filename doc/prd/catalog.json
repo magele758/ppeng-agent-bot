@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 479,
+    "implemented": 480,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2029,6 +2029,13 @@
       "requirement": "Add a minimal Lab Knowledge -> Pages panel over existing admin\n/api/library/pages* routes. Humans can list pages, open read-only or edit\nmarkdown, copy /pages/:shareId, rotate share (old link dies), delete\n(gone from list; public HTML 404), and create new pages. Do not clone\nGrok/Canvas UI.",
       "verificationStage": "software",
       "file": "acceptance/lab-library-pages.yaml"
+    },
+    {
+      "id": "lab-performance-regression-gate",
+      "title": "固定基准拦截 Lab 性能退化",
+      "requirement": "这次修复挺好的，做一个基准测试，以后如果降级了要能拦截和及时发现",
+      "verificationStage": "software",
+      "file": "acceptance/lab-performance-regression-gate.yaml"
     },
     {
       "id": "lab-poll-crash-diagnostics",

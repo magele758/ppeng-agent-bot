@@ -32,19 +32,29 @@ export function composerDraftKey(args: { sessionId: string | null; surface: stri
   return args.sessionId ? `session:${args.sessionId}` : `${NEW_PREFIX}${args.surface}:${args.botId}`;
 }
 
+/** While opening a remembered Bot, its draft belongs to that Bot before the server supplies a session id. */
+export function composerDraftSpot(args: { sessionId: string | null; surface: string; botId: string; openingBotId: string }): ComposerDraftSpot {
+  const botId = args.botId || args.openingBotId;
+  return { key: composerDraftKey({ ...args, botId }), botId };
+}
+
 /** Text typed while a session is being created (by this send, or a bot opening) belongs to the session that just appeared. */
 function draftFollows(from: ComposerDraftSpot, to: ComposerDraftSpot, claimed: boolean): boolean {
   if (!from.key.startsWith(NEW_PREFIX) || to.key.startsWith(NEW_PREFIX)) return false;
-  return claimed || (Boolean(from.botId) && from.botId === to.botId);
+  return from.botId ? from.botId === to.botId : claimed;
 }
 
 export function createComposerDraftScope(first: ComposerDraftSpot) {
   const saved = new Map<string, ComposerDraft>();
   let at = first;
 
-  const restore = (key: string): ComposerDraft => {
-    const draft = saved.get(key) ?? emptyComposerDraft();
-    saved.delete(key);
+  const restore = (to: ComposerDraftSpot): ComposerDraft => {
+    const pending = to.botId && !to.key.startsWith(NEW_PREFIX)
+      ? composerDraftKey({ sessionId: null, surface: 'bot', botId: to.botId })
+      : to.key;
+    const draft = saved.get(to.key) ?? saved.get(pending) ?? emptyComposerDraft();
+    saved.delete(to.key);
+    saved.delete(pending);
     return draft;
   };
 
@@ -66,7 +76,7 @@ export function createComposerDraftScope(first: ComposerDraftSpot) {
         return;
       }
       stash(from.key, current);
-      io.apply(restore(to.key));
+      io.apply(restore(to));
     }
   };
 }
