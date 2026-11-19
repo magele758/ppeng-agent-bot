@@ -639,6 +639,19 @@ export const play = {
     hint: 'Follow default uses the global default model. Subagents and teammates inherit this model.'
   },
 
+  botEffort: {
+    title: 'Bot thinking effort',
+    tip: 'Sets how hard this Bot asks the model to think, without changing the global setting. Pick Off when its pinned model does not accept a thinking effort.',
+    label: 'Thinking effort',
+    aria: 'Thinking effort used by this Bot',
+    followGlobal: 'Follow global (default)',
+    followGlobalWith: 'Follow global (current: {level})',
+    effectivePinned: 'In effect: {level} (pinned for this Bot)',
+    effectiveGlobal: 'In effect: {level} (follows global)',
+    effectiveUnknown: 'In effect: follows the global setting',
+    hint: 'Applies from the next turn. Subagents and teammates keep this Bot’s pinned level.'
+  },
+
   botCommand: {
     compacted: 'Compacted this chat in place. No new conversation was opened.',
     nothingToCompact: 'Nothing to compact. This is still the same conversation.',

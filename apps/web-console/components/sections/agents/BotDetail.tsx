@@ -26,6 +26,7 @@ import {
 } from '@/lib/bot-console-selection';
 import { readBotSettings, type BotSettingsSnapshot } from '@/lib/bot-policy';
 import type { BotPermissionMode } from '@/lib/bot-permission';
+import type { BotThinkingEffort } from '@/lib/bot-thinking-effort';
 import { catalogToPickerOptions, type ModelProvidersResponse, type ModelRef } from '@/lib/model-providers';
 import type { BotInfo } from '@/lib/types';
 import { BOT_PERMISSIONS_SECTION_ID, readBotPermissionsTarget } from '@/lib/bot-chat-header';
@@ -36,6 +37,7 @@ import { BotHistory } from '../../bot-work/BotHistory';
 import { BotConnections } from '../../bot-work/BotConnections';
 import { BotCronPanel } from '../../BotCronPanel';
 import { BotModelSetting } from '../../BotModelSetting';
+import { BotThinkingEffortSetting } from '../../BotThinkingEffortSetting';
 import { BotPolicySettings } from '../../BotPolicySettings';
 import { BotFace } from '../../BotFace';
 import { BotFaceChoice } from '../../BotFaceChoice';
@@ -295,6 +297,13 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
     [patchBot]
   );
 
+  const saveThinkingEffort = useCallback(
+    async (next: BotThinkingEffort | null) => {
+      await patchBot({ thinkingEffort: next });
+    },
+    [patchBot]
+  );
+
   return (
     <section ref={panelRef} className="ag-panel bot-settings-panel" aria-label={t('agents.bots.detailTitle')} id={embedded ? 'botDetailEmbedded' : 'botDetail'} data-testid={embedded ? "bot-detail-embedded" : "bot-detail"}>
       <div className="ag-panel__head">
@@ -349,6 +358,10 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
             options={catalogToPickerOptions(catalog)}
             defaultRef={catalog?.catalog.defaultRef ?? null}
             onSave={saveModel}
+          />          <BotThinkingEffortSetting
+            botId={bot.id}
+            pinned={settings.thinkingEffort}
+            onSave={saveThinkingEffort}
           />          <div id={embedded ? `${panelId}-permissions` : BOT_PERMISSIONS_SECTION_ID} data-testid="bot-permissions">
             <BotPolicySettings
               botId={bot.id}
