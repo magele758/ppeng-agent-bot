@@ -206,6 +206,12 @@ No new RAW_AGENT_* feature flags. Acceptance-first, user asked to fix now, tests
 
 这种定时任务不用展示全内容，只展示是哪个定时任务的，点击再用弹窗显示详情，免得占用太多视图
 
+## daydream-idle-history
+每日复盘空闲时不反复读取历史
+
+是不是还额外触发了一个竞态的问题？我看现在经常无法打开网页？
+本机 Lab 首页白屏或打不开
+
 ## daydream-tick-cost
 每日复盘调度不能拖死 daemon
 

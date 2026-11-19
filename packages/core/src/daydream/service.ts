@@ -1,5 +1,6 @@
 import { isTemporaryMemoryInstruction } from '../memory/memory-dialogue-extract.js';
 import { createHash, randomUUID } from 'node:crypto';
+import { daydreamEffectKey, installDaydreamPollStore, dueDaydreamWork } from './poll-store.js';
 import { DAYDREAM_PROMPT, parseDaydreamCandidates } from './candidates.js';
 import { daydreamLocalDate, daydreamLocalTime, readDaydreamSettings, shiftDay, updateDaydreamSettings } from './settings.js';
 import type { DaydreamBot, DaydreamDeps, DaydreamRun, DaydreamSettings, DaydreamCandidate, DaydreamOutput } from './types.js';
@@ -46,6 +47,7 @@ export class BotDaydreamService {
   }
   constructor(private readonly deps: DaydreamDeps) {
     deps.db.exec(`CREATE TABLE IF NOT EXISTS bot_daydream_runs(id TEXT PRIMARY KEY,bot_id TEXT NOT NULL,tenant_id TEXT,date TEXT NOT NULL,dedupe TEXT UNIQUE,body TEXT NOT NULL,lease TEXT,lease_until INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS bot_daydream_bot ON bot_daydream_runs(bot_id,date); CREATE TABLE IF NOT EXISTS bot_daydream_effects(key TEXT PRIMARY KEY,body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS bot_daydream_leases(bot_id TEXT PRIMARY KEY,lease TEXT NOT NULL,lease_until INTEGER NOT NULL);`);
+    installDaydreamPollStore(deps.db);
   }
   private async withBotLease(botId: string, action: () => Promise<DaydreamRun>): Promise<DaydreamRun> {
     this.bot(botId);
@@ -128,28 +130,23 @@ export class BotDaydreamService {
   }
   private async runDueBots(): Promise<void> {
     for (const bot of runnableBots(this.deps.listBots())) {
-      const settings = this.getSettings(bot.id);
-      if (!this.isDue(settings) || this.isBusy(bot.id))
+      const settings = readDaydreamSettings(this.deps, bot.id);
+      if (!this.isDue(settings))
         continue;
       const today = daydreamLocalDate(this.now(), settings.timezone);
       const first = daydreamLocalDate(Date.parse(settings.effectiveFrom), settings.timezone);
       // Revisit saved work even when a long outage has moved it outside
       // the normal discovery window. Manual snapshots keep their original ID.
-      const pending = this.deps.db.prepare(`SELECT id,date,dedupe FROM bot_daydream_runs
-        WHERE bot_id=? AND json_extract(body,'$.status') IN ('partial','queued','running','failed')
-        ORDER BY date,rowid`).all(bot.id) as { id: string; date: string; dedupe: string }[];
-      const resumed = new Set<string>();
+      const window = Array.from({length: 7}, (_, index) => shiftDay(today, index - 7)).filter(date => date >= first);
+      const {pending, dates} = dueDaydreamWork(this.deps.db, bot.id, window, settings.collaborationEnabled && Boolean(this.deps.submitKnowledge));
+      if (!pending.length && !dates.length) continue;
+      if (this.isBusy(bot.id)) continue;
       for (const row of pending) {
         if (this.closing || !this.getSettings(bot.id).enabled) return;
         const manual = row.dedupe !== bot.id + ':' + row.date;
         await this.track(this.withBotLease(bot.id, () => this.runInner(bot.id, { date: row.date, manual }, row.id)));
-        if (!manual) resumed.add(row.date);
       }
-      for (let offset = 7; offset >= 1; offset--) {
-        const date = shiftDay(today, -offset);
-        if (date >= first && !resumed.has(date))
-          await this.run(bot.id, { date });
-      }
+      for (const date of dates) await this.run(bot.id, { date });
     }
   }
   private isDue(settings: DaydreamSettings): boolean {
@@ -394,7 +391,7 @@ export class BotDaydreamService {
       throw new Error('Installed artifact required');
   }
   private effectKey(run: DaydreamRun, candidate: DaydreamCandidate) {
-    return createHash('sha256').update(JSON.stringify([run.tenantId, run.botId, candidate.kind, candidate.content, candidate.evidenceIds.slice().sort()])).digest('hex');
+    return daydreamEffectKey(run.tenantId, run.botId, candidate);
   }
   private canShare(run: DaydreamRun, output: DaydreamOutput): boolean {
     if (output.status !== 'saved' || !output.artifactId)

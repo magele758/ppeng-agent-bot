@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-19T08:41:50.369Z",
-  "reviewNote": "The goal scheduler reads candidacy from stored goals and execution rows. A matching canonical parent continues through the existing approval, dispatch and result ledger. A terminal notice appends one keyed system message and records its receipt in the same transaction. The scheduler regression checks repeat delivery. Tool call IDs and result folding remain in the bounded pairing probes.",
+  "reviewedAt": "2026-11-19T08:59:16.163Z",
+  "reviewNote": "Daydream polling selects persisted run IDs and proposal output positions. Eligible work still uses the Daydream run, approval and knowledge-submission paths. A stored shared-effect receipt uses the same tenant, Bot, content and sorted evidence IDs. The scheduled reconciliation test resolves the pending proposal at its original output index. Ordinary session tool-call pairing is exercised by the existing bounded probes.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -296,6 +296,8 @@
       "files": [
         "packages/core/src/runtime/daydream-host.ts",
         "packages/core/src/daydream/service.ts",
+        "packages/core/src/daydream/poll-store.ts",
+        "packages/core/src/daydream/settings.ts",
         "packages/core/test/bot-daydream-local.test.js",
         "packages/core/test/daydream-integration.test.js",
         "packages/core/test/daydream-runtime.test.js"
@@ -534,11 +536,13 @@
     "packages/agent-loop/src/approval/authorized-by.ts": "fbef8855ee927432f932ca41f4563ab7ba2852dbb2dbfd1fc88b4fb08c3d981b",
     "packages/core/src/runtime/bypass-approvals.ts": "c5befa4729c442878644421d98ab4dabb229bacdc98cde9e37a4139341688884",
     "packages/core/test/bypass-reconcile.test.js": "4addf36f7cdd54fb59eebaa24817010ef4d0effd6a8677c3cc5dc589121365db",
-    "packages/core/src/runtime/daydream-host.ts": "4e185a960481393908868cef2feed5a81d7bea0346a891e931f24e8245c1f770",
-    "packages/core/src/daydream/service.ts": "bb1b39497af3db67ad86f1bab4cb5647282377b7cf8b5edd5b7363e8c11f2372",
-    "packages/core/test/bot-daydream-local.test.js": "f99fe2bf9a2732c7e4689b723b431c7192d3034cc44012a52d7e820a61e8f6d5",
+    "packages/core/src/runtime/daydream-host.ts": "06bceb350a701b3bdae8922d9dc4799a67141e808c1fe36b9529f089874e669d",
+    "packages/core/src/daydream/service.ts": "101f659ba72c1acec1363d4368a3a846b409dbbf1db9250cd9f55805f15dabe9",
+    "packages/core/src/daydream/poll-store.ts": "cb72de49f9e8960d9f8754255383f7fafce6cd8302b867078f3509d689ff1186",
+    "packages/core/src/daydream/settings.ts": "53a62484529ca6e535f2d7f81f46d2d0995ebced6a5f4f985fb23bbf451a68ae",
+    "packages/core/test/bot-daydream-local.test.js": "c05be102b65a59b1043b08da67e43c349b0b8fff215d6895f5c113a1d73929e8",
     "packages/core/test/daydream-integration.test.js": "7bdf86ccbedf88c15eba32c46d0c8cefb0dc97dcd7b5eee488f1b84ba3b58f22",
-    "packages/core/test/daydream-runtime.test.js": "c246dba35416ab0f9254ad6490b55e3298d9ea576153b8162bf86708606b266a",
+    "packages/core/test/daydream-runtime.test.js": "a155dd902da3145de02714fa0c175cbac31c6d77aff0e3d90a28e2de1abce54f",
     "packages/core/src/runtime/background-job-recovery.ts": "515806685f6380407e4d55f441cd0d6de04e00a8669d7627a886437da50c2293",
     "packages/core/src/bots/goals/restart-resume.ts": "7358f3999b598f6c0ce6473126ff6a21e28d9fa3291b6cbfef85f01b91bbab9e",
     "packages/core/src/bots/bot-work-waits.ts": "9749cc4d22e532ffc7c18cc4b3b5164ce5572bbd209541fe0e3c6003562ccf1b",

@@ -3059,6 +3059,14 @@
       ]
     },
     {
+      "id": "daydream-idle-history",
+      "title": "每日复盘空闲时不反复读取历史",
+      "tests": [
+        "packages/core/test/bot-daydream-local.test.js",
+        "packages/core/test/daydream-runtime.test.js"
+      ]
+    },
+    {
       "id": "daydream-tick-cost",
       "title": "每日复盘调度不能拖死 daemon",
       "tests": [

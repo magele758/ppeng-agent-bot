@@ -91,6 +91,7 @@ cases:
     specs:
       - bot-scoped-skill-sharing
       - bot-routine-main-session
+      - daydream-idle-history
       - agent-skill-management
   - id: ops-without-evolution
     route: "#/settings/ops/health"

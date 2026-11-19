@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-19T08:41:50.369Z",
-  "reviewNote": "A new process reconstructs goal work from persisted snapshots, running execution rows and notice receipts on each poll. Recovery retains the approval hold and safe-to-retry decision for expired leases. A missing receipt causes the terminal notice and its receipt to be written in one transaction. Product regressions cover expiry and redelivery after a missed notice.",
+  "reviewedAt": "2026-11-19T08:59:16.163Z",
+  "reviewNote": "The Daydream constructor installs the indexes and backfills proposal and sharing fields from existing run bodies in one SQLite savepoint. Run status, checkpoint, manual run identity and share receipts retain their existing storage. A restarted scheduler can find unfinished work outside the seven-day discovery window. The migration regression exercises pre-existing outputs, rollback, a subsequent legacy update and an unknown stored state.",
   "mapping": [
     {
       "step": "Production startup, persistence, writer claims and graceful shutdown (HTTP drain not exercised)",
@@ -352,6 +352,8 @@
       "files": [
         "packages/core/src/runtime/daydream-host.ts",
         "packages/core/src/daydream/service.ts",
+        "packages/core/src/daydream/poll-store.ts",
+        "packages/core/src/daydream/settings.ts",
         "packages/core/test/bot-daydream-local.test.js",
         "packages/core/test/daydream-integration.test.js",
         "packages/core/test/daydream-runtime.test.js"
@@ -597,11 +599,13 @@
     "packages/core/src/cron/linked-job-observation.ts": "43d4118c28b19d891c9f7becdf70dc35417f1c804c2149669e9620dccfbb75c3",
     "packages/core/src/runtime/bypass-approvals.ts": "c5befa4729c442878644421d98ab4dabb229bacdc98cde9e37a4139341688884",
     "packages/core/test/bypass-reconcile.test.js": "4addf36f7cdd54fb59eebaa24817010ef4d0effd6a8677c3cc5dc589121365db",
-    "packages/core/src/runtime/daydream-host.ts": "4e185a960481393908868cef2feed5a81d7bea0346a891e931f24e8245c1f770",
-    "packages/core/src/daydream/service.ts": "bb1b39497af3db67ad86f1bab4cb5647282377b7cf8b5edd5b7363e8c11f2372",
-    "packages/core/test/bot-daydream-local.test.js": "f99fe2bf9a2732c7e4689b723b431c7192d3034cc44012a52d7e820a61e8f6d5",
+    "packages/core/src/runtime/daydream-host.ts": "06bceb350a701b3bdae8922d9dc4799a67141e808c1fe36b9529f089874e669d",
+    "packages/core/src/daydream/service.ts": "101f659ba72c1acec1363d4368a3a846b409dbbf1db9250cd9f55805f15dabe9",
+    "packages/core/src/daydream/poll-store.ts": "cb72de49f9e8960d9f8754255383f7fafce6cd8302b867078f3509d689ff1186",
+    "packages/core/src/daydream/settings.ts": "53a62484529ca6e535f2d7f81f46d2d0995ebced6a5f4f985fb23bbf451a68ae",
+    "packages/core/test/bot-daydream-local.test.js": "c05be102b65a59b1043b08da67e43c349b0b8fff215d6895f5c113a1d73929e8",
     "packages/core/test/daydream-integration.test.js": "7bdf86ccbedf88c15eba32c46d0c8cefb0dc97dcd7b5eee488f1b84ba3b58f22",
-    "packages/core/test/daydream-runtime.test.js": "c246dba35416ab0f9254ad6490b55e3298d9ea576153b8162bf86708606b266a",
+    "packages/core/test/daydream-runtime.test.js": "a155dd902da3145de02714fa0c175cbac31c6d77aff0e3d90a28e2de1abce54f",
     "packages/core/src/runtime/background-job-recovery.ts": "515806685f6380407e4d55f441cd0d6de04e00a8669d7627a886437da50c2293",
     "packages/core/src/bots/bot-work-restart.ts": "014bda14cb76d8b726e210f77c452035285b31042985b6bf9c8c10c7c5bcf2b3",
     "packages/core/src/bots/goals/restart-resume.ts": "7358f3999b598f6c0ce6473126ff6a21e28d9fa3291b6cbfef85f01b91bbab9e",

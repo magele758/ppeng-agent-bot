@@ -50,3 +50,67 @@ test('scheduler resumes an old manual snapshot at its checkpoint [AC:daydream-un
   assert.deepEqual(calls.slice(2), [['m30']]);
   s.db.close();
 });
+
+test('settled automatic days cost no leases or history reads, and sharing can catch up [AC:daydream-idle-history#AC-1] [AC:daydream-idle-history#AC-2]', async t => {
+ const {service, db, deps} = setup();
+ t.after(() => db.close());
+ service.patchSettings('a', {collaborationEnabled: false});
+ const submitted = [];
+ deps.submitKnowledge = async (...args) => { submitted.push(args); };
+ deps.complete = async () => JSON.stringify({candidates: [{kind: 'memory', content: '必须核查部署健康状态', shareable: true, evidenceIds: ['m0'], reason: '明确约定'}]});
+ await service.tick();
+ const runs = service.listRuns('a');
+ assert.equal(runs.length, 2);
+ assert.equal(submitted.length, 0);
+ const total = () => db.prepare('SELECT total_changes() AS n').get().n;
+ const before = total();
+ const prepare = db.prepare.bind(db);
+ const historyReads = [];
+ db.prepare = sql => {
+  if (/SELECT\s+body\s+FROM\s+bot_daydream_runs/i.test(sql)) historyReads.push(sql);
+  return prepare(sql);
+ };
+ await service.tick();
+ assert.deepEqual(historyReads, []);
+ assert.equal(total(), before, 'idle polls must not acquire or release Bot leases');
+ service.patchSettings('a', {collaborationEnabled: true});
+ await service.tick();
+ assert.equal(submitted.length, 1, 'the two days refer to the same share receipt');
+ const after = total();
+ await service.tick();
+ assert.equal(total(), after);
+ assert.equal(submitted.length, 1);
+});
+
+test('an older database backfills its outstanding proposals and tracks transactional edits [AC:daydream-idle-history#AC-2]', async t => {
+ const {pendingDaydreamSkills} = await import('../dist/daydream/poll-store.js');
+ const template = setup();
+ t.after(() => template.db.close());
+ const db = new DatabaseSync(':memory:');
+ t.after(() => db.close());
+ db.exec(template.db.prepare("SELECT sql FROM sqlite_schema WHERE name='bot_daydream_runs'").get().sql);
+ const run = {id: 'old', botId: 'a', tenantId:'t', date: '2026-11-02', timezone:'UTC', status:'completed', checkpoint:0, inputs:[], outputs:[
+  {status:'pending', artifactId:'proposal', candidate:{kind:'skill', content:'pending', evidenceIds:[], shareable:false}}
+ ]};
+ const write = db.prepare('INSERT INTO bot_daydream_runs(id,bot_id,tenant_id,date,dedupe,body) VALUES(?,?,?,?,?,?)');
+ write.run(run.id, run.botId, run.tenantId, run.date, 'a:' + run.date, JSON.stringify(run));
+ const service = new BotDaydreamService({...template.deps, db});
+ const pending = () => pendingDaydreamSkills(db).get('a')?.map(item => item.artifactId) ?? [];
+ assert.deepEqual(pending(), ['proposal']);
+ db.exec('BEGIN');
+ run.outputs[0].status='rejected';
+ db.prepare('UPDATE bot_daydream_runs SET body=? WHERE id=?').run(JSON.stringify(run), run.id);
+ assert.deepEqual(pending(), []);
+ db.exec('ROLLBACK');
+ assert.deepEqual(pending(), ['proposal']);
+ // A legacy writer still using only the canonical table commits a new state.
+ db.prepare('UPDATE bot_daydream_runs SET body=? WHERE id=?').run(JSON.stringify(run), run.id);
+ assert.deepEqual(pending(), []);
+ assert.equal(service.getRun('a', run.id).outputs[0].status, 'rejected');
+ const future = {...run, id:'unknown', date:'2026-11-01', status:'newer-status', outputs:[]};
+ write.run(future.id, future.botId, future.tenantId, future.date, 'a:' + future.date, JSON.stringify(future));
+ const changes = () => db.prepare('SELECT total_changes() AS n').get().n;
+ const before = changes();
+ await service.tick();
+ assert.equal(changes(), before, 'unrecognized persisted states must not be claimed for recovery');
+});
