@@ -2147,6 +2147,13 @@
       ]
     },
     {
+      "id": "bot-concise-replies",
+      "title": "Bot 回复默认直说结果",
+      "tests": [
+        "packages/core/test/product-admin-tools.test.js"
+      ]
+    },
+    {
       "id": "bot-daydream-http",
       "title": "每日复盘与共享治理真实 HTTP 通路",
       "tests": [

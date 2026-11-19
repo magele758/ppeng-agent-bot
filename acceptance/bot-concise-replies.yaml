@@ -1,0 +1,16 @@
+id: bot-concise-replies
+title: Bot 回复默认直说结果
+status: implemented
+requirement: |
+  我知道为什么每次我读bot的结果很难受了，他废话太多了，讲了一大堆内容，让我看起来很难受，最好让bot的回复都精炼、准确、减少冗余、别绕弯、直接点，让人能一下看懂最好
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 用户向已有或新建的 Bot 提出普通问题
+    when: Bot 回复
+    then: 开头直接回答问题，能用一句话说清就收住，省去复述问题、过程流水账和重复总结
+  - id: AC-2
+    given: Bot 汇报任务结果，或用户要求详解、完整交付物或特定格式
+    when: Bot 组织回复
+    then: 如实说明影响判断的证据、不确定性或阻塞，按要求给足细节并遵守指定格式

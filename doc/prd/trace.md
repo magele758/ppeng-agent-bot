@@ -1894,6 +1894,12 @@ Bloub 动态头像风格
 - `scripts/test/bot-quality-reliability.test.mjs`
 - `scripts/test/completion-audit.test.mjs`
 
+### bot-concise-replies
+
+Bot 回复默认直说结果
+
+- `packages/core/test/product-admin-tools.test.js`
+
 ### bot-daydream-http
 
 每日复盘与共享治理真实 HTTP 通路

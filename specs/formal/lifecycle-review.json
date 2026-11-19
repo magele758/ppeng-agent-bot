@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-19T15:41:59.142Z",
-  "reviewNote": "Reviewed the Bot pin permission fix. sessions.ts now asks the shared Bot pin rule (core permittedBotPinPatch through apps/daemon/src/bot-pin-guard.ts) before opening a Bot chat with metadata pins, before creating a session whose metadata names a Bot, and before a /model chat command reaches handleBotChatCommand; replyBotChatCommand only gains the request auth for that check, and a refused change throws before any session is created or metadata is written. product-admin-tools.ts passes the bot_update patch through permittedToolBotPins before updateBot, which only drops or rejects model / thinking effort pin fields. No turn, tool-call, approval, writer-claim, restart or session lifecycle code path changed. Pairing, lifecycle, restart and concurrency models, real source probes and mutations passed while fingerprints were needs-review. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-19T15:45:21.639Z",
+  "reviewNote": "Reviewed the Bot pin permission fix. sessions.ts now asks the shared Bot pin rule (core permittedBotPinPatch through apps/daemon/src/bot-pin-guard.ts) before opening a Bot chat with metadata pins, before creating a session whose metadata names a Bot, and before a /model chat command reaches handleBotChatCommand; replyBotChatCommand only gains the request auth for that check, and a refused change throws before any session is created or metadata is written. product-admin-tools.ts passes the bot_update patch through permittedToolBotPins before updateBot, which only drops or rejects model / thinking effort pin fields. No turn, tool-call, approval, writer-claim, restart or session lifecycle code path changed. Pairing, lifecycle, restart and concurrency models, real source probes and mutations passed while fingerprints were needs-review. Merged with main; the prompt-builder.ts fingerprint recorded there (v18 version literal) is kept as reviewed. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -615,7 +615,7 @@
     "packages/core/src/session/bot-compact-policy.ts": "fb6e56853b505a71b9098c5c9f298794a8f89764efdb015a684299496d45c655",
     "packages/core/src/bots/bot-coaching.ts": "8a47cff8a8dd9db67ec3ee780c1d604dc294c821a55857206d443ae75bad6c4e",
     "packages/core/src/bots/coaching-scope.ts": "56e0bf80040518440fb08863d9aee109070d3e1de50bc2d844f73d43f042b9d8",
-    "packages/core/src/model/prompt-builder.ts": "95056044c697de0ff9f496795adb4acdab1fd75e645c219cdff1e31a368ad645",
+    "packages/core/src/model/prompt-builder.ts": "ed9f2613f24fd324a0e3cbb71c0e97f21556fdc6cd0dfc32595db6df603c069b",
     "packages/core/src/skills/skill-task-scope.ts": "6cac24762d4038815564b94af1afc2ff7b56a433ccc0fe1b3a8d12d9663fc1b5",
     "packages/agent-loop/src/runtime/abort-lineage.ts": "e77b46a793f5d18aad14e95fec7f38aad9218a40938e81c81dd45c1d31433913",
     "packages/core/src/runtime/quality-gates.ts": "947f86e45a70e52fa98e98e54e5875b0b63c07bbe92eb51f0680a268fc719ba3",
