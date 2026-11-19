@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 481,
+    "implemented": 482,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -272,6 +272,13 @@
       "requirement": "可以考虑让bot模式加一个能力：自动在输入框填下一次可能输入的内容（用输入框的提示模式），tab才真实输入，如果不tab直接输入，就正常输入，这个下一次的提示来源，可以让bot根据之前会话内容推荐\n2、bot会话框里推荐的会话是要推荐下一步的行动的，你现在推荐的内容质量比较低\n那就对话框里的内容让bot生成，然后作为下一步的行动推荐，不要搞成写死的",
       "verificationStage": "software",
       "file": "acceptance/bot-composer-next-hint.yaml"
+    },
+    {
+      "id": "bot-concise-replies",
+      "title": "Bot 回复默认直说结果",
+      "requirement": "我知道为什么每次我读bot的结果很难受了，他废话太多了，讲了一大堆内容，让我看起来很难受，最好让bot的回复都精炼、准确、减少冗余、别绕弯、直接点，让人能一下看懂最好",
+      "verificationStage": "software",
+      "file": "acceptance/bot-concise-replies.yaml"
     },
     {
       "id": "bot-concurrent-subagents",

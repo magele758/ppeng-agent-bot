@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 481 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 482 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -86,7 +86,7 @@
 
 - `bombadil-bot-stability` Bot 切换稳定性探索
 
-## bot（141）
+## bot（142）
 
 需求正文见 [bot](bot.md)。
 
@@ -106,6 +106,7 @@
 - `bot-coaching-playbook` 项目内置 Bot 调教流程
 - `bot-completion-reliability` 完成验证可追溯与任务收尾可靠性
 - `bot-composer-next-hint` Bot 输入框推荐下一句
+- `bot-concise-replies` Bot 回复默认直说结果
 - `bot-concurrent-subagents` Bot 并发工作时派生子代理，并允许子代理复用记忆与互助
 - `bot-console-selection` 切换 Bot 时显示当前会话，开发态仍能载入默认 Bot
 - `bot-create-named-tools` 对话里能用 create_bot 和 create_room 创建
