@@ -74,6 +74,7 @@ node scripts/prd/core-cases.mjs
 - `unified-bot-goal-lifecycle` 统一 Bot 目标生命周期与归档展示
 - `bot-goal-result-return` 子执行结果回到原目标并收口
 - `bot-multi-goal-coordination` Bot 多目标持续执行与自动选择执行方式
+- `idle-bot-goal-scheduler` 空闲 Bot 的目标历史不阻塞 Lab
 
 ## 群里只有被点到的才发言
 

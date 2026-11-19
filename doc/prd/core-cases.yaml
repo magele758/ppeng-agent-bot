@@ -53,6 +53,7 @@ cases:
       - unified-bot-goal-lifecycle
       - bot-goal-result-return
       - bot-multi-goal-coordination
+      - idle-bot-goal-scheduler
   - id: room-speaks-when-picked
     route: "#/bot"
     aliases: [群聊, 群成员, 点名, room]

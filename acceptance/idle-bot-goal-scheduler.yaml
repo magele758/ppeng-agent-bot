@@ -1,0 +1,16 @@
+id: idle-bot-goal-scheduler
+title: 空闲 Bot 的目标历史不阻塞 Lab
+status: implemented
+requirement: |
+  是不是还额外触发了一个竞态的问题？我看现在经常无法打开网页？
+  本机 Lab 首页白屏或打不开
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 多个 Bot 没有待处理目标，已有历史目标的状态已通知
+    when: 后台连续检查目标进度
+    then: 不重复载入各 Bot 的完整目标历史或全部会话，也不改写目标记录
+  - id: AC-2
+    given: 历史目标有漏发的状态通知，或任务等待已过期
+    when: 后台恢复检查并再次轮询
+    then: 补发一次通知，及时记录实际超时，不反复改写已收尾的历史
