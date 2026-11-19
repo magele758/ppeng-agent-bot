@@ -58,6 +58,7 @@ import { sessionRecapRoutes } from './routes/session-recap.js';
 import { mailboxRoutes } from './routes/mailbox.js';
 import { mcpOAuthRoutes } from './routes/mcp-oauth.js';
 import { memoryRoutes } from './routes/memory.js';
+import { magpieCacheRoute } from './routes/magpie-cache.js';
 import { miscRoutes } from './routes/misc.js';
 import { modelFallbackRoutes } from './routes/model-fallback.js';
 import { modelProviderRoutes } from './routes/model-providers.js';
@@ -110,6 +111,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
   const policy = buildRoutePolicy({ runtime, owners: new ResourceOwnerStore(runtime.store.db) });
   return new Router({ applyCors: deps.applyCors, readBody: deps.readBody, policy })
     .addAll(authRoutes({ runtime, authStore: deps.authStore, env }))
+    .add(magpieCacheRoute(runtime.stateDir, deps.env))
     .addAll(miscRoutes(runtime, { pkgName: deps.pkgName, pkgVersion: deps.pkgVersion }))
     .addAll(sessionsRoutes(runtime))
     .addAll(sidechatRoutes(runtime,env))

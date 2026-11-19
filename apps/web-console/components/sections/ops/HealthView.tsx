@@ -16,6 +16,7 @@ import {
 } from '@/lib/ops-health';
 import { EffectiveConfigCard } from '../../EffectiveConfigCard';
 import { useLab } from '../../shell/LabProvider';
+import { MagpieCacheHealth } from './MagpieCacheHealth';
 import { DoctorCard } from './DoctorCard';
 import { useOpsStatus } from './useOpsStatus';
 
@@ -291,6 +292,7 @@ export function HealthView() {
         ) : null}
       </div>
 
+      <MagpieCacheHealth updatedAt={status.updatedAt} />
       <DoctorCard onReport={onDoctor} onLoadFailed={onDoctorFailed} />
       <EffectiveConfigCard onLoaded={onConfig} onLoadFailed={onConfigFailed} />
     </div>

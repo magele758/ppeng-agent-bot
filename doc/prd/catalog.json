@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 480,
+    "implemented": 481,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2197,6 +2197,13 @@
       "requirement": "User decision: macOS “App A wants to control App B” (Apple Events / Automation TCC, the Grok Bot → Cursor dialog) should live in the OUTER host and be injected as tools. Do NOT put osascript, Accessibility, or Apple Events inside packages/agent-loop. The loop may only see tool names and results. Existing LCU (lcu_js / lcu_js_reset, requires a local lcu binary and signed ChatGPT app) stays as-is.\n\nAdd a sibling outer-layer capability in packages/core (computer-use or a small app-control module):\n\n- Default OFF. Persist in daemon_control KV (same style as computer_use_settings). Lab settings toggle, i18n zh+en. No new RAW_AGENT_* env.\n- Model-visible tools are narrow and fixed, not arbitrary AppleScript. Suggested: activate a named app, type text into the front app, send a keystroke (small allowlist: return, tab, escape, arrows, cmd-c/v). The host fills a fixed osascript template. Reject any tool argument that looks like raw script, do shell script, or a URL scheme.\n- macOS only. On Linux/Windows the tool returns a clear unavailable error and does not spawn.\n- First use will cause the normal macOS TCC dialog; do not try to pre-grant or bypass it. Lab approval still required before the host runs the osascript (same spirit as LCU: approve this action, not a permanent silent grant).\n- Spawn via sanitizeSpawnEnv with a minimal env. No network.\n- agent-loop: at most add the tool names to an allowlist constant if that is the existing pattern for host-implemented tools (see how lcu_js is named). Do not import node or osascript from the SDK. If you touch SKILL.md, one sentence: app control is a host tool, not in the portable loop.",
       "verificationStage": "software",
       "file": "acceptance/macos-app-control.yaml"
+    },
+    {
+      "id": "magpie-cache-monitor",
+      "title": "监控本机 Lab 的实际模型缓存命中率",
+      "requirement": "再看下 Magpie 和本机 Lab 的日志，对比下优化前后的实际缓存命中率，也把命中率加到监控里，持续下降时能及时提醒我。",
+      "verificationStage": "software",
+      "file": "acceptance/magpie-cache-monitor.yaml"
     },
     {
       "id": "mandatory-skill-gate",

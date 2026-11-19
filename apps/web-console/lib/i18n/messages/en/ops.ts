@@ -108,6 +108,28 @@ export const ops = {
     open: 'Open Settings → Ops · System health'
   },
 
+  cache: {
+    stale: 'The monitor is overdue. These results are from the last check.',
+    lastWindow: 'Last checked window',
+    title: 'Magpie model cache',
+    checked: 'Last checked',
+    lastValid: 'Last valid observation',
+    never: 'None yet',
+    empty: 'No monitoring results yet.',
+    unavailable: 'Monitoring data is unavailable.',
+    incomplete: 'Some logs are missing. This observation is incomplete.',
+    healthy: 'Healthy',
+    watching: 'Watching for a sustained decline',
+    degraded: 'Sustained degradation',
+    insufficient: 'Insufficient observations',
+    window: 'Window',
+    current: 'Current',
+    reference: 'Reference',
+    period: 'Start and end',
+    noWindow: 'No data',
+    tokenRatio: 'Cached input share (cached / input tokens)',
+    hitRatio: 'Request hit rate (hits / requests)',
+  },
   health: {
     overallAria: 'Health overview',
     levelOk: 'All systems normal',

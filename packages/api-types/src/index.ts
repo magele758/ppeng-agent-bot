@@ -34,3 +34,5 @@ export type {
 export { filterSessionsByQuery, type SessionSearchable } from './session-query.js';
 
 export type { SidechatAnchor, SidechatStatus, SidechatGrasp, SidechatThread, SidechatMessage, SidechatDetail, SidechatMatch, SidechatSearchHit } from './sidechat.js';
+
+export type { MagpieCacheSummary, MagpieCacheModel, MagpieCacheWindow } from './magpie-cache.js';

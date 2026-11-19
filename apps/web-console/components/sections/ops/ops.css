@@ -180,3 +180,10 @@
 .factory-table td, .factory-table th { text-align: left; padding: .6rem; border-bottom: 1px solid var(--border, #ddd); vertical-align: top; }
 .factory-panel pre { max-width: 60vw; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
 .factory-panel button { margin: .3rem; }
+
+.ops-cache__models { list-style: none; padding: 0; }
+.ops-cache__models > li + li { margin-top: var(--ui-space-4); }
+.ops-cache__table { overflow-x: auto; }
+.ops-cache__table table { width: 100%; border-collapse: collapse; text-align: left; font-variant-numeric: tabular-nums; }
+.ops-cache__table th, .ops-cache__table td { padding: var(--ui-space-2); border-bottom: 1px solid var(--ui-border); }
+.ops-cache__table small { display: block; color: var(--ui-text-muted); }

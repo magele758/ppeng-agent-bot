@@ -546,6 +546,11 @@ Add a sibling outer-layer capability in packages/core (computer-use or a small a
 - Spawn via sanitizeSpawnEnv with a minimal env. No network.
 - agent-loop: at most add the tool names to an allowlist constant if that is the existing pattern for host-implemented tools (see how lcu_js is named). Do not import node or osascript from the SDK. If you touch SKILL.md, one sentence: app control is a host tool, not in the portable loop.
 
+## magpie-cache-monitor
+监控本机 Lab 的实际模型缓存命中率
+
+再看下 Magpie 和本机 Lab 的日志，对比下优化前后的实际缓存命中率，也把命中率加到监控里，持续下降时能及时提醒我。
+
 ## mandatory-skill-gate
 高危面必须先加载对应技能
 

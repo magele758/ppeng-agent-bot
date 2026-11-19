@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 480 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 481 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -685,6 +685,12 @@
 需求正文见 [other](other.md)。
 
 - `macos-app-control` macOS 应用控制（外层宿主）
+
+## magpie（1）
+
+需求正文见 [other](other.md)。
+
+- `magpie-cache-monitor` 监控本机 Lab 的实际模型缓存命中率
 
 ## mandatory（1）
 
