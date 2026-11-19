@@ -804,6 +804,13 @@ bypass也要继承
 
 具体线索是，我用科研小助手发送的给RSI的，说是一直在队列里，但是没看到RSIbot执行
 
+## bot-thinking-effort
+每个 Bot 的思考力度固定
+
+实现「per-bot thinking effort pin 并透出到 Lab UI」：给每个 Bot 单独固定思考力度，可选
+跟随全局（默认）/ 关闭 / 低 / 中 / 高；只要固定了（包括关闭）就覆盖全局，未固定才跟随全局
+思考力度设置；BotDetail 在模型固定旁可以选择，「跟随全局」带出当前全局档位，zh/en 文案齐全。
+
 ## bot-turn-ownership
 Bot 当轮任务和目标审查归属
 

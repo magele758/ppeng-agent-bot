@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 473,
+    "implemented": 474,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1098,6 +1098,13 @@
       "requirement": "具体线索是，我用科研小助手发送的给RSI的，说是一直在队列里，但是没看到RSIbot执行",
       "verificationStage": "software",
       "file": "acceptance/bot-task-terminal-wait.yaml"
+    },
+    {
+      "id": "bot-thinking-effort",
+      "title": "每个 Bot 的思考力度固定",
+      "requirement": "实现「per-bot thinking effort pin 并透出到 Lab UI」：给每个 Bot 单独固定思考力度，可选\n跟随全局（默认）/ 关闭 / 低 / 中 / 高；只要固定了（包括关闭）就覆盖全局，未固定才跟随全局\n思考力度设置；BotDetail 在模型固定旁可以选择，「跟随全局」带出当前全局档位，zh/en 文案齐全。",
+      "verificationStage": "software",
+      "file": "acceptance/bot-thinking-effort.yaml"
     },
     {
       "id": "bot-turn-ownership",
