@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-18T16:18:00.000Z",
-  "reviewNote": "Reviewed the placeholder substitution in steer-tools.ts and the related core tests. Only an example machine name inside the steer judge prompt text and test fixture strings was replaced with a placeholder; no code path changed. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-19T08:55:18.000Z",
+  "reviewNote": "Reviewed the per-Bot thinking effort pin. fitProductModelRequest in l5-bindings.ts now passes the session metadata.thinkingEffort (off | low | medium | high) to applyThinkingEffortToTurn, which only sets or removes reasoningEffort on the outgoing model request; messages, tools, the prepared model view and turn outcomes are unchanged. inheritModelOverride in spawn-policy.ts also copies a valid thinkingEffort pin into child metadata next to modelOverride; permission mode, allowlists and the planner exclusion are unchanged. bot_update in product-admin-tools.ts forwards thinkingEffort to updateBot, which validates it before any write, and botView echoes it. sessions.ts validates metadata.thinkingEffort on session create and applies Bot pins through updateBot before openBot, as it already did for modelOverride. Pairing, lifecycle, restart and concurrency probes and mutations passed while fingerprints were needs-review. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -435,7 +435,7 @@
     "packages/core/test/human-continuation.test.js": "aa7c22e3cfae700ce93f743e764b0393644450b833fadfd866c5fe0b0421ad8a",
     "packages/agent-loop/src/session/step-inbox-context.test.ts": "3c6ab63684e0cff31ea32a1eef6408afee2a208ab74355f2e9c1f001876a84b4",
     "packages/agent-loop/src/session/apply-claimed-inbox.test.ts": "15cc1445fc4c8ebf53ac8d4c056567287249908a90cce4b91afe0e49645979c2",
-    "apps/daemon/src/routes/sessions.ts": "f432b26eb00e5837dff81bbcf1f798836863cca613a541af45f05f3bd3bec8aa",
+    "apps/daemon/src/routes/sessions.ts": "1877d86c0662dea9a3742ee02c9cdc33e5a53d57638cb76ee092b7ffbb24ea23",
     "packages/core/src/session/session-fork.ts": "4f35397b2641885ac71b044828793b84d461c0266c7892ef394d7b4b6ed0e1e4",
     "packages/core/src/bots/shared-context-isolation.ts": "d7adbfde162699e0b82e7b4b377bda6e027b73f78bfac7313b71a854295e3857",
     "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
@@ -490,7 +490,7 @@
     "packages/core/src/bots/goals/settings.ts": "d356dd1c14289de9c8f79db89558e614025f37897735d841e26e0994429007a0",
     "packages/core/src/bots/goals/completion-evidence.ts": "744fad416149d739f38023cc13f50cd58c83dc084e12589232a919b12ef274c3",
     "packages/core/src/runtime.ts": "c794eaacb7ac334183414c677437a00064761cf9dc838a73f505351435e289fa",
-    "packages/core/src/runtime/l5-bindings.ts": "eebc7ce1d15f3ef439dde9847f85c32c3334ce10131f41b0ee848eb8fb44fdc4",
+    "packages/core/src/runtime/l5-bindings.ts": "5af8303457e6db2c23c3b95cfa05de64aa1333ad0b4b9bc2bc40f085a51b1aa6",
     "packages/core/src/bots/strict-output.ts": "892f0f7347b6bf134c1f4d66d97e8f9a0677afaff69b5fc812d1ecf117d7aeb2",
     "packages/core/src/runtime/steer-tools.ts": "5fd2b787f41943c947322525b2dd8c0b5f9fb516aa371142e441ae65cf6990bc",
     "packages/core/test/steer-tool-continuity.test.js": "4ae0b8876808936524d7ab75b9cec59990c9eb9bb611793f185e682a6eeb9e9d",
@@ -498,7 +498,7 @@
     "packages/core/src/cron/routine-runtime.ts": "751349566b4c78fe1e178d650504fa681ab76765e7a238af16438894bdd2bb4b",
     "packages/core/src/runtime/scheduler-host.ts": "2173ab9c09ce3ffd6bacd51ec3bb21786030ca98fe1b46824f8a185613997ce5",
     "packages/core/test/learning-governance.test.js": "3df0904451a8b9244df1301d1bfecc3d3f1f24babcd87ef3a62d59b6228b7f29",
-    "packages/core/src/tools/product-admin-tools.ts": "778c537dd2a0983cb8e91fe6402b14d99cc13d90541e27a467d5b78d58d49c5a",
+    "packages/core/src/tools/product-admin-tools.ts": "5f83d7a8a1f1419190ae2a59eb80c412f6fddc230b3a8f015eb5946558f7b147",
     "packages/core/src/waits/types.ts": "82ded488485a76dc7bffba1fc8d181a410c2f83db393937cbae46f53cef8c206",
     "packages/core/src/waits/conditions.ts": "2b5a3aab81282771f9bbc1a0bf66bbd4a9103dfd1a38efaa8bb4e889f09141f7",
     "packages/core/src/waits/store.ts": "b76c349408e6002390e769d8b0d7000f79042f9ee2f989f44f98f487f6fd387d",
