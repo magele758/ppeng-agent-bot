@@ -3,7 +3,7 @@ import { messageRetryBusy, retryMessageBody, runMessageRetry, userMessageText } 
 import { goalMessage } from '@/lib/bot-goals';
 import { composerMessageToSend } from '@/lib/composer-next-hint';
 import { useChatAttachments } from './useChatAttachments';
-import { composerDraftKey } from '@/lib/composer-draft';
+import { composerDraftSpot } from '@/lib/composer-draft';
 import { useComposerDraftScope } from './useComposerDraftScope';
 import { recapCommandShouldSend } from '@/lib/session-recap';
 import { noteBotFirstTaskSent } from '@/lib/bot-first-task';
@@ -266,6 +266,7 @@ export interface PlayChatDeps {
   bots: BotInfo[];
   upsertBot?: (bot: BotInfo) => void;
   playSurface: PlaySurface;
+  openingBotId: string;
   onPlaySurfaceChange?: (surface: PlaySurface) => void;
   tick: (opts?: { includePlayPanel?: boolean }) => Promise<void>;
   /** Status from the shared session list, so a page that did not send can still follow. */
@@ -281,6 +282,12 @@ function isSessionResult(event: string, payload: { session?: { id?: string } }):
   return (event === 'result' || event === 'session') && Boolean(payload.session?.id);
 }
 
+type BotOpenOptions = {
+  liveGen?: number;
+  existing?: OpenBotResponse;
+  onBound?: (sessionId: string) => void;
+};
+
 async function readOpenedBot(id: string, existing?: OpenBotResponse): Promise<OpenBotResponse> {
   if (existing) return existing;
   return await api(`/api/bots/${encodeURIComponent(id)}/open`, { method: 'POST' }) as OpenBotResponse;
@@ -295,6 +302,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     agents,
     upsertBot,
     playSurface,
+    openingBotId,
     onPlaySurfaceChange,
     tick,
     sharedSessionStatus
@@ -1049,16 +1057,17 @@ export function usePlayChat(deps: PlayChatDeps) {
     }
   }, [stopSpeechDictation, t]);
 
-  const draftKey = composerDraftKey({ sessionId: selectedSessionId, surface: playSurface, botId });
+  const draftSpot = composerDraftSpot({ sessionId: selectedSessionId, surface: playSurface, botId, openingBotId });
+  const draftKey = draftSpot.key;
   const draftKeyRef = useRef(draftKey);
   draftKeyRef.current = draftKey;
-  const uploadOwner = useRef<string | null>(null);
+  const draftOwner = useRef<string | null>(null);
   useComposerDraftScope(
-    { key: draftKey, botId },
-    [liveOwnerRef.current, uploadOwner.current].includes(selectedSessionId),
+    draftSpot,
+    [liveOwnerRef.current, draftOwner.current].includes(selectedSessionId),
     {
       read: () => ({
-        text: playInputLiveRef.current,
+        text: playInput,
         imageAssetIds: pendingImageAssetIds,
         attachmentIds: pendingAttachmentIds,
         context: pendingContext
@@ -1078,7 +1087,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   );
 
   useLayoutEffect(() => {
-    uploadOwner.current = null;
+    draftOwner.current = null;
   }, [draftKey]);
 
   const toggleOptionalGroup = useCallback(
@@ -1623,18 +1632,17 @@ export function usePlayChat(deps: PlayChatDeps) {
   }, []);
 
   const openBotSession = useCallback(
-    async (id: string, adopt?: { liveGen: number }, existing?: OpenBotResponse): Promise<{ bot: BotInfo; sessionId: string }> => {
+    async (id: string, { liveGen, existing, onBound }: BotOpenOptions = {}): Promise<{ bot: BotInfo; sessionId: string }> => {
       const requestId = ++botOpenRequestRef.current;
       const selectedAtStart = selectedSessionRef.current;
-      const generation = adopt?.liveGen ?? liveGenRef.current;
+      const generation = liveGen ?? liveGenRef.current;
       const data = await readOpenedBot(id, existing);
       const opened = parseOpenBotResponse(data);
       if (!botOpenApplies(requestId, botOpenRequestRef.current, selectedAtStart, selectedSessionRef.current, liveTurnCurrent(generation))) return opened;
       applyBotSelection(opened.bot);
       upsertBot?.(opened.bot);
-      if (adopt) {
-        liveOwnerRef.current = opened.sessionId;
-      }
+      if (liveGen !== undefined) liveOwnerRef.current = opened.sessionId;
+      onBound?.(opened.sessionId);
       selectedSessionRef.current = opened.sessionId;
       setSelectedSessionId(opened.sessionId);
       return opened;
@@ -1643,7 +1651,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   );
 
   const selectBot = useCallback(
-    async (id: string, existing?: OpenBotResponse) => {
+    async (id: string, options?: Omit<BotOpenOptions, 'liveGen'>) => {
       // Invalidate pending opens and stream callbacks as soon as selection is requested.
       botOpenRequestRef.current += 1;
       liveGenRef.current += 1;
@@ -1659,7 +1667,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       }
       try {
         onPlaySurfaceChange?.('bot');
-        await openBotSession(id, undefined, existing);
+        await openBotSession(id, options);
         requestScrollPlayToBottom();
         sessionListStickTopRef.current = true;
         await refreshPlayPanel();
@@ -2065,7 +2073,7 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const adoptUploadSession = (sid: string) => {
     if (draftKeyRef.current !== draftKey) return;
-    uploadOwner.current = sid;
+    draftOwner.current = sid;
     selectedSessionRef.current = sid;
     setSelectedSessionId(sid);
     requestScrollPlayToBottom();
@@ -2642,6 +2650,10 @@ export function usePlayChat(deps: PlayChatDeps) {
     botModelOverride,
     applyBotSelection,
     selectBot,
+    selectInitialBot: (id: string, existing?: OpenBotResponse) => selectBot(id, {
+      existing,
+      onBound: sessionId => { draftOwner.current = sessionId; }
+    }),
     getBotSelectionVersion: () => botOpenRequestRef.current,
     modelOptions,
     modelRef,

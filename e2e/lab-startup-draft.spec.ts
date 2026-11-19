@@ -53,3 +53,24 @@ test('manual selection supersedes a pending remembered Bot without claiming its 
   await expect(page.locator('#playTitle')).toHaveText(second.name);
   await expect(opening.composer).toHaveValue('Second draft');
 });
+
+test('input delivered with the initial selection survives the same render [AC:composer-draft-per-session#AC-4] [AC:lab-performance-regression-gate#AC-4]', async ({ page }) => {
+  // Deliver an input event after the open is accepted, before the new Bot paints.
+  await page.addInitScript(() => {
+    const write = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+      write.call(this, key, value);
+      if (key !== 'lab.selectedBot') return;
+      Storage.prototype.setItem = write;
+      queueMicrotask(() => {
+        const field = document.querySelector<HTMLTextAreaElement>('#playInput')!;
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
+        setter.call(field, '同一帧输入');
+        field.dispatchEvent(new InputEvent('input', { bubbles: true, data: '同一帧输入', inputType: 'insertText' }));
+      });
+    };
+  });
+  await page.goto('/');
+  await expect(page.locator('#playTitle').getByTestId('bot-detail-toggle')).toBeVisible();
+  await expect(page.locator('#playInput')).toHaveValue('同一帧输入', { timeout: 1500 });
+});

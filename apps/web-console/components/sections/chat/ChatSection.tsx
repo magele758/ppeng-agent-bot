@@ -21,6 +21,12 @@ import { PlayPanel } from '../../PlayPanel';
 import { usePlayChat } from '../../usePlayChat';
 import { useLab } from '../../shell/LabProvider';
 
+function readOpeningBot(surface: PlaySurface, sessionId: string | null) {
+  if (surface !== 'bot' || sessionId) return '';
+  try { return localStorage.getItem('lab.selectedBot') ?? ''; }
+  catch { return ''; }
+}
+
 function openedDefault(data: OpenBotResponse) {
   return data.sessionId || data.session?.id ? data : undefined;
 }
@@ -94,6 +100,7 @@ export function ChatSection({ active }: { active: boolean }) {
     writeStoredPlaySurface(next);
   }, []);
 
+  const openingBotId = useMemo(() => readOpeningBot(playSurface, selectedSessionId), [playSurface, selectedSessionId]);
   const sharedSessionStatus = sessions.find((session) => session.id === selectedSessionId)?.status;
   const chat = usePlayChat({
     selectedSessionId,
@@ -104,6 +111,7 @@ export function ChatSection({ active }: { active: boolean }) {
     bots,
     upsertBot,
     playSurface,
+    openingBotId,
     onPlaySurfaceChange: setPlaySurface,
     tick,
     sharedSessionStatus
@@ -122,17 +130,11 @@ export function ChatSection({ active }: { active: boolean }) {
         const maySelect = () =>
           defaultBotLoadMaySelect(selectionAtStart, selectedSessionRef.current, isCancelled() || intentAtStart !== chat.getBotSelectionVersion());
         try {
-          let saved = '';
-          try {
-            saved = localStorage.getItem('lab.selectedBot') ?? '';
-          } catch {
-            /* private mode */
-          }
-          if (saved) {
+          if (openingBotId) {
             try {
-              const opened = await api(`/api/bots/${encodeURIComponent(saved)}/open`, { method: 'POST' }) as OpenBotResponse;
+              const opened = await api(`/api/bots/${encodeURIComponent(openingBotId)}/open`, { method: 'POST' }) as OpenBotResponse;
               if (!maySelect()) return;
-              await chat.selectBot(saved, opened);
+              await chat.selectInitialBot(openingBotId, opened);
               return;
             } catch {
               if (!maySelect()) return;
@@ -141,14 +143,14 @@ export function ChatSection({ active }: { active: boolean }) {
           if (!maySelect()) return;
           const data = (await api('/api/bot-work/default')) as OpenBotResponse & { bot: BotInfo };
           if (!maySelect()) return;
-          await chat.selectBot(data.bot.id, openedDefault(data));
+          await chat.selectInitialBot(data.bot.id, openedDefault(data));
         } catch (e) {
           if (maySelect()) chat.setPlayStatus({ text: String(e), err: true });
         }
       }
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chat callbacks are unstable; rerunning cancels the load that selects the bot.
-  }, [defaultBotGuard, playSurface, selectedSessionId]);
+  }, [defaultBotGuard, playSurface, openingBotId, selectedSessionId]);
 
   // Bot 表面锁定 bot.agentId；否则跟随会话 / 默认 Agent。
   // 必须在绘制前写上：目录按 id 排序，第一项是没有 bash 的 capability-prober，

@@ -2530,7 +2530,10 @@ Bot 设置优先展示基本信息与已有定时任务
 
 聊天输入框草稿按会话隔离
 
+- `apps/web-console/lib/bot-opening-draft.test.ts`
 - `apps/web-console/lib/composer-draft.test.ts`
+- `e2e/bot-opening-draft-isolation.spec.ts`
+- `e2e/lab-startup-draft.spec.ts`
 
 ### composer-drop-retirement-soak-isolation
 
@@ -3097,6 +3100,18 @@ Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 - `apps/web-console/components/sections/knowledge/LibraryPagesPanel.render.test.ts`
 - `apps/web-console/components/sections/knowledge/library-pages-actions.test.ts`
 - `apps/web-console/components/sections/knowledge/library-pages-model.test.ts`
+
+### lab-performance-regression-gate
+
+固定基准拦截 Lab 性能退化
+
+- `apps/web-console/lib/bot-opening-draft.test.ts`
+- `e2e/bot-opening-draft-isolation.spec.ts`
+- `e2e/lab-startup-draft.spec.ts`
+- `scripts/test/lab-performance-gate.test.mjs`
+- `scripts/test/lab-performance-history.test.mjs`
+- `scripts/test/lab-performance-homepage.test.mjs`
+- `scripts/test/lab-performance-session.test.mjs`
 
 ### lab-poll-crash-diagnostics
 

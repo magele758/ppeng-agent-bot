@@ -13,7 +13,7 @@ const git = args => execFileSync('git', args, {env: sanitizeScriptEnv(), encodin
 const revision = git(['rev-parse', 'HEAD']);
 const budget = JSON.parse(readFileSync(new URL('./budgets.json', import.meta.url), 'utf8'));
 const metadata = {
-  workloadVersion: budget.version, measuredAt: new Date().toISOString(), browser,
+  workloadVersion: budget.version, referenceRun: budget.referenceRun, measuredAt: new Date().toISOString(), browser,
   node: process.version, platform: process.platform, arch: process.arch,
   dirty: Boolean(git(['status', '--porcelain'])),
 };
@@ -32,6 +32,13 @@ const report = await runScenarios(revision, [
 const summary = formatSummary(report);
 console.log(summary);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+if (process.env.GITHUB_ACTIONS) {
+  for (const scenario of report.scenarios) {
+    for (const metric of scenario.metrics.filter(item => item.warning)) {
+      console.log(`::warning title=Lab performance (${scenario.name})::${metric.name} measured ${metricValue(metric)} ms, reference ${metric.reference} ms, maximum ${metric.max} ms`);
+    }
+  }
+}
 if (!report.passed) {
   if (process.env.GITHUB_ACTIONS) {
     for (const scenario of report.scenarios.filter(item => !item.passed)) {

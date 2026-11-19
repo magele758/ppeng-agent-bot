@@ -7,6 +7,17 @@ import { checkScenario, runScenarios, formatSummary } from '../lab-performance/g
 const spec = [{name: 'wait', max: 10, unit: 'ms'}, {name: 'rewrites', max: 0, unit: 'writes'}];
 const healthy = [{name: 'wait', value: 10}, {name: 'rewrites', value: 0}];
 
+test('sustained slowdown relative to the reference produces an early warning before the hard limit [AC:lab-performance-regression-gate#AC-3]', () => {
+  const measured = value => checkScenario('startup', [{name:'latency', max:100, unit:'ms', reference:30}], [{name:'latency', value}]);
+  assert.equal(measured(45).metrics[0].warning, false);
+  const slower = measured(55);
+  assert.equal(slower.passed, true);
+  assert.equal(slower.metrics[0].warning, true);
+  assert.match(formatSummary({revision:'abc', passed:true, scenarios:[slower]}), /WARN/);
+  assert.equal(measured(101).passed, false);
+  assert.equal(checkScenario('startup', [{name:'latency', max:100, unit:'ms', reference:null}], [{name:'latency', value:5}]).passed, false);
+});
+
 test('fails a regression and reports the actual value beside its budget [AC:lab-performance-regression-gate#AC-3]', () => {
   assert.equal(checkScenario('idle', spec, healthy).passed, true);
   const result = checkScenario('idle', spec, [healthy[0], {name: 'rewrites', value: 94}]);
@@ -66,6 +77,7 @@ test('protected PR check and scheduled full verification run the same benchmark 
   }
   const action = yaml('.github/actions/lab-performance/action.yml');
   assert.ok(action.runs.steps.some(s => s.run === 'timeout --kill-after=10s 3m node scripts/lab-performance/run.mjs' && !s['continue-on-error']));
+  assert.ok(action.runs.steps.some(s => s.run?.includes('bot-opening-draft.test.ts') && !s['continue-on-error']));
   const upload = action.runs.steps.find(s => s.uses?.startsWith('actions/upload-artifact@'));
   assert.equal(upload.if, 'always()');
   assert.equal(upload.with['if-no-files-found'], 'error');

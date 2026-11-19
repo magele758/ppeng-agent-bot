@@ -6,6 +6,9 @@ runs:
     - name: Measure Lab responsiveness
       shell: bash
       run: timeout --kill-after=10s 3m node scripts/lab-performance/run.mjs
+    - name: Verify draft ownership while a Bot opens
+      shell: bash
+      run: node --experimental-strip-types --test apps/web-console/lib/bot-opening-draft.test.ts apps/web-console/lib/composer-draft.test.ts
     - name: Preserve Lab performance report
       if: always()
       uses: actions/upload-artifact@v4
