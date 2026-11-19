@@ -2695,6 +2695,13 @@ Bot 页视觉与列表状态
 
 - `e2e/cron-message-details.spec.ts`
 
+### daydream-idle-history
+
+每日复盘空闲时不反复读取历史
+
+- `packages/core/test/bot-daydream-local.test.js`
+- `packages/core/test/daydream-runtime.test.js`
+
 ### daydream-tick-cost
 
 每日复盘调度不能拖死 daemon

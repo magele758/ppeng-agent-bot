@@ -1,7 +1,8 @@
+import { pendingDaydreamSkills, type SkillReview } from '../daydream/poll-store.js';
 import { createHash } from "node:crypto";
 import type { RawAgentRuntime } from "../runtime.js";
 import { BotDaydreamService } from "../daydream/service.js";
-import type { DaydreamBot, DaydreamCandidate, DaydreamOutput } from "../daydream/types.js";
+import type { DaydreamBot, DaydreamCandidate } from "../daydream/types.js";
 import { KnowledgeService } from "../knowledge/service.js";
 import type {
   KnowledgeActor,
@@ -487,36 +488,16 @@ export class DaydreamHost {
       this.complete(botId, input),
     );
   }
-  private async reconcileOutput(
-    botId: string,
-    runId: string,
-    index: number,
-    output: DaydreamOutput,
-    proposals: SkillProposalStore,
-  ) {
-    if (
-      output.status !== "pending" ||
-      output.candidate.kind !== "skill" ||
-      !output.artifactId
-    )
-      return;
-    const proposal = proposals.get(output.artifactId);
-    if (!proposal) return;
-    if (proposal.status === "approved" && proposals.isInstalled(proposal))
-      await this.local.reconcileSkill(botId, runId, index, {
-        status: "saved",
-        artifactId: proposal.id,
-      });
-    if (proposal.status === "rejected" || proposal.status === "revoked")
-      await this.local.reconcileSkill(botId, runId, index, {
-        status: "rejected",
-      });
-  }
-  private async reconcileSkills(botId: string) {
+  private async reconcileSkills(reviews: SkillReview[]) {
     const proposals = new SkillProposalStore(this.runtime.stateDir);
-    for (const run of this.local.listRuns(botId))
-      for (const [index, output] of run.outputs.entries())
-        await this.reconcileOutput(botId, run.id, index, output, proposals);
+    for (const {botId, runId, outputIndex, artifactId} of reviews) {
+      const proposal = proposals.get(artifactId);
+      if (!proposal) continue;
+      if (proposal.status === "approved" && proposals.isInstalled(proposal))
+        await this.local.reconcileSkill(botId, runId, outputIndex, {status: "saved", artifactId: proposal.id});
+      if (proposal.status === "rejected" || proposal.status === "revoked")
+        await this.local.reconcileSkill(botId, runId, outputIndex, {status: "rejected"});
+    }
   }
   private async governDue(botId: string) {
     const actor = this.actor(botId);
@@ -540,11 +521,13 @@ export class DaydreamHost {
   }
   private async executeTick() {
     await this.local.tick();
+    const pending = pendingDaydreamSkills(this.runtime.store.db);
     for (const bot of this.reviewBots()) {
       if (this.closed) return;
       try {
-        if (this.local.getSettings(bot.id).enabled)
-          await this.reconcileSkills(bot.id);
+        const reviews = pending.get(bot.id);
+        if (reviews && this.local.getSettings(bot.id).enabled)
+          await this.reconcileSkills(reviews);
         await this.governDue(bot.id);
       } catch (error) {
         if (!this.closed)
