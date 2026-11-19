@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 481 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 482 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -86,7 +86,7 @@
 
 - `bombadil-bot-stability` Bot 切换稳定性探索
 
-## bot（141）
+## bot（142）
 
 需求正文见 [bot](bot.md)。
 
@@ -169,6 +169,7 @@
 - `bot-network-pan` 横向拖动的 Bot 协作全景
 - `bot-panel-reset` 切换 Bot 时重置记忆、暂停开关和软件连接
 - `bot-pin-area` Bot 列表置顶区
+- `bot-pin-permission` Bot 模型与思考力度固定的修改权限
 - `bot-pin-sync` 跨浏览器置顶同步
 - `bot-product-admin` 对话 bot 能管理产品和配置
 - `bot-product-p0` Bot可靠工作与可验收交付闭环

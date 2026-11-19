@@ -2066,6 +2066,14 @@ Bot 回复标签显示 Bot 名称
 - `apps/web-console/lib/assistant-name.test.ts`
 - `e2e/bot-message-name.spec.ts`
 
+### bot-pin-permission
+
+Bot 模型与思考力度固定的修改权限
+
+- `apps/daemon/test/bot-pin-permission-http.test.ts`
+- `apps/web-console/lib/bot-pin-error.test.ts`
+- `packages/core/test/bot-pin-permission.test.js`
+
 ### bot-pin-sync
 
 跨浏览器置顶同步
@@ -2235,8 +2243,10 @@ Bot 监督状态新鲜度与回复关联
 每个 Bot 的思考力度固定
 
 - `apps/daemon/test/bot-thinking-effort-http.test.ts`
+- `apps/web-console/components/bot-thinking-effort-live.test.ts`
 - `apps/web-console/components/bot-thinking-effort-setting.test.ts`
 - `apps/web-console/lib/bot-thinking-effort.test.ts`
+- `apps/web-console/lib/page-return.test.ts`
 - `packages/core/test/bot-thinking-effort.test.js`
 - `packages/core/test/product-admin-tools.test.js`
 
