@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import {
   BOT_EFFORT_FOLLOW_GLOBAL,
@@ -15,27 +14,20 @@ import {
   type BotThinkingEffort
 } from '@/lib/bot-thinking-effort';
 import { botPinErrorText } from '@/lib/bot-pin-error';
+import { onPageReturn } from '@/lib/page-return';
 import { ConfigGroup, FieldLabel } from './ConfigGroup';
+import { useSettingsResource } from './sections/settings/categories/kit/settings-store';
 
 const GLOBAL_EFFORT_PATH = '/api/thinking-effort/settings';
 
-/** Level saved on the global card; null until loaded or when it cannot be read. */
+/**
+ * Level saved on the global card; null until it has been read. Shares the card's settings
+ * store, so saving the card updates it at once; coming back to the page reads it again.
+ */
 function useGlobalThinkingEffort(): BotThinkingEffort | null {
-  const [level, setLevel] = useState<BotThinkingEffort | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void api(GLOBAL_EFFORT_PATH)
-      .then((data) => {
-        if (!cancelled) setLevel(readGlobalThinkingEffort(data));
-      })
-      .catch(() => {
-        if (!cancelled) setLevel(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return level;
+  const { settings, effective, reload } = useSettingsResource<unknown, unknown>(GLOBAL_EFFORT_PATH);
+  useEffect(() => onPageReturn(window, document, () => void reload()), [reload]);
+  return readGlobalThinkingEffort({ settings, effective });
 }
 
 export function BotThinkingEffortSetting({
