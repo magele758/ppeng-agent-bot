@@ -2230,6 +2230,16 @@ Bot 监督状态新鲜度与回复关联
 - `packages/core/test/bot-supervision-freshness.test.js`
 - `packages/core/test/bot-supervision-runtime.test.js`
 
+### bot-thinking-effort
+
+每个 Bot 的思考力度固定
+
+- `apps/daemon/test/bot-thinking-effort-http.test.ts`
+- `apps/web-console/components/bot-thinking-effort-setting.test.ts`
+- `apps/web-console/lib/bot-thinking-effort.test.ts`
+- `packages/core/test/bot-thinking-effort.test.js`
+- `packages/core/test/product-admin-tools.test.js`
+
 ### bot-work-durable-wait
 
 Bot 任务停在持久等待上并只恢复一次

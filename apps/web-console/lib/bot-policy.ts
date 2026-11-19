@@ -1,5 +1,6 @@
 import { parseBotPermissionMode, type BotPermissionMode } from './bot-permission.ts';
 import { parseBotModelOverride } from './bot-model.ts';
+import { parseBotThinkingEffort, type BotThinkingEffort } from './bot-thinking-effort.ts';
 import type { ModelRef } from './model-providers.ts';
 
 export interface BotSettingsSnapshot {
@@ -8,6 +9,7 @@ export interface BotSettingsSnapshot {
   allowedSkills: string[];
   permissionMode: BotPermissionMode;
   modelOverride: ModelRef | null;
+  thinkingEffort: BotThinkingEffort | null;
 }
 
 function nameList(raw: unknown): string[] {
@@ -24,6 +26,7 @@ export function readBotSettings(metadata: Record<string, unknown> | undefined): 
     allowedTools: nameList(metadata?.allowedTools),
     allowedSkills: nameList(metadata?.allowedSkills),
     permissionMode: parseBotPermissionMode(metadata?.permissionMode),
-    modelOverride: parseBotModelOverride(metadata)
+    modelOverride: parseBotModelOverride(metadata),
+    thinkingEffort: parseBotThinkingEffort(metadata)
   };
 }

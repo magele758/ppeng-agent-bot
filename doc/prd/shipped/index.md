@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 478 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 479 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -86,7 +86,7 @@
 
 - `bombadil-bot-stability` Bot 切换稳定性探索
 
-## bot（140）
+## bot（141）
 
 需求正文见 [bot](bot.md)。
 
@@ -224,6 +224,7 @@
 - `bot-switch-live-turn` 切换 Bot 后主画面离开上一场进行中的对话
 - `bot-task-permission-inheritance` 同 Bot 任务继承权限，跨 Bot 按目标权限执行
 - `bot-task-terminal-wait` 已结束的委派能唤醒接收回执的 Bot
+- `bot-thinking-effort` 每个 Bot 的思考力度固定
 - `bot-turn-ownership` Bot 当轮任务和目标审查归属
 - `bot-window-compact` 规范 Bot 按真实模型窗口的一半和 85% 压缩
 - `bot-work-durable-wait` Bot 任务停在持久等待上并只恢复一次

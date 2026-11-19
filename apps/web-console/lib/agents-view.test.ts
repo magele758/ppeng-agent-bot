@@ -100,7 +100,8 @@ describe('bot settings snapshot', () => {
       allowedTools: [],
       allowedSkills: [],
       permissionMode: 'auto',
-      modelOverride: null
+      modelOverride: null,
+      thinkingEffort: null
     });
   });
 

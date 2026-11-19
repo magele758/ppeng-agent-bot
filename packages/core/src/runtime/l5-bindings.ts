@@ -44,6 +44,7 @@ import { checkToolBindingPin, markBindingNeedsReverify } from '../discovery/cbom
 import { resolveDiscoveryEnabled } from '../discovery/settings.js';
 import { readModelCatalog, resolveSessionModelAdapter, type ModelRef } from '../model/provider-catalog.js';
 import { applyThinkingEffortToTurn } from '../model/thinking-effort-settings.js';
+import { readBotThinkingEffort } from '../bots/bot-thinking-effort.js';
 import { planModelFallback, rememberServedBy, runWithFallbackChain } from '../model/fallback-chain.js';
 import { resolveModelRoute, withProviderFallback } from '../model/registry-router.js';
 import { handoffOriginalPinDue, handoffRoleRequest, resolvePinnedRoleAdapter, selectOriginalModelPin } from '../model/role-pinning.js';
@@ -793,7 +794,7 @@ function fitProductModelRequest(
     if (slot && fitted.sessionId && fitted.messages) {
       linkPrepareSlot(rt.store, fitted.sessionId, fitted.messages, slot);
     }
-    return applyThinkingEffortToTurn(fitted, rt.store);
+    return applyThinkingEffortToTurn(fitted, rt.store, readBotThinkingEffort(session?.metadata));
   });
 }
 

@@ -51,6 +51,8 @@ export interface UpdateBotInput {
   allowedSkills?: unknown;
   /** `null` clears (follow global default). Otherwise { providerId, modelId } from the picker list. */
   modelOverride?: unknown;
+  /** `null` clears (follow the global thinking effort). Otherwise off | low | medium | high. */
+  thinkingEffort?: unknown;
   /** `null` clears the saved shape. Omitted leaves it unchanged. */
   faceShape?: unknown;
   /** `null` clears the saved color. Omitted leaves it unchanged. */

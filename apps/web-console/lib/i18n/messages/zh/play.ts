@@ -639,6 +639,19 @@ export const play = {
     hint: '选「跟随默认」表示使用全局默认模型。子代理和队友默认沿用这个模型。'
   },
 
+  botEffort: {
+    title: 'Bot 思考力度',
+    tip: '只改这个 Bot 每轮要求模型思考的力度，不影响全局设置。它固定的模型不支持思考力度时，选「关闭」。',
+    label: '思考力度',
+    aria: 'Bot 使用的思考力度',
+    followGlobal: '跟随全局（默认）',
+    followGlobalWith: '跟随全局（当前：{level}）',
+    effectivePinned: '当前生效：{level}（本 Bot 固定）',
+    effectiveGlobal: '当前生效：{level}（跟随全局）',
+    effectiveUnknown: '当前生效：跟随全局设置',
+    hint: '下一轮对话生效。子代理和队友沿用这个 Bot 的固定档位。'
+  },
+
   botCommand: {
     compacted: '已在当前对话里压缩，没有新开对话。',
     nothingToCompact: '当前对话没有可压缩的内容，仍是同一条对话。',
