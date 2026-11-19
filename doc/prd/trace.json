@@ -3525,6 +3525,13 @@
       ]
     },
     {
+      "id": "lcu-chat-startup",
+      "title": "普通聊天和 Bot 消息复用已发现的桌面能力",
+      "tests": [
+        "packages/core/test/lcu-computer-use.test.js"
+      ]
+    },
+    {
       "id": "lcu-computer-use",
       "title": "本机 LCU 桌面操作接入",
       "tests": [
@@ -4142,6 +4149,15 @@
       "tests": [
         "apps/web-console/lib/request-metric-turn.test.ts",
         "e2e/request-metric-follows-turn.spec.ts"
+      ]
+    },
+    {
+      "id": "responses-session-phase-cache",
+      "title": "Responses 连续工具轮次的阶段状态与前缀缓存",
+      "tests": [
+        "packages/agent-loop/src/model/reasoning-replay.test.ts",
+        "packages/core/test/conversation-clock-request.test.js",
+        "packages/core/test/prompt-builder.test.js"
       ]
     },
     {

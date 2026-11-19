@@ -73,7 +73,7 @@ export interface TurnKernelPrompt {
   buildSystemPromptParts?(
     ctx: PromptContext,
     messages: SessionMessage[]
-  ): Promise<{ stable: string; dynamic: string; text: string }>;
+  ): Promise<{ stable: string; dynamic: string; text: string; sessionPhase?: ModelTurnInput['sessionPhase'] }>;
 }
 
 /**

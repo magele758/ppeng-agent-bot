@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 473,
+    "implemented": 475,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -2045,6 +2045,13 @@
       "file": "acceptance/lcu-app-grant.yaml"
     },
     {
+      "id": "lcu-chat-startup",
+      "title": "普通聊天和 Bot 消息复用已发现的桌面能力",
+      "requirement": "那你优化一下，另外看看另一个问题，是否可以提升bot和普通会话的启动速度，现在感觉还是有点慢",
+      "verificationStage": "software",
+      "file": "acceptance/lcu-chat-startup.yaml"
+    },
+    {
       "id": "lcu-computer-use",
       "title": "本机 LCU 桌面操作接入",
       "requirement": "那你去接一下",
@@ -2631,6 +2638,13 @@
       "requirement": "这里要跟着下面拖动的会话轮数显示对应轮的请求token啊",
       "verificationStage": "software",
       "file": "acceptance/request-metric-follows-turn.yaml"
+    },
+    {
+      "id": "responses-session-phase-cache",
+      "title": "Responses 连续工具轮次的阶段状态与前缀缓存",
+      "requirement": "现在这个项目走的是magpie的代理服务，我看现在的缓存命中率很低，帮我从magpie的日志和当前服务的日志来分析下原因，以及看看是否可以优化",
+      "verificationStage": "software",
+      "file": "acceptance/responses-session-phase-cache.yaml"
     },
     {
       "id": "risk-advisory-ui",

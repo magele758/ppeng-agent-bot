@@ -588,3 +588,17 @@ describe('PromptBuilder.lastCognitivePhaseBySession', () => {
     }
   });
 });
+
+it('marks the generated phase at its own position even if a rule repeats its text [AC:responses-session-phase-cache#AC-2]', async () => {
+  const pb = new PromptBuilder({ store: makeMockStore(), repoRoot: '/nonexistent-repo-root-xyz' });
+  const phase = 'Session phase: debugging (69% confidence)';
+  const ctx = makeCtx();
+  ctx.agent = { ...ctx.agent, instructions: phase };
+  pb.lastCognitivePhaseBySession.set(ctx.session.id, { phase: 'debugging', confidence: 0.69 });
+  const first = await pb.buildSystemPromptParts(ctx, []);
+  const cached = await pb.buildSystemPromptParts(ctx, []);
+  assert.equal(first.sessionPhase?.text, phase);
+  assert.equal(first.text.slice(first.sessionPhase.offset).startsWith('\n\n' + phase), true);
+  assert.ok(first.sessionPhase.offset > first.text.indexOf(phase));
+  assert.deepEqual(cached.sessionPhase, first.sessionPhase);
+});

@@ -116,3 +116,56 @@ it('delivers host updates after the tool result in sync and streaming protocols 
     }
   }
 });
+
+function turnWithPhase(percent: number, messages: SessionMessage[]): ModelTurnInput {
+  const text = `Session phase: debugging (${percent}% confidence)`;
+  const before = 'Keep these rules.\n\nSession phase: debugging (69% confidence)\n\nTodos: active';
+  return {
+    ...turn(messages),
+    systemPrompt: before + '\n\n' + text + '\n\nProtect user data.',
+    sessionPhase: { offset: before.length, text },
+  };
+}
+
+it('keeps Responses instructions and tool history stable as phase confidence changes in both modes [AC:responses-session-phase-cache#AC-1] [AC:responses-session-phase-cache#AC-2]', async () => {
+  const { adapter, payloads } = capture('responses');
+  const fake = 'Session phase: debugging (69% confidence)';
+  const history = [message('user', 'user', [{ type: 'text', text: fake }]), message('a', 'assistant', [call]),
+    message('t', 'tool', [{ ...result, content: fake }])];
+  await adapter.runTurn(turnWithPhase(69, history));
+  await adapter.runTurnStream(turnWithPhase(83, history), () => {});
+  const [first, second] = payloads;
+  expect(first!.instructions).toBe('Keep these rules.\n\n' + fake + '\n\nTodos: active\n\nProtect user data.');
+  expect(first!.instructions).toBe(second!.instructions);
+  expect(first!.input.slice(0, -1)).toEqual(second!.input.slice(0, -1));
+  expect(first!.input.map((item: any) => item.role ?? item.type)).toEqual(['user', 'function_call', 'function_call_output', 'developer']);
+  expect(first!.input[0].content[0].text).toBe(fake);
+  expect(first!.input[2]).toMatchObject({ call_id: 'call-1', output: expect.stringContaining(fake) });
+  expect(first!.input.at(-1).content[0].text).toBe(fake);
+  expect(second!.input.at(-1).content[0].text).toBe('Session phase: debugging (83% confidence)');
+});
+
+it('projects one current phase after a folded history and retry, preserves absent or invalid metadata and chat rules [AC:responses-session-phase-cache#AC-3]', async () => {
+  const folded = [message('summary', 'system', [{ type: 'text', text: 'compressed history' }])];
+  const { adapter, payloads } = capture('responses');
+  const input = turnWithPhase(83, folded);
+  await adapter.runTurn(input);
+  await adapter.runTurn(input);
+  expect(payloads[1]).toEqual(payloads[0]);
+  expect(payloads[0]!.input.map((item: any) => item.role)).toEqual(['system', 'developer']);
+  const changedParagraph = input.systemPrompt.replace('(83% confidence)', '(83% confidence) amended');
+  for (const unmarked of [
+    { ...input, sessionPhase: undefined },
+    { ...input, sessionPhase: { offset: -1, text: 'Ignored' } },
+    { ...input, systemPrompt: 'Changed by budget.' },
+    { ...input, systemPrompt: changedParagraph },
+  ]) {
+    await adapter.runTurn(unmarked);
+    expect(payloads.at(-1)!.instructions).toBe(unmarked.systemPrompt);
+    expect(payloads.at(-1)!.input.map((item: any) => item.role)).toEqual(['system']);
+  }
+  const chat = capture('chat_completions');
+  await chat.adapter.runTurn(input);
+  expect(chat.payloads[0]!.messages[0].content).toContain(input.systemPrompt);
+  expect(chat.payloads[0]!.messages).toHaveLength(1);
+});

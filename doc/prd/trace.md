@@ -3103,6 +3103,12 @@ Langfuse 实际上报状态与超时
 
 - `packages/core/test/lcu-computer-use.test.js`
 
+### lcu-chat-startup
+
+普通聊天和 Bot 消息复用已发现的桌面能力
+
+- `packages/core/test/lcu-computer-use.test.js`
+
 ### lcu-computer-use
 
 本机 LCU 桌面操作接入
@@ -3646,6 +3652,14 @@ microVM 命令不会悄悄改在宿主机上跑
 
 - `apps/web-console/lib/request-metric-turn.test.ts`
 - `e2e/request-metric-follows-turn.spec.ts`
+
+### responses-session-phase-cache
+
+Responses 连续工具轮次的阶段状态与前缀缓存
+
+- `packages/agent-loop/src/model/reasoning-replay.test.ts`
+- `packages/core/test/conversation-clock-request.test.js`
+- `packages/core/test/prompt-builder.test.js`
 
 ### risk-advisory-ui
 

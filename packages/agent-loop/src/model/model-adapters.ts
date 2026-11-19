@@ -1126,6 +1126,20 @@ async function buildResponsesApiInput(
   return out;
 }
 
+/** Preserve full system authority unless the original host-marked paragraph still matches. */
+async function buildResponsesPrompt(turn: ModelTurnInput): Promise<{ instructions: string; input: Array<Record<string, unknown>> }> {
+  const input = await buildResponsesApiInput(turn.messages, turn.resolveImageDataUrl, turn.signal, turn.resolveMediaDataUrl);
+  const instructions = turn.systemPrompt;
+  const phase = turn.sessionPhase;
+  if (!phase?.text || !Number.isSafeInteger(phase.offset) || phase.offset < 0) return { instructions, input };
+  const paragraph = '\n\n' + phase.text;
+  if (!instructions.startsWith(paragraph, phase.offset)) return { instructions, input };
+  const end = phase.offset + paragraph.length;
+  if (end !== instructions.length && !instructions.startsWith('\n\n', end)) return { instructions, input };
+  input.push({ type: 'message', role: 'developer', content: [{ type: 'input_text', text: phase.text }] });
+  return { instructions: instructions.slice(0, phase.offset) + instructions.slice(end), input };
+}
+
 async function buildAnthropicMessages(
   messages: SessionMessage[],
   resolveImage?: (assetId: string, signal?: AbortSignal) => Promise<string | undefined>,
@@ -1453,16 +1467,9 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     const endpoint = openAiCompatEndpoint(this.options.baseUrl, this.httpKind);
 
     if (this.httpKind === 'responses') {
-      const responsesInput = await buildResponsesApiInput(
-        input.messages,
-        input.resolveImageDataUrl,
-        input.signal,
-        input.resolveMediaDataUrl
-      );
       const payload = {
         model: this.options.model,
-        instructions: input.systemPrompt,
-        input: responsesInput,
+        ...await buildResponsesPrompt(input),
         tools: mapToolDefinitionsToResponsesFormat(tools),
         tool_choice: 'auto' as const,
         ...reasoningEffortBody('responses', input.reasoningEffort),
@@ -1567,13 +1574,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       this.httpKind === 'responses'
         ? {
             model: this.options.model,
-            instructions: input.systemPrompt,
-            input: await buildResponsesApiInput(
-              input.messages,
-              input.resolveImageDataUrl,
-              input.signal,
-              input.resolveMediaDataUrl
-            ),
+            ...await buildResponsesPrompt(input),
             tools: mapToolDefinitionsToResponsesFormat(tools),
             tool_choice: 'auto' as const,
             stream: true,

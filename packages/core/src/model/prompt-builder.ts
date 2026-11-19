@@ -56,6 +56,7 @@ import { EXTERNAL_FENCE_SYSTEM_SENTENCE } from '../safety/external-content.js';
 import { textSummaryFromParts } from './model-adapters.js';
 import type {
   AgentSpec,
+  ModelTurnInput,
   SessionMessage,
   SessionRecord,
   SkillSpec,
@@ -338,12 +339,34 @@ export interface PromptBuilderDeps {
   cloudSkillsLoader?: () => Promise<SkillSpec[]>;
 }
 
+type SessionPhase = NonNullable<ModelTurnInput['sessionPhase']>;
+
+interface SystemPromptParts {
+  stable: string;
+  dynamic: string;
+  text: string;
+  sessionPhase?: SessionPhase;
+}
+
+function joinPhaseContext(before: string[], phase: string, after: string[], mark?: (phase: SessionPhase) => void): string {
+  const leading = before.filter(Boolean).join('\n\n');
+  if (phase) mark?.({ offset: leading.length, text: phase });
+  return [leading, phase, ...after].filter(Boolean).join('\n\n');
+}
+
+function systemPromptParts(stable: string, dynamic: string, phase?: SessionPhase): SystemPromptParts {
+  const text = [stable, dynamic].filter(Boolean).join('\n\n---\n\n');
+  const parts: SystemPromptParts = { stable, dynamic, text };
+  if (phase) parts.sessionPhase = { text: phase.text, offset: text.length - dynamic.length + phase.offset };
+  return parts;
+}
+
 export class PromptBuilder {
   private workspaceSkillsPromise?: Promise<SkillSpec[]>;
   private skillGeneration = 0;
   private readonly sessionSkillCache = new Map<string, { key: string; skills: SkillSpec[] }>();
   private readonly stablePrefixCache = new Map<string, { key: string; text: string }>();
-  private readonly assembledBySession = new Map<string, { key: string; text: string; stable: string; dynamic: string; routing?: SkillRoutingResult }>();
+  private readonly assembledBySession = new Map<string, { key: string; parts: SystemPromptParts; routing?: SkillRoutingResult }>();
   private readonly routingBySession = new Map<string, SkillRoutingResult>();
   private readonly searchHitsBySession = new Map<string, string[]>();
   /** Exposes last cognitive phase info by session (set externally by runtime). */
@@ -687,7 +710,9 @@ export class PromptBuilder {
   }
 
   /** Build the dynamic per-turn block (todos, task, memory, skills). */
-  async buildDynamicContext(ctx: PromptContext, messages: SessionMessage[]): Promise<string> {
+  async buildDynamicContext(
+    ctx: PromptContext, messages: SessionMessage[], markPhase?: (phase: SessionPhase) => void
+  ): Promise<string> {
     const started = Date.now();
     try {
     const profile = runProfileFromSession(ctx.session);
@@ -784,9 +809,10 @@ export class PromptBuilder {
           })
         : '';
     const dynToolsBlock = buildDynToolsPromptBlock(resolveDynToolsEnabled(this.deps.store));
-    return [taskLine, buildTaskContext(ctx.session, ctx.task), `Todos: ${todoLine}`, cognitiveLine, summaryLine, ptcBlock, replayBlock, dynToolsBlock, skillBlock]
-      .filter(Boolean)
-      .join('\n\n');
+    return joinPhaseContext(
+      [taskLine, buildTaskContext(ctx.session, ctx.task), `Todos: ${todoLine}`],
+      cognitiveLine, [summaryLine, ptcBlock, replayBlock, dynToolsBlock, skillBlock], markPhase
+    );
     } finally {
       emitStartupPhase(ctx.session.id, {
         phase: 'dynamic_context',
@@ -838,31 +864,30 @@ export class PromptBuilder {
   async buildSystemPromptParts(
     ctx: PromptContext,
     messages: SessionMessage[]
-  ): Promise<{ stable: string; dynamic: string; text: string }> {
+  ): Promise<SystemPromptParts> {
     const skillSelect = chainHas(resolveJevChain(this.deps.store), 'skillSelect');
     const skills = await this.skillsForSession(ctx.session.id);
     const key = skillSelect ? '' : this.assembledPromptKey(ctx, messages, skills);
     const hit = skillSelect ? undefined : this.assembledBySession.get(ctx.session.id);
     if (hit && hit.key === key) {
       if (hit.routing) this.routingBySession.set(ctx.session.id, hit.routing);
-      return { stable: hit.stable, dynamic: hit.dynamic, text: hit.text };
+      return { ...hit.parts };
     }
     const started = Date.now();
     try {
       const stable = this.buildStablePrefix(ctx);
-      const dynamicContext = await this.buildDynamicContext(ctx, messages);
-      const dynamic = [dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
-      const text = [stable, dynamic].filter(Boolean).join('\n\n---\n\n');
+      let sessionPhase: SessionPhase | undefined;
+      const context = await this.buildDynamicContext(ctx, messages, (phase) => { sessionPhase = phase; });
+      const dynamic = [context, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
+      const parts = systemPromptParts(stable, dynamic, sessionPhase);
       if (!skillSelect) {
         this.assembledBySession.set(ctx.session.id, {
           key,
-          text,
-          stable,
-          dynamic,
+          parts,
           routing: this.routingBySession.get(ctx.session.id)
         });
       }
-      return { stable, dynamic, text };
+      return { ...parts };
     } finally {
       emitStartupPhase(ctx.session.id, {
         phase: 'system_prompt',
