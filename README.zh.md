@@ -1,74 +1,45 @@
-# Raw Agent SDK
+# Raw Agent
 
-[English README](README.md) | **中文**
+[English](README.md) | **简体中文**
 
-类 Claude Code 风格的 **Node.js 多智能体运行时**：本地 **Daemon**（HTTP API）、**CLI**、**Agent Lab**（Next.js 调试台）、**SQLite** 状态、任务/工作区隔离、审批、**Teams 编排**、**自愈（Self-heal）**、**Evolution**（RSS → inbox → worktree → 测试 → 可选合并），以及可选的 **视觉路由**、**MCP（stdio）**、**能力网关** 等集成。
+> **你只管目标，Bot 全天候为你工作。**
+>
+> 一个越来越懂你的长期工作 Bot —— 帮你管理消息线索、处理重复任务、整理与消化信息，让工作持续向前；底层由自研零封装的可嵌入内核 **`@mage-ai-lab/agent-loop`** 与多智能体宿主 **`@ppeng/agent-core`** 驱动。
 
-你可以把它作为本地 Agent 工作台使用，把循环内核嵌入自己的应用，也可以沿源码学习一套 Agent Harness 如何工作。可复用内核位于 `packages/agent-loop`，`packages/core` 负责接入产品存储、工具、策略与服务。
-
-## 按你的目标开始
-
-| 你想做什么 | 第一站 | 下一步 |
-|------------|--------|--------|
-| 先把产品跑起来 | [快速开始](#快速开始) | [Agent Lab](#agent-labweb-调试台) |
-| 理解 Agent 的运行原理 | [Harness 实现指南](doc/harness/README.md) | [从零教程](doc/harness/from-zero/README.md)，再按问题查专题 |
-| 只嵌入循环内核 | [Agent Loop 包说明](packages/agent-loop/README.md) | [SDK 指南：装配档位、宿主端口、生命周期](skills/agent-loop/SKILL.md) |
-| 嵌入完整产品运行时 | [Core SDK](packages/core/README.md) | [嵌入指南](doc/EMBEDDING_SDK.md) |
-| 改代码或定位问题 | [AGENTS.md](AGENTS.md) | [架构](doc/ARCHITECTURE.md) · [测试](doc/TESTING.md) |
-| 部署或了解进阶能力 | [文档总目录](doc/README.md) | [部署](doc/DEPLOYMENT.md) · [Evolution](doc/evolution/README.md) |
-
-README 负责项目概览与上手；Harness 负责原理和代码导读；[文档总目录](doc/README.md) 负责专题检索，不必从头读完所有文档。
-
-## 代码如何串起来
-
-```text
-Agent Lab / CLI → daemon HTTP / SSE
-                       ↓
-          RawAgentRuntime（产品宿主，packages/core）
-                       ↓  注入 model / tools / storage / hooks
-          createAssembledLoop（packages/agent-loop，默认 mini）
-                       ↓
-          turn kernel → 组装上下文 → 模型 → 工具 → 下一轮
-```
-
-这是自建并抽取为 SDK 的循环，不是 `@openai/agents` 的封装。产品默认使用 `kernelVariant=agent-loop`、`assemblyPreset=max`；本地 `ppeng` 内核保留为显式选择的参考路径。选择通过 Lab 设置持久化（`GET/PATCH /api/loop/settings`）。详见[执行路径导读](doc/harness/00-self-built-agent-loop.md)。
-
-SDK 提供 `mini / normal / full / max` 四档装配。浏览器和扩展宿主应使用 `/mini` 入口，不能引入面向 Node 的根入口/full/max。仓库内包名为 `@ppeng/agent-loop`，公开发布名为 `@mage-ai-lab/agent-loop`。
+`Node.js >= 22` · `pnpm 10.29.2` · `SDK: @mage-ai-lab/agent-loop` · `已交付 481 项验收规格 / 2,347 条门禁标准` · `Web · Desktop · CLI · Embeddable SDK`
 
 ---
 
-## 能力一览
+## 为什么选择 Raw Agent？
 
-| 领域 | 说明 |
-|------|------|
-| **运行时** | `RawAgentRuntime`：会话、任务、工具、审批、工作区（`git worktree` 或目录复制）、后台任务、Mailbox（Teammate）、Trace、为 **KV 缓存** 优化的稳定/动态 system 前缀 |
-| **模型** | `heuristic`（无密钥）、`openai-compatible`、`anthropic-compatible`；可选 **混合 VL 路由** + `vision_analyze`；不兼容 `response_format` 时可设 `RAW_AGENT_USE_JSON_MODE=0` |
-| **工具** | 读写/编辑文件、`bash`、Todo、harness 规格、子 Agent/Teammate、Mailbox、`bg_run`、Skills；可选 **glob** / **web_fetch** / **MCP stdio** / **工具钩子** / **LSP** / **OpenTelemetry** 等 |
-| **Skills** | 仓库 `skills/**/SKILL.md` + 可选 `~/.agents/**/SKILL.md` 合并；**技能路由**（`legacy` / `hybrid`） |
-| **自愈** | 隔离 worktree、白名单测试、可选合并与 **daemon 重启握手** |
-| **Evolution** | `evolution:learn`（RSS → inbox + 摘要技能）+ `evolution:run-day`（研究 → Agent → 构建 → 测试；`AUTO_MERGE=1` 时主仓 **merge 串行互斥**） |
-| **Web** | Next.js 15 App Router：Playground、Teams、Trace、审批；Ops **Swarm**；「更多」**Orchestration / Memory**；`/api/*` 代理 Daemon |
-| **2.0 切片** | **五层记忆**、**Swarm**（pipeline 执行器）、**Orchestration** 引擎、**DeepResearch** 管线 MVP；可选 `RAW_AGENT_AUTH_TOKEN` |
+大多数 Agent 工具把「选技能、配连接、拆会话、盯循环、核结果」的复杂度抛给用户——每次干活都像在重新组装一台机器。**Raw Agent 把专业编排收进产品内部，把确定性与控制权留给人与开发者：**
+
+1. **以 Bot 为统一入口，告别编排税**：每只 Bot 拥有稳定身份、实时动态表情、独立模型与思考力度档位、私有记忆、受控技能与一条永久主对话。内置总助手 **Super Bot** 可巡检名册、按接收方自身权限跨 Bot 派工并汇总成果，无需每次手动挑选工作流引擎。
+2. **对话 · 目标 · 执行三层解耦，绝不「假装做完」**：回合结束不等于目标达成。系统追踪 8 种目标状态（排队 / 进行中 / 等待 / 受阻 / 暂停 / 完成 / 失败 / 取消），每次交付保留独立快照与版本谱系，并基于文件、构建或真实连接器回执做独立完成核验。
+3. **一次有效交付，一键转为例行运转**：完成的交付可直接保存为定时或事件触发的 **例行任务（Routine）**，支持**「仅内容变化时通知」**、错峰补跑、发送前人工审核，既免去每天重复交代，也拒绝无更新刷屏。
+4. **多 Bot 群聊不吵闹：稀疏激活、协作与辩论**：群聊内置 **Agentic Sparse-MoE** 相关性选人（无关成员静默、未达门槛可零回复），并支持一键切换 **任务协作模式**（临时负责人派工 + 公开证据汇总）与 **多轮辩论模式**（交替反驳 + 裁判裁决）。
+5. **既是开箱即用的本地工作台，也是可嵌入的四档 SDK**：既可通过 **Agent Lab（Web）**、**原生桌面客户端（macOS Apple Silicon / Linux）** 与 **CLI** 直接投入使用；也可将无封装自研的 **`@mage-ai-lab/agent-loop`**（`mini / normal / full / max`，其中 `/mini` 零 Node 内置依赖，可直接进浏览器与插件）嵌入你自己的产品。
 
 ---
 
-## 包与应用
+## 按你的目标快速导航
 
-| 路径 | 职责 |
-|------|------|
-| `packages/agent-loop`（`@ppeng/agent-loop`） | 可嵌入的 turn 内核、装配档位、模型/工具循环与会话控制；见 [SDK 指南](skills/agent-loop/SKILL.md) |
-| `packages/api-types` | 共享 API 类型 |
-| `packages/core`（`@ppeng/agent-core`） | 运行时、存储、适配器、工具、工作区、自愈策略、Trace、Skills；作为**可嵌入 SDK** 独立使用见 [`packages/core/README.md`](packages/core/README.md) / [`doc/EMBEDDING_SDK.md`](doc/EMBEDDING_SDK.md) |
-| `packages/capability-gateway` | 可选网关/桥接（如 IM、配置）；`evolution:learn` 拉 feed 会用到 |
-| `apps/daemon` | HTTP API、调度器、`/` 仅 stub；**日常 UI 请用 Next** |
-| `apps/cli` | `chat`、`send`、任务、审批、**self-heal**、daemon 重启确认 |
-| `apps/web-console` | Agent Lab（Next.js） |
+| 你想做什么 | 第一站 | 深入阅读 |
+|------------|--------|----------|
+| **立即运行产品（Web / 桌面端）** | [快速开始](#快速开始) | [Agent Lab 工作台导览](#产品能力全景已交付) · [桌面客户端](apps/desktop/README.md) |
+| **审阅产品定位、功能与交付边界** | [Bot 完整功能说明](doc/bot/00-functional-guide.md) | [产品需求目录](doc/prd/README.md) · 终端运行 `pnpm feature-map <关键词>` |
+| **只把 Agent 循环嵌入浏览器或后端** | [`@mage-ai-lab/agent-loop`](packages/agent-loop/README.md) | [Loop SDK 契约与四档装配指南](skills/agent-loop/SKILL.md) |
+| **嵌入完整多智能体运行时宿主** | [`@ppeng/agent-core`](packages/core/README.md) | [Core SDK 稳定 API 与嵌入指南](doc/EMBEDDING_SDK.md) |
+| **系统学习工业级 Agent Harness 原理** | [Harness 实现地图](doc/harness/README.md) | [从零构建教程](doc/harness/from-zero/README.md) · [8 分区架构全图](doc/architecture/README.md) |
+| **参与开发或派 AI Coding Agent 改代码** | [`AGENTS.md`](AGENTS.md) | [架构手册](doc/ARCHITECTURE.md) · [验收门禁](doc/ACCEPTANCE_GATE.md) · [测试矩阵](doc/TESTING.md) |
 
 ---
 
 ## 快速开始
 
-前置条件：Node.js 22+（SQLite 需支持 FTS5）与 pnpm 10.29.2。在仓库根目录执行：
+前置条件：**Node.js 22+**（需内置 `node:sqlite` FTS5 支持）与 **pnpm 10.29.2**。
+
+### 1. 一键启动 Agent Lab（零 `.env` 界面优先配置）
 
 ```bash
 corepack enable
@@ -78,205 +49,242 @@ pnpm run build
 pnpm run dev
 ```
 
-打开**终端打印的 Agent Lab 地址**，在对话区「配置模型」填写服务商 Base URL / API Key，发现模型并选择后发送消息。采用界面配置时，不需要先复制 `.env`。
+1. 打开**终端打印的 Agent Lab 地址**（默认首选 Lab `23000` / Daemon `27070`，端口占用时自动顺延并写入 `.agent-state/dev-lab.ports.json`）。
+2. 默认首页直达 **Bot 工作台**。点击对话区「**配置模型**」，填入任意 OpenAI / Anthropic 兼容服务商的 Base URL 与 API Key，一键自动发现模型即可开聊——**首次体验无需手抄 `.env`**（演示视频：[doc/lab/lab-model-setup-autodiscover.mp4](doc/lab/lab-model-setup-autodiscover.mp4)）。
+3. 在 macOS / Linux 上按 `Ctrl+C` 退出开发启动器时，编译器、Daemon 与 Next 进程组会自动联动清理，重启可直接复用原端口。
 
-开发启动器会选择可用端口并自动连接代理，实际地址也写入 `.agent-state/dev-lab.ports.json`。没有覆盖配置时，首选端口是 Lab 23000、daemon 27070；冲突时自动后移，不要照搬旧示例的固定端口。 在 macOS/Linux 上，关闭启动器（Ctrl+C、SIGTERM 或 SIGHUP）会一并清理其编译器、daemon 和 Next 进程组；最多等待三秒后强制停止残留后代，使重启可复用原端口，不影响其他工作目录的服务。
-
-不接真实模型也可以在构建后验证 HTTP 能力：
+不配置真实模型密钥时，也可以直接跑隔离的启发式契约自检：
 
 ```bash
 pnpm run agent:eval:fast --exit-on-fail
 ```
 
-该命令使用隔离的 heuristic daemon，不代表真实模型回答质量。CLI/HTTP 的进一步操作见[从零教程](doc/harness/from-zero/README.md)。单独启动 Next 时，将 `DAEMON_PROXY_TARGET` 指向实际 daemon 地址；生产 UI 使用 `pnpm run build:web-console` 与 `pnpm run start:web-console`。
+### 2. 原生桌面客户端（macOS Apple Silicon & Linux）
 
----
-
-## 给 AI 编码 Agent 的指引
-
-若你是 **自动化编码 Agent**（Cursor、Codex、Claude Code 等）在本仓库中改代码：
-
-1. **先读 [`AGENTS.md`](AGENTS.md)** — 工作区约定、环境变量、Evolution/自愈/前端行为与常见坑。
-2. **代码位置**：循环 SDK → `packages/agent-loop`；产品宿主与集成 → `packages/core`；HTTP API → `apps/daemon`；Agent Lab → `apps/web-console`；Evolution → `scripts/evolution*`。
-3. **改完怎么验**：逻辑改动跑 `pnpm run test:unit`；全量 TS 编译用 `pnpm run build`。界面/E2E 见 [`doc/TESTING.md`](doc/TESTING.md)、必要时 `pnpm run test:e2e`。
-4. **配置与密钥**：支持的功能优先使用 Lab UI 与持久化 settings API，避免新增功能开关 env。必要的连接、进程引导或 CI 回退配置参考 [`.env.example`](.env.example)；**切勿提交 `.env`**。env 修改需重启进程；界面设置的生效范围以各 API 为准。
-5. **Evolution**：`pnpm run evolution --help` 查看参数（`--learn`、`--agent`、`--review`、`--until-empty`、`--research`、`--test-agent` 等）。一键 drain + 展示站：`pnpm run evolution:drain-showcase --help`。`run-day` 默认只处理 inbox **「今日新条目」** 分段（下文 Evolution 一节）。
-6. **子进程 / 沙箱**：新增 `spawn` 须走 `sanitizeSpawnEnv()` 与现有沙箱封装（`packages/core/src/sandbox/env-sanitizer.ts`、`packages/core/src/sandbox/os-sandbox.ts`、`SandboxManager`），勿在完整父进程环境下裸调 `spawn`。
-7. **Skills**：仓库内 `skills/**/SKILL.md`；可与 `~/.agents/**/SKILL.md` 合并（见 `AGENTS.md`）。
-8. **循环 SDK 改动**：契约变化须同步 [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md)，并执行 `pnpm run test --workspace=@ppeng/agent-loop` 与 `pnpm run build --workspace=@ppeng/agent-loop`；根目录 `test:unit` 不能代替 SDK 的 Vitest 测试。
-
-架构与 API 全貌：[`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md)。
-
----
-
-## npm 脚本（参考）
-
-| 命令 | 说明 |
-|------|------|
-| `pnpm run build` | TypeScript 工作区编译 + Next 生产构建 |
-| `pnpm run test` | build + 单测 |
-| `pnpm run test:unit` | 仅单测 |
-| `pnpm run test:regression` | 临时 daemon HTTP 回归 |
-| `pnpm run test:e2e` | 临时 daemon + Playwright |
-| `pnpm run test:e2e:install` | 安装 Playwright Chromium |
-| `pnpm run test:remote` | 真模型冒烟（需环境变量） |
-| `pnpm run agent:eval:fast --exit-on-fail` | 隔离 heuristic daemon 的 HTTP 能力检查，失败返回非零 |
-| `pnpm run test --workspace=@ppeng/agent-loop` | 循环 SDK 的 Vitest 测试 |
-| `pnpm run ci` | build + unit + formal + fast eval + 评估引擎 simulation + 包产物自检 + CRAP + regression + integration + e2e |
-| `pnpm run start:daemon` / `start:supervised` | 守护进程 / 监督拉起 |
-| `pnpm run pm2:start` / `pm2:stop` / `pm2:restart` | 用 PM2 管理受监督的 daemon（`ecosystem.config.cjs`） |
-| `pnpm run start:cli` | CLI（含 `self-heal`、`chat` 等） |
-| `pnpm run dev:lab` | 开发辅助（Next + 代理） |
-| `pnpm run evolution --help` | 统一进化入口，查看全部参数 |
-| `pnpm run evolution --learn --agent cursor --review codex` | learn + cursor 开发 + codex review |
-| `pnpm run evolution --learn-only` | 仅拉 RSS → inbox |
-| `pnpm run evolution:pipeline` | learn → run-day → 可选合并后重载（一键） |
-| `pnpm run ai:tools` | 检测本机 `claude` / `codex` 等 CLI |
-
-详见 [`doc/TESTING.md`](doc/TESTING.md)、[`doc/CI.md`](doc/CI.md)、[`.env.example`](.env.example)。
-
----
-
-## Agent Lab（Web 调试台）
-
-- **Jev 接入**：可选的宿主语义判断、独立档位、PTC 辅助与调用观测。见 [Jev 接入指南](doc/JEV_INTEGRATION.md)；默认关闭，在「更多 → Jev」中配置。
-- **模型配置**：对话区「配置模型」填 Base URL / API Key，自动发现模型名。演示：[doc/lab/lab-model-setup-autodiscover.mp4](doc/lab/lab-model-setup-autodiscover.mp4)
-- **Playground**：流式（SSE）、thinking、工具结果、Markdown
-- **会话 / 任务 / Teams**：Mailbox 有向图、邮件流
-- **Trace**：读 `stateDir/traces/.../events.jsonl`
-- **审批 / 后台任务 / 工作区**
-
-Daemon API 示例：`GET /api/version`、`GET /api/health`、`GET /api/traces?sessionId=...` — 完整列表见 `apps/daemon/src/server.ts`。
-
----
-
-## Evolution（持续学习）
-
-统一入口：`pnpm run evolution [options]`（`--help` 查看全部参数）。
-
-**分步固定流程**（learn → run-day → 展示站）：[`doc/evolution/README.md`](doc/evolution/README.md)。
-
-**飞轮与能力矩阵**：[`doc/evolution-flywheel-review.md`](doc/evolution-flywheel-review.md)。
-
-**常用组合：**
-
-| 命令 | 说明 |
-|------|------|
-| `pnpm run evolution --learn-only` | 仅拉 RSS → inbox，不跑开发 |
-| `pnpm run evolution --learn --agent claude` | learn + Claude 实现（默认） |
-| `pnpm run evolution --learn --agent cursor` | learn + Cursor composer-2-fast 实现 |
-| `pnpm run evolution --learn --agent cursor --review codex` | learn + Cursor 实现 + Codex review |
-| `pnpm run evolution --learn --agent cursor --review cursor` | learn + Cursor 全链路 |
-| `pnpm run evolution --learn --agent cursor --model claude-opus-4-7-thinking-max --review cursor` | learn + Cursor Opus-Max 实现与 review |
-| `pnpm run evolution --learn --agent full` | learn + 研究→多CLI路由实现（自动按难度分配） |
-| `pnpm run evolution --learn --agent cursor --review codex --concurrency 5 --merge` | 5 路并发 + 自动合并 |
-| `pnpm run evolution --pipeline-build --learn --agent cursor --review codex` | 先编译 gateway + learn + 开发 |
-
-**部分常用参数**（完整列表与当前默认值以 `--help` 为准）：
-
-```
---learn                  先拉 RSS → inbox
---learn-only             仅 learn，不跑开发
---pipeline-build         learn 前先编译 capability-gateway
---agent cursor|claude|codex|full|multi   实现 agent（默认 claude）
---model <name>           cursor agent 模型（默认 composer-2-fast）
---review cursor|codex|none   review agent（默认 none）
---review-model <name>    review 用模型（默认同 --model）
---concurrency <n>        并发 worktree 数（上限见 --help）
---items <n>              最多处理条目数
---merge                  测试通过后自动合并
---target-branch <b>      合并目标分支（默认 main）
---skip-rebase            跳过 rebase 步骤
-```
-
-**运行规则与排障：**
-
-- `run-day` 默认只执行 inbox 里的 **“今日新条目”** 分段；“近期滚动（参考）”仅展示，不重复调度，避免同一链接在高并发下共用 worktree。
-- 选择 Cursor 时，CLI 会先执行 `agent --list-models` 预检；若模型不可用会在开跑前直接报错，而不是跑到 research 阶段才失败。
-- research 阶段现在更保守：正文抓取为空、模型不可用、或输出里明确出现 `SKIP:` 时，会直接跳过，不再默认 `PROCEED`。
-- review / rebase / merge 等失败时，实验分支会尽量保留，便于人工接管；可在 `doc/evolution/failure/` 中查看对应条目，再到本地 `exp/evolution-*` 分支检查。
-- `evolution:learn` 若大量 RSS 失败，优先检查代理 / DNS / TLS；`news.ycombinator.com` 证书异常通常是本机网络或代理链路问题，不是仓库代码问题。
-
-底层仍可直接使用 `pnpm run evolution:pipeline`（bash 一键：build→learn→run-day→可选重载），或 `pnpm run evolution:learn` / `pnpm run evolution:run-day` 单独执行。高级细粒度调参（plan、test-agent、review rounds 等）见 `scripts/evolution-quality-pipeline.env.example` 与 `.env.example`。
-
-> **已停止维护（2026-10-16）：** 自进化流水线（`evolution:*` 脚本、`scripts/evolution*`）不再维护，请勿扩展，后续可能移除。详见 `scripts/evolution/DEPRECATED.md`。
-
----
-
-## 自愈（Self-heal）
-
-`pnpm run start:daemon`（或 supervised）后：
+Electron 桌面版内置独立 Daemon 与 Web 控制台，数据持久化在系统用户目录，并支持**带完整备份与自动回滚校验的本地安全升级**（菜单「`Raw Agent → 更新客户端…`」）：
 
 ```bash
-pnpm run start:cli self-heal start '{"testPreset":"unit","autoMerge":false}'
+pnpm run build:desktop
+# 产物：apps/desktop/release/RawAgent-<version>-<os>-<arch>.{dmg,AppImage}
 ```
 
-调度器在隔离 worktree 跑白名单测试；失败可驱动 **self-healer** 会话。可选 `autoMerge` / `autoRestartDaemon`，配合 `GET /api/daemon/restart-request` 与 `POST .../ack`。详见 [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md)。
+支持平台：**macOS arm64（`.dmg`）**、**Linux x64 / arm64（`.AppImage`）**（Windows 与 Intel Mac 不打包；未公证 DMG 首次打开说明见 [`apps/desktop/README.md`](apps/desktop/README.md)）。
 
 ---
 
-## 核心能力（摘要）
+## 产品能力全景（已交付）
 
-- SQLite：agents、sessions、messages、tasks、events、approvals、workspaces、mailbox、background_jobs、self_heal_*、daemon 控制等
-- 团队模型：main / planner / researcher / implementer / reviewer / **self-healer** + 可spawn 的 Teammate
-- **稳定 / 动态 system 提示** 拆分以利于 KV 缓存（见 `doc/PROMPT_CACHE.md`）
-- **图片资产**：热/温/冷、contact sheet、`vision_analyze`
-- **可选外部 AI 工具**（`RAW_AGENT_EXTERNAL_AI_TOOLS=1`）：`claude_code`、`codex_exec`、`cursor_agent`（默认需审批）— 见 [`doc/EXTERNAL_AI_CLI.md`](doc/EXTERNAL_AI_CLI.md)
+> 以下能力均已按仓库 [`acceptance/*.yaml`](acceptance) 通过单机软件阶段验收（`implemented`）。完整台账可通过 `pnpm feature-map` 或 [`doc/prd/README.md`](doc/prd/README.md) 按自然语言检索。
+
+### 1. Bot 工作台与丝滑主对话
+- **名册与组织**：默认总助手 **Super Bot** + 开箱即用的 **模拟面试官** + 自定义专业 Bot；支持置顶、可折叠功能分组、拖拽编组、鼠尾草绿深浅色双主题与中英双语（`zh` / `en`）热切换。
+- **永久主对话与斜杠命令**：压缩、停止、换模型均不更换主对话身份。整句 `/new` 在窗口达 **50% / 85%** 时做两级增量结构化摘要（完整保留工具调用配对与可检索原文）；`/stop` 即时止损；`/model` 切换或固定模型；单个 Bot 还可独立固定**思考力度**（关闭 / 低 / 中 / 高）。
+- **实时插话（Steer）、回顾与幽灵建议**：Bot 执行中发追问即刻上屏并在下一轮转向（冲突工具波在启动前自动取消）；离开 3 分钟回来自动生成一行 **会话回顾**（或发 `/recap` / `/回顾` 当场查看）；回复结束后空输入框提供按 `Tab` 采纳的模型下一步建议。
+- **原文侧聊（Sidechat）与多模态草稿**：框选任意回复词句即可在右侧发起独立追问、通俗解释或类比，支持一键凝练成一句话批注并跨会话检索；支持文件与图片拖拽入框、按会话隔离草稿与本机桌面通知。
+
+### 2. 多目标自主推进与多 Bot 协同
+- **多目标与收尾跟进**：自动区分新目标、追加约束、进度查询与闲聊；2 件以上在途工作自动展开「目标与进展」面板；内置 **收尾跟进（Finish Check & Wake）** 防止「嘴上说稍后处理却提前停机」，服务重启后自动释放陈旧锁并补发终态通知。
+- **多粒度协作引擎**：支持单聊直接委派 `bot_delegate`（严格执行接收方自身权限，杜绝借身份提权）、**Sparse-MoE 群聊**、**群任务协作**、**群多轮辩论**、**Team DAG**、**Swarm 流水线**（队友完成后须经独立审查者 + 真实跑测双重门禁）与 **Orchestrator**。
+- **可视化协作全景图**：「任务 → 工作流」内置多 Bot 协作关系画布，支持点击头像/连线核查回执、费用与来源会话，并可动态回放近期协作交接轨迹。
+
+### 3. 五层记忆、每日复盘、调教闭环与知识库
+- **可溯源五层记忆（`AgentMemoryStore`）**：覆盖 `session.scratch` / `session.long` / `user` / `team` / `project`，严格隔离各 Bot 私有记忆；记录来源消息/文件与替换历史，自动过滤「这次先这样」的临时指令，纠错后新值覆盖旧值而不拼接矛盾事实。
+- **每日复盘（Daydream）与技能沉淀**：后台按证据分段执行每日复盘；对话内确认一次即可将有效方法提炼为可复用技能（[`doc/SKILL_CAPTURE.md`](doc/SKILL_CAPTURE.md)）；支持仓库 `skills/`、`~/.agents/` 与 Bot 间只读授权共享及分组共享条文。
+- **Bot 调教与经验治理**：支持保存职责契约与固定流程技能，经验按 **候选 → 已验证 → 退役** 生命周期登记证据，仅验证通过的经验进入执行上下文（[`doc/bot/BOT_COACHING_PLAYBOOK.md`](doc/bot/BOT_COACHING_PLAYBOOK.md)）。
+- **本地知识目录与 Obsidian 联动**：大目录后台非阻塞索引；任意已完成回复可一键「**收藏这条回复**」写入本地 **Obsidian 库**，并在「收藏图谱」按主题浏览；还支持浏览器内只读查看本机 Grok 缓存历史。
+
+### 4. 多模型路由、工具面、软件连接与即时通讯
+- **多协议模型与多模态路由**：原生适配 `openai-compatible`（Chat Completions & Responses）、`anthropic-compatible`、无密钥 `heuristic`，支持可选**混合视觉路由（Hybrid VL Router）**与 `vision_analyze`（不兼容结构化输出的上游可关 `RAW_AGENT_USE_JSON_MODE=0`）；工具面覆盖文件读写编辑、`bash`、`bg_run`、`glob`、`web_fetch`、LSP，以及默认需逐次审批的可选外部编程 CLI（`claude_code` / `codex_exec` / `cursor_agent`，见 [`doc/EXTERNAL_AI_CLI.md`](doc/EXTERNAL_AI_CLI.md)）与本机桌面操作开关（[`doc/LCU_COMPUTER_USE.md`](doc/LCU_COMPUTER_USE.md)）。
+- **软件连接器与外部交接**：支持 HTTP、OpenAPI 导入（可筛只读操作）与 **MCP（stdio / 连接器）**，凭证写入密钥库不回显；支持授权外部系统或远端 Agent 向指定 Bot 提交独立任务（[`doc/EXTERNAL_AGENT_HANDOFF.md`](doc/EXTERNAL_AGENT_HANDOFF.md)）。
+- **IM 渠道接入**：支持 **飞书** 双向对话（含发送前记账与重启重放）、**企业微信** 桥接/群机器人、**Slack** 入站事件唤醒与通用 Webhook（[`doc/IM_AGENT_INTEGRATION.md`](doc/IM_AGENT_INTEGRATION.md)）。
+- **对话内交互卡片（A2UI v0.9）与领域能力包**：热开启后可在气泡内流式渲染表单与按钮，点击动作自动合成下一轮输入（[`doc/A2UI.md`](doc/A2UI.md)）；内置 `@ppeng/agent-sre`（只读运维巡检）与 `@ppeng/agent-stock`（行情/基本面/模拟源）热插拔领域包，工作区另含 `agent-homeiot`、`agent-erp` 扩展包。
+- **PTC 动态工作流与动态工具厂**：通过 `ptc_exec` 生成异步 JS 编排只读工具与子任务，并可将高频代码单元收割为会话粘滞的具名动态工具（[`doc/PTC_DYNAMIC_WORKFLOW.md`](doc/PTC_DYNAMIC_WORKFLOW.md)、[`doc/DYNAMIC_TOOLS.md`](doc/DYNAMIC_TOOLS.md)）。
+
+### 5. 纵深安全、沙箱隔离与缓存经济学
+- **精细权限与会话级放行**：每只 Bot 独立权限档位（计划 / 自动 / 二次确认完全放行）；审批卡支持「**本会话始终允许**」（严格按 `会话 × 工具 × 沙箱隔离方式` 精确绑定，随时可撤销，10 分钟未批自动过期失败）。
+- **OS 沙箱与零明文保险库（User Vault）**：子进程统一经 `sanitizeSpawnEnv()` 剥离注入向量，macOS `sandbox-exec` / Linux `bwrap` 拦截 `~/.ssh`、`~/.aws` 等敏感目录，工具回流自动脱敏；登录密码、银行卡与验证码存入 **User Vault**，仅向模型暴露 `uvref:` 不透明引用完成表单填充，明文绝不进入提示词或日志。
+- **轮内退化看门狗与 Magpie 缓存观测**：流式复读看门狗（命中中止并干净重答一次）+ 思考空转看门狗 + 跨轮 `LoopGuard` / `RiskEngine`；追问请求保持开头稳定前缀逐字节不变以最大化上游 KV 缓存命中，并由内置 **Magpie 面板** 实时监控各模型缓存命中率与持续退化告警。
 
 ---
 
-## 配置方式
+## 5 分钟嵌入你的应用（双层 SDK）
 
-模型服务商与已支持的运行策略优先走 **Lab UI + 持久化设置**。例如循环内核和插话策略通过 `GET/PATCH /api/loop/settings` 管理。配置优先级、持久化位置及下一次请求/运行何时采用新设置，应分别查对应 API，不能套用一条全局 env 优先规则。
+不需要 Web 控制台或守护进程？你可以按需嵌入纯循环内核或完整产品宿主：
 
-环境变量用于密钥与上游连接、进程引导，以及受支持的 CI/eval 回退。下面是查阅入口，不是首次运行必须填写的开关清单：
+### 方案 A：轻量循环内核 `@mage-ai-lab/agent-loop`（支持浏览器 `/mini` 到全功能 `max`）
 
-- **核心**：`RAW_AGENT_STATE_DIR`、`RAW_AGENT_DAEMON_*`、`RAW_AGENT_MODEL_*`、`RAW_AGENT_API_KEY`、`RAW_AGENT_BASE_URL`、`RAW_AGENT_ANTHROPIC_URL`、`RAW_AGENT_USE_JSON_MODE`、`RAW_AGENT_MEMORY_BACKEND`、可选 `RAW_AGENT_AUTH_TOKEN`、可选 Lab 账号 `RAW_AGENT_OAUTH_*`（Google / GitHub）
-- **视觉**：`RAW_AGENT_VL_*`、图片上限等 — 见 `doc/ARCHITECTURE.md` 与 `.env.example`
-- **Evolution / 自愈 / Skills / 网关**：见 `AGENTS.md` 与 `.env.example`
+已发布至 npm（[`@mage-ai-lab/agent-loop`](packages/agent-loop/README.md) + `@mage-ai-lab/api-types`），提供 `step() / run() / for await / steer() / abort() / fold()`，原生支持图片 / 音频 / 视频 `MediaPart`（OpenAI、`qwen-omni`、Anthropic）：
+
+```bash
+pnpm add @mage-ai-lab/agent-loop
+```
+
+```ts
+import { createAssembledLoop, OpenAiChatAdapter } from '@mage-ai-lab/agent-loop';
+import { createDefaultMemoryStore, DEFAULT_EMBED_AGENT } from '@mage-ai-lab/agent-loop/mini';
+
+const { store, surface } = createDefaultMemoryStore({ agent: DEFAULT_EMBED_AGENT });
+const session = surface.createSession({ title: 'demo', mode: 'chat', agentId: DEFAULT_EMBED_AGENT.id });
+surface.appendMessage(session.id, 'user', [{ type: 'text', text: '帮我查一下上海今天的天气' }]);
+
+const loop = await createAssembledLoop({
+  preset: 'full', // mini（零 Node 依赖，可进浏览器/插件）| normal | full | max
+  io: {
+    store,
+    model: new OpenAiChatAdapter({
+      apiKey: process.env.OPENAI_API_KEY!,
+      baseUrl: process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
+      model: 'gpt-4o',
+      useJsonMode: false,
+    }),
+    tools: [{
+      name: 'fetch_weather',
+      description: '查询城市天气',
+      inputSchema: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
+      approvalMode: 'never',
+      sideEffectLevel: 'none',
+      execute: async (_ctx, args) => ({ ok: true, content: `${String(args.city)}：晴，22°C` }),
+    }],
+  },
+});
+
+const handle = loop.createHandle!(session.id);
+await handle.run();
+console.log(await handle.fold());
+```
+
+### 方案 B：完整多智能体宿主 `@ppeng/agent-core`
+
+直接在你自己的 Node.js 进程里实例化 `RawAgentRuntime`，获得 SQLite 持久化、工作区隔离、审批、Skills 与领域包挂载（详见 [`doc/EMBEDDING_SDK.md`](doc/EMBEDDING_SDK.md)，运行 `pnpm run test:examples` 可一次体验 `01`–`07` 全部无密钥示例）：
+
+```ts
+import { RawAgentRuntime, HeuristicModelAdapter } from '@ppeng/agent-core';
+
+const runtime = new RawAgentRuntime({
+  repoRoot: process.cwd(),
+  stateDir: './.my-agent-state',
+  modelAdapter: new HeuristicModelAdapter(), // 或 createModelAdapterFromEnv(process.env)
+});
+
+const session = runtime.createChatSession({ message: '你好，请自我介绍' });
+await runtime.runSession(session.id);
+console.log(runtime.getLatestAssistantText(session.id));
+```
 
 ---
 
-## 文档索引
+## 架构与代码版图
 
-**完整目录：** [`doc/README.md`](doc/README.md)（中英对照、含已移除文档说明）。
+![项目总览 · 产品入口与执行主干](doc/architecture/01.svg)
 
-| 文档 | 内容 |
+> 完整 8 分区矢量图与可编辑 `.excalidraw` 源文件（每个模块框均带真实源码路径索引）见 [`doc/architecture/README.md`](doc/architecture/README.md)。
+
+```text
+Agent Lab (Next.js 15) / Desktop (Electron) / CLI / IM & Connectors
+                                ↓  HTTP / SSE / 同源 Bearer 代理
+                  apps/daemon（认证 · 路由 · 调度器 · 健康检查）
+                                ↓
+         packages/core · RawAgentRuntime（Bot / Goal / Memory / Sandbox / Vault）
+                                ↓  注入 model / tools / storage / hooks
+     packages/agent-loop · createAssembledLoop（默认 kernel=agent-loop, preset=max）
+                                ↓
+         Turn Kernel → 构建上下文 → 模型流式推理 → 工具波与审批 → 下一轮 / 收尾核验
+```
+
+### Monorepo 目录结构
+
+| 路径 | 包名 | 职责说明 |
+|------|------|----------|
+| `packages/agent-loop` | `@ppeng/agent-loop`（npm: `@mage-ai-lab/agent-loop`） | 自研可嵌入 Turn 内核、四档装配、模型适配、流式看门狗与会话控制 |
+| `packages/api-types` | `@ppeng/api-types`（npm: `@mage-ai-lab/api-types`） | Daemon ↔ Lab 共享 HTTP 视图类型与浏览器安全查询辅助 |
+| `packages/core` | `@ppeng/agent-core` | 产品宿主运行时：Bot、Goal、五层记忆、沙箱、保险库、工具、Swarm、编排与存储 |
+| `packages/daemon-client` | `@ppeng/daemon-client` | CLI 与外部工具复用 Daemon HTTP/SSE 的类型化客户端 |
+| `packages/capability-gateway` | `@ppeng/agent-capability-gateway` | IM 渠道桥接（飞书 / 企微 / Slack / Webhook）与外部信息源网关 |
+| `packages/agent-sre` · `agent-stock` · `agent-homeiot` · `agent-erp` | `@ppeng/agent-*` | 可插拔领域身份与工具包（内置默认展示 SRE 只读值守与行情分析两套参照包） |
+| `apps/web-console` | `@ppeng/agent-lab-web` | **Agent Lab**：Next.js 15 App Router Web 工作台（`/api/*` 服务端代理至 Daemon） |
+| `apps/daemon` | `@ppeng/agent-daemon` | 本地 HTTP/SSE 服务、定时与目标调度器、`/api/readiness` 健康探针 |
+| `apps/desktop` | `@ppeng/agent-desktop` | **Raw Agent Desktop**：Electron 桌面客户端（macOS arm64 / Linux x64 & arm64） |
+| `apps/cli` | `@ppeng/agent-cli` | 命令行交互、任务与审批操作、`self-heal` 自愈控制与重启确认 |
+
+---
+
+## 工程质量与形式化门禁
+
+我们不靠「跑通一次 Demo」宣称稳定，而是用多层自动化门禁锁住每一次提交：
+
+- **可执行验收标准门禁（`pnpm run test:acceptance`）**：`481` 份已实现规格、`2,347` 条 `Given / When / Then` 标准全部与 `1,165+` 个可运行测试文件中的 `[AC:<id>#<AC-n>]` 标签双向绑定（详见 [`doc/ACCEPTANCE_GATE.md`](doc/ACCEPTANCE_GATE.md)）。
+- **可执行不变量与形式化验证（`pnpm run test:formal`）**：覆盖工具调用/结果配对、会话生命周期、重启恢复与并发写入不变量（[`doc/formal/README.md`](doc/formal/README.md)）。
+- **CRAP 复杂度 × 覆盖率棘轮（`pnpm run test:crap`）与变异测试（`pnpm run test:mutation`）**：严控圈复杂度膨胀与无效断言（[`doc/CRAP_GATE.md`](doc/CRAP_GATE.md)）。
+- **真实路径性能与缓存门禁（`pnpm run bench:lab`）**：对首页加载、会话首包延迟与提示词缓存前缀稳定性做回归卡点。
+- **从用户原话直达源码（`pnpm feature-map`）**：输入任意功能叫法（如 `pnpm feature-map 侧聊`），秒级定位界面入口、源码文件、验收规格与回归测试命令。
+
+---
+
+## 商业愿景与诚实交付边界
+
+产品的长期演进路径是：**从一只懂你的个人 Bot → 多角色虚拟员工团队 → 数字任务的「黑灯软件工厂」**（需求进入 → Super Bot 拆分派工 → 专业 Bot 执行 → 自动跑测与独立验收 → 汇总交付并沉淀例行任务）。
+
+为了确保评估者、接入方与团队对当前阶段有 100% 透明的预期，我们严格区分**已交付的软件能力**与**待现场验证/规划中的方向**：
+
+- **已交付组成件 vs. 商业北极星**：「24 小时虚拟员工」与「黑灯软件工厂」是建立在现有多目标、例行任务、群协作与多机配置之上的商业落地方向，**不代表**已出售开箱即用的固定岗位套餐，也**不构成** 7×24 可用性 SLA 或无人值守替代承诺。
+- **多机软件工厂与平台切片**：Super Bot 配置远程 SSH 机器别名、发现仓库与发起**只读试跑**已实现（`superbot-factory-setup`）；跨机器连续盯梢与端到端无人值守生产发布仍需按具体业务流程完成现场验收（见 [`doc/SINGLE_HOST_COMPLETION.md`](doc/SINGLE_HOST_COMPLETION.md)）。DeepResearch 当前为管线保存与运行入口 MVP；容器级沙箱（`container`）尚未实现；SQLite 仍为主状态库，K8s 多 Pod 会话接管尚未完整认证。
+- **运维自愈（Self-heal）与旧演进脚本说明**：`pnpm run start:cli self-heal start` / `pnpm run self-heal:flow` 是面向本仓库维护者的隔离 worktree 白名单跑测与修复流程，不是普通用户的日常聊天按钮。早期自进化流水线（`evolution:*` / `scripts/evolution*`）已于 **2026-10-16 停止维护冻结**，仅保留历史记录供查阅（见 [`scripts/evolution/DEPRECATED.md`](scripts/evolution/DEPRECATED.md)）。
+
+---
+
+## 常用命令速查
+
+| 命令 | 说明 |
 |------|------|
-| [Harness 实现指南](doc/harness/README.md) · [从零教程](doc/harness/from-zero/README.md) | 请求 → 循环 → 模型/工具 → 状态 → 验证的学习路线 |
-| [Agent Loop SDK 指南](skills/agent-loop/SKILL.md) | 装配档位、宿主契约、step/run/steer/fold 与 SDK 开发 |
-| [Jev 接入指南](doc/JEV_INTEGRATION.md) | Lab 配置、档位、12 个切入点及接线状态、PTC、回退与 trace |
-| [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md) | 模块、调度器、API、工具（`doc-sync-tools`） |
-| [`doc/ENV_REFERENCE.md`](doc/ENV_REFERENCE.md) | 环境变量索引 |
-| [`doc/TESTING.md`](doc/TESTING.md) · [`doc/CI.md`](doc/CI.md) | 测试矩阵 · GitHub Actions |
-| [`doc/MEMORY_MULTIUSER.md`](doc/MEMORY_MULTIUSER.md) | 五层记忆、`RAW_AGENT_MEMORY_BACKEND` |
-| [`doc/TEAMS_SWARM.md`](doc/TEAMS_SWARM.md) | Swarm 执行器、API、Lab Ops 面板 |
-| [`doc/AGENT_ORCHESTRATOR.md`](doc/AGENT_ORCHESTRATOR.md) | 编排 run/step/event、引擎 tick |
-| [`doc/DEEP_RESEARCH.md`](doc/DEEP_RESEARCH.md) | 研究任务、管线、HTTP 触发 |
-| [`doc/DOMAIN_AGENTS.md`](doc/DOMAIN_AGENTS.md) · [`doc/A2UI.md`](doc/A2UI.md) | 领域 Agent · A2UI |
-| [`doc/SELF_EVOLUTION_V2.md`](doc/SELF_EVOLUTION_V2.md) · [`doc/evolution/README.md`](doc/evolution/README.md) | Evolution 2.0 · 固定三步 |
-| [`doc/DEPLOYMENT.md`](doc/DEPLOYMENT.md) · [`doc/HARNESS_EVAL.md`](doc/HARNESS_EVAL.md) | 部署 · agent-eval |
-| [`doc/ROADMAP.md`](doc/ROADMAP.md) | 长期路线 P0–P4 |
-| [`AGENTS.md`](AGENTS.md) | 本仓库编码 Agent 约定 |
+| `pnpm run dev`（或 `pnpm run dev:lab`） | 并行启动 Daemon + Agent Lab 开发环境并自动绑定端口代理 |
+| `pnpm run build` | 编译全部 TypeScript 工作区包并构建 Next.js 生产前端 |
+| `pnpm run test:unit` | 运行工作区核心与前端/脚本单元测试（`node:test`） |
+| `pnpm --filter @ppeng/agent-loop run test` | 运行 `@ppeng/agent-loop` 的 Vitest 测试套件 |
+| `pnpm run test:acceptance` | 秒级静态校验 `acceptance/*.yaml` 与测试标签完整性 |
+| `pnpm run test:formal` | 运行配对、生命周期、重启与并发形式化验证 |
+| `pnpm run test:e2e` | 自拉起隔离随机端口与同源 Token 的 Daemon + Lab 并执行 Playwright |
+| `pnpm run ci` | 本地完整发布门禁（build + 性能 + unit + soak + acceptance + formal + fast eval + package + CRAP + regression + integration + e2e） |
+| `pnpm feature-map [关键词]` | 检索产品功能台账、实现入口与绑定回归测试（支持 `--json` / `--core`） |
+| `pnpm run start:daemon` / `pnpm run pm2:start` | 直接启动或使用 PM2 守护运行受监督的 Daemon |
+| `pnpm run start:cli` | 启动命令行工具（`chat`、`send`、任务审批、`self-heal` 等） |
+| `pnpm run build:desktop` | 打包当前系统架构对应的 Electron 桌面安装包 |
+| `pnpm run doctor` / `pnpm run ai:tools` | 本机运行环境健康诊断 / 检测 `claude`、`codex`、`cursor` 等外部 CLI |
 
 ---
 
-## CI
+## 配置原则与安全隐私
 
-`pnpm run ci` 执行构建、单测、formal、fast 契约 eval、评估引擎 simulation、tarball 安装自检、CRAP、HTTP 回归、integration 与 E2E。命令见 [`package.json`](package.json)，流程见 [CI](doc/CI.md)。npm 与 Docker 必须先通过门禁并验证实际产物才发布；部署边界见[发布可靠性计划](doc/RELEASE_RELIABILITY_PLAN.md)，新功能/提示词的真实模型配对回归见 [Harness 评估](doc/HARNESS_EVALUATION.md)。simulation 不代表能力提升。可选真模型冒烟需要凭证；fork PR 无法读取上游 Secret。
+- **界面优先，少堆环境变量**：模型供应商、循环档位（`GET/PATCH /api/loop/settings`）、沙箱模式、技能路由、收尾跟进、A2UI 与领域包开关等均走 **Agent Lab 设置界面 + SQLite 持久化热配置**，保存后按各自范围立即生效，无需反复改 `.env` 重启。
+- **环境变量职责聚焦**：`.env` 仅用于上游密钥与地址（`RAW_AGENT_API_KEY`、`RAW_AGENT_BASE_URL`、`RAW_AGENT_MODEL_NAME`、可选视觉路由 `RAW_AGENT_VL_*`）、进程引导（端口、`RAW_AGENT_AUTH_TOKEN`、可选 OAuth `RAW_AGENT_OAUTH_*`）及 CI 回退。完整索引见 [`.env.example`](.env.example) 与 [`doc/ENV_REFERENCE.md`](doc/ENV_REFERENCE.md)。
+- **安全基线**：
+  - **切勿提交 `.env` 或 `gateway.config.json`**：只以 `.env.example` 与 `gateway.config.example.json` 为模板；一旦密钥误入日志或提交记录请立即轮换。
+  - **同源代理与鉴权**：生产或局域网部署请设置 `RAW_AGENT_AUTH_TOKEN`（Next 服务端代理自动注入 Bearer，浏览器端不暴露 Token）并按需收敛 `RAW_AGENT_CORS_ORIGIN`，切勿将未鉴权 Daemon 暴露至公网。
 
 ---
 
-## 安全与隐私
+## 给 AI Coding Agent 的协作指引
 
-- **`.env` 已在 `.gitignore` 中** — 勿将 API Key、飞书 Secret、网关 token 等提交到 Git；仅以 `.env.example` 为模板。
-- 若密钥曾误提交、贴在 Issue 或打进日志，请 **轮换密钥**。
-- **网关**（`gateway.config.json`）：`bridgeSecret` 与各通道凭证勿入库；可参考 `gateway.config.example.json`。
-- **CI**：fork PR 无 Secret，设计为无法窃取上游密钥。
-- **Daemon**：跨域请配置 `RAW_AGENT_CORS_ORIGIN`；生产环境建议设置 `RAW_AGENT_AUTH_TOKEN`（Bearer）；勿把未鉴权 Daemon 暴露到不可信网络。Lab 多人隔离可配 `RAW_AGENT_OAUTH_GOOGLE_*` / `RAW_AGENT_OAUTH_GITHUB_*`（见 `.env.example`）。
+如果你是正在本仓库工作的 **Cursor、Claude Code、Codex 或 Antigravity**：
+
+1. **先读 [`AGENTS.md`](AGENTS.md)**：了解界面优先配置、前端 i18n（`useI18n` 中英同 key）、Web 控制台 CRAP 0% 覆盖棘轮规则与审查合并约定。
+2. **定位产品行为先跑 `pnpm feature-map <词>`**：修改用户可见行为或仓库技能后，按 [`skills/product-prd/SKILL.md`](skills/product-prd/SKILL.md) 更新说明并运行 `node scripts/prd/build-catalog.mjs`。
+3. **验收优先工作流**：新需求或行为变更按 [`skills/acceptance-first/SKILL.md`](skills/acceptance-first/SKILL.md) 编写 `acceptance/<id>.yaml` 与带 `[AC:<id>#<AC-n>]` 标签的测试，跑通 `pnpm run test:acceptance`。
+4. **Loop SDK 契约同步**：凡修改 `packages/agent-loop`，必须同步更新 [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md)，并跑通该包的 `pnpm run test` 与 `pnpm run build`（确保 `/mini` 不引入任何 Node 内置模块）。
+5. **子进程沙箱**：新增 `spawn` 必须走 `sanitizeSpawnEnv()` 或 `SandboxManager`，严禁裸传完整父进程环境。
+
+---
+
+## 文档总入口
+
+完整中英对照手册目录见 **[`doc/README.md`](doc/README.md)**：
+
+- **产品与交互规格**：[Bot 完整功能说明](doc/bot/00-functional-guide.md) · [Bot 01–10 分章目录](doc/bot/README.md) · [产品需求目录](doc/prd/README.md) · [Bot 调教手册](doc/bot/BOT_COACHING_PLAYBOOK.md)
+- **原理与架构导读**：[8 分区 Excalidraw 架构图](doc/architecture/README.md) · [Harness 00–20 纵向切片](doc/harness/README.md) · [从零教程](doc/harness/from-zero/README.md) · [架构参考](doc/ARCHITECTURE.md)
+- **SDK 与扩展接入**：[Agent Loop SDK 指南](skills/agent-loop/SKILL.md) · [Core 嵌入指南](doc/EMBEDDING_SDK.md) · [领域包开发](doc/DOMAIN_AGENTS.md) · [A2UI 协议](doc/A2UI.md) · [外部任务交接](doc/EXTERNAL_AGENT_HANDOFF.md)
+- **质量、运维与路线**：[测试矩阵](doc/TESTING.md) · [CI 与发布门禁](doc/CI.md) · [Docker / Compose / Helm 部署](doc/DEPLOYMENT.md) · [npm 可信发布](doc/NPM_PUBLISH.md) · [长期路线图](doc/ROADMAP.md)
 
 ---
 
 ## 许可证
 
-`package.json` 标记为 **private**。若日后开源请补充 SPDX 许可证文件。
+仓库根 `package.json` 标记为 **private**；公开 npm 子包（`@mage-ai-lab/agent-loop`、`@mage-ai-lab/api-types`）按各自发布配置分发（详见 [`doc/NPM_PUBLISH.md`](doc/NPM_PUBLISH.md)）。
