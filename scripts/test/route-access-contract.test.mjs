@@ -123,8 +123,8 @@ export async function bootDaemon(env, { gatewayPrefix } = {}) {
    * `as`: 'A' | 'B' | 'C' (Lab user), 'anon' (Lab proxy, no cookie), 'operator' (bearer, no Lab header), 'raw'.
    * `lab: false` drops the `x-ppeng-lab` header while keeping the user's cookie.
    */
-  async function call(as, method, path, body, { lab = as !== 'raw' && as !== 'operator' } = {}) {
-    const headers = { 'content-type': 'application/json' };
+  async function call(as, method, path, body, { lab = as !== 'raw' && as !== 'operator', extraHeaders = {} } = {}) {
+    const headers = { 'content-type': 'application/json', ...extraHeaders };
     if (lab) headers['x-ppeng-lab'] = '1';
     if (env.RAW_AGENT_AUTH_TOKEN && as !== 'raw') headers.authorization = `Bearer ${env.RAW_AGENT_AUTH_TOKEN}`;
     if (tokens[as]) headers.cookie = `ppeng_lab_session=${tokens[as]}`;
@@ -633,4 +633,43 @@ test('Bot goal reads and writes reject another owner and preserve session-scoped
   assert.equal(bRead.status, 200);
   assert.ok(!bRead.text.includes(a.goal.id));
   assert.ok(!bRead.text.includes('A-PRIVATE'));
+});
+
+test('the host cache monitor only returns aggregate data to the local operator [AC:magpie-cache-monitor#AC-3]', async t => {
+  const d = await bootDaemon(labEnv({ RAW_AGENT_AUTH_TOKEN: DAEMON_TOKEN }));
+  t.after(async () => { await d.close(); await d.runtime.destroy(); });
+  const url = '/api/ops/magpie-cache';
+  for (const [who, status] of [['anon', 401], ['A', 403], ['C', 403]]) assert.equal((await d.call(who, 'GET', url)).status, status, who);
+  const read = () => d.call('operator', 'GET', url);
+  assert.deepEqual((await read()).data, { summary: null });
+  const checkedAt = '2026-11-19T09:00:00Z';
+  const window = { from: '2026-11-19T08:00:00Z', to: checkedAt, requests: 10, input: 1000, cached: 400, hitRequests: 8, ratio: 0.4, requestHitRatio: 0.8 };
+  const row = { provider: 'codex', model: 'codex/test', status: 'degraded', incidentOpen: true, lastValidAt: checkedAt, window, reference: window };
+  const summary = { version: 1, checkedAt, lastValidAt: checkedAt, sourceStatus: 'ok', models: [row] };
+  const dir = join(d.runtime.stateDir, 'monitoring');
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, 'magpie-cache-summary.json');
+  const privateDetail = { prompt: 'internal raw conversation', rid: 'private-correlation-id' };
+  writeFileSync(path, JSON.stringify({ ...summary, ...privateDetail, models: [{ ...row, ...privateDetail, window: { ...window, ...privateDetail } }] }));
+  const ok = await read();
+  assert.equal(ok.status, 200);
+  assert.deepEqual(ok.data, { summary });
+  writeFileSync(path, '{"broken');
+  const corrupt = await read();
+  assert.equal(corrupt.status, 503);
+  assert.equal(corrupt.text.includes(d.runtime.stateDir), false);
+});
+
+
+test('cache health is visible in the loopback single-user Lab only [AC:magpie-cache-monitor#AC-3]', async t => {
+  const d = await bootDaemon({});
+  t.after(async () => { await d.close(); await d.runtime.destroy(); });
+  const read = (browser, bound) => d.call('anon', 'GET', '/api/ops/magpie-cache', undefined, {
+    extraHeaders: { 'x-ppeng-browser-host': browser, 'x-forwarded-host': bound }
+  });
+  assert.deepEqual((await read('localhost:23000', 'localhost:23000')).data, {summary:null});
+  assert.equal((await read('host.example.test', 'localhost:23000')).status, 403);
+  assert.equal((await read('localhost:23000', '0.0.0.0:23000')).status, 403);
+  assert.equal((await read('', '')).status, 403);
+  assert.equal((await d.call('raw', 'GET', '/api/ops/magpie-cache')).status, 403, 'direct clients need the operator credential');
 });

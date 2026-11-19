@@ -1,0 +1,19 @@
+id: magpie-cache-monitor
+title: 监控本机 Lab 的实际模型缓存命中率
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  再看下 Magpie 和本机 Lab 的日志，对比下优化前后的实际缓存命中率，也把命中率加到监控里，持续下降时能及时提醒我。
+criteria:
+  - id: AC-1
+    given: 多个客户端共用代理，真实调用和不完整的用量记录混在一起
+    when: 查看本机 Lab 的缓存利用情况
+    then: 仅汇总能精确归属到本机 Lab 且用量完整的成功请求，分别显示缓存输入占比、请求命中比例和样本数，可按模型核查
+  - id: AC-2
+    given: 优化后已积累可比较的真实流量
+    when: 连续多个独立且样本充足的时段低于参照水平
+    then: 提醒一次并给出实际值、参照和样本量；重复检查、零流量或缺失日志不会产生重复告警或虚假的恢复
+  - id: AC-3
+    given: 本机监控正在定期运行
+    when: 查看当前结果或遇到数据缺口
+    then: 可以区分正常、持续退化和观测不足，并看到最后一次有效观测的时间

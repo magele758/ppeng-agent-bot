@@ -124,6 +124,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/skills', AUTHENTICATED],
     ['GET /api/optional-tool-groups', AUTHENTICATED],
     ['GET /api/doctor', ADMIN],
+    ['GET /api/ops/magpie-cache', ADMIN],
     ['GET /api/workspaces', ADMIN],
     ['GET /api/background-jobs', ADMIN],
     ['POST /api/scheduler/run', ADMIN],

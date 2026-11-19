@@ -3675,6 +3675,17 @@
       ]
     },
     {
+      "id": "magpie-cache-monitor",
+      "title": "监控本机 Lab 的实际模型缓存命中率",
+      "tests": [
+        "e2e/magpie-cache-health.spec.ts",
+        "scripts/test/magpie-cache-monitor.test.mjs",
+        "scripts/test/magpie-cache-policy.test.mjs",
+        "scripts/test/magpie-cache-source.test.mjs",
+        "scripts/test/route-access-contract.test.mjs"
+      ]
+    },
+    {
       "id": "mandatory-skill-gate",
       "title": "高危面必须先加载对应技能",
       "tests": [

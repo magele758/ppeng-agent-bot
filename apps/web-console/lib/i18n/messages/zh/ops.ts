@@ -108,6 +108,28 @@ export const ops = {
     open: '打开「设置 → 运维 · 系统健康」'
   },
 
+  cache: {
+    stale: '监控更新已延迟，以下为上次检查保存的结果。',
+    lastWindow: '上次检查时段',
+    title: 'Magpie 模型缓存',
+    checked: '最后检查',
+    lastValid: '最后有效观测',
+    never: '尚无',
+    empty: '还没有监控结果。',
+    unavailable: '监控数据暂不可用。',
+    incomplete: '部分日志缺失，本次观测不完整。',
+    healthy: '正常',
+    watching: '正在观察下降趋势',
+    degraded: '持续退化',
+    insufficient: '观测不足',
+    window: '时段',
+    current: '当前',
+    reference: '参照',
+    period: '起止时间',
+    noWindow: '暂无数据',
+    tokenRatio: '缓存输入占比（命中 / 输入 token）',
+    hitRatio: '请求命中比例（命中 / 样本数）',
+  },
   health: {
     overallAria: '健康总览',
     levelOk: '一切正常',

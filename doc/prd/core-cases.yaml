@@ -95,15 +95,17 @@ cases:
       - agent-skill-management
   - id: ops-without-evolution
     route: "#/settings/ops/health"
-    aliases: [运维, 服务健康, 自愈, health]
+    aliases: [运维, 服务健康, 自愈, Magpie, 模型缓存命中率, health]
     sources:
       - apps/web-console/components/sections/ops/OpsSection.tsx
+      - apps/web-console/components/sections/ops/MagpieCacheHealth.tsx
       - apps/web-console/lib/nav.ts
     title: 运维页能看服务和自愈，没有演进入口；工具默认按层提供，不是一次全给
     chapters:
       - 07-evolution-and-platform
     specs:
       - ops-console
+      - magpie-cache-monitor
       - tool-exposure-tiers
   - id: bot-switch
     route: "#/bot"

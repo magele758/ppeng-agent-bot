@@ -128,15 +128,16 @@ node scripts/prd/core-cases.mjs
 
 `ops-without-evolution`
 
-入口 `#/settings/ops/health` · 常用叫法 运维、服务健康、自愈、health
+入口 `#/settings/ops/health` · 常用叫法 运维、服务健康、自愈、Magpie、模型缓存命中率、health
 
-实现入口 [apps/web-console/components/sections/ops/OpsSection.tsx](../../apps/web-console/components/sections/ops/OpsSection.tsx)、[apps/web-console/lib/nav.ts](../../apps/web-console/lib/nav.ts)
+实现入口 [apps/web-console/components/sections/ops/OpsSection.tsx](../../apps/web-console/components/sections/ops/OpsSection.tsx)、[apps/web-console/components/sections/ops/MagpieCacheHealth.tsx](../../apps/web-console/components/sections/ops/MagpieCacheHealth.tsx)、[apps/web-console/lib/nav.ts](../../apps/web-console/lib/nav.ts)
 
 回归 `node scripts/prd/core-cases.mjs --case ops-without-evolution`
 
 对应现状：[自愈、演进与平台能力](current/07-evolution-and-platform.md)
 
 - `ops-console` 运维页：系统健康总览与轨迹浏览
+- `magpie-cache-monitor` 监控本机 Lab 的实际模型缓存命中率
 - `tool-exposure-tiers` 工具三层分类与独立的渐进和全量提供方式
 
 ## 流式回复期间切换 Bot，聊天记录和发送目标跟随当前会话

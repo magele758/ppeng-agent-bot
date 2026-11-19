@@ -3235,6 +3235,16 @@ macOS 应用控制（外层宿主）
 - `e2e/macos-app-control.spec.ts`
 - `packages/core/test/app-control.test.js`
 
+### magpie-cache-monitor
+
+监控本机 Lab 的实际模型缓存命中率
+
+- `e2e/magpie-cache-health.spec.ts`
+- `scripts/test/magpie-cache-monitor.test.mjs`
+- `scripts/test/magpie-cache-policy.test.mjs`
+- `scripts/test/magpie-cache-source.test.mjs`
+- `scripts/test/route-access-contract.test.mjs`
+
 ### mandatory-skill-gate
 
 高危面必须先加载对应技能
