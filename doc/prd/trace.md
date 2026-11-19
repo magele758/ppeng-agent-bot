@@ -2510,6 +2510,12 @@ Bot 设置优先展示基本信息与已有定时任务
 - `apps/web-console/components/compact-bot-settings.test.ts`
 - `apps/web-console/components/routine-editor-dialog.test.ts`
 
+### compact-reply-spacing
+
+同一次回复中的相邻段落保持紧凑
+
+- `e2e/composer-quote-layout.spec.ts`
+
 ### composer-draft-per-session
 
 聊天输入框草稿按会话隔离

@@ -1415,6 +1415,13 @@
       "file": "acceptance/compact-bot-settings.yaml"
     },
     {
+      "id": "compact-reply-spacing",
+      "title": "同一次回复中的相邻段落保持紧凑",
+      "requirement": "这个会话一直看着很难受，怎么空行这么大，帮我优化一下这个对话流的界面",
+      "verificationStage": "software",
+      "file": "acceptance/compact-reply-spacing.yaml"
+    },
+    {
       "id": "composer-draft-per-session",
       "title": "聊天输入框草稿按会话隔离",
       "requirement": "聊天页输入框里未发送的草稿，在切换到另一个 bot（或会话）后仍然显示，把在 A bot 输入的内容带到了 B bot。\n需求：草稿按 bot/会话隔离：切换到 B 时显示 B 自己的草稿（没有则为空）；切回 A 时恢复 A 之前未发送的草稿\n（含输入文字；附件/引用/上下文标签等 composer 状态若现有结构支持也一并按会话隔离，至少保证文字）；\n发送成功后清空该会话草稿（保持现有「发送后先挂乐观气泡、再清空、再等待请求」的顺序与行为）；\n刷新页面若项目已有草稿持久化机制则沿用并按 key 隔离，否则内存级即可。\n注意流式进行中切换、新建会话、语音输入（麦克风）回填等边界。",

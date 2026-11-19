@@ -224,3 +224,10 @@
 .lab-shell .chat-turn--streaming {
   margin-bottom: 22px;
 }
+
+/* The existing bubble padding separates consecutive prose. Cards and actions keep their own space. */
+.lab-shell .chat-reply-run > .chat-turn--assistant:has(.chat-bubble > .chat-bubble__md:last-child) {
+  &:not(:has(.chat-turn__actions > *)):has(+ .chat-turn--continued .chat-bubble > .chat-bubble__md:first-child) {
+    margin-block-end: 0;
+  }
+}

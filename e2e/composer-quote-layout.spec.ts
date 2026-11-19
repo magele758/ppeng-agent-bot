@@ -5,7 +5,8 @@ const sid = 'polish-session';
 const bot = { id: 'polish-bot', name: 'Polish Bot', agentId: 'general', canonicalSessionId: sid };
 const session = { id: sid, title: bot.name, mode: 'chat', status: 'idle', agentId: 'general', metadata: { botId: bot.id, canonicalBotChat: true } };
 const message = (id: string, text: string, role = 'assistant', key?: string, createdAt?: string) => ({ id, createdAt, seq: Number(id.replace(/\D/g, '')) || 1, role, parts: [{ type: 'text', text }], ...(key ? { key } : {}) });
-async function setup(page: Page, messages = [message('m1', '这是一条可引用的回复。\n'.repeat(12))]) {
+type FixtureMessage = Omit<ReturnType<typeof message>, 'parts'> & { parts: Array<Record<string, unknown>> };
+async function setup(page: Page, messages: FixtureMessage[] = [message('m1', '这是一条可引用的回复。\n'.repeat(12))]) {
   await page.addInitScript(() => { localStorage.setItem('lab.locale', 'zh'); localStorage.setItem('theme', 'light'); });
   await page.route('**/api/bots', r => r.fulfill({ json: { bots: [bot] } }));
   await page.route('**/api/bots/polish-bot/open', r => r.fulfill({ json: { bot, session } }));
@@ -86,4 +87,72 @@ test('all parts of a bot reply share one action row at the end [AC:whole-reply-h
   await expect(quote).toHaveCSS('opacity','1');
   await quote.click();
   await expect(page.getByTestId('composer-reply-quote')).toContainText('已读取配置。 检查完成。');
+});
+
+async function setupReplySpacing(page: Page, messages: FixtureMessage[]) {
+  // These layout fixtures exercise real components without depending on a running account or its preferences.
+  await page.route('**/api/**', r => r.fulfill({ status: 503, json: { error: 'fixture' } }));
+  await page.route('**/api/auth/me', r => r.fulfill({ json: { loginRequired:false, user:null, providers:[] } }));
+  await page.route('**/api/bot-work/default', r => r.fulfill({ json: { bot, session } }));
+  await setup(page, messages);
+}
+
+test('consecutive reply segments use paragraph spacing on desktop and narrow screens [AC:compact-reply-spacing#AC-1] [AC:compact-reply-spacing#AC-2]', async ({page}) => {
+  const intro = message('m2', '第一步已经完成。');
+  const middle = message('m3', '第二步检查完成。\n\n同一段消息里的下一段。');
+  await setupReplySpacing(page, [
+    message('m1', '开始检查', 'user'),
+    intro, middle,
+    message('m4', '检查结果已准备好。'),
+    message('m5', '再检查一次', 'user'),
+    message('m6', '收到。'),
+  ]);
+  const run = page.locator('.chat-reply-run').first();
+  const prose = run.locator('.chat-bubble__md');
+  await expect(prose).toHaveCount(3);
+  for (const width of [1218,390]) {
+    await page.setViewportSize({width,height:900});
+    const gaps = await prose.evaluateAll(blocks => blocks.slice(1).map((block,index) =>
+      block.getBoundingClientRect().top - blocks[index].getBoundingClientRect().bottom));
+    expect(gaps.every(gap=>gap >= 6 && gap <= 10), 'adjacent prose gaps: ' + gaps).toBe(true);
+    const paragraphs = prose.nth(1).locator('p');
+    await expect(paragraphs).toHaveCount(2);
+    const paragraphGap = await paragraphs.evaluateAll(([a,b]) => b.getBoundingClientRect().top - a.getBoundingClientRect().bottom);
+    expect(paragraphGap).toBeGreaterThan(4);
+    const end = await run.getByTestId('reply-quote-start').boundingBox();
+    const next = await page.locator('.chat-turn--user', {hasText:'再检查一次'}).boundingBox();
+    expect(next!.y - (end!.y+end!.height)).toBeGreaterThan(12);
+  }
+  await expect(run.getByTestId('reply-quote-start')).toHaveCount(1);
+  await run.getByTestId('reply-quote-start').click();
+  await expect(page.getByTestId('composer-reply-quote')).toContainText('检查结果已准备好。');
+});
+
+test('process details in a multipart reply can still expand and collapse [AC:compact-reply-spacing#AC-2]', async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem('lab.sessionBrief', '0'));
+  await setupReplySpacing(page, [
+    message('m1', '检查一下。', 'user'),
+    message('m2', '开始检查。'),
+    { ...message('m3',''), parts: [{type:'reasoning',text:'核对检查顺序。'}] },
+    { ...message('m4',''), parts: [{type:'tool_call',toolCallId:'check',name:'bash',input:{command:'pwd'}}] },
+    { ...message('m5','','tool'), parts: [{type:'tool_result',toolCallId:'check',name:'bash',ok:true,content:'CHECKED_WORKDIR'}] },
+    message('m6', '检查已完成。'),
+  ]);
+  const run = page.locator('.chat-reply-run');
+  const beforeProcess = run.locator('.chat-turn--assistant', {hasText: '开始检查。'});
+  await expect(beforeProcess).toHaveCSS('margin-bottom','22px');
+  for (const [selector, text] of [
+    ['.chat-tool-fold--reasoning','核对检查顺序。'],
+    ['.chat-tool-fold--result','CHECKED_WORKDIR'],
+  ]) {
+    const detail = run.locator(selector);
+    const summary = detail.locator(':scope > summary');
+    await expect(detail).not.toHaveAttribute('open','');
+    await summary.click();
+    await expect(detail).toHaveAttribute('open','');
+    await expect(detail).toContainText(text);
+    await summary.click();
+    await expect(detail).not.toHaveAttribute('open','');
+  }
+  await expect(run.getByTestId('reply-quote-start')).toHaveCount(1);
 });

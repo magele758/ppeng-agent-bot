@@ -2850,6 +2850,13 @@
       ]
     },
     {
+      "id": "compact-reply-spacing",
+      "title": "同一次回复中的相邻段落保持紧凑",
+      "tests": [
+        "e2e/composer-quote-layout.spec.ts"
+      ]
+    },
+    {
       "id": "composer-draft-per-session",
       "title": "聊天输入框草稿按会话隔离",
       "tests": [
