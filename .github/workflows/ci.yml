@@ -87,9 +87,16 @@ jobs:
       actions: read
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Lab candidate
+        run: pnpm run build
+      - name: Check Lab performance on this PR
+        uses: ./.github/actions/lab-performance
       - name: Block merge while main full validation is red
         env:
           GH_TOKEN: ${{ github.token }}

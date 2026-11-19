@@ -96,14 +96,16 @@ function runPlaywright(registry, env) {
   });
 }
 
-export async function runIsolatedLab(registry, runTest) {
-  const buildStatus = ensureNextBuild();
+export async function runIsolatedLab(registry, runTest, { prepareState, serviceEnv = process.env, allowBuild = true } = {}) {
+  if (!allowBuild && !nextBuildUsable()) throw new Error('Build the production Lab with pnpm run build before starting the benchmark.');
+  const buildStatus = allowBuild ? ensureNextBuild() : 0;
   if (buildStatus !== 0) return buildStatus;
 
+  const stateDir = registry.trackDir(mkdtempSync(join(tmpdir(), 'ppeng-e2e-')));
+  if (prepareState) await prepareState(stateDir);
   const daemonPort = await freePort();
   let webPort = await freePort();
   while (webPort === daemonPort) webPort = await freePort();
-  const stateDir = registry.trackDir(mkdtempSync(join(tmpdir(), 'ppeng-e2e-')));
   const daemonBase = `http://127.0.0.1:${daemonPort}`;
   const webBase = `http://127.0.0.1:${webPort}`;
   const e2eBearer = randomBytes(24).toString('hex');
@@ -111,7 +113,7 @@ export async function runIsolatedLab(registry, runTest) {
   registry.spawnService('daemon', process.execPath, ['apps/daemon/dist/server.js'], {
     cwd: repoRoot,
     env: {
-      ...envForEphemeralDaemon(),
+      ...envForEphemeralDaemon(serviceEnv),
       RAW_AGENT_DAEMON_HOST: '127.0.0.1',
       RAW_AGENT_DAEMON_PORT: String(daemonPort),
       RAW_AGENT_STATE_DIR: stateDir,
@@ -123,7 +125,7 @@ export async function runIsolatedLab(registry, runTest) {
   registry.spawnService('next', process.execPath, [nextBin, 'start', '-p', String(webPort), '-H', '127.0.0.1'], {
     cwd: webConsoleDir,
     env: {
-      ...envForEphemeralDaemon(),
+      ...envForEphemeralDaemon(serviceEnv),
       DAEMON_PROXY_TARGET: daemonBase,
       RAW_AGENT_AUTH_TOKEN: e2eBearer
     }

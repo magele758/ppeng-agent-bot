@@ -25,7 +25,7 @@ try{
     'packages/core/test/bots.test.js','packages/core/test/bot-goal-result-return.test.js','scripts/test/ci-action-reliability.test.mjs','scripts/test/settings-route-contracts.test.mjs','scripts/test/e2e-suite.test.mjs','apps/web-console/lib/feed-window.test.ts',
     'scripts/test/ci-parallel-validation.test.mjs','packages/core/test/approval-policy.test.js','packages/core/test/permission-mode.test.js',
     'scripts/test/ci-fast-bihourly.test.mjs','scripts/test/changed-complexity.test.mjs','scripts/test/main-full-health.test.mjs','scripts/test/core-unit-scope.test.mjs','scripts/test/ci-audit.test.mjs','scripts/test/ci-verification-evidence.test.mjs',
-    'scripts/test/ci-evidence-review-drift.test.mjs','scripts/test/ci-performance-clock.test.mjs','scripts/test/ci-gate-measurements.test.mjs',
+    'scripts/test/ci-evidence-review-drift.test.mjs','scripts/test/ci-performance-clock.test.mjs','scripts/test/ci-gate-measurements.test.mjs','scripts/test/lab-performance-gate.test.mjs',
     'scripts/test/ci-speedup-workflow.test.mjs','scripts/test/release-workflow-policy.test.mjs','scripts/test/acceptance-lib.test.mjs','scripts/test/acceptance-stages.test.mjs']);
   run(['scripts/integration-test.mjs']);
   run(['scripts/acceptance/acceptance-gate.mjs']);

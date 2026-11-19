@@ -1,0 +1,16 @@
+name: Lab performance budget
+description: Measure the built candidate with isolated local services and retain the results
+runs:
+  using: composite
+  steps:
+    - name: Measure Lab responsiveness
+      shell: bash
+      run: timeout --kill-after=10s 3m node scripts/lab-performance/run.mjs
+    - name: Preserve Lab performance report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: lab-performance
+        path: test-results/lab-performance/report.json
+        if-no-files-found: error
+        retention-days: 30

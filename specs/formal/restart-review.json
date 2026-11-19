@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-19T09:10:31.000Z",
-  "reviewNote": "Reviewed the per-Bot thinking effort pin on top of the reviewed main manifests (Daydream polling and idle Bot scheduler fingerprints are unchanged). fitProductModelRequest in l5-bindings.ts now passes the session metadata.thinkingEffort (off | low | medium | high) to applyThinkingEffortToTurn, which only sets or removes reasoningEffort on the outgoing model request; messages, tools, the prepared model view and turn outcomes are unchanged. inheritModelOverride in spawn-policy.ts also copies a valid thinkingEffort pin into child metadata next to modelOverride; permission mode, allowlists and the planner exclusion are unchanged. bot_update in product-admin-tools.ts forwards thinkingEffort to updateBot, which validates it before any write, and botView echoes it. sessions.ts validates metadata.thinkingEffort on session create and applies Bot pins through updateBot before openBot, as it already did for modelOverride. Pairing, lifecycle, restart and concurrency probes and mutations passed while fingerprints were needs-review. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-19T10:00:09.114Z",
+  "reviewNote": "The root CI command, bench:lab and the release HTTP job invoke the performance runner. Quick CI adds tests for malformed measurements, failure reporting and workflow wiring. The restart and formal commands retain their OS-process fixtures, crash cuts and fault controls.",
   "mapping": [
     {
       "step": "Production startup, persistence, writer claims and graceful shutdown (HTTP drain not exercised)",
@@ -453,9 +453,9 @@
     "scripts/formal/run-restart-verification.mjs": "ca9423e352534619b1f7107ff8aadf455b530d0ec93d419d4f2e31d86570f7d1",
     "scripts/test/session-restart-recovery-verification.test.mjs": "f0e29fc1b42280c8fd4f18b59f590ce669229920056e84b73c73f593aca256d7",
     "skills/verify-session-restart/SKILL.md": "ac32ffd6d9f0b84852c7d3ebb6f05503d485a1d4d03a2553a5cc23fb385bf194",
-    "package.json": "913b4520b72ae6d070bd5233bba8720295fa264a5675b5f45d90c7087de38bce",
+    "package.json": "f6d102913c335c931c07ed13f10b685b913487a0457a47e549fc68e3a5d968e5",
     "scripts/formal/run-formal-regression.mjs": "f6a9d8e8a45d372115a9e81ca0ab800ff32bac727a349ae73ca6bb35dcd1076d",
-    ".github/workflows/release-gate.yml": "627734b5e304825f29a6c037da6e8b244cc2f30cf6cce55c07e828fe5db09f4b",
+    ".github/workflows/release-gate.yml": "a253118c881ee14051ff2977b8030b7078ab7a56999da59187bf0f8046ac0e17",
     "scripts/formal/lifecycle-verifier.mjs": "3555385ae003dbf6ac4e6e54021e1b6cbc4979be7f43c25ba3573ad32f8e1195",
     "scripts/formal/pairing-verifier.mjs": "1e6231655bb707d4bf7c29285a786eeefcafe98d42502538e6c63fcefe957e98",
     "scripts/formal/restart-cases.mjs": "52101fb273241e7bdafabf5d5bff91c3dca25d14729c9b5376f518e92e17ca78",
@@ -510,7 +510,7 @@
     "scripts/ci/validation-lane.mjs": "4bd43ff55f1c6708f6acc7c135a27693d4eb2ab00c26f988de84845c6af653be",
     "scripts/ci/release-results.mjs": "6396174f7b0ad6fcdf164adb0320e32ee24767220c60133fe17ed4afe680835a",
     "scripts/ci/test-partition.mjs": "d6018aebae05ebc907ddd0de10c6905ee68e0c1ab2406057a7f09bb21b8ed28e",
-    "scripts/ci/quick-gate.mjs": "5c1072c45613eeb4ac6b4236e89cf50416e817f3c9ed97a6c8f3d6e26a7a40cd",
+    "scripts/ci/quick-gate.mjs": "12445fdd0999f77aed45405c8fdbe229666ef2e51249bff112dfd5019bb5c973",
     "scripts/test/ci-speedup-workflow.test.mjs": "291d702d5da3d0f5c22838acf32c4601a3cf7f4a28b8c81840540427c3eca4a9",
     "scripts/test/ci-parallel-validation.test.mjs": "1f262fe4c6b3d34fd40120f965972be6f955ab341e9513be5e350b663987f4da",
     "scripts/ci/retry-failed-tests.mjs": "48fb79b3392941919d46a76a227769d1f61bf1f8bce79206c33b6e1130c9de4a",

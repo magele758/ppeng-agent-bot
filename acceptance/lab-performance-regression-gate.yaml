@@ -1,0 +1,23 @@
+id: lab-performance-regression-gate
+title: 固定基准拦截 Lab 性能退化
+status: approved
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  这次修复挺好的，做一个基准测试，以后如果降级了要能拦截和及时发现
+criteria:
+  - id: AC-1
+    given: 固定的多 Bot 历史数据包含已完成的目标和每日复盘
+    when: 测量空闲调度及其间 Lab 页面依赖的请求
+    then: 报告延迟和后台重复工作的观测值，预算超标或采样不完整时失败
+  - id: AC-2
+    given: 普通会话和 Bot 使用本地可控的模型与桌面工具替身
+    when: 预热后从正常入口发送首条消息并比较不同会话阶段的请求
+    then: 本地准备耗时超标、重复连接或可复用的请求前缀发生漂移时失败
+  - id: AC-3
+    given: 提交进入合并检查或主分支的定期验证
+    when: 性能基准通过、退化或无法完成
+    then: 验证保留可定位的结果，并将退化或未完成报告为失败，阻止带有失败结果的变更合并
+  - id: AC-4
+    given: 用户首次进入首页，或重新打开记住的 Bot 对话
+    when: 浏览器基准在输入框可用时输入一次草稿，并等待对应对话完成打开
+    then: 交互耗时包含打开对话与验证草稿仍在输入框的时间，草稿消失时基准失败
