@@ -94,6 +94,19 @@ test('update bot name, title, description, and turn cap [AC:bot-product-admin#AC
   fx.store.db.close();
 });
 
+test('bot_update pins and clears the thinking effort, off included [AC:bot-thinking-effort#AC-1]', async () => {
+  const fx = fixture();
+  const created = await call(fx, 'bot_create', { name: 'Effort' });
+  assert.equal(created.body.bot.thinkingEffort, null);
+  assert.equal((await call(fx, 'bot_update', { bot: created.body.bot.id, thinkingEffort: 'off' })).ok, true);
+  assert.equal((await call(fx, 'bot_get', { bot: 'Effort' })).body.bot.thinkingEffort, 'off');
+  assert.equal((await call(fx, 'bot_update', { bot: created.body.bot.id, thinkingEffort: 'turbo' })).ok, false);
+  assert.equal((await call(fx, 'bot_get', { bot: 'Effort' })).body.bot.thinkingEffort, 'off');
+  assert.equal((await call(fx, 'bot_update', { bot: created.body.bot.id, thinkingEffort: null })).ok, true);
+  assert.equal((await call(fx, 'bot_get', { bot: 'Effort' })).body.bot.thinkingEffort, null);
+  fx.store.db.close();
+});
+
 test('create a group chat with members [AC:bot-product-admin#AC-3]', async () => {
   const fx = fixture();
   const a = await call(fx, 'bot_create', { name: 'Alpha' });

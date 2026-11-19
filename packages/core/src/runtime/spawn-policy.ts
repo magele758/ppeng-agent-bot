@@ -1,5 +1,12 @@
 import { readAllowedSkillNames } from '../skills/skill-allowlist.js';
 import { readSessionModelOverride, type SessionModelOverride } from '../model/provider-catalog.js';
+import { readBotThinkingEffort } from '../bots/bot-thinking-effort.js';
+import type { ThinkingEffortLevel } from '../model/thinking-effort-settings.js';
+
+export interface InheritedModelPins {
+  modelOverride?: SessionModelOverride;
+  thinkingEffort?: ThinkingEffortLevel;
+}
 
 /**
  * Subagent inheritance. Children keep the effective permission mode and do not
@@ -34,14 +41,20 @@ export function copyScratchOnSpawn(
 
 /**
  * Children follow the parent's model pin (Bot setting or an inherited
- * spawn_subagent `model`). Empty when the parent has none. An explicit
- * `model` passed to spawn_subagent is applied by the caller and wins.
+ * spawn_subagent `model`) and its thinking effort pin, so a child on a model
+ * without effort support keeps the Bot's `off`. Empty when the parent has
+ * neither. An explicit `model` passed to spawn_subagent is applied by the
+ * caller and wins.
  */
 export function inheritModelOverride(
   metadata: Record<string, unknown> | undefined
-): { modelOverride?: SessionModelOverride } {
+): InheritedModelPins {
   const pinned = readSessionModelOverride(metadata);
-  return pinned ? { modelOverride: pinned } : {};
+  const effort = readBotThinkingEffort(metadata);
+  return {
+    ...(pinned ? { modelOverride: pinned } : {}),
+    ...(effort ? { thinkingEffort: effort } : {})
+  };
 }
 
 /** Copies an explicit handoff ceiling. Parser-default and auto-policy tiers do not propagate. */
@@ -64,7 +77,7 @@ export function handoffChildCeiling(metadata: Record<string, unknown> | undefine
 /** A planner child must not inherit the parent's current model pin. */
 export function childModelInheritance(
   metadata: Record<string, unknown> | undefined
-): { modelOverride?: SessionModelOverride } {
+): InheritedModelPins {
   if (handoffChildCeiling(metadata).handoffRole === 'planner') return {};
   return inheritModelOverride(metadata);
 }

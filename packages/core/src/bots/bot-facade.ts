@@ -9,6 +9,7 @@ import { createChatSession, ensureAgent } from '../runtime/session-facade.js';
 import { parseSessionMaxTurns } from '../runtime/session-max-turns.js';
 import type { AgentSpec, SessionRecord } from '../types.js';
 import type { SqliteStateStore } from '../storage.js';
+import type { ThinkingEffortLevel } from '../model/thinking-effort-settings.js';
 import { normalizeAllowedSkillNames, readAllowedSkillNames } from '../skills/skill-allowlist.js';
 import { normalizeAllowedToolNames, readPositiveAllowedTools } from './bot-policy.js';
 import {
@@ -24,6 +25,11 @@ import {
   normalizeBotModelOverride,
   readBotModelOverride
 } from './bot-model.js';
+import {
+  BOT_THINKING_EFFORT_META,
+  normalizeBotThinkingEffort,
+  readBotThinkingEffort
+} from './bot-thinking-effort.js';
 import {
   BOT_DEFAULT_MAX_TURNS,
   BOT_DEFAULT_PERMISSION_MODE,
@@ -184,6 +190,26 @@ function listBotChats(store: SqliteStateStore, bot: BotRecord): SessionRecord[] 
   return out;
 }
 
+/** Validated before any write. `undefined` leaves the pin alone, `null` clears it. */
+function thinkingEffortEdit(raw: unknown): ThinkingEffortLevel | null | undefined {
+  return raw === undefined ? undefined : normalizeBotThinkingEffort(raw);
+}
+
+/** Pins or clears the thinking effort on every chat of this Bot. */
+function writeBotThinkingEffort(
+  host: SessionFacadeHost,
+  bot: BotRecord,
+  edit: ThinkingEffortLevel | null | undefined
+): void {
+  if (edit === undefined) return;
+  for (const session of listBotChats(host.store, bot)) {
+    const metadata = { ...session.metadata };
+    if (edit) metadata[BOT_THINKING_EFFORT_META] = edit;
+    else delete metadata[BOT_THINKING_EFFORT_META];
+    host.store.updateSession(session.id, { metadata });
+  }
+}
+
 function createCanonicalSession(
   host: SessionFacadeHost,
   bot: Pick<BotRecord, 'id' | 'name'> & { canonicalSessionId?: string },
@@ -195,6 +221,7 @@ function createCanonicalSession(
   const inheritedTools = readPositiveAllowedTools(prior?.metadata);
   const inheritedSkills = readAllowedSkillNames(prior?.metadata);
   const inheritedModel = readBotModelOverride(prior?.metadata);
+  const inheritedEffort = readBotThinkingEffort(prior?.metadata);
   return createChatSession(host, {
     title: canonicalBotChatTitle(bot.name),
     agentId: bot.id,
@@ -208,6 +235,7 @@ function createCanonicalSession(
       ...(inheritedTools ? { allowedTools: inheritedTools } : {}),
       ...(inheritedSkills ? { allowedSkills: inheritedSkills } : {}),
       ...(inheritedModel ? { [BOT_MODEL_OVERRIDE_META]: inheritedModel } : {}),
+      ...(inheritedEffort ? { [BOT_THINKING_EFFORT_META]: inheritedEffort } : {}),
       ...resolveBotPrincipal(host.store, owner)
     }
   });
@@ -361,6 +389,7 @@ export function updateBot(
     }
     modelOverride = normalizeBotModelOverride(patch.modelOverride, opts.modelOptions);
   }
+  const thinkingEffort = thinkingEffortEdit(patch.thinkingEffort);
   const name = patch.name !== undefined ? normalizeName(patch.name) : current.name;
   if (name !== current.name) {
     const taken = host.store.getBotByName(name);
@@ -400,6 +429,7 @@ export function updateBot(
       host.store.updateSession(session.id, { metadata });
     }
   }
+  writeBotThinkingEffort(host, next, thinkingEffort);
   refreshBotAgent(host, next);
   return next;
 }

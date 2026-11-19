@@ -27,6 +27,7 @@ import {
 } from '../bots/bot-identity.js';
 import { createBot, getBot, openBot, updateBot } from '../bots/bot-facade.js';
 import { normalizeBotModelOverride, readBotModelOverride } from '../bots/bot-model.js';
+import { readBotThinkingEffort } from '../bots/bot-thinking-effort.js';
 import { BotFunctionalGroupService } from '../bots/functional-groups.js';
 import { setBotWorkControl, type BotWorkHost } from '../bots/bot-work.js';
 import type { BotRecord, UpdateBotInput } from '../bots/types.js';
@@ -193,6 +194,7 @@ function botView(store: SqliteStateStore, bot: BotRecord) {
     allowedTools: session?.metadata?.allowedTools ?? null,
     allowedSkills: session?.metadata?.allowedSkills ?? null,
     modelOverride: readBotModelOverride(session?.metadata) ?? null,
+    thinkingEffort: readBotThinkingEffort(session?.metadata) ?? null,
     persona: typeof session?.metadata?.persona === 'string' && session.metadata.persona.trim()
       ? session.metadata.persona
       : null
@@ -444,7 +446,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'bot_update',
-      description: 'Update a bot: name, title, description, hidden, maxTurns (0 unlimited|24|48|96, single-execution step limit), allowedTools, allowedSkills, modelOverride, face, or avatar. You can do this. Empty allowedTools or allowedSkills clears the allowlist.',
+      description: 'Update a bot: name, title, description, hidden, maxTurns (0 unlimited|24|48|96, single-execution step limit), allowedTools, allowedSkills, modelOverride, thinkingEffort (off|low|medium|high, null follows the global setting), face, or avatar. You can do this. Empty allowedTools or allowedSkills clears the allowlist.',
       properties: {
         bot: { type: 'string' },
         name: { type: 'string' },
@@ -455,6 +457,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
         allowedTools: { type: 'array', items: { type: 'string' } },
         allowedSkills: { type: 'array', items: { type: 'string' } },
         modelOverride: {},
+        thinkingEffort: {},
         faceShape: {},
         faceColor: {},
         faceStyle: {},
@@ -475,6 +478,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
         if ('allowedTools' in args) patch.allowedTools = args.allowedTools;
         if ('allowedSkills' in args) patch.allowedSkills = args.allowedSkills;
         if ('modelOverride' in args) patch.modelOverride = args.modelOverride;
+        if ('thinkingEffort' in args) patch.thinkingEffort = args.thinkingEffort;
         if ('faceShape' in args) patch.faceShape = args.faceShape;
         if ('faceColor' in args) patch.faceColor = args.faceColor;
         if ('faceStyle' in args) patch.faceStyle = args.faceStyle;

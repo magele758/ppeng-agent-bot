@@ -92,12 +92,15 @@ export function thinkingEffortOptions(): readonly ThinkingEffortLevel[] {
   return LEVELS;
 }
 
-/** Stamp the saved level onto the next chat turn. Off removes the field. */
+/** Stamp the effective level onto the next chat turn. Off removes the field.
+ * A session pin (Bot `metadata.thinkingEffort`, off included) wins over the saved
+ * global level; without a pin the turn follows the global setting exactly as before. */
 export function applyThinkingEffortToTurn<T extends { reasoningEffort?: ReasoningEffort }>(
   input: T,
-  store: ThinkingEffortSettingsStore | undefined
+  store: ThinkingEffortSettingsStore | undefined,
+  pin?: ThinkingEffortLevel
 ): T {
-  const level = resolveThinkingEffort(store);
+  const level = pin ?? resolveThinkingEffort(store);
   if (level === 'off') {
     const { reasoningEffort: _drop, ...rest } = input;
     return rest as T;

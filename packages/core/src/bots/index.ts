@@ -30,6 +30,11 @@ export {
   readBotModelOverride
 } from './bot-model.js';
 export {
+  BOT_THINKING_EFFORT_META,
+  normalizeBotThinkingEffort,
+  readBotThinkingEffort
+} from './bot-thinking-effort.js';
+export {
   BOT_AVATAR_EMOJIS,
   BOT_FACE_COLORS,
   BOT_FACE_SHAPES,
