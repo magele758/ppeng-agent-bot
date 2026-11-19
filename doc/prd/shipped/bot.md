@@ -377,6 +377,11 @@ Team / Swarm 扇出后，父目标可能一直 waiting，也可能被误唤醒�
 
 增加“同时删除组内 Bot”选项，保留历史会话
 
+## bot-group-click-no-list-refresh
+点击 Bot 菜单群聊不刷新左侧列表
+
+http://localhost:23000/， 怎么现在没次点击bot菜单里的群聊，列表就会刷新一下？修复一下这个
+
 ## bot-group-disclosure-memory
 刷新后记住各 Bot 分组的展开状态
 

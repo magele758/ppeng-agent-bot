@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 472 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 473 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -86,7 +86,7 @@
 
 - `bombadil-bot-stability` Bot 切换稳定性探索
 
-## bot（139）
+## bot（140）
 
 需求正文见 [bot](bot.md)。
 
@@ -149,6 +149,7 @@
 - `bot-goals-panel-rules` 目标与进展只展示同时在做的多件事
 - `bot-goals-panel-threshold` 目标与进展少于两个目标时不展示
 - `bot-group-cleanup` 删除分组时可一并删除 Bot
+- `bot-group-click-no-list-refresh` 点击 Bot 菜单群聊不刷新左侧列表
 - `bot-group-disclosure-memory` 刷新后记住各 Bot 分组的展开状态
 - `bot-group-drag-only` Bot 侧栏移组仅保留拖拽入口
 - `bot-history-memory` Bot 持续对话历史与记忆

@@ -2029,6 +2029,12 @@ Bot 只在必须时才为目标再开子任务
 
 - `packages/core/test/bot-goal-only-when-needed.test.js`
 
+### bot-group-click-no-list-refresh
+
+点击 Bot 菜单群聊不刷新左侧列表
+
+- `apps/web-console/components/sidechat/SidechatWorkspace.test.ts`
+
 ### bot-linked-watchers
 
 关联原工作的临时盯梢与观察证据
