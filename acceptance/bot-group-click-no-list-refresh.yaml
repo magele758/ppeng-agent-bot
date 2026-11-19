@@ -1,0 +1,11 @@
+id: bot-group-click-no-list-refresh
+title: 点击 Bot 菜单群聊不刷新左侧列表
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  http://localhost:23000/， 怎么现在没次点击bot菜单里的群聊，列表就会刷新一下？修复一下这个
+criteria:
+  - id: AC-1
+    given: Bot 页左侧列表已加载出 Bot、群聊与功能分组
+    when: 用户点击列表中的群聊或在 Bot 与群聊之间切换
+    then: 右侧切换到对应群聊或 Bot 对话，左侧列表保持原有已加载项与展开状态，不出现重新加载骨架或整表重拉闪烁

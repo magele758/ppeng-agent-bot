@@ -54,11 +54,35 @@ function useSourceJump(chat: Chat, target: Destination | null, onResult: (status
     return () => controller.abort();
   }, [target, chat.loadedTranscriptSessionId]);
 }
-export function SidechatWorkspace(props: Props) {
-  if (!props.enabled || !props.sessionId) return <>{props.children}</>;
-  return <SessionWorkspace {...props} sessionId={props.sessionId} />;
+function activeSessionId(enabled: boolean, sessionId: string | null): string | null {
+  return enabled && sessionId ? sessionId : null;
 }
-function SessionWorkspace({ sessionId, chat, onNavigate, children }: Props & { sessionId: string }) {
+function activeScreen(screen: Screen | null, sessionId: string | null): Screen | null {
+  return sessionId && screen?.sessionId === sessionId ? screen : null;
+}
+function activeRequest(shown: Screen | null): SidechatPanelRequest | null {
+  return shown ? shown.request : null;
+}
+function workspaceActions(
+  sessionId: string | null,
+  threads: SidechatThread[],
+  activeThreadId: string | null,
+  open: (request: SidechatPanelRequest) => void,
+  hasBack: boolean,
+  goBack: () => void
+) {
+  if (!sessionId) return null;
+  return {
+    threads,
+    activeId: activeThreadId,
+    open,
+    back: hasBack ? goBack : undefined
+  };
+}
+export function SidechatWorkspace(props: Props) {
+  return <SessionWorkspace {...props} sessionId={activeSessionId(props.enabled, props.sessionId)} />;
+}
+function SessionWorkspace({ sessionId, chat, onNavigate, children }: Props) {
   const { t } = useI18n();
   const list = useSidechatThreads(sessionId);
   const drafts = useSidechatDraftBook();
@@ -72,7 +96,8 @@ function SessionWorkspace({ sessionId, chat, onNavigate, children }: Props & { s
   const layout = useRef<{ spot: ReadingSpot; line: ReadingLine | null } | null>(null);
   const openedAt = useRef<number | null>(null);
   const route = useRef(0);
-  const visible = screen?.sessionId === sessionId;
+  const shown = activeScreen(screen, sessionId);
+  const visible = Boolean(shown);
   const expectedSession = useRef(sessionId);
   useEffect(() => {
     if (expectedSession.current === sessionId) return;
@@ -178,19 +203,21 @@ function SessionWorkspace({ sessionId, chat, onNavigate, children }: Props & { s
       anchor: { kind: 'message', quote: replySourceText(source.parts).trim().slice(0, 320) }
     });
   }
-  const actions = {
-    threads: list.threads,
-    activeId: activeId(visible, model.current),
+  const actions = workspaceActions(
+    sessionId,
+    list.threads,
+    activeId(visible, model.current),
     open,
-    back: backstack.length ? goBack : undefined
-  };
-  const panel = visible ? (
+    backstack.length > 0,
+    goBack
+  );
+  const panel = shown ? (
     <aside data-testid="sidechat-dock" className="sidechat-dock">
       {notice && <p role="status">{notice}</p>}
       <SidechatPanel
-        key={screen.sessionId}
-        sessionId={screen.sessionId}
-        request={screen.request}
+        key={shown.sessionId}
+        sessionId={shown.sessionId}
+        request={shown.request}
         threads={list.threads}
         error={list.error}
         draftBook={drafts}
@@ -199,7 +226,7 @@ function SessionWorkspace({ sessionId, chat, onNavigate, children }: Props & { s
         onNew={newDraft}
         onLocate={locate}
         onOpenSource={openSource}
-        onReturn={actions.back}
+        onReturn={actions?.back}
         onViewChange={onViewChange}
         onCite={cite}
       />
@@ -208,15 +235,15 @@ function SessionWorkspace({ sessionId, chat, onNavigate, children }: Props & { s
   return (
     <SourceContext.Provider value={actions}>
       <DockContext.Provider value={panel}>{children}</DockContext.Provider>
-      {
+      {sessionId ? (
         <SourceBindings
           feedRef={feed}
           threads={list.threads}
           open={open}
           sessionId={sessionId}
-          current={visible ? screen.request : null}
+          current={activeRequest(shown)}
         />
-      }
+      ) : null}
       <LocationNotice notice={notice} visible={visible} />
     </SourceContext.Provider>
   );

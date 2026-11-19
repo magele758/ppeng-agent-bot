@@ -2301,6 +2301,13 @@
       ]
     },
     {
+      "id": "bot-group-click-no-list-refresh",
+      "title": "点击 Bot 菜单群聊不刷新左侧列表",
+      "tests": [
+        "apps/web-console/components/sidechat/SidechatWorkspace.test.ts"
+      ]
+    },
+    {
       "id": "bot-linked-watchers",
       "title": "关联原工作的临时盯梢与观察证据",
       "tests": [

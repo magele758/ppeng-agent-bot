@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 472,
+    "implemented": 473,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -573,6 +573,13 @@
       "requirement": "增加“同时删除组内 Bot”选项，保留历史会话",
       "verificationStage": "software",
       "file": "acceptance/bot-group-cleanup.yaml"
+    },
+    {
+      "id": "bot-group-click-no-list-refresh",
+      "title": "点击 Bot 菜单群聊不刷新左侧列表",
+      "requirement": "http://localhost:23000/， 怎么现在没次点击bot菜单里的群聊，列表就会刷新一下？修复一下这个",
+      "verificationStage": "software",
+      "file": "acceptance/bot-group-click-no-list-refresh.yaml"
     },
     {
       "id": "bot-group-disclosure-memory",
