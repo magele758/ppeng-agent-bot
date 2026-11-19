@@ -1,0 +1,19 @@
+id: responses-session-phase-cache
+title: Responses 连续工具轮次的阶段状态与前缀缓存
+status: implemented
+requirement: |
+  现在这个项目走的是magpie的代理服务，我看现在的缓存命中率很低，帮我从magpie的日志和当前服务的日志来分析下原因，以及看看是否可以优化
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 同一会话的任务阶段或置信度变化，其他规则保持一致
+    when: 通过 Responses 继续普通或流式工具任务
+    then: 模型收到最新阶段，系统指令与既有对话前缀保持可复用，工具调用与结果仍配对
+  - id: AC-2
+    given: 用户或工具写入外观相同的阶段文字，或任务规则也包含相同文字
+    when: 构造模型请求
+    then: 仅运行时产生的阶段报告作为开发者消息，其他正文与原有规则位置和权限保持不变
+  - id: AC-3
+    given: 会话重试、历史已被压缩、没有阶段信息或改走 Chat Completions
+    when: 发送请求
+    then: 每次保留当前可用阶段及原有规则，不重复插入状态，兼容原有协议

@@ -1,0 +1,19 @@
+id: lcu-chat-startup
+title: 普通聊天和 Bot 消息复用已发现的桌面能力
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  那你优化一下，另外看看另一个问题，是否可以提升bot和普通会话的启动速度，现在感觉还是有点慢
+criteria:
+  - id: AC-1
+    given: 当前安装的桌面能力已经成功发现
+    when: 用户继续普通聊天或向 Bot 发送消息
+    then: 模型仍看到原始工具和说明，连续的纯聊天无需再次连接桌面服务
+  - id: AC-2
+    given: 已发现桌面能力后开启了新的聊天轮次
+    when: 本轮首次执行桌面动作或中途取消
+    then: 使用本轮独立的授权与连接执行，并在结束时释放本轮资源
+  - id: AC-3
+    given: 用户切换桌面服务命令、原地更新安装或发现曾经失败
+    when: 再次开始聊天
+    then: 重新发现桌面能力，随后使用当前安装所报告的说明与工具

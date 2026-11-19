@@ -367,6 +367,12 @@ export interface ModelTurnInput {
    * message, so a follow-up reuses the cached history.
    */
   cacheStablePrefix?: string;
+  /**
+   * Host-authored phase paragraph within systemPrompt. The UTF-16 offset points
+   * to its leading blank line. Responses can move this one paragraph behind
+   * history while other adapters keep the fully assembled instructions.
+   */
+  sessionPhase?: { offset: number; text: string };
 }
 
 export interface ModelTurnResult {

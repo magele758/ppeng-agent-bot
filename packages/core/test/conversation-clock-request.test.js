@@ -136,3 +136,35 @@ test('wire diagnostics distinguish append-only history, rewrites and tool change
   check(['changed'], 'shortened');
   check(['changed'], 'request-settings', ['new-tool']);
 });
+
+test('both product kernels deliver the host phase at the end of a Responses request [AC:responses-session-phase-cache#AC-1]', async t => {
+  const { OpenAICompatibleAdapter } = await import('../dist/model/model-adapters.js');
+  const dir = mkdtempSync(join(tmpdir(), 'responses-phase-'));
+  const delivered = [];
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    const body = JSON.parse(init.body);
+    delivered.push(body);
+    const response = { output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'done' }] }] };
+    return body.stream
+      ? new Response('data: ' + JSON.stringify({ type: 'response.completed', response }) + '\n\ndata: [DONE]\n\n')
+      : Response.json(response);
+  });
+  const adapter = new OpenAICompatibleAdapter({ apiKey: 'test', baseUrl: 'https://example.invalid/v1', model: 'test', httpKind: 'responses', useJsonMode: false });
+  const rt = new RawAgentRuntime({ repoRoot: dir, stateDir: join(dir, 'state'), modelAdapter: adapter });
+  t.after(async () => { await rt.destroy(); rmSync(dir, { recursive: true, force: true }); });
+  for (const kernelVariant of ['agent-loop', 'ppeng']) {
+    rt.store.setDaemonControl('loop_settings', { kernelVariant });
+    const session = rt.store.createSession({ title: 'phase', agentId: 'general', mode: 'chat', background: false });
+    rt.store.appendMessage(session.id, 'user', [{ type: 'text', text: 'Inspect current status' }]);
+    rt.promptBuilder.lastCognitivePhaseBySession.set(session.id, { phase: 'debugging', confidence: 0.69 });
+    delivered.length = 0;
+    await rt.runSession(session.id);
+    await rt.listTraceEvents(session.id, 1);
+    const wire = delivered.find(body => body.tools);
+    assert.ok(wire, kernelVariant);
+    assert.doesNotMatch(wire.instructions, /Session phase:/);
+    assert.equal(wire.input.at(-1).role, 'developer', kernelVariant);
+    assert.match(wire.input.at(-1).content[0].text, /^Session phase: /);
+    assert.doesNotMatch(JSON.stringify(rt.store.foldMessages(session.id)), /Session phase:/);
+  }
+});

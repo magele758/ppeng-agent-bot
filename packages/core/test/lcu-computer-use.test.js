@@ -146,3 +146,229 @@ test('runtime respects explicit bypass for root and delegated sessions [AC:lcu-a
     await rt.runSession(child.id); assert.deepEqual(answers.at(-1),{action:'accept',content:{},_meta:{persist:'session'}}); assert.equal(rt.listApprovals().filter(a=>a.toolName==='lcu_app_access').length,0);
   }finally{await rt.destroy();}
 });
+
+test('warm text-only turns retain the discovered desktop surface without any new clients [AC:lcu-chat-startup#AC-1]', async () => {
+  const f = fixture();
+  await f.provider.beginTurn('first', 'cold');
+  const published = f.provider.tools().map(({name,description,inputSchema}) => ({name,description,inputSchema}));
+  await f.provider.endTurn('first');
+  for (const session of ['ordinary', 'bot']) {
+    await f.provider.beginTurn(session, 'warm');
+    assert.equal(f.provider.instructionsForSession(session), 'ORIGINAL CUA INSTRUCTIONS');
+    assert.deepEqual(f.provider.tools().map(({name,description,inputSchema}) => ({name,description,inputSchema})), published);
+    await f.provider.endTurn(session);
+  }
+  assert.equal(f.clients.length, 1);
+  assert.equal(f.calls.filter(call => call.closed).length, 1);
+});
+
+test('a warm desktop turn connects on demand using its own approval and cleanup [AC:lcu-chat-startup#AC-2]', async () => {
+  const approvals = [];
+  const f = fixture({
+    requestApproval: async (sessionId) => { approvals.push(sessionId); return { action: 'accept' }; },
+    call: async (_name, _args, ctx, elicit) => {
+      await elicit({ mode: 'form' }, { signal: ctx.signal });
+      return {content: []};
+    },
+  });
+  await f.provider.beginTurn('text', 'first');
+  await f.provider.endTurn('text');
+  await f.provider.beginTurn('work', 'second');
+  assert.equal(f.clients.length, 1);
+  await f.provider.execute('work', 'js', {});
+  await f.provider.execute('work', 'js_reset', {});
+  await f.provider.endTurn('work', 'Interrupt');
+  assert.equal(f.clients.length, 2);
+  assert.deepEqual(approvals, ['work','work']);
+  assert.deepEqual(f.calls.filter(call => call.ended).at(-1).ended, {sessionId:'work',turnId:'second',event:'Interrupt'});
+});
+
+test('changed desktop installations are rediscovered and discovery failures can be retried [AC:lcu-chat-startup#AC-3]', async (t) => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const root = mkdtempSync(join(tmpdir(),'lcu-surface-'));
+  t.after(() => rmSync(root,{recursive:true,force:true}));
+  let command;
+  let serial = 0;
+  function install(dir, version) {
+    mkdirSync(join(dir,'bin'),{recursive:true});
+    mkdirSync(join(dir,'adapters'),{recursive:true});
+    command = join(dir,'bin','lcu');
+    writeFileSync(command,version);
+    const adapter = 'export function createCuaClient(){return {instructions:'+JSON.stringify(version)+',connect:async()=>{},publicTools:()=>[{name:"js",description:'+JSON.stringify(version)+'}],turnEnded:async()=>{},close:async()=>{}}}';
+    writeFileSync(join(dir,'adapters','client.mjs'),adapter);
+  }
+  const provider = new LcuComputerUseProvider({enabled:()=>true,command:()=>command});
+  async function inspect(version) {
+    const sid = 's'+(++serial);
+    await provider.beginTurn(sid,'t');
+    assert.equal(provider.instructionsForSession(sid),version);
+    assert.equal(provider.tools()[0].description,version);
+    await provider.endTurn(sid);
+  }
+  install(join(root,'one'),'a'); await inspect('a');
+  install(join(root,'two'),'b'); await inspect('b');
+  install(join(root,'two'),'c-stable-update'); await inspect('c-stable-update');
+  const app = join(root,'ChatGPT.app');
+  mkdirSync(join(app,'Contents'),{recursive:true});
+  const versionPath = join(app,'Contents','Info.plist');
+  symlinkSync(app,join(root,'two','app'));
+  writeFileSync(versionPath,'host A');
+  const dynamicAdapter = 'import {readFileSync} from "node:fs"; const version=readFileSync('+JSON.stringify(versionPath)+',"utf8"); export function createCuaClient(){return {instructions:version,connect:async()=>{},publicTools:()=>[{name:"js",description:version}],turnEnded:async()=>{},close:async()=>{}}}';
+  writeFileSync(join(root,'two','adapters','client.mjs'),dynamicAdapter);
+  await inspect('host A');
+  writeFileSync(versionPath,'host B updated in place');
+  await inspect('host B updated in place');
+  command = join(root,'missing','bin','lcu');
+  await assert.rejects(provider.beginTurn('retry','t'));
+  install(join(root,'missing'),'repaired'); await inspect('repaired');
+});
+
+test('simultaneous cold starts share discovery and retry a failed handshake [AC:lcu-chat-startup#AC-1] [AC:lcu-chat-startup#AC-3]', async () => {
+  const connected = deferred();
+  let attempts = 0;
+  let closes = 0;
+  const provider = new LcuComputerUseProvider({
+    enabled: () => true,
+    clientFactory: async () => {
+      const attempt = ++attempts;
+      return {
+        instructions: 'discovered',
+        connect: async () => {
+          await connected.promise;
+          if (attempt === 1) throw new Error('first handshake failed');
+        },
+        publicTools: () => [{ name: 'js' }],
+        turnEnded: async () => {},
+        close: async () => { closes++; },
+      };
+    },
+  });
+  const first = provider.beginTurn('first','t1');
+  const second = provider.beginTurn('second','t2');
+  connected.resolve();
+  const failures = await Promise.allSettled([first,second]);
+  assert.deepEqual(failures.map(f => f.reason.message), ['first handshake failed','first handshake failed']);
+  assert.equal(attempts, 1);
+  assert.equal(closes, 1);
+  await Promise.all([provider.beginTurn('first','retry'),provider.beginTurn('second','retry')]);
+  assert.equal(attempts, 2);
+  assert.equal(provider.instructionsForSession('second'), 'discovered');
+  await provider.close();
+  assert.equal(closes, 2);
+});
+
+test('replacement tools reach the runtime catalog and warm turns cannot act through a changed installation [AC:lcu-chat-startup#AC-3]', async () => {
+  let command = '/v1';
+  const provider = new LcuComputerUseProvider({
+    enabled: () => true,
+    command: () => command,
+    clientFactory: async () => ({
+      instructions: command,
+      connect: async () => {},
+      publicTools: () => command === '/v1' ? [{name:'js'},{name:'js_reset'}] : [{name:'js'}],
+      turnEnded: async () => {},
+      close: async () => {},
+    }),
+  });
+  await provider.beginTurn('cold','t');
+  const catalog = [{name:'other'},{name:'lcu_extra'}];
+  provider.registerTools(catalog);
+  await provider.endTurn('cold');
+  await provider.beginTurn('active','t1');
+  command = '/v2';
+  await assert.rejects(provider.execute('active','js',{}), /installation changed/);
+  await provider.beginTurn('replacement','t2');
+  provider.registerTools(catalog);
+  assert.deepEqual(catalog.map(t=>t.name), ['other','lcu_extra','lcu_js']);
+  await assert.rejects(provider.execute('replacement','js_reset',{}), /not available/);
+  await provider.close();
+});
+
+test('cancelled warm calls do not connect and concurrent desktop actions use one client [AC:lcu-chat-startup#AC-2]', async () => {
+  const f = fixture();
+  await f.provider.beginTurn('cold','t');
+  await f.provider.endTurn('cold');
+  await f.provider.beginTurn('warm','t');
+  await assert.rejects(f.provider.execute('warm','js',{},AbortSignal.abort()), /abort/i);
+  assert.equal(f.clients.length,1);
+  await Promise.all([f.provider.execute('warm','js',{}), f.provider.execute('warm','js_reset',{})]);
+  assert.equal(f.clients.length,2);
+  assert.deepEqual(f.calls.filter(c => c.name).map(c => c.name),['js','js_reset']);
+  await f.provider.close();
+});
+
+test('late discovery for a previous installation preserves the newer tool catalog [AC:lcu-chat-startup#AC-3]', async () => {
+  let command='/old';
+  const oldConnect=deferred();
+  const provider=new LcuComputerUseProvider({
+    enabled:()=>true, command:()=>command,
+    clientFactory:async()=>{
+      const version=command;
+      return {
+        instructions:version,
+        connect:async()=>{if(version==='/old') await oldConnect.promise;},
+        publicTools:()=>[{name:'js',description:version}],
+        turnEnded:async()=>{}, close:async()=>{},
+      };
+    },
+  });
+  const old=provider.beginTurn('first','t1');
+  command='/new';
+  await provider.beginTurn('second','t2');
+  oldConnect.resolve();
+  await old;
+  assert.equal(provider.instructionsForSession('first'),'/old');
+  assert.equal(provider.instructionsForSession('second'),'/new');
+  const global = [];
+  provider.registerTools(global);
+  assert.equal(global[0].description,'/new');
+  assert.equal(provider.toolsForSession(global,'first')[0].description,'/old');
+  assert.equal(provider.toolsForSession(global,'second')[0].description,'/new');
+  assert.equal(global[0].description,'/new');
+  await provider.close();
+});
+
+test('stopping during a lazy desktop handshake releases the turn from both cancellation paths [AC:lcu-chat-startup#AC-2]', async () => {
+  const waiting = deferred();
+  const connecting = deferred();
+  let clients = 0;
+  const closed = [];
+  const actions = [];
+  const provider = new LcuComputerUseProvider({
+    enabled: () => true,
+    clientFactory: async () => {
+      const n = ++clients;
+      return {
+        instructions:'discovered', publicTools:()=>[{name:'js'}],
+        connect:async()=>{ if(n===2){ connecting.resolve(); await waiting.promise; } },
+        call:async()=>{actions.push(n); return {content:[]};},
+        turnEnded:async()=>{}, close:async()=>{closed.push(n);},
+      };
+    },
+  });
+  await provider.beginTurn('first','cold');
+  await provider.endTurn('first');
+  await provider.beginTurn('second','warm');
+  const stop = new AbortController();
+  const blocked = provider.execute('second','js',{},stop.signal);
+  const rejected = assert.rejects(blocked,/abort/i);
+  await connecting.promise;
+  stop.abort();
+  const timer = setTimeout(()=>waiting.resolve(),1500);
+  try {
+    const before=Date.now();
+    await rejected;
+    await Promise.all([provider.endTurn('second','Interrupt'),provider.endTurn('second','Interrupt')]);
+    assert.ok(Date.now()-before<1000,'interrupt waited for the blocked handshake');
+    assert.deepEqual(closed,[1,2]);
+    assert.deepEqual(actions,[]);
+    waiting.resolve();
+    await provider.beginTurn('third','works');
+    await provider.execute('third','js',{});
+    await provider.endTurn('third');
+    assert.deepEqual(closed,[1,2,3]);
+    assert.deepEqual(actions,[3]);
+  } finally {clearTimeout(timer);waiting.resolve();}
+});

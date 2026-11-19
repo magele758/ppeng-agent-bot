@@ -2156,10 +2156,7 @@ export class RawAgentRuntime {
               } finally {
                 this.traceAdmit(sessionId, 'computer_use_begin', computerStarted);
               }
-              for (const tool of this.computerUse.tools()) {
-                const index = this.tools.findIndex(item => item.name === tool.name);
-                if (index >= 0) this.tools[index] = tool; else this.tools.push(tool);
-              }
+              this.computerUse.registerTools(this.tools);
               if (kernelVariant === 'ppeng') {
                 this.traceAdmit(sessionId, 'admit', admitStarted);
                 return await runSessionKernelPpeng(coreHost, sessionId, ppengOptions);
@@ -2324,7 +2321,8 @@ export class RawAgentRuntime {
       stateDir: this.stateDir,
       tools: this.tools,
       syncConnectorTools: () => this.syncConnectorTools(),
-      filterSoftwareTools: (tools, session) => this.connectors.software.filterForSession(tools, session),
+      filterSoftwareTools: (tools, session) =>
+        this.connectors.software.filterForSession(this.computerUse.toolsForSession(tools, session.id), session),
       hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since),
       isSessionRunning: (id) => this.runningSessions.has(id),
       modelAdapter: this.modelAdapter,

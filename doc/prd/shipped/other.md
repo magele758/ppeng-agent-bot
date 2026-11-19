@@ -439,6 +439,11 @@ Langfuse 实际上报状态与超时
 Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Computer Use to use "Voice Memos"?」，
 批准后同一应用的下一个动作又再申请。全自动下不该再弹；需要审批时一次批准后同会话同应用不再申请。
 
+## lcu-chat-startup
+普通聊天和 Bot 消息复用已发现的桌面能力
+
+那你优化一下，另外看看另一个问题，是否可以提升bot和普通会话的启动速度，现在感觉还是有点慢
+
 ## lcu-computer-use
 本机 LCU 桌面操作接入
 
@@ -902,6 +907,11 @@ Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk 
 已发送请求指标随所选轮变化
 
 这里要跟着下面拖动的会话轮数显示对应轮的请求token啊
+
+## responses-session-phase-cache
+Responses 连续工具轮次的阶段状态与前缀缓存
+
+现在这个项目走的是magpie的代理服务，我看现在的缓存命中率很低，帮我从magpie的日志和当前服务的日志来分析下原因，以及看看是否可以优化
 
 ## risk-advisory-ui
 对话里的运行策略提醒
