@@ -3025,6 +3025,13 @@ Lab 只读查看本机 Grok Bot 会话
 - `packages/core/test/bot-goals-scheduler.test.js`
 - `packages/core/test/daydream-tick-cost.test.js`
 
+### idle-bot-goal-scheduler
+
+空闲 Bot 的目标历史不阻塞 Lab
+
+- `packages/core/test/bot-goals-scheduler.test.js`
+- `packages/core/test/bot-goals.test.js`
+
 ### jev-model-settings
 
 在模型设置中配置 Jev 评估

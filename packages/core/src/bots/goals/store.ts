@@ -47,12 +47,12 @@ function rollback(db: GoalDb, nested: boolean): void {
   }
 }
 
-function mutateOnce<T>(store: GoalStore, botId: string, fn: (state: GoalSnapshot) => T): T {
+function mutateOnce<T>(store: GoalStore, botId: string, fn: (state: GoalSnapshot) => T, shouldWrite: (result: T) => boolean = () => true): T {
   const db = goalDb(store);
   if (!db) {
     const state = readGoalSnapshot(store, botId);
     const result = fn(state);
-    store.setDaemonControl(`bot_goals:${botId}`, state);
+    if (shouldWrite(result)) store.setDaemonControl(`bot_goals:${botId}`, state);
     return result;
   }
   const nested = db.isTransaction === true;
@@ -60,7 +60,7 @@ function mutateOnce<T>(store: GoalStore, botId: string, fn: (state: GoalSnapshot
   try {
     const state = readGoalSnapshot(store, botId);
     const result = fn(state);
-    store.setDaemonControl(`bot_goals:${botId}`, state);
+    if (shouldWrite(result)) store.setDaemonControl(`bot_goals:${botId}`, state);
     db.exec(nested ? 'RELEASE bot_goal_mutation' : 'COMMIT');
     return result;
   } catch (error) {
@@ -70,14 +70,15 @@ function mutateOnce<T>(store: GoalStore, botId: string, fn: (state: GoalSnapshot
 }
 
 /** Write lock before the read, so a deferred snapshot cannot go stale. One restart if the lock still lands mid-write. A short busy wait skips that retry. */
-export function mutateGoalSnapshot<T>(store: GoalStore, botId: string, fn: (state: GoalSnapshot) => T, options?: { busyWaitMs?: number }): T {
+export function mutateGoalSnapshot<T>(store: GoalStore, botId: string, fn: (state: GoalSnapshot) => T, options?: { busyWaitMs?: number; shouldWrite?: (result: T) => boolean }): T {
+  const mutate = () => mutateOnce(store, botId, fn, options?.shouldWrite);
   if (options?.busyWaitMs !== undefined) {
-    return withSqliteBusyWait(goalDb(store), options.busyWaitMs, () => mutateOnce(store, botId, fn));
+    return withSqliteBusyWait(goalDb(store), options.busyWaitMs, mutate);
   }
   try {
-    return mutateOnce(store, botId, fn);
+    return mutate();
   } catch (error) {
     if (!sqliteBusy(error) || goalDb(store)?.isTransaction === true) throw error;
-    return mutateOnce(store, botId, fn);
+    return mutate();
   }
 }

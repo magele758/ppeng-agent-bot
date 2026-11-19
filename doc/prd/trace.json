@@ -3436,6 +3436,14 @@
       ]
     },
     {
+      "id": "idle-bot-goal-scheduler",
+      "title": "空闲 Bot 的目标历史不阻塞 Lab",
+      "tests": [
+        "packages/core/test/bot-goals-scheduler.test.js",
+        "packages/core/test/bot-goals.test.js"
+      ]
+    },
+    {
       "id": "jev-model-settings",
       "title": "在模型设置中配置 Jev 评估",
       "tests": [

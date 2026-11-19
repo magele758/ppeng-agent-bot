@@ -116,3 +116,33 @@ test('unverified completion stays reviewable and is consumed only by verificatio
  assert.equal(rejected.status,'queued');assert.equal(rejected.resumeRequested,true);assert.match(rejected.nextStep,/Missing the last check/);
  assert.deepEqual(rejected.evidence,['partial note']);assert.ok(s.claim('b',again.id,{strategy:'direct'}));
 });
+
+test('a lease renewed by another connection before recovery locks stays owned [AC:idle-bot-goal-scheduler#AC-2]', t => {
+ const {store, s, tick} = fixture(t);
+ const goal = create(s);
+ const execution = s.claim('b', goal.id, {strategy: 'direct', leaseMs: 100});
+ tick();
+ const writer = new SqliteStateStore(store.db.prepare('PRAGMA database_list').get().file);
+ try {
+  const other = new BotGoalService(writer);
+  const read = store.getDaemonControl.bind(store);
+  let renewed = false;
+  store.getDaemonControl = key => {
+   const state = read(key);
+   if (!renewed && key === 'bot_goals:b') {
+    renewed = true;
+    other.renewRunningLease('b', execution.id, 2000000);
+   }
+   return state;
+  };
+  const writes = () => store.db.prepare('SELECT total_changes() AS n').get().n;
+  const before = writes();
+  assert.deepEqual(s.recover('b'), []);
+  assert.equal(renewed, true);
+  assert.equal(writes(), before);
+  assert.equal(s.get('b', goal.id).activeExecutionId, execution.id);
+  assert.equal(s.executions('b', goal.id)[0].leaseUntil, 2000000);
+ } finally {
+  writer.db.close();
+ }
+});

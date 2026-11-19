@@ -11,10 +11,11 @@ import { inheritBotIdentityMetadata } from '../../memory/bot-memory-scope.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../../runtime/spawn-policy.js';
 import { inheritForkRetrievalMetadata, forkOpeningMessage } from '../fork-inheritance.js';
 import { childSessionTrace } from '../../stores/trace-visible.js';
-import { announceGoalState, bindGoalExecution, goalAlreadyHandled, goalScope, judgeChildCompletion, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
+import { announceGoalState, goalNoticeVersion, bindGoalExecution, goalAlreadyHandled, goalScope, judgeChildCompletion, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
 import { settleDeadGoalExecution } from './restart-resume.js';
 import type { BotGoal, GoalExecution, GoalReport } from './types.js';
 
+import { goalSchedulerWork, type GoalSchedulerWork } from './scheduler-work.js';
 import { occupiesGoalCapacity } from './service.js';
 const ticking = new WeakSet<object>();
 const ended = new Set(['completed', 'failed', 'cancelled', 'unknown', 'expired', 'rejected', 'timed_out']);
@@ -282,9 +283,6 @@ function resumeApprovedDispatch(host: GoalRuntimeHost, session: SessionRecord, g
 
 type GoalService = NonNullable<ReturnType<typeof goalScope>>['service'];
 
-function canonicalParents(host: GoalRuntimeHost): SessionRecord[] {
- return host.store.listSessions().filter(s => s.metadata.canonicalBotChat === true);
-}
 function executionSession(host: GoalRuntimeHost, execution: GoalExecution): SessionRecord | undefined {
  return execution.sessionId ? host.store.getSession(execution.sessionId) : undefined;
 }
@@ -501,25 +499,29 @@ function tickQueuedGoals(host: GoalRuntimeHost, parent: SessionRecord, service: 
 function tickWaitingGoals(host: GoalRuntimeHost, parent: SessionRecord, service: GoalService, botId: string): void {
  for (const goal of service.list(botId).filter(g => g.status === 'waiting')) wakeFinishedWait(host, parent, service, botId, goal);
 }
-function announceGoals(host: GoalRuntimeHost, service: GoalService, botId: string): void {
- for (const goal of service.list(botId)) announceGoalState(host, goal);
-}
-async function tickParent(host: GoalRuntimeHost, parent: SessionRecord): Promise<void> {
+async function tickParent(host: GoalRuntimeHost, work: GoalSchedulerWork): Promise<void> {
+ const parent = host.store.getSession(work.sessionId);
+ if (!parent || parent.metadata.canonicalBotChat !== true) return;
  const scope = goalScope(host.store, parent);
- if (!scope) return;
+ if (!scope || scope.botId !== work.botId) return;
  const {service, botId} = scope;
- const held = new Set(service.list(botId).filter(goal => heldForApproval(host, parent, goal)).flatMap(goal => service.executions(botId, goal.id).filter(execution => execution.status === 'running').map(execution => execution.id)));
- for (const goal of service.list(botId)) await tickRunningGoal(host, service, botId, parent, goal);
- service.recover(botId, held);
- tickWaitingGoals(host, parent, service, botId);
- tickQueuedGoals(host, parent, service, botId);
- announceGoals(host, service, botId);
+ if (work.active) {
+  const running = service.list(botId).filter(goal => work.runningOrDraining.has(goal.id));
+  const held = new Set(running.filter(goal => heldForApproval(host, parent, goal)).flatMap(goal => service.executions(botId, goal.id).filter(execution => execution.status === 'running').map(execution => execution.id)));
+  for (const goal of running) await tickRunningGoal(host, service, botId, parent, goal);
+  service.recover(botId, held);
+  tickWaitingGoals(host, parent, service, botId);
+  tickQueuedGoals(host, parent, service, botId);
+ }
+ for (const goal of service.list(botId)) {
+  if (work.goalIds.has(goal.id) && goalNoticeVersion(goal) !== undefined) announceGoalState(host, goal);
+ }
 }
 export async function tickBotGoals(host: GoalRuntimeHost): Promise<void> {
  if (ticking.has(host.store)) return;
  ticking.add(host.store);
  try {
-  for (const parent of canonicalParents(host)) await tickParent(host, parent);
+  for (const work of goalSchedulerWork(host.store)) await tickParent(host, work);
  } finally { ticking.delete(host.store); }
 }
 

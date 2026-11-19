@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 475 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 476 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -566,6 +566,12 @@
 需求正文见 [other](other.md)。
 
 - `history-startup-contention` 后台调度期间打开历史会话
+
+## idle（1）
+
+需求正文见 [other](other.md)。
+
+- `idle-bot-goal-scheduler` 空闲 Bot 的目标历史不阻塞 Lab
 
 ## jev（1）
 
