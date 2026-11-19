@@ -1,75 +1,47 @@
-# Raw Agent SDK
+# Raw Agent
 
-**English** | [README 中文](README.zh.md)
+**English** | [简体中文](README.zh.md)
 
-Node.js multi-agent runtime in the spirit of Claude Code: **local daemon** (HTTP API), **CLI**, **Agent Lab** (Next.js web console), **SQLite** state, task/workspace isolation, approvals, team orchestration, **self-heal**, **Evolution** (RSS → inbox → worktree → tests → optional merge), and **optional** vision routing, MCP (stdio), and capability gateway integrations.
+> **"You own the goal. Your Bot works around the clock."**
+>
+> Start with a persistent AI Bot that learns how you work, manages incoming context, turns one-off wins into ongoing routines, and pauses only when human judgment is needed—powered underneath by a self-built, zero-wrapper **Agent Loop SDK (`@mage-ai-lab/agent-loop`)** and **Multi-Agent Host Runtime (`@ppeng/agent-core`)**.
 
-Use it as a local Agent workspace, embed its loop in your own application, or follow the source to learn how an Agent harness works. The reusable loop lives in `packages/agent-loop`; `packages/core` connects it to product storage, tools, policies, and services.
-
-## Choose your path
-
-| I want to… | Start here | Continue with |
-|------------|------------|---------------|
-| Run the product | [Quick start](#quick-start) | [Agent Lab](#agent-lab-web-console) |
-| Understand how an Agent works | [Harness guide](doc/harness/README.md) | [From-zero tutorial](doc/harness/from-zero/README.md), then topic deep-dives |
-| Embed just the loop | [Agent Loop package](packages/agent-loop/README.md) | [SDK guide: presets, host ports, lifecycle](skills/agent-loop/SKILL.md) |
-| Embed the product runtime | [Core SDK](packages/core/README.md) | [Embedding guide](doc/EMBEDDING_SDK.md) |
-| Change or debug the code | [AGENTS.md](AGENTS.md) | [Architecture](doc/ARCHITECTURE.md) · [Testing](doc/TESTING.md) |
-| Deploy or explore advanced features | [Documentation index](doc/README.md) | [Deployment](doc/DEPLOYMENT.md) · [Evolution](doc/evolution/README.md) |
-
-The Harness tutorial is currently in Chinese. This README is the overview; the [documentation index](doc/README.md) is the reference catalog.
-
-## How the pieces fit
-
-```text
-Agent Lab / CLI → daemon HTTP / SSE
-                       ↓
-          RawAgentRuntime (product host, packages/core)
-                       ↓  injected model / tools / storage / hooks
-          createAssembledLoop (packages/agent-loop, default: mini)
-                       ↓
-          turn kernel → prepare context → model → tools → next turn
-```
-
-This is a self-built loop, now extracted into an embeddable SDK—not a wrapper around `@openai/agents`. The product defaults to `kernelVariant=agent-loop` and `assemblyPreset=max`; the local `ppeng` kernel remains an explicit reference option. Selection is persisted through Lab settings (`GET/PATCH /api/loop/settings`). See the [execution-path guide](doc/harness/00-self-built-agent-loop.md).
-
-SDK presets are `mini / normal / full / max`. Browser and extension hosts must use the `/mini` entry, not the Node-oriented root/full/max entries. The workspace package is `@ppeng/agent-loop`; its public package name is `@mage-ai-lab/agent-loop`.
+`Node.js >= 22` · `pnpm 10.29.2` · `SDK: @mage-ai-lab/agent-loop` · `481 Shipped Specs / 2,347 Gated Criteria` · `Web · Desktop · CLI · Embeddable SDK`
 
 ---
 
-## Highlights
+## Why Raw Agent?
 
-| Area | What you get |
-|------|----------------|
-| **Runtime** | `RawAgentRuntime`: sessions, tasks, tools, approvals, workspaces (`git worktree` or directory copy), background jobs, mailbox (teammates), trace events, prompt-cache–friendly system prefixes |
-| **Models** | `heuristic` (no keys), `openai-compatible`, `anthropic-compatible`; optional **hybrid VL router** + `vision_analyze`; optional `RAW_AGENT_USE_JSON_MODE=0` for picky providers |
-| **Tools** | File read/write/edit, `bash`, todos, harness specs, subagents/teammates, mailbox, `bg_run`, skills, optional **glob** / **web_fetch** / **MCP stdio** / hooks / LSP / OpenTelemetry hooks |
-| **Skills** | Repo `skills/**/SKILL.md` + optional `~/.agents/**/SKILL.md` merge; **skill router** (`legacy` / `hybrid`); **Guided learning** (coaching mode) |
-| **Self-heal** | Isolated worktree, whitelist tests, optional merge + daemon restart handshake |
-| **Evolution** | `evolution:learn` (RSS → inbox + digest skill) + `evolution:run-day` (research → agent → build → test; merge with mutex when `AUTO_MERGE=1`) |
-| **Web** | Next.js 15 App Router: playground (SSE, thinking, tools, Markdown), teams graph, traces, mailbox, approvals; Ops **Swarm**; More **Orchestration / Memory**; `/api/*` proxied to daemon |
-| **2.0 slices** | **Agent memory** (five layers), **Swarm** (`pipeline` executor), **Orchestration** engine, **DeepResearch** pipeline MVP; optional `RAW_AGENT_AUTH_TOKEN` |
+Most agent frameworks hand you raw plumbing—sessions, skills, MCP servers, subagent graphs—and force *you* to act as the systems integrator every single time you want work done. **Raw Agent internalizes the orchestration tax for everyday users while keeping every gear inspectable and embeddable for engineers:**
+
+1. **Bot-First Workspace, Zero Orchestration Tax**: Every Bot has a persistent identity, expressive live avatar, per-Bot model & thinking-effort pin, private memory, scoped skills, and one canonical conversation thread. Your built-in **Super Bot** inspects the roster, delegates tasks to specialist Bots under *their* own permissions, and synthesizes outcomes—no workflow wiring required to get started.
+2. **Conversation · Goal · Execution Separation (Never "Trust Me, I'm Done")**: Finishing a model turn is *not* goal completion. Goals move through an 8-state lifecycle (`queued / running / waiting / blocked / paused / completed / failed / cancelled`), deliverables are versioned as immutable snapshots, and completion requires independent verification against files, builds, or real connector receipts.
+3. **One Verified Deliverable → Ongoing Routine**: Turn any finished task into a cron or event-driven **Routine** in one click—complete with **"notify only on diff"**, missed-run catch-up, and optional pre-send human approval so recurring briefings and checks run without daily re-prompting or empty notification noise.
+4. **Multi-Bot Rooms Without the Chatter**: Group Rooms use **Agentic Sparse-MoE** selection so only relevant specialists speak (including zero-reply when none clear the bar), or switch seamlessly into **Task Collaboration Mode** (lead coordinator + public evidence rollup) and **Structured Debate Mode** (multi-round rebuttals + judge verdict).
+5. **Two Products in One Monorepo: Local-First Workspace + 4-Preset Embeddable SDK**: Run the full **Agent Lab** (Next.js 15 + SQLite + Native Electron Desktop) out of the box, *or* install **`@mage-ai-lab/agent-loop`** from npm (`mini / normal / full / max`, where `/mini` has zero Node built-in imports for browsers and extensions) to power your own product.
 
 ---
 
-## Packages & apps
+## Choose Your Path
 
-| Path | Role |
-|------|------|
-| `packages/agent-loop` (`@ppeng/agent-loop`) | Embeddable turn kernel, assembly presets, model/tool loop, session control; [SDK guide](skills/agent-loop/SKILL.md) |
-| `packages/api-types` | Shared API types |
-| `packages/core` (`@ppeng/agent-core`) | Runtime, storage, adapters, tools, workspaces, self-heal policy, traces, skills; usable standalone as an **embeddable SDK** — see [`packages/core/README.md`](packages/core/README.md) / [`doc/EMBEDDING_SDK.md`](doc/EMBEDDING_SDK.md) |
-| `packages/capability-gateway` | Optional bridge (e.g. IM channels, config); used by `evolution:learn` feeds |
-| `apps/daemon` | HTTP API, scheduler, static stub for `/`; **use Next for UI** |
-| `apps/cli` | `chat`, `send`, tasks, approvals, **self-heal**, daemon restart ack |
-| `apps/web-console` | Agent Lab (Next.js) |
-| `apps/desktop` | **Desktop Client** (Electron; macOS arm64, Windows and Linux × x64 / arm64) |
+| I want to… | Start here | Go deeper |
+|------------|------------|-----------|
+| **Run the workspace (Web / Desktop)** | [Quick start](#quick-start) | [Capabilities tour](#what-you-can-do-today-shipped) · [Desktop client](apps/desktop/README.md) |
+| **Review product specs & feature status** | [Bot Functional Guide (ZH)](doc/bot/00-functional-guide.md) | [PRD Catalog](doc/prd/README.md) · Run `pnpm feature-map <query>` |
+| **Embed just the Agent Loop (Browser / Node)** | [`@mage-ai-lab/agent-loop`](packages/agent-loop/README.md) | [Loop SDK contract & 4 presets](skills/agent-loop/SKILL.md) |
+| **Embed the full Multi-Agent Host Runtime** | [`@ppeng/agent-core`](packages/core/README.md) | [Core SDK stability & embedding guide](doc/EMBEDDING_SDK.md) |
+| **Learn how an industrial Agent Harness works** | [Harness Guide](doc/harness/README.md) | [From-Zero Tutorial](doc/harness/from-zero/README.md) · [8-Zone Architecture Map](doc/architecture/README.md) |
+| **Contribute or run AI coding agents** | [`AGENTS.md`](AGENTS.md) | [Architecture](doc/ARCHITECTURE.md) · [Acceptance Gate](doc/ACCEPTANCE_GATE.md) · [Testing](doc/TESTING.md) |
+
+> Note: Product narrative books (`doc/bot/`, `doc/prd/`) and the 20-chapter Harness tutorial are maintained primarily in Chinese; [`doc/README.md`](doc/README.md) provides a bilingual index of the entire handbook.
 
 ---
 
 ## Quick start
 
-Prerequisites: Node.js 22+ with SQLite FTS5 support, and pnpm 10.29.2. Run these commands from the repository root:
+Prerequisites: **Node.js 22+** (with built-in `node:sqlite` FTS5 support) and **pnpm 10.29.2**.
+
+### 1. Launch Agent Lab in 60 Seconds (UI-First, Zero `.env` Required)
 
 ```bash
 corepack enable
@@ -79,216 +51,242 @@ pnpm run build
 pnpm run dev
 ```
 
-Open the **Agent Lab URL printed in the terminal**. Configure a provider (Base URL / API Key) in chat's model settings, discover models, then select one and send a message. No `.env` copy is required for this UI-first setup.
+1. Open the **Agent Lab URL printed in your terminal** (prefers `23000` for Lab and `27070` for Daemon, probing upward automatically on port conflicts and writing actual bindings to `.agent-state/dev-lab.ports.json`).
+2. You land directly in the **Bot Workspace**. Click **Configure Model** in the chat composer, enter any OpenAI- or Anthropic-compatible Base URL and API Key, auto-discover models, and send your first goal—**no `.env` file copy needed** (demo clip: [doc/lab/lab-model-setup-autodiscover.mp4](doc/lab/lab-model-setup-autodiscover.mp4)).
+3. On macOS/Linux, stopping `pnpm run dev` (`Ctrl+C`, `SIGTERM`, `SIGHUP`) cleanly tears down compiler, daemon, and Next process groups so restarts immediately reuse the same ports.
 
-The dev launcher selects available ports and wires the proxy automatically; chosen addresses are also saved to `.agent-state/dev-lab.ports.json`. Without overrides, preferred ports are 23000 (Lab) and 27070 (daemon), with fallback on conflicts. Do not assume a fixed port from an older example. On macOS/Linux, stopping the launcher (Ctrl+C, SIGTERM, or SIGHUP) also stops its compiler, daemon, and Next process groups. It waits up to three seconds before force-stopping remaining descendants, so a restart can reuse the same ports without touching other checkouts.
-
-For a no-key smoke check, use the isolated heuristic eval after building:
+Want a zero-API-key capability check right after building? Run the isolated heuristic smoke eval:
 
 ```bash
 pnpm run agent:eval:fast --exit-on-fail
 ```
 
-This verifies HTTP capabilities, not real-model answer quality. For CLI/HTTP walkthroughs, continue with the [from-zero tutorial](doc/harness/from-zero/README.md). To start Next separately, set `DAEMON_PROXY_TARGET` to the actual daemon address; production UI commands are `pnpm run build:web-console` and `pnpm run start:web-console`.
+### 2. Native Desktop Client (macOS Apple Silicon & Linux)
 
-### Desktop Client (macOS / Linux)
-
-Electron app that bundles daemon + Lab. Local pack matches this machine when it is macOS or Linux:
+Pack the standalone Electron app bundling Daemon + Agent Lab + OS tray + **transactional backup-and-rollback local client updates** (`Raw Agent → Update client…`):
 
 ```bash
 pnpm run build:desktop
 # Output: apps/desktop/release/RawAgent-<version>-<os>-<arch>.{dmg,AppImage}
 ```
 
-CI builds three artifacts (macOS arm64, plus Linux × x64/arm64) daily at 17:00 UTC (01:00 Beijing), via Actions → **Desktop artifacts**, a `desktop-v*` tag (no GitHub Release), or a `v*` tag. Windows and Intel Mac (darwin x64) are not built. See [`doc/CI.md`](doc/CI.md) and [`apps/desktop/README.md`](apps/desktop/README.md).
+Supported targets: **macOS arm64 (`.dmg`)** and **Linux x64 / arm64 (`.AppImage`)** (Windows and Intel Mac are intentionally not built; see Gatekeeper & updater notes in [`apps/desktop/README.md`](apps/desktop/README.md) and [`doc/CI.md`](doc/CI.md)).
 
 ---
 
-## Guidance for AI coding agents
+## What You Can Do Today (Shipped)
 
-If you are an **automated coding agent** (Cursor, Codex, Claude Code, etc.) working in this repo:
+> Every capability below is backed by `implemented` specs in [`acceptance/*.yaml`](acceptance). Explore the live catalog anytime via `pnpm feature-map` or [`doc/prd/README.md`](doc/prd/README.md).
 
-1. **Read [`AGENTS.md`](AGENTS.md) first** — workspace conventions, env vars, Evolution/self-heal/web-console notes, and operational gotchas.
-2. **Where code lives**: loop SDK → `packages/agent-loop`; product host & integrations → `packages/core`; HTTP API → `apps/daemon`; Agent Lab → `apps/web-console`; Evolution → `scripts/evolution*`.
-3. **After edits**: `pnpm run test:unit` for logic; `pnpm run build` for TypeScript across packages. UI/E2E → `doc/TESTING.md`, `pnpm run test:e2e` when relevant.
-4. **Secrets & config**: prefer Lab UI and persisted settings APIs for supported options; avoid adding feature-switch env vars. Use [`.env.example`](.env.example) for necessary connection/bootstrap or CI fallback configuration; **never commit `.env`**. Env changes require process restart; consult each settings API for its effective scope.
-5. **Evolution**: `pnpm run evolution --help` for flags (`--learn`, `--agent`, `--review`, `--until-empty`, `--research`, `--test-agent`, …). Optional full drain + showcase: `pnpm run evolution:drain-showcase --help`. Inbox processing defaults to the **「今日新条目」** section (see README Evolution section below).
-6. **Spawning / sandbox**: new subprocess code must use `sanitizeSpawnEnv()` and existing sandbox helpers (`packages/core/src/sandbox/env-sanitizer.ts`, `packages/core/src/sandbox/os-sandbox.ts`, `SandboxManager`) — not raw `spawn` with full parent env.
-7. **Skills**: `skills/**/SKILL.md`; optional merge with `~/.agents/**/SKILL.md` (details in `AGENTS.md`).
-8. **Loop SDK changes**: update [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md) alongside SDK contracts, and run both `pnpm run test --workspace=@ppeng/agent-loop` and `pnpm run build --workspace=@ppeng/agent-loop`. Root `test:unit` does not replace the SDK's Vitest suite.
+### 1. Bot Workspace & High-Craft Conversational UX
+- **Persistent Roster & Organization**: Default **Super Bot** coordinator + built-in **Mock Interviewer** + custom specialist Bots; pinned items, collapsible functional groups with drag-and-drop, sage-green light/dark glass UI, and hot-switched `en` / `zh` localization.
+- **Canonical Thread & Slash Commands**: Compaction, stopping, and model switching never fracture a Bot's main thread. `/new` runs two-tier incremental structured summarization at **50% and 85%** of the real model context window (preserving tool-call/result pairing and searchable raw history); `/stop` halts the active turn; `/model` pins a provider/model; each Bot can also pin its own **Thinking Effort** (`off / low / medium / high`).
+- **Live Mid-Turn Steering, Away Recap & Ghost Suggestions**: Send follow-ups while a Bot is busy to steer the next step immediately (cancelling conflicting queued tool calls before launch); return after 3+ minutes away for a 1-line **Session Recap** (or run `/recap` anytime); press `Tab` on an empty composer to adopt context-aware next-step suggestions.
+- **Inline Sidechat & Multimodal Drafts**: Highlight any phrase in a finished reply to open a right-rail **Sidechat** for plain-language explanations, analogies, 1-line takeaways, and cross-session annotation search; drag-and-drop files and images with per-Bot draft preservation and optional browser desktop notifications.
 
-Deeper architecture: [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md).
+### 2. Multi-Goal Execution & Multi-Bot Collaboration
+- **Autonomous Goal Engine & Finish Follow-Up**: Automatically distinguishes new goals, constraint updates, status checks, and casual chat; surfaces a **Goals & Progress** panel when 2+ goals are active; includes **Finish Check & Scheduled Wakeups** so Bots don't stop prematurely after promising follow-up work, plus crash-safe lock release and missed-notification recovery across restarts.
+- **Multi-Granularity Collaboration**: Direct `bot_delegate` (strictly enforcing the *target* Bot's permissions—never escalating via caller identity), **Sparse-MoE Rooms**, **Room Task Collaboration**, **Room Debate Mode**, **Team DAG**, **Swarm (`pipeline`)** (requiring both an independent reviewer pass and real test execution before completion), and **Orchestrator**.
+- **Interactive Collaboration Graph**: `Tasks → Workflow` renders a live multi-Bot handoff canvas—inspect receipts, token cost, latency, and replay recent cross-Bot handoffs visually.
 
----
+### 3. Five-Layer Memory, Daydream, Coaching & Obsidian Sync
+- **Provenance-Backed 5-Layer Memory (`AgentMemoryStore`)**: Scoped across `session.scratch`, `session.long`, `user`, `team`, and `project` with strict private-memory isolation between Bots; tracks message/file provenance and replacement history, filters out temporary one-off instructions, and replaces contradicted facts cleanly.
+- **Daily Daydream & Conversational Skill Capture**: Resumable background daily reflection (`daydream`); one-confirmation conversational **Skill Capture** ([`doc/SKILL_CAPTURE.md`](doc/SKILL_CAPTURE.md)); merges repo `skills/` + `~/.agents/` with read-only cross-Bot skill sharing and group-scoped shared instructions.
+- **Bot Coaching & Experience Governance**: Persist role contracts and pinned workflow skills; govern operational lessons through a **`candidate → verified → retired`** ledger so only verified experiences enter execution prompts ([`doc/bot/BOT_COACHING_PLAYBOOK.md`](doc/bot/BOT_COACHING_PLAYBOOK.md)).
+- **Local Library Indexing & Obsidian Vault Graph**: Non-blocking background folder indexing; one-click **Bookmark Reply** writes clean Markdown straight into your local **Obsidian Vault** with an in-app Topic Graph; optional local Grok desktop cache reader in the browser.
 
-## npm scripts (reference)
+### 4. Model Routing, Built-in Tools, Connectors & Messaging Channels
+- **Multi-Provider Models & Rich Tool Suite**: Native adapters for `openai-compatible` (Chat Completions & Responses), `anthropic-compatible`, and keyless `heuristic`, plus optional **Hybrid VL Routing** + `vision_analyze` (`RAW_AGENT_USE_JSON_MODE=0` supported for strict-JSON-incompatible providers). Built-in tools span file read/write/edit, `bash`, `bg_run`, `glob`, `web_fetch`, and LSP, alongside approval-gated external coding CLIs (`claude_code` / `codex_exec` / `cursor_agent`, see [`doc/EXTERNAL_AI_CLI.md`](doc/EXTERNAL_AI_CLI.md)) and gated local desktop control ([`doc/LCU_COMPUTER_USE.md`](doc/LCU_COMPUTER_USE.md)).
+- **Software Connectors & External Agent Handoff**: Configure HTTP, OpenAPI (with read-only operation filtering), and **MCP (`stdio` & connectors)** backed by write-only secret references; authorize external apps or remote agents to submit isolated tasks to specific Bots ([`doc/EXTERNAL_AGENT_HANDOFF.md`](doc/EXTERNAL_AGENT_HANDOFF.md)).
+- **IM & Webhook Channels**: Bidirectional **Feishu (Lark)** integration with durable outbox replay, **WeCom** bridge/webhook, **Slack** inbound event wakeups, and generic Webhooks ([`doc/IM_AGENT_INTEGRATION.md`](doc/IM_AGENT_INTEGRATION.md)).
+- **In-Chat Interactive Cards (A2UI v0.9) & Domain Bundles**: Stream interactive forms and buttons inside chat bubbles that feed user actions back as structured turns ([`doc/A2UI.md`](doc/A2UI.md)); hot-toggle built-in Domain Bundles (`@ppeng/agent-sre` read-only on-call tools & `@ppeng/agent-stock` market/fundamentals with mock fallback), plus workspace packages `agent-homeiot` and `agent-erp`.
+- **PTC Dynamic Workflows & Dynamic Tool Factory**: Let models compose async JavaScript over read-only tools and subagents via `ptc_exec`, and harvest recurring cells into session-sticky named tools ([`doc/PTC_DYNAMIC_WORKFLOW.md`](doc/PTC_DYNAMIC_WORKFLOW.md), [`doc/DYNAMIC_TOOLS.md`](doc/DYNAMIC_TOOLS.md)).
 
-| Script | Description |
-|--------|-------------|
-| `pnpm run build` | TypeScript workspace build + Next production build |
-| `pnpm run test` | build + unit tests |
-| `pnpm run test:unit` | unit tests only |
-| `pnpm run test:regression` | temp daemon HTTP regression |
-| `pnpm run test:e2e` | temp daemon + Playwright (Agent Lab) |
-| `pnpm run test:e2e:install` | Playwright Chromium |
-| `pnpm run test:remote` | real-model smoke (needs env; skipped if unset) |
-| `pnpm run agent:eval:fast --exit-on-fail` | Isolated heuristic daemon; HTTP capability checks, nonzero on failure |
-| `pnpm run test --workspace=@ppeng/agent-loop` | Loop SDK Vitest suite |
-| `pnpm run ci` | build + unit + formal + fast eval + quality-engine simulation + package smoke + CRAP gate + regression + integration + e2e |
-| `pnpm run start:daemon` / `start:supervised` | daemon / supervisor |
-| `pnpm run pm2:start` / `pm2:stop` / `pm2:restart` | PM2-managed supervised daemon (`ecosystem.config.cjs`) |
-| `pnpm run start:cli` | CLI (`self-heal`, `chat`, …) |
-| `pnpm run dev:lab` | dev helper (Next + daemon proxy) |
-| `pnpm run evolution --help` | unified evolution entry, see all options |
-| `pnpm run evolution --learn --agent cursor --review codex` | learn + cursor implement + codex review |
-| `pnpm run evolution --learn-only` | pull RSS → inbox only |
-| `pnpm run evolution:pipeline` | learn → run-day → optional post-merge reload (one-shot) |
-| `pnpm run ai:tools` | check external CLIs (`claude`, `codex`, …) |
-
-See [`doc/TESTING.md`](doc/TESTING.md), [`doc/CI.md`](doc/CI.md), [`.env.example`](.env.example).
+### 5. Defense-in-Depth Security, Sandboxing & Cache Economics
+- **Granular Permissions & Session-Scoped Allowances**: Per-Bot permission tiers (`plan`, `auto`, double-confirmed full bypass); approval cards support **"Always allow in this session"** bound strictly to `session × tool × sandbox mode` (revocable anytime; unanswered approvals expire safely as failures after 10 minutes).
+- **OS Sandboxing & Zero-Leak User Vault**: Every subprocess strips injection vectors via `sanitizeSpawnEnv()`; macOS `sandbox-exec` (Seatbelt) and Linux `bwrap` block `~/.ssh`, `~/.aws`, and `~/.gnupg`; tool outputs auto-redact secrets; **User Vault (`uvref:`)** fills passwords, cards, and OTPs inside runtime forms without ever exposing plaintext secrets to LLM prompts or traces.
+- **In-Turn Watchdogs & Magpie Cache Telemetry**: Streaming repetition watchdog (aborts & cleanly retries once) + reasoning-spin watchdog + cross-turn `LoopGuard` / `RiskEngine`; follow-up turns preserve byte-identical leading prompt prefixes for upstream KV caching, monitored continuously by **Magpie** in `Settings → Ops → Health`.
 
 ---
 
-## Agent Lab (web console)
+## Embed in 5 Minutes (Dual SDKs)
 
-- **Jev integration**: optional host-side semantic decisions, independent profiles, PTC helpers, and traces. See the [Jev integration guide](doc/JEV_INTEGRATION.md) (Chinese); off by default, configured in More → Jev.
-- **Model setup**: chat 「配置模型」 for Base URL / API Key, then auto-discover model names. Demo: [doc/lab/lab-model-setup-autodiscover.mp4](doc/lab/lab-model-setup-autodiscover.mp4)
-- **Playground**: streaming (SSE), thinking blocks, tool results, Markdown
-- **Sessions / tasks / teams**: mailbox graph, mail flow
-- **Traces**: reads `stateDir/traces/.../events.jsonl`
-- **Approvals / background jobs / workspaces**
+Building your own AI product, CLI, or browser extension? Use the exact engine that powers Raw Agent—without adopting the UI or daemon.
 
-Daemon API examples: `GET /api/version`, `GET /api/health`, `GET /api/traces?sessionId=...` — full list in `apps/daemon/src/server.ts`.
+### Option A: Lightweight Turn Kernel — `@mage-ai-lab/agent-loop`
+
+Published on npm ([`@mage-ai-lab/agent-loop`](packages/agent-loop/README.md) + `@mage-ai-lab/api-types`, self-built—not a wrapper around `@openai/agents`). Offers `mini / normal / full / max` presets, `step() / run() / for await / steer() / abort() / fold()`, and native image/audio/video `MediaPart` input (`openai`, `qwen-omni`, `anthropic`):
+
+```bash
+pnpm add @mage-ai-lab/agent-loop
+```
+
+```ts
+import { createAssembledLoop, OpenAiChatAdapter } from '@mage-ai-lab/agent-loop';
+import { createDefaultMemoryStore, DEFAULT_EMBED_AGENT } from '@mage-ai-lab/agent-loop/mini';
+
+const { store, surface } = createDefaultMemoryStore({ agent: DEFAULT_EMBED_AGENT });
+const session = surface.createSession({ title: 'weather', mode: 'chat', agentId: DEFAULT_EMBED_AGENT.id });
+surface.appendMessage(session.id, 'user', [{ type: 'text', text: 'What is the weather in Shanghai?' }]);
+
+const loop = await createAssembledLoop({
+  preset: 'full', // 'mini' (zero Node built-ins for browsers/extensions) | 'normal' | 'full' | 'max'
+  io: {
+    store,
+    model: new OpenAiChatAdapter({
+      apiKey: process.env.OPENAI_API_KEY!,
+      baseUrl: process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
+      model: 'gpt-4o',
+      useJsonMode: false,
+    }),
+    tools: [{
+      name: 'fetch_weather',
+      description: 'Query current weather for a city',
+      inputSchema: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
+      approvalMode: 'never',
+      sideEffectLevel: 'none',
+      execute: async (_ctx, args) => ({ ok: true, content: `${String(args.city)}: Sunny, 22°C` }),
+    }],
+  },
+});
+
+const handle = loop.createHandle!(session.id);
+await handle.run();
+console.log(await handle.fold());
+```
+
+### Option B: Full Multi-Agent Host — `@ppeng/agent-core`
+
+Instantiate `RawAgentRuntime` directly in Node.js for SQLite persistence, isolated workspaces (`git worktree` or copy), approvals, skills, and domain bundles (see [`doc/EMBEDDING_SDK.md`](doc/EMBEDDING_SDK.md); run `pnpm run test:examples` to execute all keyless examples `01`–`07`):
+
+```ts
+import { RawAgentRuntime, HeuristicModelAdapter } from '@ppeng/agent-core';
+
+const runtime = new RawAgentRuntime({
+  repoRoot: process.cwd(),
+  stateDir: './.my-agent-state',
+  modelAdapter: new HeuristicModelAdapter(), // or createModelAdapterFromEnv(process.env)
+});
+
+const session = runtime.createChatSession({ message: 'Summarize this repository.' });
+await runtime.runSession(session.id);
+console.log(runtime.getLatestAssistantText(session.id));
+```
 
 ---
 
-## Evolution (continuous learning)
+## Architecture & Monorepo Layout
 
-Unified entry: `pnpm run evolution [options]` (run `--help` for all flags).
+![Architecture Overview](doc/architecture/01.svg)
 
-**Typical split-command loop** (learn → run-day batch → Pages showcase): fixed three-step sequence in [`doc/evolution/README.md`](doc/evolution/README.md).
+> Browse all 8 vector architecture zones and the editable `.excalidraw` source (with source-path links on every module box) in [`doc/architecture/README.md`](doc/architecture/README.md).
 
-**Flywheel planning**: current Evolution direction, capability gaps, Agent scheduler mode, and redeploy regression gate are tracked in [`doc/evolution-flywheel-review.md`](doc/evolution-flywheel-review.md).
+```text
+Agent Lab (Next.js 15) / Desktop (Electron) / CLI / IM & Connectors
+                                ↓  HTTP / SSE / Same-Origin Bearer Proxy
+                 apps/daemon (Auth · Routing · Schedulers · Readiness)
+                                ↓
+         packages/core · RawAgentRuntime (Bots / Goals / Memory / Sandbox / Vault)
+                                ↓  Injected model / tools / storage / hooks
+     packages/agent-loop · createAssembledLoop (default: kernel=agent-loop, preset=max)
+                                ↓
+         Turn Kernel → Context Assembly → Streaming Model → Tool Wave & Approvals → Verify
+```
 
-**Common combinations:**
+### Packages & Applications
+
+| Path | Package | Role |
+|------|---------|------|
+| `packages/agent-loop` | `@ppeng/agent-loop` (npm: `@mage-ai-lab/agent-loop`) | Embeddable turn kernel, 4 assembly presets, model adapters, watchdogs & session control |
+| `packages/api-types` | `@ppeng/api-types` (npm: `@mage-ai-lab/api-types`) | Shared HTTP view types & browser-safe session query helpers |
+| `packages/core` | `@ppeng/agent-core` | Host runtime: Bots, Goals, 5-layer memory, sandboxing, Vault, tools, Swarm, Orchestrator & SQLite |
+| `packages/daemon-client` | `@ppeng/daemon-client` | Typed HTTP/SSE client shared by CLI and external integrations |
+| `packages/capability-gateway` | `@ppeng/agent-capability-gateway` | IM channel bridges (Feishu / WeCom / Slack / Webhook) & feed gateway |
+| `packages/agent-sre` · `agent-stock` · `agent-homeiot` · `agent-erp` | `@ppeng/agent-*` | Pluggable Domain Bundles (SRE read-only on-call & Stock analysis enabled as built-in reference bundles) |
+| `apps/web-console` | `@ppeng/agent-lab-web` | **Agent Lab**: Next.js 15 App Router web console (`/api/*` proxied server-side to Daemon) |
+| `apps/daemon` | `@ppeng/agent-daemon` | Local HTTP/SSE server, goal/routine schedulers, `/api/readiness` probe (`/` serves stub only) |
+| `apps/desktop` | `@ppeng/agent-desktop` | **Raw Agent Desktop**: Electron shell for Apple Silicon macOS & Linux (`x64` / `arm64`) |
+| `apps/cli` | `@ppeng/agent-cli` | Terminal client for chat, tasks, approvals, `self-heal`, and daemon restart handshakes |
+
+---
+
+## Engineering Rigor & Quality Gates
+
+Every change to `main` is guarded by automated, deterministic verification rather than ad-hoc demo runs:
+
+- **Executable Acceptance Gate (`pnpm run test:acceptance`)**: `481` implemented specs and `2,347` `Given / When / Then` criteria traced directly to `[AC:<id>#<AC-n>]` test tags across `1,165+` runnable test files ([`doc/ACCEPTANCE_GATE.md`](doc/ACCEPTANCE_GATE.md)).
+- **Executable Formal Invariants (`pnpm run test:formal`)**: Property-based and state-machine verification for tool-call pairing, session lifecycles, restart recovery, and concurrent writers ([`doc/formal/README.md`](doc/formal/README.md)).
+- **CRAP Complexity × Coverage Ratchet (`pnpm run test:crap`) & Mutation Testing (`pnpm run test:mutation`)**: Blocks cyclomatic complexity regressions on uncovered paths ([`doc/CRAP_GATE.md`](doc/CRAP_GATE.md)).
+- **Measured Lab Performance & Cache Gate (`pnpm run bench:lab`)**: Guards startup request budgets, homepage latency, and prompt-cache prefix stability on real request paths.
+- **Instant Feature Traceability (`pnpm feature-map`)**: Query any user-facing concept (`pnpm feature-map sidechat` or `--json`) to locate its UI route, source files, acceptance spec, and targeted regression suite.
+
+---
+
+## Vision & Honest Delivery Boundaries
+
+Our commercial trajectory scales naturally: **Personal Bot → Specialist Virtual Employee Team → Digital "Lights-Out Software Factory"** (*intake → Super Bot decomposition → specialist execution → automated tests & independent verification → deliverable rollup & routine capture*).
+
+To keep expectations crystal-clear for evaluators, embedders, and operators, we explicitly separate **shipped software** from **commercial north-star & active validation milestones**:
+
+- **Commercial North Star vs. Turnkey SLA**: "24/7 Virtual Employees" and "Lights-Out Software Factory" describe commercial deployment patterns built on top of our shipped Bot, Goal, Routine, and Room primitives—not pre-packaged job SKUs, guaranteed 7×24 uptime SLAs, or zero-human-oversight promises.
+- **Multi-Machine Factory & Platform Slices**: Super Bot SSH machine registration, repo discovery, and **read-only pilot runs** (`superbot-factory-setup`) are shipped; cross-machine continuous supervision and end-to-end unattended production release remain gated on field certification ([`doc/SINGLE_HOST_COMPLETION.md`](doc/SINGLE_HOST_COMPLETION.md)). DeepResearch is currently a pipeline task MVP; `container` sandboxing is unimplemented (refuses cleanly rather than falling back silently); SQLite remains the primary state store while multi-Pod K8s session failover is not yet certified.
+- **Self-Heal & Legacy Evolution Pipeline**: `pnpm run start:cli self-heal start` (`pnpm run self-heal:flow`) is an operator CLI/API maintenance workflow running whitelist tests in isolated worktrees—not an end-user Bot chat button. The legacy self-evolution pipeline (`evolution:*` / `scripts/evolution*`) has been **deprecated and frozen since 2026-10-16** and is retained only for historical reference (see [`scripts/evolution/DEPRECATED.md`](scripts/evolution/DEPRECATED.md)).
+
+---
+
+## Essential Commands
 
 | Command | Description |
 |---------|-------------|
-| `pnpm run evolution --learn-only` | Pull RSS → inbox only, no dev |
-| `pnpm run evolution --learn --agent claude` | learn + Claude implement (default) |
-| `pnpm run evolution --learn --agent cursor` | learn + Cursor composer-2-fast |
-| `pnpm run evolution --learn --agent cursor --review codex` | learn + Cursor implement + Codex review |
-| `pnpm run evolution --learn --agent cursor --review cursor` | learn + Cursor full pipeline |
-| `pnpm run evolution --learn --agent cursor --model claude-opus-4-7-thinking-max --review cursor` | learn + Cursor Opus-Max implement & review |
-| `pnpm run evolution --learn --agent full` | learn + research → multi-CLI routing by difficulty |
-| `pnpm run evolution --learn --agent cursor --review codex --concurrency 5 --merge` | 5 parallel worktrees + auto-merge |
-| `pnpm run evolution --pipeline-build --learn --agent cursor --review codex` | build gateway + learn + dev |
-
-**Selected flags** (use `--help` for the complete, current list):
-
-```
---learn                  pull RSS → inbox first
---learn-only             learn only, skip dev
---pipeline-build         build capability-gateway before learn
---agent cursor|claude|codex|full|multi   implement agent (default: claude)
---model <name>           cursor agent model (default: composer-2-fast)
---review cursor|codex|none   review agent (default: none)
---review-model <name>    review model (default: same as --model)
---concurrency <n>        parallel worktrees (limits shown by --help)
---items <n>              max inbox items to process
---merge                  auto-merge on passing tests
---target-branch <b>      merge target branch (default: main)
---skip-rebase            skip post-test rebase
-```
-
-**Runtime behavior and troubleshooting:**
-
-- `run-day` now executes the **“今日新条目”** section from the inbox by default; the rolling reference section is display-only and is not re-queued, which avoids duplicate links sharing one worktree under high concurrency.
-- When Cursor is selected, the CLI runs `agent --list-models` up front; unsupported model IDs fail fast before learn / research starts.
-- The research gate is intentionally conservative now: missing excerpts, unsupported Cursor models, or outputs that clearly contain `SKIP:` will be skipped instead of silently defaulting to `PROCEED`.
-- Review / rebase / merge failures try to keep the experiment branch around for manual takeover. Check `doc/evolution/failure/` for the matching record, then inspect the local `exp/evolution-*` branch.
-- If `evolution:learn` shows widespread RSS failures, check proxy / DNS / TLS first. A `news.ycombinator.com` certificate mismatch usually points to local network or proxy interception rather than repo code.
-
-`pnpm run evolution:pipeline` (bash one-shot: build→learn→run-day→optional reload) and the low-level `evolution:learn` / `evolution:run-day` scripts are still available. For advanced fine-grained tuning (plan, test-agent, review rounds, etc.) see `scripts/evolution-quality-pipeline.env.example` and `.env.example`.
-
-> **Deprecated (2026-10-16):** the self-evolution pipeline (`evolution:*` scripts, `scripts/evolution*`) is no longer maintained. Do not extend it; it may be removed later. See `scripts/evolution/DEPRECATED.md`.
+| `pnpm run dev` (or `pnpm run dev:lab`) | Launch Daemon + Agent Lab in parallel with automatic port & proxy wiring |
+| `pnpm run build` | Build all TypeScript workspace packages + Next.js production bundle |
+| `pnpm run test:unit` | Run workspace unit tests (`node:test`) |
+| `pnpm --filter @ppeng/agent-loop run test` | Run `@ppeng/agent-loop` Vitest suite |
+| `pnpm run test:acceptance` | Fast static traceability check across `acceptance/*.yaml` and test tags |
+| `pnpm run test:formal` | Run formal pairing, lifecycle, restart, and concurrency verifications |
+| `pnpm run test:e2e` | Boot isolated temp Daemon + Lab with shared random auth token & run Playwright |
+| `pnpm run ci` | Full local gate (build + perf + unit + soak + acceptance + formal + fast eval + package + CRAP + regression + integration + e2e) |
+| `pnpm feature-map [query]` | Map user-facing features to specs, source files, and regression tests (`--json`, `--core`) |
+| `pnpm run start:daemon` / `pnpm run pm2:start` | Run standalone Daemon or PM2-supervised Daemon (`ecosystem.config.cjs`) |
+| `pnpm run start:cli` | Run CLI (`chat`, `send`, tasks, approvals, `self-heal`, restart ack) |
+| `pnpm run build:desktop` | Package native Electron desktop artifact for host OS/arch |
+| `pnpm run doctor` / `pnpm run ai:tools` | Run local environment diagnostics / check external CLIs (`claude`, `codex`, `cursor`) |
 
 ---
 
-## Self-heal
+## Configuration, Security & Privacy
 
-After `pnpm run start:daemon` (or supervised flow):
-
-```bash
-pnpm run start:cli self-heal start '{"testPreset":"unit","autoMerge":false}'
-```
-
-Scheduler runs whitelist tests in an isolated worktree; failures can drive a **self-healer** session. Optional `autoMerge` / `autoRestartDaemon` with `GET /api/daemon/restart-request` + `POST .../ack`. See [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md).
+- **UI-First Hot Settings, Minimal Env Vars**: Model providers, loop presets (`GET/PATCH /api/loop/settings`), sandbox isolation mode, skill routing, finish-check behavior, A2UI, and Domain Bundles are configured in **Agent Lab + persisted SQLite settings** and take effect without editing `.env` or restarting processes.
+- **Focused Environment Variables**: Reserve `.env` for upstream secrets/endpoints (`RAW_AGENT_API_KEY`, `RAW_AGENT_BASE_URL`, `RAW_AGENT_MODEL_NAME`, optional vision `RAW_AGENT_VL_*`), process bootstrap (ports, `RAW_AGENT_AUTH_TOKEN`, optional OAuth `RAW_AGENT_OAUTH_*`), and CI fallbacks. See [`.env.example`](.env.example) and [`doc/ENV_REFERENCE.md`](doc/ENV_REFERENCE.md).
+- **Security Hygiene**:
+  - **Never commit `.env` or `gateway.config.json`** — use `.env.example` and `gateway.config.example.json` as templates only, and rotate any key immediately if exposed.
+  - **Same-Origin Proxy & Auth**: Set `RAW_AGENT_AUTH_TOKEN` in non-local deployments (Next middleware injects `Authorization: Bearer` server-side without exposing tokens to the browser) and restrict `RAW_AGENT_CORS_ORIGIN`. Never expose an unauthenticated Daemon to untrusted networks.
 
 ---
 
-## Core capabilities (summary)
+## Guidance for AI Coding Agents
 
-- SQLite persistence: agents, sessions, messages, tasks, events, approvals, workspaces, mailbox, background jobs, self-heal runs, daemon control
-- Team model: main / planner / researcher / implementer / reviewer / **self-healer** + spawnable teammates
-- **Stable vs dynamic system prompt** split for KV cache (see `doc/PROMPT_CACHE.md`)
-- **Image assets**: hot/warm/cold, contact sheet, `vision_analyze`
-- **Optional external AI tools** (`RAW_AGENT_EXTERNAL_AI_TOOLS=1`): `claude_code`, `codex_exec`, `cursor_agent` with approval — see [`doc/EXTERNAL_AI_CLI.md`](doc/EXTERNAL_AI_CLI.md)
+If you are an automated coding agent (**Cursor, Claude Code, Codex, Antigravity**) working in this repository:
 
----
-
-## Configuration
-
-Start with **Lab UI + persisted settings** for model providers and supported runtime policies. For example, loop selection and steering settings use `GET/PATCH /api/loop/settings`. Persistence, override precedence, and whether a change affects the next request or run are defined by each settings API—not by one global env rule.
-
-Environment variables remain useful for secrets/upstream connections, process bootstrap, and CI/eval fallbacks where supported. The list below is a reference, not a checklist of required switches:
-
-- **Core**: `RAW_AGENT_STATE_DIR`, `RAW_AGENT_DAEMON_HOST`, `RAW_AGENT_DAEMON_PORT`, `RAW_AGENT_MODEL_PROVIDER`, `RAW_AGENT_MODEL_NAME`, `RAW_AGENT_API_KEY`, `RAW_AGENT_BASE_URL`, `RAW_AGENT_ANTHROPIC_URL`, `RAW_AGENT_USE_JSON_MODE`, `RAW_AGENT_MEMORY_BACKEND`, optional `RAW_AGENT_AUTH_TOKEN`, optional Lab OAuth `RAW_AGENT_OAUTH_*`
-- **Vision**: `RAW_AGENT_VL_*`, image limits — see `doc/ARCHITECTURE.md` and `.env.example`
-- **Evolution / self-heal / skills / gateway**: see `AGENTS.md` and `.env.example`
+1. **Read [`AGENTS.md`](AGENTS.md) first** — covers UI-first configuration rules, mandatory frontend i18n (`useI18n` with matching `zh`/`en` keys), Web Console 0%-coverage CRAP ratchet rules, and review-before-merge workflow.
+2. **Locate features via `pnpm feature-map <term>`** — when changing user-visible behavior or skills, sync [`doc/prd/`](doc/prd/README.md) per [`skills/product-prd/SKILL.md`](skills/product-prd/SKILL.md) and regenerate with `node scripts/prd/build-catalog.mjs`.
+3. **Follow Acceptance-First** — for new features or behavior changes, write `acceptance/<id>.yaml` and `[AC:<id>#<AC-n>]`-tagged tests in the same turn per [`skills/acceptance-first/SKILL.md`](skills/acceptance-first/SKILL.md), then verify with `pnpm run test:acceptance`.
+4. **Keep Loop SDK & Skill in sync** — any contract or preset change in `packages/agent-loop` must update [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md) and pass both `pnpm --filter @ppeng/agent-loop run test` and `pnpm --filter @ppeng/agent-loop run build` (`/mini` must remain free of static Node built-ins).
+5. **Subprocess safety** — always spawn through `sanitizeSpawnEnv()` or `SandboxManager` (`packages/core/src/sandbox/`), never raw `spawn` with unsanitized parent `process.env`.
 
 ---
 
-## Documentation
+## Documentation Index
 
-**Full index:** [`doc/README.md`](doc/README.md) (bilingual table of all handbook docs).
+Full bilingual catalog: **[`doc/README.md`](doc/README.md)**
 
-| Doc | Content |
-|-----|---------|
-| [Harness guide](doc/harness/README.md) · [From-zero tutorial](doc/harness/from-zero/README.md) | Reading route: request → loop → model/tools → state → validation |
-| [Agent Loop SDK guide](skills/agent-loop/SKILL.md) | Presets, host contracts, step/run/steer/fold, SDK development |
-| [Jev integration](doc/JEV_INTEGRATION.md) | Lab setup, profiles, 12 insertion-point IDs and wiring status, PTC, fallbacks, traces |
-| [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md) | Modules, scheduler, APIs, tools (see `doc-sync-tools`) |
-| [`doc/ENV_REFERENCE.md`](doc/ENV_REFERENCE.md) | Environment variable reference |
-| [`doc/TESTING.md`](doc/TESTING.md) · [`doc/CI.md`](doc/CI.md) | Test matrix · GitHub Actions |
-| [`doc/MEMORY_MULTIUSER.md`](doc/MEMORY_MULTIUSER.md) | Memory layers, `RAW_AGENT_MEMORY_BACKEND`, `/api/memory` |
-| [`doc/TEAMS_SWARM.md`](doc/TEAMS_SWARM.md) | Swarm runs/tasks, `SwarmExecutor`, Lab Ops panel |
-| [`doc/AGENT_ORCHESTRATOR.md`](doc/AGENT_ORCHESTRATOR.md) | Orchestration runs/steps/events, engine tick |
-| [`doc/DEEP_RESEARCH.md`](doc/DEEP_RESEARCH.md) | Research tasks, pipeline, HTTP run trigger |
-| [`doc/DOMAIN_AGENTS.md`](doc/DOMAIN_AGENTS.md) · [`doc/A2UI.md`](doc/A2UI.md) | Domain bundles · A2UI surfaces |
-| [`doc/SELF_EVOLUTION_V2.md`](doc/SELF_EVOLUTION_V2.md) · [`doc/evolution/README.md`](doc/evolution/README.md) | Evolution 2.0 · learn/run-day loop |
-| [`doc/DEPLOYMENT.md`](doc/DEPLOYMENT.md) · [`doc/HARNESS_EVAL.md`](doc/HARNESS_EVAL.md) | Deploy · `agent:eval` harness |
-| [`doc/ROADMAP.md`](doc/ROADMAP.md) | Long-term roadmap (P0–P4) |
-| [`AGENTS.md`](AGENTS.md) | Conventions for coding agents in this repo |
-
----
-
-## CI
-
-`pnpm run ci` runs build, unit, formal, fast contract eval, quality-engine simulation, tarball installation smoke, CRAP, HTTP regression, integration, and E2E checks. See [`package.json`](package.json) and [CI](doc/CI.md). npm and Docker publication require the release gate and test the actual artifacts before publishing. See the [reliability plan](doc/RELEASE_RELIABILITY_PLAN.md) for deployment boundaries and [harness evaluation](doc/HARNESS_EVALUATION.md) for paired real-model feature/prompt regression. Simulation is not capability evidence. Optional **remote model smoke** requires credentials; fork PRs do not receive upstream secrets.
-
----
-
-## Security & privacy
-
-- **`.env` is listed in `.gitignore`** — do not commit API keys, tokens, or Feishu secrets. Use `.env.example` as a template only.
-- **Rotate keys** if they were ever committed, pasted in issues, or shared in logs.
-- **Gateway** (`gateway.config.json`): keep `bridgeSecret` and any channel tokens out of Git; use `gateway.config.example.json` as reference.
-- **CI**: fork PRs cannot read upstream secrets; remote smoke is skipped safely.
-- **Daemon**: configure `RAW_AGENT_CORS_ORIGIN` for browser clients; set `RAW_AGENT_AUTH_TOKEN` (Bearer) in production; avoid exposing an unauthenticated daemon to untrusted networks. Optional Lab login: `RAW_AGENT_OAUTH_GOOGLE_*` / `RAW_AGENT_OAUTH_GITHUB_*` (see `.env.example`).
+- **Product & Specs**: [Bot Functional Guide](doc/bot/00-functional-guide.md) · [Bot Chapters 01–10](doc/bot/README.md) · [PRD Catalog](doc/prd/README.md) · [Bot Coaching Playbook](doc/bot/BOT_COACHING_PLAYBOOK.md)
+- **Architecture & Harness Deep-Dives**: [8-Zone Excalidraw Architecture Map](doc/architecture/README.md) · [Harness Vertical Slices 00–20](doc/harness/README.md) · [From-Zero Tutorial](doc/harness/from-zero/README.md) · [Architecture Reference](doc/ARCHITECTURE.md)
+- **SDKs & Extensibility**: [Agent Loop SDK Guide](skills/agent-loop/SKILL.md) · [Core Embedding Guide](doc/EMBEDDING_SDK.md) · [Domain Agents](doc/DOMAIN_AGENTS.md) · [A2UI Surfaces](doc/A2UI.md) · [External Agent Handoff](doc/EXTERNAL_AGENT_HANDOFF.md)
+- **Quality, Ops & Roadmap**: [Testing Matrix](doc/TESTING.md) · [CI & Release Gates](doc/CI.md) · [Docker / Compose / Helm Deployment](doc/DEPLOYMENT.md) · [npm OIDC Publishing](doc/NPM_PUBLISH.md) · [Roadmap](doc/ROADMAP.md)
 
 ---
 
 ## License
 
-This project is **private** (`package.json`). Add a SPDX license file if you open-source it later.
+The workspace root is marked **private** (`package.json`); public npm packages (`@mage-ai-lab/agent-loop`, `@mage-ai-lab/api-types`) are published under their package manifests via GitHub OIDC Trusted Publishing (see [`doc/NPM_PUBLISH.md`](doc/NPM_PUBLISH.md)).
