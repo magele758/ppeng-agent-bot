@@ -20,6 +20,7 @@ import {
 import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified } from '../http-utils.js';
 import { visibleBots } from '../access/visibility.js';
+import { guardBotPins } from '../bot-pin-guard.js';
 import { withoutRunLogs } from '../session-detail-view.js';
 
 /** Model and thinking effort pins present in a request body; updateBot validates both. */
@@ -89,7 +90,7 @@ export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'PATCH',
       pattern: '/api/bots/:id',
-      handler: async ({ requireParam, readBody, response }) => {
+      handler: async ({ requireParam, readBody, response, auth }) => {
         const id = requireParam('id');
         const body = (await readBody()) as Record<string, unknown>;
         const patch: UpdateBotInput = {};
@@ -102,7 +103,7 @@ export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if ('allowedSkills' in body) patch.allowedSkills = body.allowedSkills;
         Object.assign(patch, readBotPinInput(body), readFaceInput(body));
         const skillCatalog = 'allowedSkills' in body ? await runtime.listSkills() : undefined;
-        const bot = runtime.updateBot(id, patch, { skillCatalog });
+        const bot = runtime.updateBot(id, guardBotPins(runtime, auth, id, patch), { skillCatalog });
         const saved = runtime.getSession(bot.canonicalSessionId);
         json(response, 200, {
           bot,

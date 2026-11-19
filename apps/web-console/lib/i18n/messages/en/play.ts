@@ -652,6 +652,10 @@ export const play = {
     hint: 'Applies from the next turn. Subagents and teammates keep this Bot’s pinned level.'
   },
 
+  botPin: {
+    forbidden: 'Only this Bot’s owner or an admin can change its model or thinking effort. Nothing was changed.'
+  },
+
   botCommand: {
     compacted: 'Compacted this chat in place. No new conversation was opened.',
     nothingToCompact: 'Nothing to compact. This is still the same conversation.',

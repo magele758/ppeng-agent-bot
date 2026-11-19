@@ -10,6 +10,7 @@ import { noteBotFirstTaskSent } from '@/lib/bot-first-task';
 
 import { botComposerStatusText, planBotComposerSend } from '@/lib/bot-chat-commands';
 import { parseBotModelOverride, resolveLoadedComposerModelRef } from '@/lib/bot-model';
+import { botPinErrorText } from '@/lib/bot-pin-error';
 import { resolveComposerAgentId } from '@/lib/default-agent';
 import {
   canRequestOlderPage,
@@ -2153,7 +2154,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         await tick({ includePlayPanel: true });
       } catch (err) {
         if (!liveTurnOnScreen(generation)) return;
-        setPlayStatus({ text: String(err), err: true });
+        setPlayStatus({ text: botPinErrorText(t, err, String(err)), err: true });
       } finally {
         finishLiveTurn(generation);
       }

@@ -5,7 +5,7 @@ import { BotCoachingService } from '../bots/bot-coaching.js';
  * Reuses the same stores and services as the daemon routes.
  */
 
-import { withProductAccess } from './product-admin-access.js';
+import { permittedToolBotPins, withProductAccess } from './product-admin-access.js';
 import { createId, nowIso } from '../id.js';
 import { AuthorizationError, NotFoundError, ValidationError } from '../errors.js';
 import type { SqliteStateStore } from '../storage.js';
@@ -491,7 +491,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
         if (patch.allowedSkills !== undefined && !skillCatalog) {
           throw new ValidationError('allowedSkills requires a skill catalog');
         }
-        const next = updateBot(host.facade, bot.id, patch, {
+        const next = updateBot(host.facade, bot.id, permittedToolBotPins(store, ctx.session, bot.id, patch), {
           toolCatalog: host.toolNames().map((name) => ({ name })),
           dynToolNames: dyn ? dyn.list({ sessionId: bot.canonicalSessionId }).map((record) => record.name) : undefined,
           skillCatalog,

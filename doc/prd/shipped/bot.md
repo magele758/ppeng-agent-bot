@@ -491,6 +491,23 @@ Bot 列表置顶区
 
 我还想要加一个bot里的置顶的功能，顶部加一个置顶区域，我把bot拖进去就可以置顶，默认是把big boss（super bot？）置顶的
 
+## bot-pin-permission
+Bot 模型与思考力度固定的修改权限
+
+权限漏洞（早就存在）：对没有主人的 Bot，POST /api/sessions 对任何登录用户放行，所以带 metadata
+打开对话就能改它的模型固定和思考力度固定；而 PATCH /api/bots/:id 要求管理员。
+要求：
+- 审计所有能写入 Bot 对话 metadata.modelOverride / metadata.thinkingEffort 的路径（至少：
+  POST /api/sessions、会话 metadata 的任何 PATCH/更新路由、bot_update 工具、其它 grep 到的写入点），
+  全部与 PATCH /api/bots/:id 使用同一权限判断（所有者或管理员；无主 Bot 仅管理员）。抽一个共用的判定函数，
+  不要各处复制逻辑。
+- 语义：只有「改变」固定值才需要权限。无权限的调用者在 metadata 里不带这两个字段，或带的值与该 Bot
+  当前固定值相同 → 放行，新对话继承当前固定值；带的值不同 → 403，不创建会话、不改任何已有值。先查 Lab
+  前端打开 Bot 对话时会发什么 metadata，确保普通用户正常打开 Bot 对话不受影响。
+- 普通非 Bot 会话行为不变。
+- AC 覆盖：无主 Bot 普通用户改不了（模型、思考力度各一条）、普通用户仍能正常打开对话并继承固定值、
+  所有者和管理员仍能改、bot_update 工具路径同样受限。
+
 ## bot-pin-sync
 跨浏览器置顶同步
 
@@ -815,6 +832,9 @@ bypass也要继承
 实现「per-bot thinking effort pin 并透出到 Lab UI」：给每个 Bot 单独固定思考力度，可选
 跟随全局（默认）/ 关闭 / 低 / 中 / 高；只要固定了（包括关闭）就覆盖全局，未固定才跟随全局
 思考力度设置；BotDetail 在模型固定旁可以选择，「跟随全局」带出当前全局档位，zh/en 文案齐全。
+追加（AC-9）：「跟随全局（当前：X）」不实时。同一页面在全局卡保存后，Bot 设置里的「当前：X」立即更新
+（不刷新页面、不重开设置）；其它标签页/其他人改了全局后，窗口重新获得焦点或页面变为可见时重新拉取。
+不要轮询，不要加后端推送。
 
 ## bot-turn-ownership
 Bot 当轮任务和目标审查归属

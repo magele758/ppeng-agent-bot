@@ -2350,6 +2350,15 @@
       ]
     },
     {
+      "id": "bot-pin-permission",
+      "title": "Bot 模型与思考力度固定的修改权限",
+      "tests": [
+        "apps/daemon/test/bot-pin-permission-http.test.ts",
+        "apps/web-console/lib/bot-pin-error.test.ts",
+        "packages/core/test/bot-pin-permission.test.js"
+      ]
+    },
+    {
       "id": "bot-pin-sync",
       "title": "跨浏览器置顶同步",
       "tests": [
@@ -2541,8 +2550,10 @@
       "title": "每个 Bot 的思考力度固定",
       "tests": [
         "apps/daemon/test/bot-thinking-effort-http.test.ts",
+        "apps/web-console/components/bot-thinking-effort-live.test.ts",
         "apps/web-console/components/bot-thinking-effort-setting.test.ts",
         "apps/web-console/lib/bot-thinking-effort.test.ts",
+        "apps/web-console/lib/page-return.test.ts",
         "packages/core/test/bot-thinking-effort.test.js",
         "packages/core/test/product-admin-tools.test.js"
       ]

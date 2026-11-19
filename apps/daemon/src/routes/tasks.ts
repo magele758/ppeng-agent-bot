@@ -4,9 +4,11 @@ import {
   filterTasksByAuth,
   parseModelOverrideInput,
   stampOwnerMetadata,
-  type RawAgentRuntime
+  type RawAgentRuntime,
+  type RequestAuth
 } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
+import { guardBotTaggedMetadata } from '../bot-pin-guard.js';
 import { etagFromState, json, sendIfNotModified } from '../http-utils.js';
 
 function imageAssetIdsFromBody(body: Record<string, unknown>): string[] {
@@ -14,11 +16,16 @@ function imageAssetIdsFromBody(body: Record<string, unknown>): string[] {
   return body.imageAssetIds.map(String).filter(Boolean);
 }
 
-function taskMetadataFromBody(body: Record<string, unknown>): Record<string, unknown> {
+function taskMetadataFromBody(
+  runtime: RawAgentRuntime,
+  body: Record<string, unknown>,
+  auth: RequestAuth
+): Record<string, unknown> {
   const extra =
     body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
       ? { ...(body.metadata as Record<string, unknown>) }
       : {};
+  guardBotTaggedMetadata(runtime, auth, extra);
   if ('modelOverride' in extra) {
     const pin = parseModelOverrideInput(extra.modelOverride);
     if (pin) extra.modelOverride = pin;
@@ -54,7 +61,7 @@ export function tasksRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
           blockedBy: Array.isArray(body.blockedBy) ? body.blockedBy.map(String) : undefined,
           background: body.background !== false,
-          metadata: stampOwnerMetadata(taskMetadataFromBody(body), auth)
+          metadata: stampOwnerMetadata(taskMetadataFromBody(runtime, body, auth), auth)
         });
         if (body.autoRun !== false) await runtime.runSession(result.session.id);
         json(response, 201, {

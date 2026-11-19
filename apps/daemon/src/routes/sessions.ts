@@ -44,6 +44,7 @@ import {
 } from '@ppeng/agent-core';
 import { cancelInputSuggestion } from './input-suggestion.js';
 import { readBotPinInput } from './bots.js';
+import { guardBotChatCommand, guardBotPins, guardBotTaggedMetadata } from '../bot-pin-guard.js';
 import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified, sseInit, sseSend } from '../http-utils.js';
 import { steerHttpFromCoreAck } from '../steer-ack.js';
@@ -100,6 +101,7 @@ function sessionMetadataFromBody(
     body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
       ? { ...(body.metadata as Record<string, unknown>) }
       : {};
+  guardBotTaggedMetadata(runtime, auth, extra);
   if (Array.isArray(body.enabledOptionalToolGroups)) {
     extra.enabledOptionalToolGroups = body.enabledOptionalToolGroups.map(String).filter(Boolean);
   }
@@ -197,8 +199,8 @@ function openBotFromBody(
   const botId = resolveBotIdFromBody(body);
   if (!botId) return undefined;
   assertNoBotPolicyInMetadata(body);
+  const pins = guardBotPins(runtime, auth, botId, botPinPatchFromMetadata(body.metadata));
   const extra = sessionMetadataFromBody(runtime, body, auth);
-  const pins = botPinPatchFromMetadata(body.metadata);
   if (Object.keys(pins).length > 0) {
     // Same rules as PATCH /api/bots/:id (model in the picker list, a known effort level; 400
     // otherwise), applied to every chat of the bot, before openBot so a freshly created
@@ -231,8 +233,10 @@ async function replyBotChatCommand(
   runtime: RawAgentRuntime,
   sessionId: string,
   text: string,
-  response: ServerResponse
+  response: ServerResponse,
+  auth: RequestAuth
 ): Promise<boolean> {
+  guardBotChatCommand(runtime, auth, sessionId, text);
   const command = await runtime.handleBotChatCommand(sessionId, text);
   if (!command) return false;
   json(response, 200, {
@@ -707,7 +711,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const openedBot = openBotFromBody(runtime, body, auth);
         if (openedBot) {
           const commandText = plainCommandText(body);
-          if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) {
+          if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response, auth))) {
             return;
           }
           const hasContent = hasUserContent(body);
@@ -972,7 +976,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'POST',
       pattern: '/api/sessions/:id/messages',
-      handler: async ({ readBody, requireParam, response }) => {
+      handler: async ({ readBody, requireParam, response, auth }) => {
         const id = requireParam('id');
         const body = (await readBody()) as Record<string, unknown>;
         const message = String(body.message ?? '').trim();
@@ -982,7 +986,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           throw new ValidationError('Missing message, imageAssetIds, attachmentIds, or contextSources');
         }
         const commandText = plainCommandText(body);
-        if (commandText && (await replyBotChatCommand(runtime, id, commandText, response))) return;
+        if (commandText && (await replyBotChatCommand(runtime, id, commandText, response, auth))) return;
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
         runtime.sendUserMessage(id, message || (imgIds.length ? '(image)' : '(attachment)'), {
           replyTo: replyToFromBody(body),
@@ -1021,7 +1025,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'POST',
       pattern: '/api/sessions/:id/stream',
-      handler: async ({ requireParam, readBody, response }) => {
+      handler: async ({ requireParam, readBody, response, auth }) => {
         const id = requireParam('id');
         const body = (await readBody()) as Record<string, unknown>;
         if (body.follow === true) {
@@ -1033,7 +1037,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const imgIds = imageAssetIdsFromBody(body);
         const attIds = attachmentIdsFromBody(body);
         const commandText = plainCommandText(body);
-        if (commandText && (await replyBotChatCommand(runtime, id, commandText, response))) return;
+        if (commandText && (await replyBotChatCommand(runtime, id, commandText, response, auth))) return;
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
         if (msg || imgIds.length > 0 || attIds.length > 0 || hasContextSources(body)) {
           runtime.sendUserMessage(id, msg || (imgIds.length ? '(image)' : '(attachment)'), {
@@ -1270,12 +1274,12 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         };
         const commandText = plainCommandText(body);
         if (openedBot) {
-          if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;
+          if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response, auth))) return;
           maybeMergeOptionalGroupsFromBody(runtime, openedBot.sessionId, body);
           session = runtime.sendUserMessage(openedBot.sessionId, message || '(attachment)', sendOpts);
         } else if (sessionId) {
           guardSession(runtime, sessionId, auth);
-          if (commandText && (await replyBotChatCommand(runtime, sessionId, commandText, response))) return;
+          if (commandText && (await replyBotChatCommand(runtime, sessionId, commandText, response, auth))) return;
           maybeMergeOptionalGroupsFromBody(runtime, sessionId, body);
           session = runtime.sendUserMessage(sessionId, message || '(attachment)', sendOpts);
         } else {
@@ -1323,12 +1327,12 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         };
         const commandText = plainCommandText(body);
         if (openedBot) {
-          if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;
+          if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response, auth))) return;
           maybeMergeOptionalGroupsFromBody(runtime, openedBot.sessionId, body);
           session = runtime.sendUserMessage(openedBot.sessionId, message || '(attachment)', sendOpts);
         } else if (sessionId) {
           guardSession(runtime, sessionId, auth);
-          if (commandText && (await replyBotChatCommand(runtime, sessionId, commandText, response))) return;
+          if (commandText && (await replyBotChatCommand(runtime, sessionId, commandText, response, auth))) return;
           maybeMergeOptionalGroupsFromBody(runtime, sessionId, body);
           session = runtime.sendUserMessage(sessionId, message || '(attachment)', sendOpts);
         } else {
