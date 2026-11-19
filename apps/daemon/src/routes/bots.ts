@@ -5,10 +5,13 @@ import { BotFunctionalGroupService, setBotDefinitionOwner, resolveBotPrincipal }
  * GET/POST /api/bots, GET/PATCH /api/bots/:id (both carry policy `warnings`), POST /api/bots/:id/open
  * Persistence is core `bots` table (schema v15). No RAW_AGENT_* switches.
  * PATCH `modelOverride` ({providerId, modelId} | null) pins the Bot's model on its canonical chats.
+ * PATCH `thinkingEffort` (off | low | medium | high | null) pins its thinking effort the same way;
+ * null follows the global thinking effort setting.
  */
 
 import {
   readBotModelOverride,
+  readBotThinkingEffort,
   readFaceInput,
   stampOwnerMetadata,
   type RawAgentRuntime,
@@ -18,6 +21,22 @@ import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified } from '../http-utils.js';
 import { visibleBots } from '../access/visibility.js';
 import { withoutRunLogs } from '../session-detail-view.js';
+
+/** Model and thinking effort pins present in a request body; updateBot validates both. */
+export function readBotPinInput(source: Record<string, unknown>): UpdateBotInput {
+  const patch: UpdateBotInput = {};
+  if ('modelOverride' in source) patch.modelOverride = source.modelOverride;
+  if ('thinkingEffort' in source) patch.thinkingEffort = source.thinkingEffort;
+  return patch;
+}
+
+/** Saved pins as PATCH echoes them; null follows the global setting. */
+function botPinsView(metadata: Record<string, unknown> | undefined) {
+  return {
+    modelOverride: readBotModelOverride(metadata) ?? null,
+    thinkingEffort: readBotThinkingEffort(metadata) ?? null
+  };
+}
 
 export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   return [
@@ -81,15 +100,14 @@ export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if ('maxTurns' in body) patch.maxTurns = body.maxTurns;
         if ('allowedTools' in body) patch.allowedTools = body.allowedTools;
         if ('allowedSkills' in body) patch.allowedSkills = body.allowedSkills;
-        if ('modelOverride' in body) patch.modelOverride = body.modelOverride;
-        Object.assign(patch, readFaceInput(body));
+        Object.assign(patch, readBotPinInput(body), readFaceInput(body));
         const skillCatalog = 'allowedSkills' in body ? await runtime.listSkills() : undefined;
         const bot = runtime.updateBot(id, patch, { skillCatalog });
         const saved = runtime.getSession(bot.canonicalSessionId);
         json(response, 200, {
           bot,
           warnings: runtime.getBotPolicyWarnings(bot.id),
-          modelOverride: readBotModelOverride(saved?.metadata) ?? null
+          ...botPinsView(saved?.metadata)
         });
       }
     },

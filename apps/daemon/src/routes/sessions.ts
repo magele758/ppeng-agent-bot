@@ -17,6 +17,7 @@ import {
   mergeModelRefMetadata,
   NotFoundError,
   parseModelOverrideInput,
+  normalizeBotThinkingEffort,
   parseModelRef,
   parseSessionMaxTurns,
   parsePermissionMode,
@@ -38,9 +39,11 @@ import {
   type RawAgentRuntime,
   type RequestAuth,
   type MessageReplyTo,
-  type SessionRecord
+  type SessionRecord,
+  type UpdateBotInput
 } from '@ppeng/agent-core';
 import { cancelInputSuggestion } from './input-suggestion.js';
+import { readBotPinInput } from './bots.js';
 import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified, sseInit, sseSend } from '../http-utils.js';
 import { steerHttpFromCoreAck } from '../steer-ack.js';
@@ -74,6 +77,20 @@ function replyToFromBody(body: Record<string, unknown>): string | MessageReplyTo
   throw new ValidationError('Invalid replyTo');
 }
 
+/** Same rule as PATCH /api/bots/:id: a junk level is a 400 and null drops the key. */
+function normalizeThinkingEffortMetadata(extra: Record<string, unknown>): void {
+  if (!('thinkingEffort' in extra)) return;
+  const pin = normalizeBotThinkingEffort(extra.thinkingEffort);
+  if (pin) extra.thinkingEffort = pin;
+  else delete extra.thinkingEffort;
+}
+
+/** Model and thinking effort pins sent as create-time metadata on a Bot chat. */
+function botPinPatchFromMetadata(rawMeta: unknown): UpdateBotInput {
+  if (!rawMeta || typeof rawMeta !== 'object' || Array.isArray(rawMeta)) return {};
+  return readBotPinInput(rawMeta as Record<string, unknown>);
+}
+
 function sessionMetadataFromBody(
   runtime: RawAgentRuntime,
   body: Record<string, unknown>,
@@ -95,6 +112,7 @@ function sessionMetadataFromBody(
     if (pin) extra.modelOverride = pin;
     else delete extra.modelOverride;
   }
+  normalizeThinkingEffortMetadata(extra);
   if (!parseTaskMode(extra.taskRunMode)) {
     extra.taskRunMode = readLoopSettings(runtime.store).defaultTaskMode;
   }
@@ -180,11 +198,12 @@ function openBotFromBody(
   if (!botId) return undefined;
   assertNoBotPolicyInMetadata(body);
   const extra = sessionMetadataFromBody(runtime, body, auth);
-  const rawMeta = body.metadata;
-  if (rawMeta && typeof rawMeta === 'object' && !Array.isArray(rawMeta) && 'modelOverride' in rawMeta) {
-    // Same rule as PATCH /api/bots/:id: must be in the picker list (400 otherwise), applied to
-    // every chat of the bot, before openBot so a freshly created per-user chat inherits it.
-    runtime.updateBot(botId, { modelOverride: (rawMeta as Record<string, unknown>).modelOverride });
+  const pins = botPinPatchFromMetadata(body.metadata);
+  if (Object.keys(pins).length > 0) {
+    // Same rules as PATCH /api/bots/:id (model in the picker list, a known effort level; 400
+    // otherwise), applied to every chat of the bot, before openBot so a freshly created
+    // per-user chat inherits them.
+    runtime.updateBot(botId, pins);
   }
   const opened = runtime.openBot(
     botId,
