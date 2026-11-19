@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 488" role="img" aria-labelledby="verification-gates-zh-title verification-gates-zh-desc">
+  <title id="verification-gates-zh-title">「反剧场式」五层验证体系与发布前捕获的真实分布式缺陷</title>
+  <desc id="verification-gates-zh-desc">行覆盖率不等于断言有效，100% 样本通过不等于统计显著 —— 每一层门禁都以「真抓到过线上级隐蔽 Bug」自证价值</desc>
+
+  <rect width="1200" height="488" rx="10" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="1"/>
+
+  <text x="32" y="34" fill="#2F6846" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.12em">PILLAR 04 · ANTI-THEATER VERIFICATION &amp; EPISTEMIC DISCIPLINE</text>
+  <text x="32" y="60" fill="#1A201B" font-size="20" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">「反剧场式」五层验证体系与发布前捕获的真实分布式缺陷</text>
+  <text x="32" y="80" fill="#4A564D" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">行覆盖率不等于断言有效，100% 样本通过不等于统计显著 —— 每一层门禁都以「真抓到过线上级隐蔽 Bug」自证价值</text>
+
+  <line x1="42" y1="420" x2="42" y2="112" stroke="#2F6846" stroke-width="1.4"/>
+  <polygon points="38,116 42,104 46,116" fill="#2F6846"/>
+  <text x="24" y="268" fill="#738076" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" transform="rotate(-90 24 268)" text-anchor="middle" letter-spacing="0.14em">EPISTEMIC RIGOR</text>
+
+  
+      <rect x="68" y="100" width="1100" height="58" rx="6" fill="#FFFFFF" stroke="#B7C3B9" stroke-width="1"/>
+      <rect x="80" y="110" width="136" height="18" rx="3" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="0.8"/>
+      <text x="148" y="122" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L5 · LIVE STAT A/B</text>
+      <text x="80" y="144" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">≥30 独立题 × 3 轮 · 非劣界 ≤5pp</text>
+
+      <line x1="340" y1="108" x2="340" y2="150" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="124" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">交错真模型 A/B 与 Wilson-Bonferroni 置信门禁</text>
+      <text x="356" y="144" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">铁律实证：grok-4.7 跑出 96/96 (100%) 仍因 N=32 区间 [-19.9%,+29.8%] 超 5pp 判 inconclusive 拒合 #251；绕路答对判 0/3 FAIL</text>
+    
+      <rect x="68" y="166" width="1100" height="58" rx="6" fill="#FAFAF8" stroke="#B7C3B9" stroke-width="1"/>
+      <rect x="80" y="176" width="136" height="18" rx="3" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="0.8"/>
+      <text x="148" y="188" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L4 · LTL UI &amp; PERF</text>
+      <text x="80" y="210" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">90s 探 4,270 浏览器状态 · 64 Bot</text>
+
+      <line x1="340" y1="174" x2="340" y2="216" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="190" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Bombadil 时序性质浏览器探索 + bench:lab 负载门禁</text>
+      <text x="356" y="210" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">捕获并清零：3 次空闲轮询产生的 192 次 Goal 空写 + 2,688 次 Daydream 空写降至 0；强制校验多 Bot 切换零串线与 0 前缀漂移</text>
+    
+      <rect x="68" y="232" width="1100" height="58" rx="6" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.5"/>
+      <rect x="80" y="242" width="136" height="18" rx="3" fill="#2F6846" stroke="#2F6846" stroke-width="0.8"/>
+      <text x="148" y="254" fill="#FFFFFF" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L3 · MODEL CHECK</text>
+      <text x="80" y="276" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">14,292 状态 · 31,230 边 · 125 实机</text>
+
+      <line x1="340" y1="240" x2="340" y2="282" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="256" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">4 套有界显式状态模型检验 + 真实多进程 SIGKILL 探针 + ESM 故障金丝雀</text>
+      <text x="356" y="276" fill="#2F6846" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">首跑击穿：重启恢复 28/43 失败（捕获 SIGKILL 后 WRITER_CLAIM_MISMATCH 锁死会话）；并发 38/58 失败（揪出被 UI 去重掩盖的重复执行）</text>
+    
+      <rect x="68" y="298" width="1100" height="58" rx="6" fill="#FAFAF8" stroke="#B7C3B9" stroke-width="1"/>
+      <rect x="80" y="308" width="136" height="18" rx="3" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="0.8"/>
+      <text x="148" y="320" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L2 · AST MUTATION</text>
+      <text x="80" y="342" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">4,284 变异体 · 0 写盘 · policy 100%</text>
+
+      <line x1="340" y1="306" x2="340" y2="348" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="322" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">零依赖内存态 TypeScript AST 变异测试引擎（Node 22 registerHooks）</text>
+      <text x="356" y="342" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">揪出 3 个潜伏缺陷：(1) Linux bwrap 后挂载 /tmp 抹空工作区；(2) time -p rm -rf / 绕过硬拦截；(3) 迁移前构造 Memory 致 FTS5 失效</text>
+    
+      <rect x="68" y="364" width="1100" height="58" rx="6" fill="#FFFFFF" stroke="#B7C3B9" stroke-width="1"/>
+      <rect x="80" y="374" width="136" height="18" rx="3" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="0.8"/>
+      <text x="148" y="386" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.05em">L1 · AC &amp; CRAP</text>
+      <text x="80" y="408" fill="#4A564D" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">481 规格 · 2,347 [AC:*] · CRAP ≤ 30</text>
+
+      <line x1="340" y1="372" x2="340" y2="414" stroke="#D5DCD6" stroke-width="1"/>
+      <text x="356" y="388" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">可执行验收标准双向门禁 + CRAP（复杂度 × 覆盖率）零容忍棘轮</text>
+      <text x="356" y="408" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">扫描 1,165+ 真实运行测试文件；前端 0% 源覆盖函数按 C²+C 严格棘轮锁定（复杂度 ≥6 禁止新增任何分支），杜绝删改标准过关</text>
+    
+
+  <line x1="32" y1="444" x2="1168" y2="444" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="32" y="466" fill="#738076" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">ANTI-SELF-DECEPTION RULE</text>
+  <text x="220" y="466" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">每个形式化套件内置 3–4 个源码变异金丝雀（变异后基线必须变红）；模拟跑通一律标 not_validated，绝不冒充真模型能力提升</text>
+</svg>

@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 496" role="img" aria-labelledby="sparse-moe-handoff-en-title sparse-moe-handoff-en-desc">
+  <title id="sparse-moe-handoff-en-title">Protocol-Level Sparse-MoE Rooms &amp; Trajectory Handoff State Machine (v2.3)</title>
+  <desc id="sparse-moe-handoff-en-desc">Eliminating O(N) Group Polling Collapse · Replacing Self-Certified Completion with Role Intersection &amp; Pattern B Host Seals</desc>
+  <defs>
+    <marker id="sparse-moe-handoff-en-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#4A564D"/>
+    </marker>
+    <marker id="sparse-moe-handoff-en-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#2F6846"/>
+    </marker>
+    <marker id="sparse-moe-handoff-en-arrow-amber" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#93650F"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="496" rx="10" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="1"/>
+
+  <text x="32" y="34" fill="#2F6846" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.12em">PILLAR 02 · MULTI-AGENT TOPOLOGY &amp; STATE-MACHINE COORDINATION</text>
+  <text x="32" y="60" fill="#1A201B" font-size="20" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Protocol-Level Sparse-MoE Rooms &amp; Trajectory Handoff State Machine (v2.3)</text>
+  <text x="32" y="80" fill="#4A564D" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Eliminating O(N) Group Polling Collapse · Replacing Self-Certified Completion with Role Intersection &amp; Pattern B Host Seals</text>
+
+  <!-- LEFT PANEL -->
+  <rect x="32" y="96" width="564" height="344" rx="8" fill="#FAFAF8" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="48" y="118" fill="#738076" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">A. DEEPSEEK-INSPIRED PROTOCOL SPARSE-MOE (200 ROSTER / 100 BOTS)</text>
+
+  <line x1="216" y1="168" x2="256" y2="168" stroke="#2F6846" stroke-width="1.4" marker-end="url(#sparse-moe-handoff-en-arrow-accent)"/>
+  <path d="M 340,204 V 212 Q 340,220 332,220 H 140 Q 132,220 132,228 V 236" fill="none" stroke="#2F6846" stroke-width="1.3" marker-end="url(#sparse-moe-handoff-en-arrow-accent)"/>
+  <path d="M 368,204 V 212 Q 368,220 360,220 H 322 Q 314,220 314,228 V 236" fill="none" stroke="#4A564D" stroke-width="1.2" marker-end="url(#sparse-moe-handoff-en-arrow)"/>
+  <path d="M 396,204 V 212 Q 396,220 404,220 H 484 Q 492,220 492,228 V 236" fill="none" stroke="#738076" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#sparse-moe-handoff-en-arrow)"/>
+  <line x1="216" y1="276" x2="240" y2="276" stroke="#4A564D" stroke-width="1.2" marker-end="url(#sparse-moe-handoff-en-arrow)"/>
+
+  <rect x="48" y="136" width="168" height="68" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="60" y="155" fill="#738076" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">HUMAN / @MENTION</text>
+  <text x="60" y="175" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Room Turn / Goal</text>
+  <text x="60" y="193" fill="#4A564D" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">room.epoch++ (IMMEDIATE)</text>
+
+  <rect x="256" y="136" width="324" height="68" rx="6" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.4"/>
+  <text x="268" y="155" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">SHARED EXPERT (hostBotId)</text>
+  <text x="268" y="175" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Reads BotCapabilityCards (~30 tok/Bot) → Routes</text>
+  <text x="268" y="193" fill="#4A564D" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">room_route_turn · 100 Bots ≈ 3K tok catalog</text>
+
+  <rect x="48" y="236" width="168" height="80" rx="6" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="60" y="255" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">WAVE 1 · PARALLEL</text>
+  <text x="60" y="275" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Top K ≤ 4 Specialists</text>
+  <text x="60" y="293" fill="#4A564D" font-size="9.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Own cursor · [SILENT]=0</text>
+  <text x="60" y="308" fill="#2F6846" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">spokenBotIds lock</text>
+
+  <rect x="240" y="236" width="152" height="80" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="252" y="255" fill="#738076" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">FUNNEL DECAY</text>
+  <text x="252" y="275" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Wave 2 ≤ 2 → Wrap 1</text>
+  <text x="252" y="293" fill="#4A564D" font-size="9.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Wrap strips delegation</text>
+  <text x="252" y="308" fill="#738076" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">6 anti-storm guards</text>
+
+  <rect x="408" y="236" width="172" height="80" rx="6" fill="#FFFFFF" stroke="#B7C3B9" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="420" y="255" fill="#738076" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">UNROUTED (96 BOTS)</text>
+  <text x="420" y="275" fill="#4A564D" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">0 Wakeups · 0 Tokens</text>
+  <text x="420" y="293" fill="#738076" font-size="9.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Zero-reply allowed if &lt; bar</text>
+  <text x="420" y="308" fill="#738076" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">collab / debate modes</text>
+
+  <rect x="48" y="332" width="532" height="92" rx="6" fill="#FFFFFF" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="62" y="354" fill="#1A201B" font-size="12" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Push Blackboard + Pull Retrieval + Epistemic &quot;Touched Memory&quot; Boundary</text>
+  <text x="62" y="375" fill="#4A564D" font-size="10.4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">• Shared Rolling Summary (≤1.5K tok): 1 room compact / 20 msgs vs 100× Bot calls</text>
+  <text x="62" y="395" fill="#4A564D" font-size="10.4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">• Epistemic Contact: Only pushed, pulled, or self-spoken facts enter private memory</text>
+  <text x="62" y="413" fill="#738076" font-size="9.8" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">Daydream anti-rumor lineage: A → B → C retelling = 1 evidenceRef source</text>
+
+  <!-- RIGHT PANEL -->
+  <rect x="612" y="96" width="556" height="344" rx="8" fill="#FAFAF8" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="628" y="118" fill="#738076" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">B. TRAJECTORY HANDOFF v2.3 (KNIVES 1–4 + PATTERN B HOST SEAL)</text>
+
+  <line x1="784" y1="176" x2="824" y2="176" stroke="#4A564D" stroke-width="1.3" marker-end="url(#sparse-moe-handoff-en-arrow)"/>
+  <line x1="964" y1="176" x2="1004" y2="176" stroke="#2F6846" stroke-width="1.4" marker-end="url(#sparse-moe-handoff-en-arrow-accent)"/>
+  <path d="M 1064,216 V 248" fill="none" stroke="#93650F" stroke-width="1.3" marker-end="url(#sparse-moe-handoff-en-arrow-amber)"/>
+  <path d="M 1004,280 H 900 Q 892,280 892,272 V 216" fill="none" stroke="#2F6846" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#sparse-moe-handoff-en-arrow-accent)"/>
+  <rect x="910" y="262" width="76" height="14" rx="2" fill="#FAFAF8"/>
+  <text x="948" y="272" fill="#2F6846" font-size="8.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">re-plan (+2)</text>
+
+  <rect x="628" y="136" width="156" height="80" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="640" y="155" fill="#738076" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">ROLE: PLANNER</text>
+  <text x="640" y="175" fill="#1A201B" font-size="12" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">planner_readonly</text>
+  <text x="640" y="193" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Read-only · blocks if</text>
+  <text x="640" y="208" fill="#738076" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">pending_writes &gt; 0</text>
+
+  <rect x="824" y="136" width="140" height="80" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="836" y="155" fill="#738076" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">HANDOFF SEAM</text>
+  <text x="836" y="175" fill="#1A201B" font-size="12" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">plan_ready</text>
+  <text x="836" y="193" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Cap: 3/turn · 6/sess</text>
+  <text x="836" y="208" fill="#738076" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">pinned role model</text>
+
+  <rect x="1004" y="136" width="148" height="80" rx="6" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.4"/>
+  <text x="1016" y="155" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">ROLE: EXECUTOR</text>
+  <text x="1016" y="175" fill="#1A201B" font-size="12" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">executor_write</text>
+  <text x="1016" y="193" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Auth ∩ Phase ∩ Role</text>
+  <text x="1016" y="208" fill="#2F6846" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">8 write channels</text>
+
+  <rect x="1004" y="248" width="148" height="68" rx="6" fill="#FBF3E4" stroke="#93650F" stroke-width="1.2"/>
+  <text x="1016" y="266" fill="#93650F" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">FRICTION REPAIR</text>
+  <text x="1016" y="284" fill="#1A201B" font-size="12" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">planner_repair</text>
+  <text x="1016" y="302" fill="#4A564D" font-size="9.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Suspends on cap hit</text>
+
+  <rect x="628" y="236" width="248" height="80" rx="6" fill="#FFFFFF" stroke="#B7C3B9" stroke-width="1"/>
+  <text x="640" y="255" fill="#2A69A4" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">CODEX R1 / R2 CONSERVATION</text>
+  <text x="640" y="274" fill="#1A201B" font-size="11.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">CallReservation + Zero Blind Replay</text>
+  <text x="640" y="292" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Crash → outcome:unknown (no refund)</text>
+  <text x="640" y="308" fill="#738076" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">15-step ParentBudgetLedger</text>
+
+  <rect x="628" y="332" width="524" height="92" rx="6" fill="#FFFFFF" stroke="#2F6846" stroke-width="1.1"/>
+  <text x="642" y="354" fill="#1A201B" font-size="12" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Closing Issue #516 False Completion: kernelStateIsDeliverySuccess() === false</text>
+  <text x="642" y="375" fill="#4A564D" font-size="10.4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">• &quot;A separate folder is not isolation&quot;: POSIX guard fences all 8 write channels (incl. bash)</text>
+  <text x="642" y="395" fill="#4A564D" font-size="10.4" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">• Host-only optimistic commit + post-integration SHA-256 evidence seal + live test gate</text>
+  <text x="642" y="413" fill="#2F6846" font-size="9.8" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">mini bundle verified: 0 node:path / node:fs static imports in boundary guard</text>
+
+  <line x1="32" y1="456" x2="1168" y2="456" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="32" y="476" fill="#738076" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.1em">LIVE PROOF</text>
+  <text x="120" y="476" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">2026-11-11 Live Grok Trial: Negative control (return [] stub) 100% blocked by OS exit-code &amp; host tool-ID quality gate</text>
+</svg>

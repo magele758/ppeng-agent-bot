@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 540" role="img" aria-labelledby="hero-zh-title hero-zh-desc">
+  <title id="hero-zh-title">Raw Agent — 你只管目标，Bot 全天候为你工作</title>
+  <desc id="hero-zh-desc">融合长期记忆 Bot 工作台与零封装 L0–L6 可嵌入 Agent 内核，内置海马体上下文编译器、协议层 Sparse-MoE 与显式状态模型检验。</desc>
+  <defs>
+    <pattern id="hero-zh-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#82BD95" stroke-opacity="0.045" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="hero-zh-glow" cx="76%" cy="42%" r="52%">
+      <stop offset="0%" stop-color="#274431" stop-opacity="0.42"/>
+      <stop offset="65%" stop-color="#161F18" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#111411" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="hero-zh-top-line" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3D6A4D" stop-opacity="0.2"/>
+      <stop offset="45%" stop-color="#82BD95" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#DFB25E" stop-opacity="0.45"/>
+    </linearGradient>
+    <marker id="hero-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#82BD95"/>
+    </marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="1279" height="539" rx="14" fill="#111411" stroke="#3B453C" stroke-width="1"/>
+  <rect x="1" y="1" width="1278" height="538" rx="14" fill="url(#hero-zh-grid)"/>
+  <rect x="1" y="1" width="1278" height="538" rx="14" fill="url(#hero-zh-glow)"/>
+  <line x1="24" y1="1.5" x2="1256" y2="1.5" stroke="url(#hero-zh-top-line)" stroke-width="2"/>
+
+  <rect x="48" y="40" width="448" height="26" rx="5" fill="#1B2B20" stroke="#4A7C59" stroke-width="0.9"/>
+  <circle cx="64" cy="53" r="4" fill="#82BD95"/>
+  <text x="76" y="57" fill="#82BD95" font-size="10" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.06em">ERA 4.0 ALWAYS-ON BOT WORKSPACE  ×  EMBEDDABLE L0–L6 HARNESS</text>
+
+  <g transform="translate(48, 86)">
+    <rect x="0" y="2" width="46" height="46" rx="12" fill="#1B2B20" stroke="#82BD95" stroke-width="1.5"/>
+    <circle cx="16" cy="21" r="3.2" fill="#82BD95"/>
+    <circle cx="30" cy="21" r="3.2" fill="#82BD95"/>
+    <path d="M 15 32 Q 23 38 31 32" fill="none" stroke="#82BD95" stroke-width="2.2" stroke-linecap="round"/>
+    <text x="60" y="37" fill="#E7ECE7" font-size="40" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" letter-spacing="-0.02em">Raw Agent</text>
+    <rect x="276" y="13" width="196" height="24" rx="5" fill="#161A16" stroke="#3B453C" stroke-width="1"/>
+    <text x="374" y="29" fill="#A2ADA4" font-size="11" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">@mage-ai-lab/agent-loop</text>
+  </g>
+
+  <text x="48" y="176" fill="#82BD95" font-size="24" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">你只管目标，Bot 全天候为你工作。</text>
+
+  <text x="48" y="212" fill="#A2ADA4" font-size="12.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">跨越 Era 3.0「保姆式盯屏」与提示词工程税：将追加写 WAL 真相、字节级 KV 缓存锁定、</text>
+  <text x="48" y="234" fill="#A2ADA4" font-size="12.8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">协议层 Sparse-MoE 群调度与显式状态模型检验，收敛进同一套本地工作台与双层 SDK。</text>
+
+  <g transform="translate(48, 260)">
+    <rect x="0" y="0" width="128" height="26" rx="4" fill="#161A16" stroke="#283028" stroke-width="1"/>
+    <text x="64" y="17" fill="#E7ECE7" font-size="11" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">Agent Lab · Next 15</text>
+
+    <rect x="136" y="0" width="132" height="26" rx="4" fill="#161A16" stroke="#283028" stroke-width="1"/>
+    <text x="202" y="17" fill="#E7ECE7" font-size="11" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">Desktop · Electron</text>
+
+    <rect x="276" y="0" width="132" height="26" rx="4" fill="#161A16" stroke="#283028" stroke-width="1"/>
+    <text x="342" y="17" fill="#E7ECE7" font-size="11" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">SQLite WAL + FTS5</text>
+
+    <rect x="416" y="0" width="124" height="26" rx="4" fill="#161A16" stroke="#283028" stroke-width="1"/>
+    <text x="478" y="17" fill="#DFB25E" font-size="11" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">A2UI v0.9 + PTC</text>
+  </g>
+
+  
+      <rect x="48" y="324" width="264" height="76" rx="8" fill="#161A16" stroke="#4A7C59" stroke-width="1"/>
+      <text x="64" y="354" fill="#82BD95" font-size="22" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">-64.2%</text>
+      <text x="64" y="373" fill="#E7ECE7" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">实测未缓存输入骤降</text>
+      <text x="64" y="389" fill="#6E7A70" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">gpt-6.1-sol 连续工具波 · 100k 成本 -81%</text>
+    
+      <rect x="324" y="324" width="264" height="76" rx="8" fill="#161A16" stroke="#283028" stroke-width="1"/>
+      <text x="340" y="354" fill="#E7ECE7" font-size="22" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">14,292</text>
+      <text x="340" y="373" fill="#E7ECE7" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">显式模型检验状态数</text>
+      <text x="340" y="389" fill="#6E7A70" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">4 套状态机 + 62 双进程探针 + 4,284 变异体</text>
+    
+      <rect x="48" y="412" width="264" height="76" rx="8" fill="#161A16" stroke="#283028" stroke-width="1"/>
+      <text x="64" y="442" fill="#DFB25E" font-size="22" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">200 / 100</text>
+      <text x="64" y="461" fill="#E7ECE7" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Sparse-MoE 群名册规模</text>
+      <text x="64" y="477" fill="#6E7A70" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">1 共享专家 + K≤4 波次漏斗 · 静默零扣费</text>
+    
+      <rect x="324" y="412" width="264" height="76" rx="8" fill="#161A16" stroke="#283028" stroke-width="1"/>
+      <text x="340" y="442" fill="#E7ECE7" font-size="22" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">481 / 2,347</text>
+      <text x="340" y="461" fill="#E7ECE7" font-size="12" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">已交付规格与门禁断言</text>
+      <text x="340" y="477" fill="#6E7A70" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">mini（零 Node 依赖）→ max 四档 SDK</text>
+    
+
+  <rect x="624" y="32" width="628" height="476" rx="10" fill="#161A16" stroke="#3B453C" stroke-width="1"/>
+  <text x="644" y="56" fill="#A2ADA4" font-size="10.5" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">THREE-PLANE RUNTIME ANATOMY · 三平面运行时剖面</text>
+  <circle cx="1230" cy="52" r="4" fill="#82BD95"/>
+
+  
+    <line x1="938" y1="188" x2="938" y2="216" stroke="#82BD95" stroke-width="1.4" marker-end="url(#hero-arrow-accent)"/>
+    <line x1="938" y1="332" x2="938" y2="360" stroke="#82BD95" stroke-width="1.4" marker-end="url(#hero-arrow-accent)"/>
+  
+      <rect x="644" y="72" width="588" height="116" rx="8" fill="#1C211C" stroke="#3B453C" stroke-width="1"/>
+      <rect x="656" y="84" width="68" height="20" rx="4" fill="#161A16" stroke="#3B453C" stroke-width="0.8"/>
+      <text x="690" y="97" fill="#82BD95" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.06em">PLANE 01</text>
+      <text x="734" y="99" fill="#E7ECE7" font-size="13.2" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">身份 · 目标 · 零 Token 等待</text>
+      <text x="1220" y="98" fill="#6E7A70" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="end">Conv ≠ Goal ≠ Exec</text>
+      
+        <rect x="656" y="118" width="184" height="58" rx="6" fill="#111411" stroke="#283028" stroke-width="1"/>
+        <text x="666" y="140" fill="#E7ECE7" font-size="11.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Super Bot &amp; 名册</text>
+        <text x="666" y="160" fill="#A2ADA4" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">固定主对话 · 独立思考力度</text>
+      
+        <rect x="846" y="118" width="184" height="58" rx="6" fill="#111411" stroke="#283028" stroke-width="1"/>
+        <text x="856" y="140" fill="#E7ECE7" font-size="11.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">8 态 Goal 账本</text>
+        <text x="856" y="160" fill="#A2ADA4" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">租约 + 版本围栏 · 拒假完成</text>
+      
+        <rect x="1036" y="118" width="184" height="58" rx="6" fill="#111411" stroke="#283028" stroke-width="1"/>
+        <text x="1046" y="140" fill="#E7ECE7" font-size="11.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">SQLite 持久等待</text>
+        <text x="1046" y="160" fill="#A2ADA4" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">826 次真实回放 · 0 误唤醒</text>
+      
+    
+      <rect x="644" y="216" width="588" height="116" rx="8" fill="#1B2B20" stroke="#82BD95" stroke-width="1.3"/>
+      <rect x="656" y="228" width="68" height="20" rx="4" fill="#82BD95" stroke="#82BD95" stroke-width="0.8"/>
+      <text x="690" y="241" fill="#111411" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.06em">PLANE 02</text>
+      <text x="734" y="243" fill="#E7ECE7" font-size="13.2" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">海马体上下文编译 &amp; 缓存锁定</text>
+      <text x="1220" y="242" fill="#82BD95" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="end">WAL ≠ fold ≠ View</text>
+      
+        <rect x="656" y="262" width="184" height="58" rx="6" fill="#111411" stroke="#2E4736" stroke-width="1"/>
+        <text x="666" y="284" fill="#82BD95" font-size="11.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">System Prefix v18</text>
+        <text x="666" y="304" fill="#A2ADA4" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">SHA-256 锁定 · 递归键排序</text>
+      
+        <rect x="846" y="262" width="184" height="58" rx="6" fill="#111411" stroke="#2E4736" stroke-width="1"/>
+        <text x="856" y="284" fill="#82BD95" font-size="11.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">海马体可寻址存根</text>
+        <text x="856" y="304" fill="#A2ADA4" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">保留调用线索 · msg=/part=</text>
+      
+        <rect x="1036" y="262" width="184" height="58" rx="6" fill="#111411" stroke="#2E4736" stroke-width="1"/>
+        <text x="1046" y="284" fill="#82BD95" font-size="11.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">User 侧动态附录</text>
+        <text x="1046" y="304" fill="#A2ADA4" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">runtime_context + RRF 记忆</text>
+      
+    
+      <rect x="644" y="360" width="588" height="116" rx="8" fill="#1C211C" stroke="#3B453C" stroke-width="1"/>
+      <rect x="656" y="372" width="68" height="20" rx="4" fill="#161A16" stroke="#3B453C" stroke-width="0.8"/>
+      <text x="690" y="385" fill="#82BD95" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle" letter-spacing="0.06em">PLANE 03</text>
+      <text x="734" y="387" fill="#E7ECE7" font-size="13.2" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">受控内核 · 污点围栏 · 宿主封印</text>
+      <text x="1220" y="386" fill="#6E7A70" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="end">done ≠ Delivery</text>
+      
+        <rect x="656" y="406" width="184" height="58" rx="6" fill="#111411" stroke="#283028" stroke-width="1"/>
+        <text x="666" y="428" fill="#E7ECE7" font-size="11.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">agent-loop 内核</text>
+        <text x="666" y="448" fill="#A2ADA4" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">流式看门狗 · 轨迹交接 v2.3</text>
+      
+        <rect x="846" y="406" width="184" height="58" rx="6" fill="#111411" stroke="#283028" stroke-width="1"/>
+        <text x="856" y="428" fill="#E7ECE7" font-size="11.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">SourceLedger &amp; Vault</text>
+        <text x="856" y="448" fill="#A2ADA4" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">外部污点熔断 · uvref: 零明文</text>
+      
+        <rect x="1036" y="406" width="184" height="58" rx="6" fill="#111411" stroke="#283028" stroke-width="1"/>
+        <text x="1046" y="428" fill="#E7ECE7" font-size="11.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">Pattern B 宿主封印</text>
+        <text x="1046" y="448" fill="#A2ADA4" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">独立审查 + 实测 + SHA-256</text>
+      
+    
+
+  <line x1="644" y1="482" x2="1232" y2="482" stroke="#283028" stroke-width="1"/>
+  <text x="644" y="499" fill="#82BD95" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">● INVARIANTS:</text>
+  <text x="734" y="499" fill="#A2ADA4" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">unmatchedToolCallIds == []  ·  taint → source_scope_denied  ·  0 idle DB writes</text>
+</svg>

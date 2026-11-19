@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 488" role="img" aria-labelledby="context-economics-zh-title context-economics-zh-desc">
+  <title id="context-economics-zh-title">海马体上下文编译器与字节级 KV 缓存经济学</title>
+  <desc id="context-economics-zh-desc">存储真相与送模视图严格分离（WAL ≠ fold ≠ prepareView） · 实测连续工具波未缓存输入降低 64.2%</desc>
+  <defs>
+    <marker id="context-economics-zh-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#4A564D"/>
+    </marker>
+    <marker id="context-economics-zh-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#2F6846"/>
+    </marker>
+    <marker id="context-economics-zh-arrow-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#2A69A4"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="488" rx="10" fill="#F4F5F2" stroke="#D5DCD6" stroke-width="1"/>
+
+  <text x="32" y="34" fill="#2F6846" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.12em">PILLAR 01 · CONTEXT COMPILER &amp; CACHE ECONOMICS</text>
+  <text x="32" y="60" fill="#1A201B" font-size="20" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">海马体上下文编译器与字节级 KV 缓存经济学</text>
+  <text x="32" y="80" fill="#4A564D" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">存储真相与送模视图严格分离（WAL ≠ fold ≠ prepareView） · 实测连续工具波未缓存输入降低 64.2%</text>
+
+  <!-- LEFT ZONE -->
+  <rect x="32" y="96" width="568" height="336" rx="8" fill="#FAFAF8" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="48" y="118" fill="#738076" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">A. 海马体索引编译管线（Teyler &amp; DiScenna · LoCoMo 检索优先）</text>
+
+  <!-- Connectors -->
+  <line x1="196" y1="176" x2="228" y2="176" stroke="#4A564D" stroke-width="1.3" marker-end="url(#context-economics-zh-arrow)"/>
+  <line x1="388" y1="176" x2="420" y2="176" stroke="#2F6846" stroke-width="1.4" marker-end="url(#context-economics-zh-arrow-accent)"/>
+  <line x1="502" y1="218" x2="502" y2="266" stroke="#2F6846" stroke-width="1.4" marker-end="url(#context-economics-zh-arrow-accent)"/>
+  <path d="M 456,218 V 242 Q 456,250 448,250 H 124 Q 116,250 116,218" fill="none" stroke="#2A69A4" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#context-economics-zh-arrow-blue)"/>
+  <rect x="218" y="230" width="136" height="14" rx="2" fill="#FAFAF8"/>
+  <text x="286" y="240" fill="#2A69A4" font-size="9" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">retrieve_tool_result</text>
+
+  <!-- Box 1 -->
+  <rect x="48" y="134" width="148" height="84" rx="6" fill="#FFFFFF" stroke="#B7C3B9" stroke-width="1"/>
+  <text x="60" y="152" fill="#738076" font-size="9" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">STORAGE TRUTH</text>
+  <text x="60" y="172" fill="#1A201B" font-size="13" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">SQLite 追加写 WAL</text>
+  <text x="60" y="190" fill="#4A564D" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">1M msgs · p95 0.61ms</text>
+  <text x="60" y="206" fill="#738076" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">完整保留原始 tool_result</text>
+
+  <!-- Box 2 -->
+  <rect x="228" y="134" width="160" height="84" rx="6" fill="#FFFFFF" stroke="#1A201B" stroke-width="1"/>
+  <text x="240" y="152" fill="#738076" font-size="9" font-weight="600" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">SURFACE FOLD</text>
+  <text x="240" y="172" fill="#1A201B" font-size="13" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">foldMessages()</text>
+  <text x="240" y="190" fill="#4A564D" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">50% struct / 85% hygiene</text>
+  <text x="240" y="206" fill="#738076" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">唯一 compact-summary 槽</text>
+
+  <!-- Box 3 -->
+  <rect x="420" y="134" width="164" height="84" rx="6" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.4"/>
+  <text x="432" y="152" fill="#2F6846" font-size="9" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">MODEL VIEW</text>
+  <text x="432" y="172" fill="#1A201B" font-size="13" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">prepareTurnInput()</text>
+  <text x="432" y="190" fill="#2F6846" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">msg=&lt;id&gt; part=&lt;n&gt; stub</text>
+  <text x="432" y="206" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">保留调用线索 · 卸载载荷</text>
+
+  <!-- Wire Layout Anatomy Strip -->
+  <rect x="48" y="266" width="536" height="150" rx="6" fill="#FFFFFF" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="64" y="288" fill="#1A201B" font-size="12" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">送模字节序列：前段 100% 逐字节冻结，动态变化全部后移至最新 User 消息</text>
+
+  <rect x="64" y="300" width="144" height="44" rx="4" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="136" y="319" fill="#2F6846" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">Stable System v18</text>
+  <text x="136" y="334" fill="#4A564D" font-size="9.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">SHA-256 锁定 + 排序 Tools</text>
+
+  <rect x="212" y="300" width="184" height="44" rx="4" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="304" y="319" fill="#2F6846" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">Canonical History</text>
+  <text x="304" y="334" fill="#4A564D" font-size="9.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">递归键排序 JSON · 剥离思考</text>
+
+  <rect x="400" y="300" width="168" height="44" rx="4" fill="#FBF3E4" stroke="#93650F" stroke-width="1.2"/>
+  <text x="484" y="319" fill="#93650F" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">Latest User Turn</text>
+  <text x="484" y="334" fill="#4A564D" font-size="9.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">&lt;runtime_context&gt; + RRF</text>
+
+  <line x1="64" y1="356" x2="396" y2="356" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="230" y="374" fill="#2F6846" font-size="10.8" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">▲ 上游前缀 KV 缓存命中区（100k 成本 $0.30 → $0.057，-81%）</text>
+  <text x="230" y="394" fill="#4A564D" font-size="10.2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">拒绝将动态 Todo/记忆/摘要塞入 System，消除全量重算</text>
+  <text x="484" y="374" fill="#93650F" font-size="10.5" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif" text-anchor="middle">▲ 唯一允许波动的尾部</text>
+  <text x="484" y="394" fill="#738076" font-size="9.8" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="middle">4-slot capped appendix</text>
+
+  <!-- RIGHT ZONE -->
+  <rect x="616" y="96" width="552" height="336" rx="8" fill="#FAFAF8" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="632" y="118" fill="#738076" font-size="10" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.08em">B. 受控对照实验与被证伪的朴素假设</text>
+
+  <rect x="632" y="132" width="520" height="134" rx="6" fill="#FFFFFF" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="648" y="154" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">实验 1 · 真实网关 3 跳 read_file 前缀实测（codex/gpt-6.1-sol，2026-11-13）</text>
+
+  <text x="648" y="182" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">基线 A（动态围栏破坏前缀）</text>
+  <rect x="828" y="169" width="224" height="19" rx="3" fill="#F9ECE9" stroke="#B53C2A" stroke-width="1"/>
+  <text x="1060" y="183" fill="#B53C2A" font-size="11" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">20,278 tok</text>
+  <text x="836" y="182" fill="#B53C2A" font-size="9.5" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">cached frozen: 8,704 → 8,704 → 8,704</text>
+
+  <text x="648" y="214" fill="#1A201B" font-size="11" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">方案 C（追加写前缀锁定）</text>
+  <rect x="828" y="201" width="80" height="19" rx="3" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="916" y="215" fill="#2F6846" font-size="11" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">7,261 tok (-64.2%)</text>
+  <text x="648" y="246" fill="#4A564D" font-size="10.5" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">缓存命中随轮次单调递增：10,496 → 12,800 → 15,104 tok；线上由 Magpie 监控 ≥10% 退化</text>
+
+  <rect x="632" y="278" width="520" height="138" rx="6" fill="#FFFFFF" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="648" y="300" fill="#1A201B" font-size="12.5" font-weight="700" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">实验 2 · 离线 5 策略 × 7 场景工具结果抽离矩阵（tool_streak 连续工具链）</text>
+
+  <rect x="648" y="314" width="156" height="86" rx="5" fill="#F9ECE9" stroke="#B53C2A" stroke-width="1"/>
+  <text x="658" y="332" fill="#B53C2A" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">keep_recent = 0</text>
+  <text x="658" y="350" fill="#1A201B" font-size="11" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">-92.6% tok · 0/2 事实</text>
+  <text x="658" y="368" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">[×] 未消费即被抹除</text>
+  <text x="658" y="385" fill="#B53C2A" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">FALSIFIED</text>
+
+  <rect x="814" y="314" width="156" height="86" rx="5" fill="#FBF3E4" stroke="#93650F" stroke-width="1"/>
+  <text x="824" y="332" fill="#93650F" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">after_any_asst</text>
+  <text x="824" y="350" fill="#1A201B" font-size="11" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">-53.3% tok · 1/2 事实</text>
+  <text x="824" y="368" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">[×] 连续工具波误删 ls</text>
+  <text x="824" y="385" fill="#93650F" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">FALSIFIED ON CHAINS</text>
+
+  <rect x="980" y="314" width="156" height="86" rx="5" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="990" y="332" fill="#2F6846" font-size="10.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">after_text + stub</text>
+  <text x="990" y="350" fill="#1A201B" font-size="11" font-weight="600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">链内 2/2 · 追问 -88.1%</text>
+  <text x="990" y="368" fill="#4A564D" font-size="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">[OK] 开口后折叠+按址读回</text>
+  <text x="990" y="385" fill="#2F6846" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace">SHIPPED + MODEL-VIEW</text>
+
+  <!-- Legend Strip -->
+  <line x1="32" y1="448" x2="1168" y2="448" stroke="#D5DCD6" stroke-width="1"/>
+  <text x="32" y="468" fill="#738076" font-size="9.5" font-weight="700" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" letter-spacing="0.1em">LEGEND</text>
+  <rect x="104" y="458" width="12" height="12" rx="2" fill="#E6F0EA" stroke="#2F6846" stroke-width="1.2"/>
+  <text x="122" y="468" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">字节稳定缓存区 / 优胜策略</text>
+  <rect x="332" y="458" width="12" height="12" rx="2" fill="#FBF3E4" stroke="#93650F" stroke-width="1"/>
+  <text x="350" y="468" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">尾部动态注入区 / 受限策略</text>
+  <rect x="572" y="458" width="12" height="12" rx="2" fill="#F9ECE9" stroke="#B53C2A" stroke-width="1"/>
+  <text x="590" y="468" fill="#4A564D" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif">被实验证伪的朴素做法</text>
+  <text x="1168" y="468" fill="#738076" font-size="10" font-family="'SFMono-Regular', 'ui-monospace', 'Menlo', 'Consolas', monospace" text-anchor="end">Refs: Teyler &amp; DiScenna · Mem0 · arXiv:2603.02473 · openai/codex#27488</text>
+</svg>
