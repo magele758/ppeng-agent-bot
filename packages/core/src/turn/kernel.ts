@@ -120,6 +120,7 @@ import type {
   AgentSpec,
   MessagePart,
   ModelStreamChunk,
+  ModelTurnInput,
   ModelTurnResult,
   RunContext,
   SessionRecord,
@@ -799,6 +800,7 @@ let promptCtx: any;
 let drainedAdvisory: any;
 let systemPrompt: any;
 let cacheStablePrefix: string | undefined;
+let sessionPhase: ModelTurnInput['sessionPhase'];
 let stablePrefixHash: any;
 let routing: any;
 let resolveImageDataUrl: any;
@@ -989,9 +991,11 @@ systemPrompt = await timeKernelPhase(host, sid, startup, 'build_system_prompt', 
         if (host.promptBuilder.buildSystemPromptParts) {
           const parts = await host.promptBuilder.buildSystemPromptParts(promptCtx, rawVisible);
           cacheStablePrefix = parts.stable;
+          sessionPhase = parts.sessionPhase;
           return parts.text;
         }
         cacheStablePrefix = undefined;
+        sessionPhase = undefined;
         return host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible);
       });
 stablePrefixHash = createHash('sha256')
@@ -1116,6 +1120,7 @@ turnInput = {
         resolveImageDataUrl,
         promptCacheKey: selectedTools.promptCacheKey,
         ...(cacheStablePrefix ? { cacheStablePrefix } : {}),
+        sessionPhase,
         ...(llmPromptDebugEnabled(process.env)
           ? { debugLlmContext: { stateDir: host.stateDir, sessionId: sid } }
           : {})

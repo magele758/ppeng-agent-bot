@@ -1,0 +1,15 @@
+id: compact-reply-spacing
+title: 同一次回复中的相邻段落保持紧凑
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  这个会话一直看着很难受，怎么空行这么大，帮我优化一下这个对话流的界面
+criteria:
+  - id: AC-1
+    given: Bot 在同一次回答里连续发送多段文字
+    when: 用户在桌面或窄屏上阅读
+    then: 相邻段落之间保持段落级间距，下一轮用户提问与本次回答仍有明确分隔
+  - id: AC-2
+    given: 一次回答中有 Markdown 段落、可展开的思考和末尾回复操作
+    when: 用户阅读、展开思考或引用整条回复
+    then: 正文段落清晰可辨，思考可以展开和收起，末尾仍有一组整条回复操作

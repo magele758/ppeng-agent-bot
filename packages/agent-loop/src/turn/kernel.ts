@@ -886,6 +886,7 @@ let promptCtx: any;
 let drainedAdvisory: any;
 let systemPrompt: any;
 let cacheStablePrefix: string | undefined;
+let sessionPhase: ModelTurnInput['sessionPhase'];
 let beforeHook: any;
 let lastTurn: any;
 let picked: any;
@@ -1072,9 +1073,11 @@ systemPrompt = await timeKernelPhase(startup, 'build_system_prompt', async () =>
         if (host.promptBuilder.buildSystemPromptParts) {
           const parts = await host.promptBuilder.buildSystemPromptParts(promptCtx, rawVisible);
           cacheStablePrefix = parts.stable;
+          sessionPhase = parts.sessionPhase;
           return parts.text;
         }
         cacheStablePrefix = undefined;
+        sessionPhase = undefined;
         return host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible);
       });
 if (turn === 0) {
@@ -1151,6 +1154,7 @@ turnInput = {
           : undefined,
         ...(promptCacheKey ? { promptCacheKey } : {}),
         ...(cacheStablePrefix ? { cacheStablePrefix } : {}),
+        sessionPhase,
       };
 preTurn = await timeOptionalKernelPhase(
         startup,

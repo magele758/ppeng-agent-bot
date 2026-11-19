@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 474 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 479 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -317,13 +317,14 @@
 
 - `command-hardline` 危险命令硬拦截与密钥脱敏
 
-## compact（3）
+## compact（4）
 
-需求正文见 [other](other.md)。
+需求正文见 [compact](compact.md)。
 
 - `compact-archive-pointer` 压缩摘要带上原文位置
 - `compact-bot-secondary-tabs` 精简 Bot 能力与权限及记录页
 - `compact-bot-settings` Bot 设置优先展示基本信息与已有定时任务
+- `compact-reply-spacing` 同一次回复中的相邻段落保持紧凑
 
 ## composer（4）
 
@@ -388,10 +389,11 @@
 - `cron-detail-markdown` 定时任务详情直接阅读 Markdown
 - `cron-message-details` 聊天中的定时任务详情
 
-## daydream（2）
+## daydream（3）
 
 需求正文见 [other](other.md)。
 
+- `daydream-idle-history` 每日复盘空闲时不反复读取历史
 - `daydream-tick-cost` 每日复盘调度不能拖死 daemon
 - `daydream-unlimited-resume` 每日复盘移除额度并续跑
 
@@ -568,6 +570,12 @@
 
 - `history-startup-contention` 后台调度期间打开历史会话
 
+## idle（1）
+
+需求正文见 [other](other.md)。
+
+- `idle-bot-goal-scheduler` 空闲 Bot 的目标历史不阻塞 Lab
+
 ## jev（1）
 
 需求正文见 [other](other.md)。
@@ -599,11 +607,12 @@
 
 - `langfuse-delivery-health` Langfuse 实际上报状态与超时
 
-## lcu（2）
+## lcu（3）
 
 需求正文见 [other](other.md)。
 
 - `lcu-app-grant` 桌面操作应用授权：全自动免审批，批准一次后同会话记住
+- `lcu-chat-startup` 普通聊天和 Bot 消息复用已发现的桌面能力
 - `lcu-computer-use` 本机 LCU 桌面操作接入
 
 ## lean（1）
@@ -925,6 +934,12 @@
 
 - `request-context-events` 连续工具调用期间的来源和时间
 - `request-metric-follows-turn` 已发送请求指标随所选轮变化
+
+## responses（1）
+
+需求正文见 [other](other.md)。
+
+- `responses-session-phase-cache` Responses 连续工具轮次的阶段状态与前缀缓存
 
 ## risk（1）
 

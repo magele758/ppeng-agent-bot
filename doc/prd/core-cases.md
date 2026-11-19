@@ -74,6 +74,7 @@ node scripts/prd/core-cases.mjs
 - `unified-bot-goal-lifecycle` 统一 Bot 目标生命周期与归档展示
 - `bot-goal-result-return` 子执行结果回到原目标并收口
 - `bot-multi-goal-coordination` Bot 多目标持续执行与自动选择执行方式
+- `idle-bot-goal-scheduler` 空闲 Bot 的目标历史不阻塞 Lab
 
 ## 群里只有被点到的才发言
 
@@ -120,6 +121,7 @@ node scripts/prd/core-cases.mjs
 
 - `bot-scoped-skill-sharing` Bot 私有技能沉淀与指定 Bot 共享
 - `bot-routine-main-session` Bot 定时任务跟自己的会话走
+- `daydream-idle-history` 每日复盘空闲时不反复读取历史
 - `agent-skill-management` Agent 在对话中管理自身技能
 
 ## 运维页能看服务和自愈，没有演进入口；工具默认按层提供，不是一次全给

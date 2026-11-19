@@ -1,12 +1,22 @@
 import type { DaydreamSettings, DaydreamDeps } from './types.js';
+const localDates = new Map<string, Intl.DateTimeFormat>();
+const localTimes = new Map<string, Intl.DateTimeFormat>();
+function localFormatter(cache: Map<string, Intl.DateTimeFormat>, timezone: string, locale: string, options: Intl.DateTimeFormatOptions) {
+  let format = cache.get(timezone);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, {...options, timeZone: timezone});
+    cache.set(timezone, format);
+  }
+  return format;
+}
 export function daydreamLocalDate(now: number, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
+  return localFormatter(localDates, timezone, 'en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 export function shiftDay(date: string, offset: number): string {
   return new Date(Date.parse(`${date}T12:00:00Z`) + offset * 86400000).toISOString().slice(0, 10);
 }
 export function daydreamLocalTime(now: number, timezone: string): string {
-  return new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(now));
+  return localFormatter(localTimes, timezone, 'en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now);
 }
 export function readDaydreamSettings(deps: DaydreamDeps, botId: string): DaydreamSettings {
   const key = `bot_daydream:${botId}`;

@@ -2520,6 +2520,12 @@ Bot 设置优先展示基本信息与已有定时任务
 - `apps/web-console/components/compact-bot-settings.test.ts`
 - `apps/web-console/components/routine-editor-dialog.test.ts`
 
+### compact-reply-spacing
+
+同一次回复中的相邻段落保持紧凑
+
+- `e2e/composer-quote-layout.spec.ts`
+
 ### composer-draft-per-session
 
 聊天输入框草稿按会话隔离
@@ -2698,6 +2704,13 @@ Bot 页视觉与列表状态
 聊天中的定时任务详情
 
 - `e2e/cron-message-details.spec.ts`
+
+### daydream-idle-history
+
+每日复盘空闲时不反复读取历史
+
+- `packages/core/test/bot-daydream-local.test.js`
+- `packages/core/test/daydream-runtime.test.js`
 
 ### daydream-tick-cost
 
@@ -3035,6 +3048,13 @@ Lab 只读查看本机 Grok Bot 会话
 - `packages/core/test/bot-goals-scheduler.test.js`
 - `packages/core/test/daydream-tick-cost.test.js`
 
+### idle-bot-goal-scheduler
+
+空闲 Bot 的目标历史不阻塞 Lab
+
+- `packages/core/test/bot-goals-scheduler.test.js`
+- `packages/core/test/bot-goals.test.js`
+
 ### jev-model-settings
 
 在模型设置中配置 Jev 评估
@@ -3110,6 +3130,12 @@ Langfuse 实际上报状态与超时
 ### lcu-app-grant
 
 桌面操作应用授权：全自动免审批，批准一次后同会话记住
+
+- `packages/core/test/lcu-computer-use.test.js`
+
+### lcu-chat-startup
+
+普通聊天和 Bot 消息复用已发现的桌面能力
 
 - `packages/core/test/lcu-computer-use.test.js`
 
@@ -3656,6 +3682,14 @@ microVM 命令不会悄悄改在宿主机上跑
 
 - `apps/web-console/lib/request-metric-turn.test.ts`
 - `e2e/request-metric-follows-turn.spec.ts`
+
+### responses-session-phase-cache
+
+Responses 连续工具轮次的阶段状态与前缀缓存
+
+- `packages/agent-loop/src/model/reasoning-replay.test.ts`
+- `packages/core/test/conversation-clock-request.test.js`
+- `packages/core/test/prompt-builder.test.js`
 
 ### risk-advisory-ui
 

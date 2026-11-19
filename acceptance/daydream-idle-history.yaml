@@ -1,0 +1,16 @@
+id: daydream-idle-history
+title: 每日复盘空闲时不反复读取历史
+status: implemented
+requirement: |
+  是不是还额外触发了一个竞态的问题？我看现在经常无法打开网页？
+  本机 Lab 首页白屏或打不开
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 到期的每日复盘已经完成，所有可共享产物已投递
+    when: 后台继续轮询
+    then: 不重复读取复盘证据、申请执行锁或投递产物
+  - id: AC-2
+    given: 历史复盘仍有待审批技能、失败或中断的任务，或者此前关闭了共享
+    when: 后台轮询且对应工作可以继续
+    then: 找到可对账的技能与需要恢复的工作，恢复共享后补发一次

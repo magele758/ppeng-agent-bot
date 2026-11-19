@@ -161,6 +161,12 @@ const sessionRecord = await miniLoop.run('session-web-1');
 
 Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数里也不出现 Jev 客户端。
 
+### Responses 的阶段状态
+
+宿主拼装系统提示时，可在 `buildSystemPromptParts` 的返回值或直接传入的 `ModelTurnInput` 上设置 `sessionPhase: { offset, text }`。`offset` 是完整系统提示中的 JavaScript 字符串偏移，指向阶段段落开头的两个换行，`text` 是紧随其后的宿主阶段描述。两个内核都会传递这个字段。只标记宿主生成的段落，偏移在拼装时计算。
+
+普通和流式 Responses 请求把匹配的阶段作为最后一条 `developer` 消息发送，其他指令留在 `instructions`。每次重新构造当前模型输入，历史压缩或请求重试后也只携带一份当前状态。宿主未标记阶段或后续处理改动了对应段落时，沿用完整系统提示。Chat Completions 和 Anthropic 继续读取完整系统提示。
+
 ### Responses 流终止与回归契约
 
 - OpenAI chat-completions 的流式与非流式请求把历史 `system` 提示按原顺序合并到唯一的首条 system 消息，放在主 system prompt 之后；对话主体只保留非 system 消息的原顺序。兼容仅接受开头 system 的网关；不改写持久化历史，也不降低系统提示权限。回归：`src/model/system-prefix.test.ts`。

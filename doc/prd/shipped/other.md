@@ -141,26 +141,6 @@ No new WorkItem table/system. No RAW_AGENT_* flags.
 无论 Agent 处在哪个权限档位（包括 bypass），都不能执行毁灭性的系统命令；
 命令输出里的密钥不能回流给模型。
 
-## compact-archive-pointer
-压缩摘要带上原文位置
-
-runAutoCompact 成功做闭区间 replace 时，把归档相对路径写进同一条 summary。有记忆附录时 working-log tail 不会贴上，所以路径必须在摘要正文里，不能靠另一条 appendix。
-摘要空则 empty_summary 跳过。这段逻辑不要改。
-在 replace 之前拿到 archive 路径。路径要同时出现在 replacement 的 text 和 session.summary 里。
-没有路径（archive 未提供或返回空）时，摘要文本与今天一致。
-有路径时加一两行，说明这是被压缩掉的原文位置，只在摘要缺了具体代码或报错时再读。不要把归档正文塞进摘要。
-如果 compact 的 archive 没返回模型能 read_file 的相对路径，让它返回这种路径，再让 auto-compact 写进摘要。
-
-## compact-bot-secondary-tabs
-精简 Bot 能力与权限及记录页
-
-其他2个tab的也这么改一下
-
-## compact-bot-settings
-Bot 设置优先展示基本信息与已有定时任务
-
-这个界面太臃肿了，核心信息全部被档到下面，定时任务新增应该要隐藏到二次弹窗里，已有的定时任务和基本信息在第一个tab里前置展示，其他的配置，非必要就隐藏或者折叠起来
-
 ## connector-authorization
 Lab connector authorization states and SecretVault grant
 
@@ -225,6 +205,12 @@ No new RAW_AGENT_* feature flags. Acceptance-first, user asked to fix now, tests
 聊天中的定时任务详情
 
 这种定时任务不用展示全内容，只展示是哪个定时任务的，点击再用弹窗显示详情，免得占用太多视图
+
+## daydream-idle-history
+每日复盘空闲时不反复读取历史
+
+是不是还额外触发了一个竞态的问题？我看现在经常无法打开网页？
+本机 Lab 首页白屏或打不开
 
 ## daydream-tick-cost
 每日复盘调度不能拖死 daemon
@@ -406,6 +392,12 @@ Lab 只读查看本机 Grok Bot 会话
 
 现在我看刚才启动网页，拉取历史会话的时间还是特别长，帮我排查下原因，看看是否可以进一步提升，甚至可以加本地部署的其他中间件来提升这个性能，深度研究下，另外告诉我现在的日志记录是否完整
 
+## idle-bot-goal-scheduler
+空闲 Bot 的目标历史不阻塞 Lab
+
+是不是还额外触发了一个竞态的问题？我看现在经常无法打开网页？
+本机 Lab 首页白屏或打不开
+
 ## jev-model-settings
 在模型设置中配置 Jev 评估
 
@@ -438,6 +430,11 @@ Langfuse 实际上报状态与超时
 
 Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Computer Use to use "Voice Memos"?」，
 批准后同一应用的下一个动作又再申请。全自动下不该再弹；需要审批时一次批准后同会话同应用不再申请。
+
+## lcu-chat-startup
+普通聊天和 Bot 消息复用已发现的桌面能力
+
+那你优化一下，另外看看另一个问题，是否可以提升bot和普通会话的启动速度，现在感觉还是有点慢
 
 ## lcu-computer-use
 本机 LCU 桌面操作接入
@@ -902,6 +899,11 @@ Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk 
 已发送请求指标随所选轮变化
 
 这里要跟着下面拖动的会话轮数显示对应轮的请求token啊
+
+## responses-session-phase-cache
+Responses 连续工具轮次的阶段状态与前缀缓存
+
+现在这个项目走的是magpie的代理服务，我看现在的缓存命中率很低，帮我从magpie的日志和当前服务的日志来分析下原因，以及看看是否可以优化
 
 ## risk-advisory-ui
 对话里的运行策略提醒

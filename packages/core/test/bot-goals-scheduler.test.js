@@ -365,3 +365,48 @@ test('only a stopped child belonging to this goal and parent enables deferred di
   await tickBotGoals(host);
   assert.equal(runs.length, 1);
 });
+
+function countGoalHistoryIo(store) {
+ const counts = { reads: 0, writes: 0, sessionScans: 0 };
+ for (const [method, counter] of [['getDaemonControl', 'reads'], ['setDaemonControl', 'writes'], ['listSessions', 'sessionScans']]) {
+  const original = store[method].bind(store);
+  store[method] = (...args) => {
+   if (method === 'listSessions' || args[0].startsWith('bot_goals:')) counts[counter]++;
+   return original(...args);
+  };
+ }
+ return counts;
+}
+
+test('quiet polls leave acknowledged histories and empty bots untouched [AC:idle-bot-goal-scheduler#AC-1]', async t => {
+ const {host, store, create, service, parent} = fixture(t);
+ store.createSession({title: 'Empty Bot', mode: 'chat', agentId: 'general', metadata: {...parent.metadata, botId: 'empty'}});
+ const goal = create();
+ service.block('b', goal.id, 'Waiting on a decision');
+ await tickBotGoals(host);
+ const counts = countGoalHistoryIo(store);
+ await tickBotGoals(host);
+ await tickBotGoals(host);
+ assert.deepEqual(counts, {reads: 0, writes: 0, sessionScans: 0});
+ assert.equal(store.getDaemonControl('bot_goals:empty'), undefined);
+});
+
+test('missed goal notices are delivered once and a real wait expiry persists [AC:idle-bot-goal-scheduler#AC-2]', async t => {
+ const {host, store, parent, create, service} = fixture(t);
+ const history = create({title: 'Earlier work'});
+ service.block('b', history.id, 'Needs a decision');
+ const timed = create({title: 'Timed work'});
+ const execution = service.claim('b', timed.id, {strategy: 'direct'});
+ service.report('b', execution.id, {kind: 'waiting', summary: 'Park', wait: {source: 'durable_wait', correlationId: 'gone', deadline: 1}});
+ await tickBotGoals(host);
+ const expired = service.get('b', timed.id);
+ assert.equal(expired.status, 'blocked');
+ assert.equal(expired.blockedReason, 'Wait deadline exceeded');
+ assert.equal(store.foldMessages(parent.id).filter(m => m.parts.some(p => p.text?.includes('Earlier work'))).length, 1);
+ await tickBotGoals(host); // Finish draining the expired wait.
+ const counts = countGoalHistoryIo(store);
+ await tickBotGoals(host);
+ assert.equal(store.getDaemonControl('bot.goal-notice:' + history.id), '1:blocked:Needs a decision');
+ assert.equal(store.foldMessages(parent.id).filter(m => m.parts.some(p => p.text?.includes('Earlier work'))).length, 1);
+ assert.equal(counts.writes, 0);
+});

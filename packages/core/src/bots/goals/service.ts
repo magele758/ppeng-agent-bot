@@ -64,7 +64,11 @@ export class BotGoalService {
  updateSettings(patch: Partial<GoalSettings>): GoalSettings { return writeGoalSettings(this.store, patch, this.scopeSessionId); }
  list(botId: string): BotGoal[] { return readGoalSnapshot(this.store, botId).goals.filter(g => this.visible(g)).sort((a,b) => b.priority-a.priority || a.createdAt.localeCompare(b.createdAt)); }
  get(botId: string, id: string): BotGoal | undefined { return this.list(botId).find(g => g.id === id); }
- executions(botId: string, goalId: string): GoalExecution[] { if (!this.get(botId, goalId)) return []; return readGoalSnapshot(this.store,botId).executions.filter(e => e.goalId === goalId); }
+ executions(botId: string, goalId: string): GoalExecution[] {
+  const state = readGoalSnapshot(this.store, botId);
+  if (!state.goals.some(goal => goal.id === goalId && this.visible(goal))) return [];
+  return state.executions.filter(execution => execution.goalId === goalId);
+ }
  findBySource(botId: string, sourceMessageId: string): BotGoal | undefined { return this.list(botId).find(g => g.sourceMessageId === sourceMessageId); }
  create(input: { botId: string; sessionId: string; title: string; objective: string; sourceMessageId?: string; constraints?: string[]; completionCriteria?: string[]; resources?: string[]; priority?: number; parentGoalId?: string; resumeRequested?: boolean }): BotGoal {
   if (this.scopeSessionId && input.sessionId !== this.scopeSessionId) throw new Error('Goal session mismatch');
@@ -327,14 +331,41 @@ export class BotGoalService {
   if(terminal.has(goal.status)||goal.status==='paused')return;
   goal.status='queued';goal.blockedReason=undefined;goal.resumeRequested=true;goal.nextStep=nextStep;
  }
- recover(botId:string,heldExecutionIds?:ReadonlySet<string>):BotGoal[]{return mutateGoalSnapshot(this.store,botId,s=>{
-  const changed:BotGoal[]=[];
-  for(const e of s.executions){const g=s.goals.find(x=>x.id===e.goalId&&this.visible(x));if(!g||e.status!=='running'||e.leaseUntil>this.clock()||heldExecutionIds?.has(e.id))continue;
-   e.status='interrupted';e.endedAt=this.date();g.activeExecutionId=undefined;g.draining=false;
-   if(!terminal.has(g.status)&&g.status!=='paused'){g.status=e.safeToRetry?'queued':'blocked';g.blockedReason=e.safeToRetry?undefined:'Execution interrupted; verify external effects before retry';}
-   this.event(s,'recovered',g);changed.push(g);
-  }
-  for(const g of s.goals){if(this.visible(g)&&g.status==='waiting'&&g.wait?.deadline!==undefined&&g.wait.deadline<=this.clock()){g.status='blocked';g.draining=true;g.blockedReason='Wait deadline exceeded';this.event(s,'wait_timeout',g);changed.push(g);}}
-  return changed;
- });}
+ recover(botId: string, heldExecutionIds?: ReadonlySet<string>): BotGoal[] {
+  const expired = (execution: GoalExecution) => execution.status === 'running'
+   && !(execution.leaseUntil > this.clock()) && !heldExecutionIds?.has(execution.id);
+  const timedOut = (goal: BotGoal) => this.visible(goal) && goal.status === 'waiting'
+   && goal.wait?.deadline !== undefined && goal.wait.deadline <= this.clock();
+  const owner = (goals: BotGoal[], execution: GoalExecution) => goals.find(goal => goal.id === execution.goalId && this.visible(goal));
+
+  const snapshot = readGoalSnapshot(this.store, botId);
+  if (!snapshot.executions.some(execution => expired(execution) && owner(snapshot.goals, execution)) && !snapshot.goals.some(timedOut)) return [];
+
+  // A different connection can renew a lease after the read-only check. Decide again under the writer lock.
+  return mutateGoalSnapshot(this.store, botId, state => {
+   const changed: BotGoal[] = [];
+   for (const execution of state.executions.filter(expired)) {
+    const goal = owner(state.goals, execution);
+    if (!goal) continue;
+    execution.status = 'interrupted';
+    execution.endedAt = this.date();
+    goal.activeExecutionId = undefined;
+    goal.draining = false;
+    if (!terminal.has(goal.status) && goal.status !== 'paused') {
+     goal.status = execution.safeToRetry ? 'queued' : 'blocked';
+     goal.blockedReason = execution.safeToRetry ? undefined : 'Execution interrupted; verify external effects before retry';
+    }
+    this.event(state, 'recovered', goal);
+    changed.push(goal);
+   }
+   for (const goal of state.goals.filter(timedOut)) {
+    goal.status = 'blocked';
+    goal.draining = true;
+    goal.blockedReason = 'Wait deadline exceeded';
+    this.event(state, 'wait_timeout', goal);
+    changed.push(goal);
+   }
+   return changed;
+  }, {shouldWrite: changed => changed.length > 0});
+ }
 }

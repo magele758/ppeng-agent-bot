@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 474,
+    "implemented": 479,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1422,6 +1422,13 @@
       "file": "acceptance/compact-bot-settings.yaml"
     },
     {
+      "id": "compact-reply-spacing",
+      "title": "同一次回复中的相邻段落保持紧凑",
+      "requirement": "这个会话一直看着很难受，怎么空行这么大，帮我优化一下这个对话流的界面",
+      "verificationStage": "software",
+      "file": "acceptance/compact-reply-spacing.yaml"
+    },
+    {
       "id": "composer-draft-per-session",
       "title": "聊天输入框草稿按会话隔离",
       "requirement": "聊天页输入框里未发送的草稿，在切换到另一个 bot（或会话）后仍然显示，把在 A bot 输入的内容带到了 B bot。\n需求：草稿按 bot/会话隔离：切换到 B 时显示 B 自己的草稿（没有则为空）；切回 A 时恢复 A 之前未发送的草稿\n（含输入文字；附件/引用/上下文标签等 composer 状态若现有结构支持也一并按会话隔离，至少保证文字）；\n发送成功后清空该会话草稿（保持现有「发送后先挂乐观气泡、再清空、再等待请求」的顺序与行为）；\n刷新页面若项目已有草稿持久化机制则沿用并按 key 隔离，否则内存级即可。\n注意流式进行中切换、新建会话、语音输入（麦克风）回填等边界。",
@@ -1581,6 +1588,13 @@
       "requirement": "这种定时任务不用展示全内容，只展示是哪个定时任务的，点击再用弹窗显示详情，免得占用太多视图",
       "verificationStage": "software",
       "file": "acceptance/cron-message-details.yaml"
+    },
+    {
+      "id": "daydream-idle-history",
+      "title": "每日复盘空闲时不反复读取历史",
+      "requirement": "是不是还额外触发了一个竞态的问题？我看现在经常无法打开网页？\n本机 Lab 首页白屏或打不开",
+      "verificationStage": "software",
+      "file": "acceptance/daydream-idle-history.yaml"
     },
     {
       "id": "daydream-tick-cost",
@@ -1968,6 +1982,13 @@
       "file": "acceptance/history-startup-contention.yaml"
     },
     {
+      "id": "idle-bot-goal-scheduler",
+      "title": "空闲 Bot 的目标历史不阻塞 Lab",
+      "requirement": "是不是还额外触发了一个竞态的问题？我看现在经常无法打开网页？\n本机 Lab 首页白屏或打不开",
+      "verificationStage": "software",
+      "file": "acceptance/idle-bot-goal-scheduler.yaml"
+    },
+    {
       "id": "jev-model-settings",
       "title": "在模型设置中配置 Jev 评估",
       "requirement": "这个开启了也没办法配置了，这个应该放到模型配置里吧？",
@@ -2050,6 +2071,13 @@
       "requirement": "Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Computer Use to use \"Voice Memos\"?」，\n批准后同一应用的下一个动作又再申请。全自动下不该再弹；需要审批时一次批准后同会话同应用不再申请。",
       "verificationStage": "software",
       "file": "acceptance/lcu-app-grant.yaml"
+    },
+    {
+      "id": "lcu-chat-startup",
+      "title": "普通聊天和 Bot 消息复用已发现的桌面能力",
+      "requirement": "那你优化一下，另外看看另一个问题，是否可以提升bot和普通会话的启动速度，现在感觉还是有点慢",
+      "verificationStage": "software",
+      "file": "acceptance/lcu-chat-startup.yaml"
     },
     {
       "id": "lcu-computer-use",
@@ -2638,6 +2666,13 @@
       "requirement": "这里要跟着下面拖动的会话轮数显示对应轮的请求token啊",
       "verificationStage": "software",
       "file": "acceptance/request-metric-follows-turn.yaml"
+    },
+    {
+      "id": "responses-session-phase-cache",
+      "title": "Responses 连续工具轮次的阶段状态与前缀缓存",
+      "requirement": "现在这个项目走的是magpie的代理服务，我看现在的缓存命中率很低，帮我从magpie的日志和当前服务的日志来分析下原因，以及看看是否可以优化",
+      "verificationStage": "software",
+      "file": "acceptance/responses-session-phase-cache.yaml"
     },
     {
       "id": "risk-advisory-ui",

@@ -2861,6 +2861,13 @@
       ]
     },
     {
+      "id": "compact-reply-spacing",
+      "title": "同一次回复中的相邻段落保持紧凑",
+      "tests": [
+        "e2e/composer-quote-layout.spec.ts"
+      ]
+    },
+    {
       "id": "composer-draft-per-session",
       "title": "聊天输入框草稿按会话隔离",
       "tests": [
@@ -3060,6 +3067,14 @@
       "title": "聊天中的定时任务详情",
       "tests": [
         "e2e/cron-message-details.spec.ts"
+      ]
+    },
+    {
+      "id": "daydream-idle-history",
+      "title": "每日复盘空闲时不反复读取历史",
+      "tests": [
+        "packages/core/test/bot-daydream-local.test.js",
+        "packages/core/test/daydream-runtime.test.js"
       ]
     },
     {
@@ -3447,6 +3462,14 @@
       ]
     },
     {
+      "id": "idle-bot-goal-scheduler",
+      "title": "空闲 Bot 的目标历史不阻塞 Lab",
+      "tests": [
+        "packages/core/test/bot-goals-scheduler.test.js",
+        "packages/core/test/bot-goals.test.js"
+      ]
+    },
+    {
       "id": "jev-model-settings",
       "title": "在模型设置中配置 Jev 评估",
       "tests": [
@@ -3531,6 +3554,13 @@
     {
       "id": "lcu-app-grant",
       "title": "桌面操作应用授权：全自动免审批，批准一次后同会话记住",
+      "tests": [
+        "packages/core/test/lcu-computer-use.test.js"
+      ]
+    },
+    {
+      "id": "lcu-chat-startup",
+      "title": "普通聊天和 Bot 消息复用已发现的桌面能力",
       "tests": [
         "packages/core/test/lcu-computer-use.test.js"
       ]
@@ -4153,6 +4183,15 @@
       "tests": [
         "apps/web-console/lib/request-metric-turn.test.ts",
         "e2e/request-metric-follows-turn.spec.ts"
+      ]
+    },
+    {
+      "id": "responses-session-phase-cache",
+      "title": "Responses 连续工具轮次的阶段状态与前缀缓存",
+      "tests": [
+        "packages/agent-loop/src/model/reasoning-replay.test.ts",
+        "packages/core/test/conversation-clock-request.test.js",
+        "packages/core/test/prompt-builder.test.js"
       ]
     },
     {

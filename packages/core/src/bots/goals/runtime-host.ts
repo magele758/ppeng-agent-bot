@@ -51,13 +51,16 @@ export function formatQuietGoalNotice(goal:BotGoal):string {
  if(goal.status==='pending_review')return `[goal update] Result returned (not automatically verified): ${title}`;
  return `[goal update] ${title}: ${goal.status}`;
 }
+export function goalNoticeVersion(goal: {status: BotGoal['status']; revision: number; blockedReason?: string | null}): string | undefined {
+ if (!['completed', 'blocked', 'failed'].includes(goal.status)) return undefined;
+ return `${goal.revision}:${goal.status}:${goal.blockedReason ?? ''}`;
+}
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
- host.store.transaction(()=>{
- goal=new BotGoalService(host.store,Date.now,goal.sessionId).get(goal.botId,goal.id)??goal;
- if(!['completed','blocked','failed'].includes(goal.status))return;
  const key=`bot.goal-notice:${goal.id}`;
- const version=`${goal.revision}:${goal.status}:${goal.blockedReason??''}`;
- if(host.store.getDaemonControl<string>(key)===version)return;
+ host.store.transaction(()=>{
+  goal=new BotGoalService(host.store,Date.now,goal.sessionId).get(goal.botId,goal.id)??goal;
+  const version=goalNoticeVersion(goal);
+  if(version===undefined||host.store.getDaemonControl<string>(key)===version)return;
   host.store.setDaemonControl(key,version);
   host.store.appendMessage(goal.sessionId,'system',[{type:'text',text:formatQuietGoalNotice(goal)}],{key:`goal-notice:${goal.id}:${version}`});
  });

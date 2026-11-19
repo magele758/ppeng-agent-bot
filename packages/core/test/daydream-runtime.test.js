@@ -378,3 +378,14 @@ test("a missing conversation does not fail the scheduled review [AC:bot-daydream
   assert.equal(x.runtime.store.getDaemonControl("daydream.lastError:gone-bot"), undefined);
   assert.equal(x.runtime.store.getDaemonControl("daydream.lastError:" + x.bots.a.id), undefined);
 });
+
+test('scheduled approval reconciliation finds only pending skill outputs [AC:daydream-idle-history#AC-1] [AC:daydream-idle-history#AC-2]', async t => {
+ const x = setup(t);
+ const id = x.bots.a.id;
+ const run = await x.host.local.run(id, {date: x.date, manual: true});
+ const pending = run.outputs.find(o => o.candidate.kind === 'skill');
+ new SkillProposalStore(x.runtime.stateDir).reject(pending.artifactId, 'reviewed');
+ x.host.local.listRuns = () => assert.fail('a scheduler poll loaded the full review history');
+ await x.host.tick();
+ assert.equal(x.host.local.getRun(id, run.id).outputs.find(o => o.candidate.kind === 'skill').status, 'rejected');
+});
