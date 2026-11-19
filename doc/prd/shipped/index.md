@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 475 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 476 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -316,13 +316,14 @@
 
 - `command-hardline` 危险命令硬拦截与密钥脱敏
 
-## compact（3）
+## compact（4）
 
-需求正文见 [other](other.md)。
+需求正文见 [compact](compact.md)。
 
 - `compact-archive-pointer` 压缩摘要带上原文位置
 - `compact-bot-secondary-tabs` 精简 Bot 能力与权限及记录页
 - `compact-bot-settings` Bot 设置优先展示基本信息与已有定时任务
+- `compact-reply-spacing` 同一次回复中的相邻段落保持紧凑
 
 ## composer（4）
 
