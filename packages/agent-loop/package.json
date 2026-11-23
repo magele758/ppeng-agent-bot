@@ -1,6 +1,6 @@
 {
   "name": "@ppeng/agent-loop",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Embeddable agent loop core: turn kernel, model adapters, streaming watchdogs, loop guards, session state, and tool execution.",
   "type": "module",
   "engines": {

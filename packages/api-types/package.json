@@ -1,6 +1,6 @@
 {
   "name": "@ppeng/api-types",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Shared HTTP API view types and browser-safe session query helpers for daemon ↔ Lab.",
   "type": "module",
   "engines": {
