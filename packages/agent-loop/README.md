@@ -80,3 +80,7 @@ import { createMiniAssembledLoop } from '@mage-ai-lab/agent-loop/mini';
 Import `readMediaFile` from `@mage-ai-lab/agent-loop/model` to turn an authorized local image, audio or video file into a `MediaPart`, then append it alongside text in a user message. The original bytes go to the model without transcription or frame extraction. For asset-backed messages, inject `io.resolveMediaDataUrl(part, sessionId, signal)`.
 
 `OpenAICompatibleAdapter({ ...connection, useJsonMode: false, mediaProfile: 'qwen-omni' })` enables the Qwen-Omni Chat Completions dialect (images, audio and video). The default `openai` profile supports images and WAV/MP3 audio; Responses and Anthropic support images only in this SDK. Unsupported media fails before HTTP. `readMediaFile` defaults to 6 MiB per file; provider limits still apply. See [SDK skill](SKILL.md#原生图片音频视频文件输入) for the full example, supported formats and asset/security contract.
+
+### Trajectory Handoff & Pattern B isolation
+
+The root entrypoint exports Trajectory Handoff v2.3 primitives (default-off capability-tier config parser, state machine, immutable plan revisions, single tool gate, crash-conserving recovery, and parent budget ledger). The dedicated subpath `@mage-ai-lab/agent-loop/pattern-b` exports fail-closed write-boundary isolation primitives for trusted Swarm hosts (`PATTERN_B_PRODUCTION_ENTRY = 'closed'`). See [SDK skill](SKILL.md#trajectory-handoff-v23-与-pattern-b-隔离) for contracts and invariants.

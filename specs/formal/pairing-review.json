@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-19T15:45:21.639Z",
-  "reviewNote": "Reviewed the Bot pin permission fix. sessions.ts now asks the shared Bot pin rule (core permittedBotPinPatch through apps/daemon/src/bot-pin-guard.ts) before opening a Bot chat with metadata pins, before creating a session whose metadata names a Bot, and before a /model chat command reaches handleBotChatCommand; replyBotChatCommand only gains the request auth for that check, and a refused change throws before any session is created or metadata is written. product-admin-tools.ts passes the bot_update patch through permittedToolBotPins before updateBot, which only drops or rejects model / thinking effort pin fields. No turn, tool-call, approval, writer-claim, restart or session lifecycle code path changed. Pairing, lifecycle, restart and concurrency models, real source probes and mutations passed while fingerprints were needs-review. Merged with main; the prompt-builder.ts fingerprint recorded there (v18 version literal) is kept as reviewed. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-23T09:36:02.074Z",
+  "reviewNote": "Reviewed SDK documentation update and 0.2.0 package version bump. Appended Trajectory Handoff v2.3 and Pattern B isolation contract docs to skills/agent-loop/SKILL.md (synced to packages/agent-loop/SKILL.md) and packages/agent-loop/README.md, and bumped @ppeng/api-types and @ppeng/agent-loop from 0.1.5 to 0.2.0. Zero runtime, kernel, tool-loop, approval, writer-claim, restart, or session lifecycle source files changed. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -412,12 +412,12 @@
     "scripts/formal/run-formal-regression.mjs": "f6a9d8e8a45d372115a9e81ca0ab800ff32bac727a349ae73ca6bb35dcd1076d",
     ".github/workflows/release-gate.yml": "a253118c881ee14051ff2977b8030b7078ab7a56999da59187bf0f8046ac0e17",
     "packages/agent-loop/src/runtime/tool-loop.test.ts": "196a63c5ff2537ed970d5989e03037d03bb2e64edb44412a6a2ac6ffc4a961e5",
-    "skills/agent-loop/SKILL.md": "9037fb3024b0d8bbceef43a272384eb96cf6612944829cf0357c281a99549e43",
+    "skills/agent-loop/SKILL.md": "12f94b08ec1689ed9bb616b4d355a427d4cafea86a0f45184f2718531f848930",
     "packages/agent-loop/src/turn/host.ts": "9a2cc03321805b3ce46eb797895e695a25509df3492b6471b61afafee083a5f7",
     "packages/agent-loop/src/session/writer-claim.ts": "349510a83419f13914d10d023d64f334abeb6484b4928746262e2fcc61e34876",
     "packages/core/src/stores/session-store.ts": "04d0113c7cc0af605573f1538561b4a403d39ca4c6bd91392a49e322b6d2ecc7",
     "packages/core/src/storage.ts": "bd8a9d1b561f9ea32d42b6d89a2d7cd36d723351f2dfaca2a12b3a9f8a2a0e4a",
-    "packages/agent-loop/SKILL.md": "9037fb3024b0d8bbceef43a272384eb96cf6612944829cf0357c281a99549e43",
+    "packages/agent-loop/SKILL.md": "12f94b08ec1689ed9bb616b4d355a427d4cafea86a0f45184f2718531f848930",
     "packages/core/src/session/step-inbox.ts": "34ed1835c457036cd69afc4326b48c9416104c8bce2d17793388d899e7652f01",
     "packages/agent-loop/src/session/step-inbox.ts": "1d6168438b363a2f52edd2495f647e61fda236d3dc4b8e9e25e14760680f1e94",
     "packages/agent-loop/src/session/apply-claimed-inbox.ts": "c773fd3874248c99a578d4a20cbe24ee74e626f6f7bd07ea6cb4d89749e81e0b",

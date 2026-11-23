@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-19T15:45:21.639Z",
-  "reviewNote": "Reviewed the Bot pin permission fix. sessions.ts now asks the shared Bot pin rule (core permittedBotPinPatch through apps/daemon/src/bot-pin-guard.ts) before opening a Bot chat with metadata pins, before creating a session whose metadata names a Bot, and before a /model chat command reaches handleBotChatCommand; replyBotChatCommand only gains the request auth for that check, and a refused change throws before any session is created or metadata is written. product-admin-tools.ts passes the bot_update patch through permittedToolBotPins before updateBot, which only drops or rejects model / thinking effort pin fields. No turn, tool-call, approval, writer-claim, restart or session lifecycle code path changed. Pairing, lifecycle, restart and concurrency models, real source probes and mutations passed while fingerprints were needs-review. Merged with main; the prompt-builder.ts fingerprint recorded there (v18 version literal) is kept as reviewed. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-23T09:36:02.074Z",
+  "reviewNote": "Reviewed SDK documentation update and 0.2.0 package version bump. Appended Trajectory Handoff v2.3 and Pattern B isolation contract docs to skills/agent-loop/SKILL.md (synced to packages/agent-loop/SKILL.md) and packages/agent-loop/README.md, and bumped @ppeng/api-types and @ppeng/agent-loop from 0.1.5 to 0.2.0. Zero runtime, kernel, tool-loop, approval, writer-claim, restart, or session lifecycle source files changed. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -625,8 +625,8 @@
     "packages/agent-loop/src/model/model-adapters.ts": "81a339f0ffba32487f6b04355c3e3a5c5bad7f51f3ce03403a951de740374826",
     "packages/agent-loop/src/model/reasoning-replay.test.ts": "bd693954b8371ba3b854b8367786bfb2f2a1a1d664bf5ea9edf9830e873200a3",
     "packages/core/test/model-adapters.test.js": "4a0f76f56d59d22e21e4e36decf0d0ae138dde9d7a07d4229b6954573f84e02d",
-    "skills/agent-loop/SKILL.md": "9037fb3024b0d8bbceef43a272384eb96cf6612944829cf0357c281a99549e43",
-    "packages/agent-loop/SKILL.md": "9037fb3024b0d8bbceef43a272384eb96cf6612944829cf0357c281a99549e43",
+    "skills/agent-loop/SKILL.md": "12f94b08ec1689ed9bb616b4d355a427d4cafea86a0f45184f2718531f848930",
+    "packages/agent-loop/SKILL.md": "12f94b08ec1689ed9bb616b4d355a427d4cafea86a0f45184f2718531f848930",
     "packages/agent-loop/src/turn/turn-recovery.ts": "d7223180ed521cb7d24a357c6d7353408a7237ed9c96e86d09d5a65b7d2390a2",
     "packages/core/src/turn/turn-recovery.ts": "a220faa894acaea08e84b3ae0de1ec9d610871b7563406e8d6dd468d31a06208",
     "packages/core/src/bots/goals/delivery-review.ts": "867c32f6f765a91a3b82e981b46785c7e2bc4e25184a7e6b5cbf32134075fe0c",
