@@ -30,3 +30,11 @@ test('vault rejects reserved names; ALS only exposes referenced values', async (
   });
   assert.deepEqual(currentSecretOverrides(), {});
 });
+
+test('vault snapshotValues exposes active secrets for redaction without leaking via list()', () => {
+  const vault = createMemorySecretVault();
+  const brokerTok = 'pw1_broker_tok_AbC+Def/123';
+  vault.set('PW1_BROKER_TOKEN', brokerTok);
+  assert.deepEqual(vault.snapshotValues(), { PW1_BROKER_TOKEN: brokerTok });
+  assert.equal(JSON.stringify(vault.list()).includes(brokerTok), false);
+});

@@ -356,7 +356,18 @@ export {
   SECURE_FORM_FIELDS,
   createSecureFormPort,
   replaceSecureFormCardResult,
-  secureFormTextLeaks
+  secureFormTextLeaks,
+  DEFAULT_PASSWORD_ONE_TIMEOUT_MS,
+  MAX_PASSWORD_ONE_RESPONSE_BYTES,
+  PasswordOneClient,
+  PasswordOneClientError,
+  createPasswordOneClient,
+  resolvePasswordOneConfig,
+  passwordOneListHandles,
+  passwordOneProxyHttp,
+  passwordOneProxyExec,
+  passwordOneScrubText,
+  passwordOneVerifyAudit
 } from '../secrets/index.js';
 export type {
   SecretEntrySummary,
@@ -372,7 +383,24 @@ export type {
   SecureFormStatus,
   SecureFormCard,
   SecureFormReceipt,
-  SecureFormPort
+  SecureFormPort,
+  PasswordOneAllowedToolKind,
+  PasswordOneCrossOriginRedirectMode,
+  PasswordOneSecretPolicy,
+  PasswordOneHandle,
+  PasswordOneHttpAuthBinding,
+  PasswordOneHttpRequest,
+  PasswordOneRedirectHop,
+  PasswordOneHttpResponse,
+  PasswordOneExecRequest,
+  PasswordOneExecResponse,
+  PasswordOneScrubMatch,
+  PasswordOneScrubResult,
+  PasswordOneAuditVerification,
+  PasswordOneAuditEntry,
+  PasswordOneAuditResult,
+  PasswordOneClientOptions,
+  ResolvedPasswordOneConfig
 } from '../secrets/index.js';
 export {
   parseRemoteModelList,
@@ -621,6 +649,8 @@ export { sanitizeSpawnEnv, getInjectionVarNames } from '../sandbox/env-sanitizer
 export type { SanitizeEnvOptions } from '../sandbox/env-sanitizer.js';
 export {
   REDACT_MIN_VALUE_LENGTH,
+  REDACT_ENCODING_MIN_VALUE_LENGTH,
+  buildRedactionEnv,
   collectRedactionTargets,
   redactEnvValues,
   redactToolContent

@@ -103,7 +103,7 @@ import {
 } from '../approval/policy-loader.js';
 import { lifecycleBlocks, runLifecycleHook } from '../hooks/lifecycle-hooks.js';
 import { maybeExportOtelSpan } from '../otel.js';
-import { redactToolContent } from '../sandbox/result-redaction.js';
+import { buildRedactionEnv, redactToolContent } from '../sandbox/result-redaction.js';
 import {
   getBoundSecretVault,
   parseSecretRefs,
@@ -1538,7 +1538,7 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
           checkPin: (toolName, schema) => toolDeps.checkCapabilityPin!(toolName, schema)
         }
       : undefined,
-    redactSecrets: (content) => redactToolContent(content, process.env),
+    redactSecrets: (content) => redactToolContent(content, buildRedactionEnv(process.env)),
     // Product execution archives the complete, redacted result before any
     // preview truncation, and returns its real artifact handle to the model.
     executeToolCalls: host.executeToolCalls,

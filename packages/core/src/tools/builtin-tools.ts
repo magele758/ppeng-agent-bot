@@ -18,7 +18,7 @@ import { manifestsForSession, noteActiveSkillManifest } from '../skills/skill-ma
 import { noteLoadedSkill } from '../skills/mandatory-skill-gate.js';
 import { evaluateDefaultDenyPolicy, untrustedCorpusFromMessages } from '../safety/default-deny-policy.js';
 import { sanitizeSpawnEnv } from '../sandbox/env-sanitizer.js';
-import { redactToolContent } from '../sandbox/result-redaction.js';
+import { buildRedactionEnv, redactToolContent } from '../sandbox/result-redaction.js';
 import { createAgentSandboxFromEnv } from '../sandbox/create-agent-sandbox.js';
 import type { AgentSandbox } from '../sandbox/agent-sandbox-types.js';
 import type { SandboxMode } from '../sandbox/sandbox-settings.js';
@@ -247,7 +247,8 @@ function getAgentSandbox(): AgentSandbox {
 /** Hardline refusals are host-authored JSON, not process output. Everything else the sandbox returns is untrusted. */
 function fenceSandboxOutput(backend: string | undefined, command: string, text: string): string {
   if (backend === 'command-hardline') return text;
-  return fenceShellOutput(redactToolContent(command, process.env), redactToolContent(text, process.env));
+  const redactionEnv = buildRedactionEnv(process.env);
+  return fenceShellOutput(redactToolContent(command, redactionEnv), redactToolContent(text, redactionEnv));
 }
 
 function clipEvidenceText(text: string, maxChars: number): string {
@@ -308,7 +309,10 @@ function shellExecution(
     const ok = result.code === 0 && result.signal === null;
     const output = combined
       ? fenceSandboxOutput(result.backend, command, combined)
-      : redactToolContent(`(command exited with ${result.code ?? result.signal ?? 'unknown'} and no output)`, process.env);
+      : redactToolContent(
+          `(command exited with ${result.code ?? result.signal ?? 'unknown'} and no output)`,
+          buildRedactionEnv(process.env)
+        );
     const trailer = ok ? '' : `\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`;
     return withOsSandboxNote(
       {ok, content:`${output}${trailer}`, metadata:{exitCode:result.code, signal:result.signal, ...(result.backend ? { sandbox_backend: result.backend } : {})}},
@@ -320,9 +324,10 @@ function shellExecution(
 /** Background job `result` is raw process output. Fence it; the rest of the record is host-authored. */
 function fenceJobResult<T extends { command?: string; result?: string }>(job: T): T {
   if (!job.result) return job;
+  const redactionEnv = buildRedactionEnv(process.env);
   return {
     ...job,
-    result: fenceShellOutput(redactToolContent(job.command ?? '', process.env), redactToolContent(job.result, process.env))
+    result: fenceShellOutput(redactToolContent(job.command ?? '', redactionEnv), redactToolContent(job.result, redactionEnv))
   };
 }
 

@@ -8,7 +8,7 @@ function secretForms(secret: string): string[] {
   const forms = new Set<string>([secret]);
   if (encoded !== secret) {
     forms.add(encoded);
-    forms.add(encoded.toLowerCase());
+    forms.add(encoded.replace(/%[0-9A-F]{2}/g, (m) => m.toLowerCase()));
   }
   if (json !== secret) forms.add(json);
   return [...forms].sort((a, b) => b.length - a.length);

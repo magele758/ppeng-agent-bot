@@ -1,0 +1,536 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { AddressInfo } from 'node:net';
+import { loadWorkspaceSkills } from '../dist/skills/skill-registry.js';
+import { buildRedactionEnv, redactToolContent } from '../dist/sandbox/result-redaction.js';
+import {
+  bindSecretVault,
+  createMemorySecretVault,
+  runWithSecretRefs,
+  createPasswordOneClient,
+  resolvePasswordOneConfig,
+  PasswordOneClientError,
+  passwordOneListHandles,
+  passwordOneProxyHttp,
+  passwordOneProxyExec,
+  passwordOneScrubText,
+  passwordOneVerifyAudit
+} from '../dist/secrets/index.js';
+import { createBuiltinTools } from '../dist/tools/builtin-tools.js';
+import { McpManager } from '../dist/mcp/mcp-manager.js';
+import { executeToolCalls, processToolResults } from '../dist/runtime/tool-loop.js';
+
+const repoRoot = join(fileURLToPath(new URL('../../..', import.meta.url)));
+
+function makeMinimalToolServices() {
+  return {
+    loadSkill: async () => ({ content: '' }),
+    searchSkills: async () => ({ content: '{"hits":[]}' }),
+    updateTodo: async (_sessionId: string, items: unknown[]) => items,
+    createTask: async () => {
+      throw new Error('unused');
+    },
+    getTask: async () => undefined,
+    listTasks: async () => [],
+    updateTask: async () => {
+      throw new Error('unused');
+    },
+    harnessWriteSpec: async () => '',
+    spawnSubagent: async () => '',
+    spawnTeammate: async () => '',
+    listAgents: async () => [],
+    sendMail: async () => {
+      throw new Error('unused');
+    },
+    readInbox: async () => [],
+    startBackgroundJob: async () => {
+      throw new Error('unused');
+    },
+    getBackgroundJob: async () => undefined,
+    listBackgroundJobs: async () => [],
+    listWorkspaces: async () => [],
+    upsertSessionMemory: async () => {},
+    listSessionMemory: async () => [],
+    deleteSessionMemory: async () => false,
+    visionAnalyze: async () => ''
+  };
+}
+
+test('SecretVault active secrets (PW1_BROKER_TOKEN + mixed-case API secret) are redacted across raw, %xx, %XX, Base64, and JSON-escaped forms', async (t) => {
+  const vault = createMemorySecretVault();
+  const brokerToken = 'Pw1Broker+Secret/Token"99??>>';
+  const apiSecret = 'sk_' + 'live_Mixed+Case/Api"Secret??>>';
+  vault.set('PW1_BROKER_TOKEN', brokerToken);
+  vault.set('STRIPE_PROD_API_KEY', apiSecret);
+  bindSecretVault(vault);
+  t.after(() => bindSecretVault(undefined));
+
+  const env = buildRedactionEnv({});
+  assert.equal(env.PW1_BROKER_TOKEN, brokerToken);
+  assert.equal(env.STRIPE_PROD_API_KEY, apiSecret);
+
+  for (const [label, secret] of [
+    ['PW1_BROKER_TOKEN', brokerToken],
+    ['STRIPE_PROD_API_KEY', apiSecret]
+  ] as const) {
+    const upperPct = encodeURIComponent(secret);
+    const lowerPct = upperPct.replace(/%[0-9A-F]{2}/g, (m) => m.toLowerCase());
+    const jsonEsc = JSON.stringify(secret).slice(1, -1);
+    const b64Std = Buffer.from(secret, 'utf8').toString('base64');
+    const b64Url = Buffer.from(secret, 'utf8').toString('base64url');
+    assert.notEqual(upperPct, lowerPct);
+    assert.notEqual(b64Std, b64Url);
+
+    const leaked = `raw=${secret} up=${upperPct} lo=${lowerPct} js=${jsonEsc} b64=${b64Std} b64u=${b64Url}`;
+    const scrubbed = redactToolContent(leaked, env);
+    for (const form of [secret, upperPct, lowerPct, jsonEsc, b64Std, b64Url]) {
+      assert.equal(scrubbed.includes(form), false, `${label} leaked form ${form}`);
+    }
+    assert.equal(
+      scrubbed,
+      `raw=[REDACTED:${label}] up=[REDACTED:${label}] lo=[REDACTED:${label}] js=[REDACTED:${label}] b64=[REDACTED:${label}] b64u=[REDACTED:${label}]`
+    );
+  }
+
+  // Also verify ALS override redaction when not stored in boundVault
+  const alsOnly = 'sk_' + 'live_AlsOnly+Tok/5544';
+  await runWithSecretRefs({ EPHEMERAL_CRED: alsOnly }, async () => {
+    const lower = encodeURIComponent(alsOnly).replace(/%[0-9A-F]{2}/g, (m) => m.toLowerCase());
+    const out = redactToolContent(`echo ${alsOnly} ${lower}`, process.env);
+    assert.equal(out.includes(alsOnly), false);
+    assert.equal(out.includes(lower), false);
+    assert.equal(out, 'echo [REDACTED:EPHEMERAL_CRED] [REDACTED:EPHEMERAL_CRED]');
+  });
+});
+
+test('skill-registry discovers skills/password-one/SKILL.md cleanly with compact progressive disclosure summary and no network:none manifest', async () => {
+  const skills = await loadWorkspaceSkills(repoRoot);
+  const pw1 = skills.find((s) => s.name === 'password-one');
+  assert.ok(pw1, 'skills/password-one/SKILL.md must be discovered by loadWorkspaceSkills');
+  assert.equal(pw1.source, 'workspace');
+  assert.equal(pw1.skillPath, 'skills/password-one/SKILL.md');
+  assert.equal(pw1.manifest, undefined, 'password-one must NOT ship a skill.manifest.json');
+  assert.equal(
+    existsSync(join(repoRoot, 'skills/password-one/skill.manifest.json')),
+    false,
+    'skills/password-one/skill.manifest.json must not exist'
+  );
+  assert.deepEqual(pw1.aliases, ['pw1', 'credential-broker']);
+  assert.ok(Array.isArray(pw1.triggerWords) && pw1.triggerWords.includes('pw1'));
+
+  // Description < 180 chars and progressive disclosure index entry < 250 chars
+  assert.ok(pw1.description.length < 180, `description too long: ${pw1.description.length}`);
+  const summaryLine = `- ${pw1.name}: ${pw1.description}`;
+  assert.ok(summaryLine.length < 250, `progressive disclosure summary too long: ${summaryLine.length}`);
+
+  // Key instructions documented
+  assert.match(pw1.content, /PW1_CLI_PATH/);
+  assert.match(pw1.content, /PW1_HANDLE_HINTS/);
+  assert.match(pw1.content, /PW1_BROKER_TOKEN/);
+  assert.match(pw1.content, /--auth-bearer\s+pw1:\/\//);
+  assert.match(pw1.content, /--secret-env/);
+  assert.match(pw1.content, /audit-verify/);
+  assert.match(pw1.content, /403 POLICY_VIOLATION/);
+});
+
+test('default builtin toolset and McpManager add 0 extra tools and 0 bytes extra tool schema', async () => {
+  const services = makeMinimalToolServices() as Parameters<typeof createBuiltinTools>[0];
+  const savedUrl = process.env.RAW_AGENT_PASSWORD_ONE_URL;
+  const savedPw1Url = process.env.PW1_URL;
+  const savedToken = process.env.PW1_BROKER_TOKEN;
+
+  try {
+    delete process.env.RAW_AGENT_PASSWORD_ONE_URL;
+    delete process.env.PW1_URL;
+    delete process.env.PW1_BROKER_TOKEN;
+    const baselineTools = createBuiltinTools(services);
+    const baselineSchema = JSON.stringify(
+      baselineTools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
+    );
+
+    process.env.RAW_AGENT_PASSWORD_ONE_URL = 'http://127.0.0.1:52342';
+    process.env.PW1_URL = 'http://127.0.0.1:52342';
+    process.env.PW1_BROKER_TOKEN = 'test-broker-token-123456';
+    const configuredTools = createBuiltinTools(services);
+    const configuredSchema = JSON.stringify(
+      configuredTools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
+    );
+
+    assert.equal(configuredTools.length, baselineTools.length, 'builtin tool count must remain identical');
+    assert.equal(
+      Buffer.byteLength(configuredSchema, 'utf8') - Buffer.byteLength(baselineSchema, 'utf8'),
+      0,
+      'non-secret tool schema delta must be 0 bytes'
+    );
+    assert.equal(
+      configuredTools.some((t) => /pw1|password[-_]?one/i.test(t.name)),
+      false,
+      'must not register any password-one builtin model tool'
+    );
+  } finally {
+    if (savedUrl === undefined) delete process.env.RAW_AGENT_PASSWORD_ONE_URL;
+    else process.env.RAW_AGENT_PASSWORD_ONE_URL = savedUrl;
+    if (savedPw1Url === undefined) delete process.env.PW1_URL;
+    else process.env.PW1_URL = savedPw1Url;
+    if (savedToken === undefined) delete process.env.PW1_BROKER_TOKEN;
+    else process.env.PW1_BROKER_TOKEN = savedToken;
+  }
+
+  // McpManager must not auto-register anything when only Password One env vars are set
+  const mcpTools: unknown[] = [];
+  const mgr = new McpManager({
+    stateDir: '/tmp/pw1-mcp-zero-delta',
+    tools: mcpTools as never,
+    env: {
+      RAW_AGENT_PASSWORD_ONE_URL: 'http://127.0.0.1:52342',
+      PW1_URL: 'http://127.0.0.1:52342',
+      PW1_BROKER_TOKEN: 'test-broker-token-123456'
+    },
+    log: { warn() {}, info() {}, debug() {}, error() {} }
+  });
+  await mgr.ensureLoaded('s-zero');
+  assert.equal(mcpTools.length, 0, 'McpManager must add 0 tools for Password One env');
+});
+
+test('password-one-client is opt-in (default-OFF) and rejects CRLF/NUL in tokens and headers without echoing token', async () => {
+  assert.equal(resolvePasswordOneConfig({ env: {} }), undefined);
+  await assert.rejects(
+    () => passwordOneListHandles({ env: {} }),
+    (err: unknown) => {
+      assert.ok(err instanceof PasswordOneClientError);
+      assert.equal(err.code, 'NOT_CONFIGURED');
+      return true;
+    }
+  );
+
+  const crlfToken = 'secret-broker-tok\r\nX-Evil: injected';
+  assert.throws(
+    () => createPasswordOneClient({ baseUrl: 'http://127.0.0.1:52342', token: crlfToken }),
+    (err: unknown) => {
+      assert.ok(err instanceof PasswordOneClientError);
+      assert.equal(err.code, 'INVALID_INPUT');
+      assert.equal(err.message.includes('secret-broker-tok'), false, 'token must never appear in error');
+      return true;
+    }
+  );
+
+  assert.throws(
+    () =>
+      createPasswordOneClient({
+        baseUrl: 'http://127.0.0.1:52342',
+        headers: { 'X-Custom': 'ok\nInjected: 1' }
+      }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+
+  const client = createPasswordOneClient({ baseUrl: 'http://127.0.0.1:52342', token: 'valid-token-123456' });
+  await assert.rejects(
+    () => client.proxyHttp({ url: 'https://api.example.test', headers: { 'X-Test': 'a\r\nb' } }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+});
+
+test('password-one-client enforces timeouts, 2 MiB / maxResponseBytes cap, SecretVault token pickup, endpoints, and never leaks PW1_BROKER_TOKEN in errors', async (t) => {
+  const brokerToken = 'Pw1Secret+Broker/Token9988';
+  let lastAuthHeader = '';
+
+  const server = createServer((req, res) => {
+    lastAuthHeader = String(req.headers.authorization ?? '');
+    const url = req.url ?? '/';
+
+    if (req.method === 'GET' && url === '/v1/secrets') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          secrets: [
+            {
+              id: 'sec_1',
+              alias: 'stripe/prod',
+              handle: 'pw1://stripe/prod',
+              placeholder: '{{pw1://stripe/prod}}',
+              description: 'Stripe API',
+              version: 1,
+              policy: {
+                allowedHosts: ['api.stripe.com'],
+                allowedTools: ['http'],
+                allowedCommands: [],
+                allowHttp: false,
+                allowEnvInjection: false,
+                crossOriginRedirect: 'block',
+                maxLeaseTtlSeconds: 300,
+                requireGrant: false
+              },
+              policyHash: 'abc123',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              updatedAt: '2026-01-01T00:00:00.000Z'
+            }
+          ]
+        })
+      );
+      return;
+    }
+
+    if (req.method === 'POST' && url === '/v1/proxy/http') {
+      const chunks: Buffer[] = [];
+      req.on('data', (c: Buffer) => chunks.push(c));
+      req.on('end', () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { url?: string };
+        if (body.url?.includes('slow.test')) {
+          // Deliberately stall longer than timeoutMs
+          return;
+        }
+        if (body.url?.includes('huge.test')) {
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, result: { body: 'A'.repeat(4096) } }));
+          return;
+        }
+        if (body.url?.includes('evil.test')) {
+          const encodedTok = encodeURIComponent(brokerToken);
+          const b64Tok = Buffer.from(brokerToken, 'utf8').toString('base64');
+          res.writeHead(403, { 'content-type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              ok: false,
+              error: {
+                code: 'POLICY_VIOLATION',
+                message: `Disallowed host evil.test; debug leaked ${brokerToken} ${encodedTok} ${b64Tok} Bearer ${brokerToken}`
+              }
+            })
+          );
+          return;
+        }
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            ok: true,
+            result: {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+              body: '{"balance":100}',
+              finalUrl: body.url,
+              redirects: [],
+              redactionsCount: 0,
+              redactedAliases: [],
+              durationMs: 3
+            }
+          })
+        );
+      });
+      return;
+    }
+
+    if (req.method === 'POST' && url === '/v1/proxy/exec') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          result: {
+            exitCode: 0,
+            stdout: 'ok',
+            stderr: '',
+            redactionsCount: 1,
+            redactedAliases: ['stripe/prod'],
+            durationMs: 5
+          }
+        })
+      );
+      return;
+    }
+
+    if (req.method === 'POST' && url === '/v1/scrub') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          result: {
+            scrubbedText: '[REDACTED:pw1://stripe/prod]',
+            redactionsCount: 1,
+            redactedAliases: ['stripe/prod'],
+            matches: [{ label: 'pw1://stripe/prod', encoding: 'raw', count: 1 }]
+          }
+        })
+      );
+      return;
+    }
+
+    if (req.method === 'GET' && url.startsWith('/v1/audit')) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          verification: { valid: true, entriesChecked: 2, headHash: 'deadbeef' },
+          entries: []
+        })
+      );
+      return;
+    }
+
+    res.writeHead(404, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: { code: 'NOT_FOUND', message: 'nope' } }));
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = (server.address() as AddressInfo).port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  t.after(async () => {
+    server.closeAllConnections?.();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  // Resolve token from SecretVault automatically (not present in env)
+  const vault = createMemorySecretVault();
+  vault.set('PW1_BROKER_TOKEN', brokerToken);
+  bindSecretVault(vault);
+  t.after(() => bindSecretVault(undefined));
+
+  const env = { RAW_AGENT_PASSWORD_ONE_URL: baseUrl };
+
+  const handles = await passwordOneListHandles({ env });
+  assert.equal(handles.length, 1);
+  assert.equal(handles[0]?.handle, 'pw1://stripe/prod');
+  assert.equal(lastAuthHeader, `Bearer ${brokerToken}`);
+
+  const httpRes = await passwordOneProxyHttp(
+    { url: 'https://api.stripe.com/v1/balance', auth: { type: 'bearer', secret: 'pw1://stripe/prod' } },
+    { env }
+  );
+  assert.equal(httpRes.status, 200);
+  assert.equal(httpRes.body, '{"balance":100}');
+
+  const execRes = await passwordOneProxyExec(
+    { command: 'node', args: ['-v'], secretEnv: { API_KEY: 'pw1://stripe/prod' } },
+    { env }
+  );
+  assert.equal(execRes.exitCode, 0);
+  assert.equal(execRes.redactionsCount, 1);
+
+  const scrubRes = await passwordOneScrubText('leak', { env, source: 'unit-test' });
+  assert.equal(scrubRes.scrubbedText, '[REDACTED:pw1://stripe/prod]');
+
+  const auditRes = await passwordOneVerifyAudit({ env, limit: 10 });
+  assert.equal(auditRes.verification.valid, true);
+  assert.equal(auditRes.verification.entriesChecked, 2);
+
+  // Error path MUST scrub PW1_BROKER_TOKEN (raw, URL-encoded, Base64, Bearer)
+  await assert.rejects(
+    () => passwordOneProxyHttp({ url: 'https://evil.test/exfil' }, { env }),
+    (err: unknown) => {
+      assert.ok(err instanceof PasswordOneClientError);
+      assert.equal(err.code, 'POLICY_VIOLATION');
+      assert.equal(err.statusCode, 403);
+      assert.equal(err.message.includes(brokerToken), false, 'raw token leaked in error');
+      assert.equal(err.message.includes(encodeURIComponent(brokerToken)), false, 'encoded token leaked');
+      assert.equal(
+        err.message.includes(Buffer.from(brokerToken, 'utf8').toString('base64')),
+        false,
+        'base64 token leaked'
+      );
+      assert.match(err.message, /\[REDACTED:PW1_BROKER_TOKEN\]/);
+      return true;
+    }
+  );
+
+  // Timeout enforcement
+  await assert.rejects(
+    () => passwordOneProxyHttp({ url: 'https://slow.test/hang' }, { env, timeoutMs: 80 }),
+    (err: unknown) => {
+      assert.ok(err instanceof PasswordOneClientError);
+      assert.equal(err.code, 'TIMEOUT');
+      return true;
+    }
+  );
+
+  // Max response bytes enforcement
+  await assert.rejects(
+    () => passwordOneProxyHttp({ url: 'https://huge.test/blob' }, { env, maxResponseBytes: 256 }),
+    (err: unknown) => {
+      assert.ok(err instanceof PasswordOneClientError);
+      assert.equal(err.code, 'RESPONSE_TOO_LARGE');
+      return true;
+    }
+  );
+});
+
+test('tool-loop redacts active SecretVault values on tool return path', async (t) => {
+  const vault = createMemorySecretVault();
+  const brokerToken = 'Pw1Loop+Secret/Tok"42??>>';
+  vault.set('PW1_BROKER_TOKEN', brokerToken);
+  bindSecretVault(vault);
+  t.after(() => bindSecretVault(undefined));
+
+  const appended: unknown[] = [];
+  const lowerPct = encodeURIComponent(brokerToken).replace(/%[0-9A-F]{2}/g, (m) => m.toLowerCase());
+  const b64 = Buffer.from(brokerToken, 'utf8').toString('base64');
+
+  const echoTool = {
+    name: 'echo_probe',
+    description: 'test probe',
+    inputSchema: { type: 'object' },
+    approvalMode: 'never' as const,
+    sideEffectLevel: 'none' as const,
+    execute: async () => ({
+      ok: true,
+      content: `raw=${brokerToken} pct=${lowerPct} b64=${b64}`
+    })
+  };
+
+  const session = {
+    id: 'sess-redact',
+    agentId: 'general',
+    title: 'redact',
+    mode: 'chat' as const,
+    status: 'idle' as const,
+    todo: [],
+    summary: '',
+    metadata: { secretRefs: ['PW1_BROKER_TOKEN'] },
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z'
+  };
+
+  const deps = {
+    tools: [echoTool],
+    store: {
+      appendMessage: (_sid: string, _role: string, parts: unknown[]) => {
+        appended.push(...parts);
+      },
+      listApprovals: () => [],
+      createApproval: () => {
+        throw new Error('unused');
+      },
+      deleteApproval: () => {},
+      getTask: () => undefined,
+      updateTask: () => {}
+    },
+    envApprovalPolicy: undefined,
+    maxParallelToolCalls: 1,
+    modelAdapter: {
+      name: 'mock',
+      runTurn: async () => ({ stopReason: 'end' as const, assistantParts: [] }),
+      summarizeMessages: async () => ''
+    },
+    stateDir: '/tmp/pw1-tool-loop-redact',
+    emitTrace: () => {}
+  };
+
+  const context = {
+    session,
+    repoRoot: '/tmp',
+    stateDir: '/tmp/pw1-tool-loop-redact',
+    agent: { id: 'general', name: 'General', role: 'assistant', instructions: '', capabilities: [] }
+  };
+
+  const call = { type: 'tool_call' as const, toolCallId: 'tc_1', name: 'echo_probe', input: {} };
+  const results = await executeToolCalls(deps, [call], context, false, session.id);
+  processToolResults(deps, results, [call], session, undefined, session.id);
+
+  const serialized = JSON.stringify({ results, appended });
+  assert.equal(serialized.includes(brokerToken), false, 'raw SecretVault token must not persist');
+  assert.equal(serialized.includes(lowerPct), false, 'percent-encoded SecretVault token must not persist');
+  assert.equal(serialized.includes(b64), false, 'base64 SecretVault token must not persist');
+  assert.match(serialized, /\[REDACTED:PW1_BROKER_TOKEN\]/);
+});
