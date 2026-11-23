@@ -242,24 +242,28 @@ function resolveBrokerToken(
   explicitToken: string | undefined,
   env: NodeJS.ProcessEnv | Record<string, string | undefined>
 ): string | undefined {
-  let raw: string | undefined;
   if (explicitToken !== undefined) {
-    raw = explicitToken;
-  } else {
-    const als = currentSecretOverrides();
-    const vault = getBoundSecretVault();
-    raw =
-      als.PW1_BROKER_TOKEN ??
-      vault?.get('PW1_BROKER_TOKEN') ??
-      env.PW1_BROKER_TOKEN ??
-      als.PW1_AUTH_TOKEN ??
-      vault?.get('PW1_AUTH_TOKEN') ??
-      env.PW1_AUTH_TOKEN;
+    assertNoControlChars(explicitToken, 'auth token');
+    const trimmed = explicitToken.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
   }
-  if (raw === undefined) return undefined;
-  assertNoControlChars(raw, 'auth token');
-  const trimmed = raw.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  const als = currentSecretOverrides();
+  const vault = getBoundSecretVault();
+  const candidates = [
+    als.PW1_BROKER_TOKEN,
+    vault?.get('PW1_BROKER_TOKEN'),
+    env.PW1_BROKER_TOKEN,
+    als.PW1_AUTH_TOKEN,
+    vault?.get('PW1_AUTH_TOKEN'),
+    env.PW1_AUTH_TOKEN
+  ];
+  for (const candidate of candidates) {
+    if (candidate === undefined) continue;
+    assertNoControlChars(candidate, 'auth token');
+    const trimmed = candidate.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return undefined;
 }
 
 function collectTokenForms(token: string): string[] {
@@ -304,9 +308,19 @@ export function resolvePasswordOneConfig(
   options?: PasswordOneClientOptions
 ): ResolvedPasswordOneConfig | undefined {
   const env = options?.env ?? process.env;
-  const rawUrl = options?.baseUrl ?? env.RAW_AGENT_PASSWORD_ONE_URL ?? env.PW1_URL;
-  if (rawUrl !== undefined) {
-    assertNoControlChars(rawUrl, 'base URL');
+  let rawUrl: string | undefined;
+  if (options?.baseUrl !== undefined) {
+    assertNoControlChars(options.baseUrl, 'base URL');
+    rawUrl = options.baseUrl;
+  } else {
+    for (const candidate of [env.RAW_AGENT_PASSWORD_ONE_URL, env.PW1_URL]) {
+      if (candidate === undefined) continue;
+      assertNoControlChars(candidate, 'base URL');
+      if (candidate.trim().length > 0) {
+        rawUrl = candidate;
+        break;
+      }
+    }
   }
   if (rawUrl === undefined || rawUrl.trim() === '') {
     // Still validate explicit token/headers if caller supplied them for early fail-closed checks.
@@ -368,7 +382,7 @@ function requestJson<T>(
   signal?: AbortSignal
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const targetUrl = new URL(path, `${config.baseUrl}/`);
+    const targetUrl = new URL(path.replace(/^\/+/, ''), `${config.baseUrl.replace(/\/+$/, '')}/`);
     const bodyBuffer = body !== undefined ? Buffer.from(JSON.stringify(body), 'utf8') : undefined;
     const headers: Record<string, string> = {
       accept: 'application/json'

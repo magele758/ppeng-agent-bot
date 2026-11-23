@@ -45,9 +45,11 @@ node "$PW1_CLI_PATH" http --url <url> --method <METHOD> --auth-bearer pw1://<ali
 
 Other supported options:
 
-- Custom header placeholder: `--header "X-API-Key: {{pw1://alias}}"`
-- Named auth header: `--auth-header <Header-Name>:pw1://<alias>`
-- HTTP Basic auth: `--auth-basic <username>:pw1://<alias>`
+- Custom header (or placeholder): `--header "Name: Value"` / `--header "X-API-Key: {{pw1://alias}}"`
+- Query parameter: `--query "k=v"`
+- Named auth header: `--auth-header "<Header-Name>=pw1://<alias>"`
+- HTTP Basic auth: `--auth-basic "<username>:pw1://<alias>"`
+- Auth query parameter: `--auth-query "<param>=pw1://<alias>"`
 - Request payload: `--body '<payload>'`
 
 ## 3. Blind CLI execution

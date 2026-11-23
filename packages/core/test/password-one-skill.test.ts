@@ -127,11 +127,16 @@ test('skill-registry discovers skills/password-one/SKILL.md cleanly with compact
   const summaryLine = `- ${pw1.name}: ${pw1.description}`;
   assert.ok(summaryLine.length < 250, `progressive disclosure summary too long: ${summaryLine.length}`);
 
-  // Key instructions documented
+  // Key instructions documented (exact CLI delimiter contract matching password-one/src/cli.ts)
   assert.match(pw1.content, /PW1_CLI_PATH/);
   assert.match(pw1.content, /PW1_HANDLE_HINTS/);
   assert.match(pw1.content, /PW1_BROKER_TOKEN/);
   assert.match(pw1.content, /--auth-bearer\s+pw1:\/\//);
+  assert.match(pw1.content, /--auth-header\s+"<Header-Name>=pw1:\/\/<alias>"/);
+  assert.doesNotMatch(pw1.content, /--auth-header\s+[^\n]*:pw1:\/\//);
+  assert.match(pw1.content, /--auth-query\s+"<param>=pw1:\/\/<alias>"/);
+  assert.match(pw1.content, /--query\s+"k=v"/);
+  assert.match(pw1.content, /--auth-basic\s+"<username>:pw1:\/\/<alias>"/);
   assert.match(pw1.content, /--secret-env/);
   assert.match(pw1.content, /audit-verify/);
   assert.match(pw1.content, /403 POLICY_VIOLATION/);
@@ -232,6 +237,94 @@ test('password-one-client is opt-in (default-OFF) and rejects CRLF/NUL in tokens
     () => client.proxyHttp({ url: 'https://api.example.test', headers: { 'X-Test': 'a\r\nb' } }),
     (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
   );
+});
+
+test('password-one-client preserves baseUrl path prefix and treats empty/whitespace PW1_BROKER_TOKEN as unset for PW1_AUTH_TOKEN fallback', async (t) => {
+  // Empty / whitespace PW1_BROKER_TOKEN falls back to PW1_AUTH_TOKEN
+  const fallbackEmpty = resolvePasswordOneConfig({
+    env: {
+      RAW_AGENT_PASSWORD_ONE_URL: '',
+      PW1_URL: 'https://proxy.example.com/pw1/',
+      PW1_BROKER_TOKEN: '',
+      PW1_AUTH_TOKEN: 'auth-fallback-token-1234'
+    }
+  });
+  assert.ok(fallbackEmpty);
+  assert.equal(fallbackEmpty.baseUrl, 'https://proxy.example.com/pw1');
+  assert.equal(fallbackEmpty.token, 'auth-fallback-token-1234');
+
+  const fallbackSpaces = resolvePasswordOneConfig({
+    env: {
+      PW1_URL: 'https://proxy.example.com/pw1',
+      PW1_BROKER_TOKEN: '   \t  ',
+      PW1_AUTH_TOKEN: 'auth-fallback-token-5678'
+    }
+  });
+  assert.equal(fallbackSpaces?.token, 'auth-fallback-token-5678');
+
+  // Raw CR/LF/NUL in PW1_BROKER_TOKEN must STILL fail closed before trimming/fallback
+  assert.throws(
+    () =>
+      resolvePasswordOneConfig({
+        env: {
+          PW1_URL: 'https://proxy.example.com/pw1',
+          PW1_BROKER_TOKEN: '\r\n',
+          PW1_AUTH_TOKEN: 'auth-fallback-token-5678'
+        }
+      }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+
+  // Verify live HTTP request preserves baseUrl path prefix (/pw1 -> /pw1/v1/secrets & /pw1/v1/audit?limit=5)
+  const seenRequests: Array<{ method: string; url: string; auth: string }> = [];
+  const server = createServer((req, res) => {
+    seenRequests.push({
+      method: req.method ?? '',
+      url: req.url ?? '',
+      auth: String(req.headers.authorization ?? '')
+    });
+    if (req.url === '/pw1/v1/secrets') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, secrets: [] }));
+      return;
+    }
+    if (req.url === '/pw1/v1/audit?limit=5') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          verification: { valid: true, entriesChecked: 0, headHash: 'genesis' },
+          entries: []
+        })
+      );
+      return;
+    }
+    res.writeHead(404, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, error: { code: 'NOT_FOUND', message: `unexpected ${req.url}` } }));
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = (server.address() as AddressInfo).port;
+  t.after(async () => {
+    server.closeAllConnections?.();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  const env = {
+    PW1_URL: `http://127.0.0.1:${port}/pw1`,
+    PW1_BROKER_TOKEN: '   ',
+    PW1_AUTH_TOKEN: 'prefixed-fallback-token-99'
+  };
+
+  const handles = await passwordOneListHandles({ env });
+  assert.deepEqual(handles, []);
+  const audit = await passwordOneVerifyAudit({ env, limit: 5 });
+  assert.equal(audit.verification.valid, true);
+
+  assert.deepEqual(seenRequests, [
+    { method: 'GET', url: '/pw1/v1/secrets', auth: 'Bearer prefixed-fallback-token-99' },
+    { method: 'GET', url: '/pw1/v1/audit?limit=5', auth: 'Bearer prefixed-fallback-token-99' }
+  ]);
 });
 
 test('password-one-client enforces timeouts, 2 MiB / maxResponseBytes cap, SecretVault token pickup, endpoints, and never leaks PW1_BROKER_TOKEN in errors', async (t) => {
