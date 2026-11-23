@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-19T15:45:21.639Z",
-  "reviewNote": "Reviewed the Bot pin permission fix. sessions.ts now asks the shared Bot pin rule (core permittedBotPinPatch through apps/daemon/src/bot-pin-guard.ts) before opening a Bot chat with metadata pins, before creating a session whose metadata names a Bot, and before a /model chat command reaches handleBotChatCommand; replyBotChatCommand only gains the request auth for that check, and a refused change throws before any session is created or metadata is written. product-admin-tools.ts passes the bot_update patch through permittedToolBotPins before updateBot, which only drops or rejects model / thinking effort pin fields. No turn, tool-call, approval, writer-claim, restart or session lifecycle code path changed. Pairing, lifecycle, restart and concurrency models, real source probes and mutations passed while fingerprints were needs-review. Merged with main; the prompt-builder.ts fingerprint recorded there (v18 version literal) is kept as reviewed. Tool-call pairing, session lifecycle, restart recovery, and writer contention are unchanged. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-23T09:36:02.074Z",
+  "reviewNote": "Reviewed SDK documentation update and 0.2.0 package version bump. Appended Trajectory Handoff v2.3 and Pattern B isolation contract docs to skills/agent-loop/SKILL.md (synced to packages/agent-loop/SKILL.md) and packages/agent-loop/README.md, and bumped @ppeng/api-types and @ppeng/agent-loop from 0.1.5 to 0.2.0. Zero runtime, kernel, tool-loop, approval, writer-claim, restart, or session lifecycle source files changed. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Production runtime startup and writer surfaces, cancellation and approval decisions; actual OS process probes",
@@ -487,8 +487,8 @@
     "packages/core/src/turn/kernel.ts": "229aede615ff8d171f3c222673d32e14ab3be4f4801bd2304d6ea461ad51b803",
     "packages/core/src/runtime/tool-loop.ts": "ced6d9ade9aad2ad18b5fef0e08f42a65ea34820ad260119b8b9c4530df780ce",
     "packages/core/src/stores/trace.ts": "3053c853ebd3d0f7f25332b8fdbb8ea912e2baac51b2386b8497d026da0533f7",
-    "skills/agent-loop/SKILL.md": "9037fb3024b0d8bbceef43a272384eb96cf6612944829cf0357c281a99549e43",
-    "packages/agent-loop/SKILL.md": "9037fb3024b0d8bbceef43a272384eb96cf6612944829cf0357c281a99549e43",
+    "skills/agent-loop/SKILL.md": "12f94b08ec1689ed9bb616b4d355a427d4cafea86a0f45184f2718531f848930",
+    "packages/agent-loop/SKILL.md": "12f94b08ec1689ed9bb616b4d355a427d4cafea86a0f45184f2718531f848930",
     "scripts/test/session-multiprocess-state-consistency.test.mjs": "050990c7ddc41c4be1e61ed8ae9e5f9b170ab780e8c7ec3046d9b2c8f064718a",
     "acceptance/session-multiprocess-state-consistency.yaml": "f4006713194595ae4b03e8d16cbe45937ff9cb687e8d673e216fd4994940a1a8",
     "packages/core/test/writer-claim.test.js": "338a9772447852804bcdeb30edfe8d0710e52af90a94cc06c03883df2e03d6e7",
