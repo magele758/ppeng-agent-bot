@@ -521,6 +521,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['PATCH /api/computer-use/settings', ADMIN],
     ['GET /api/app-control/settings', AUTHENTICATED],
     ['PATCH /api/app-control/settings', ADMIN],
+    ['GET /api/external-ai/settings', AUTHENTICATED],
+    ['PATCH /api/external-ai/settings', ADMIN],
     ['GET /api/connectors', AUTHENTICATED],
     ['POST /api/connectors/:id/grant', ADMIN],
     ['POST /api/connectors/:id/revoke', ADMIN],

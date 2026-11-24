@@ -2138,6 +2138,15 @@
       ]
     },
     {
+      "id": "bot-coding-agent-tools",
+      "title": "Bot 识别并善用本机编程助手处理深度编码任务",
+      "tests": [
+        "apps/daemon/test/external-ai-settings.test.ts",
+        "apps/web-console/components/ExternalAiSettingsCard.test.ts",
+        "packages/core/test/bot-coding-agent-tools.test.js"
+      ]
+    },
+    {
       "id": "bot-completion-reliability",
       "title": "完成验证可追溯与任务收尾可靠性",
       "tests": [

@@ -85,6 +85,8 @@ import { childSessionTrace } from './stores/trace-visible.js';
 import { appendTraceEvent } from './stores/trace.js';
 import type { TraceEvent } from './stores/trace.js';
 import { createBuiltinTools } from './tools/builtin-tools.js';
+import { EXTERNAL_AI_TOOL_NAMES, resolveExternalAiSettings } from './tools/external-ai-settings.js';
+import { createExternalAiTools } from './tools/external-ai-tools.js';
 import { createMessageAgentTool } from './tools/message-agent.js';
 import type {
   AgentSpec,
@@ -442,6 +444,7 @@ export class RawAgentRuntime {
 
   private desktopUpdateSuspended = false;
   private pendingSessionAdmissions = 0;
+  private readonly customToolsProvided: boolean;
 
   get activeExecutionCount(): number {
     return this.runningSessions.size + this.backgroundJobAborts.size + this.pendingSessionAdmissions;
@@ -604,6 +607,7 @@ export class RawAgentRuntime {
     bindSandboxSettingsStore(this.store);
     const toolAssembleStarted = Date.now();
     const toolServices = createRuntimeToolServices(this.l5());
+    this.customToolsProvided = Boolean(options.tools);
     const baseTools = attachFileCompensation(
       options.tools ?? createBuiltinTools(toolServices, { includeDormantCapabilities: true })
     );
@@ -713,6 +717,7 @@ export class RawAgentRuntime {
         }
       })
     );
+    this.syncExternalAiTools();
     this.skillCaptures = new SkillCaptureService({
       stateDir: this.stateDir,
       settingsStore: this.store,
@@ -951,6 +956,7 @@ export class RawAgentRuntime {
   }
 
   availableTools() {
+    this.syncExternalAiTools();
     const enabled = runtimeCapabilityCheck(this.store);
     return this.tools.filter(tool => enabled('tools', tool.name));
   }
@@ -2307,8 +2313,28 @@ export class RawAgentRuntime {
     return this.filePolicyCache;
   }
 
+  /** Hot-mount or remove local coding-agent CLI tools from Lab settings / env fallback without restart. */
+  syncExternalAiTools(): void {
+    if (this.customToolsProvided) return;
+    const enabled = resolveExternalAiSettings(this.store, process.env).enabled;
+    const extNames = new Set<string>(EXTERNAL_AI_TOOL_NAMES);
+    if (!enabled) {
+      for (let i = this.tools.length - 1; i >= 0; i -= 1) {
+        if (extNames.has(this.tools[i]!.name)) this.tools.splice(i, 1);
+      }
+      return;
+    }
+    const present = new Set(this.tools.map((t) => t.name));
+    for (const tool of createExternalAiTools({ settingsStore: this.store })) {
+      if (!present.has(tool.name)) {
+        this.tools.push(guardRuntimeCapability(this.store, tool));
+      }
+    }
+  }
+
   /** Put granted plugin tools on the shared catalog. Domain tools stay mounted. */
   syncConnectorTools(): void {
+    this.syncExternalAiTools();
     this.connectorToolNames = mergeGrantedConnectorTools(
       this.tools,
       this.connectors.toolsForGranted(process.env),

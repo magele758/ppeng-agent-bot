@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-24T17:42:07.683Z",
-  "reviewNote": "Reviewed Phase 4 durable ownership tree additions in ownership-tree.ts, spawn-host.ts (parentDurableRunId metadata), l5-bindings.ts (read-only resolveParentRunId), recovery.ts (completing/orphan boot cleanup), and session-control.ts (bottom-up child cancellation). All writer fencing, tool-call pairing, interrupt, restart, and concurrency invariants remain unchanged.",
+  "reviewedAt": "2026-11-24T18:39:07.290Z",
+  "reviewNote": "Merged origin/main (PR #573 bot-coding-agent-tools) with Durable Agent Loop Phases 1-4; recomputed sha256 for merged runtime.ts, turn/kernel.ts, turn/host.ts, and durable files. Pairing, lifecycle, restart, and concurrency invariants remain unchanged.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -517,7 +517,7 @@
     "packages/core/test/bot-goals.test.js": "351e3bf5da30e0ed25038615e0e4fdbb9a39fb234b9f9b8e8481cd7c9b5e1b5b",
     "packages/core/test/bot-goals-budget.test.js": "95f0470da406f57a94c9881c736b1705c0692695549d110d825af6166995ca7d",
     "packages/core/src/runtime/tool-assembly.ts": "8784cde87f20b3a8b607c160dfcd7af8ef955dc2809b9db6215226799fabccba",
-    "packages/core/src/turn/resolve-turn-tools.ts": "17864345bdb3728c6fe844e04c867b9ea0bd95cab76ae6477209eb6c282dfb5e",
+    "packages/core/src/turn/resolve-turn-tools.ts": "7e26369f9760730bb03f2ee6b29b2c1f091809442684c029d4379c9ac806eef9",
     "packages/core/src/tools/tool-search.ts": "9bde547cf078ba8b58b8044f6abb6e4eba238f9ef07e8f4eacc926e8b0126cb2",
     "packages/core/src/tools/deferred-disclosure.ts": "dfeaba53ab769bad9c8b6bbabfe5fb9cf8728b8dad23efef061d34e1c3b591ca",
     "packages/core/test/necessary-tool-injection.test.js": "a25570dc9cb0a0d63fb594f187a634eb0dfe234adb39c798ae11407e1c35341a",
@@ -534,7 +534,7 @@
     "packages/core/src/bots/goals/intake.ts": "13610b1ac83589a0c92ea772e0fd9a9570cd3f9f6137cf6508c2dca0bb6c9d78",
     "packages/core/src/bots/goals/settings.ts": "d356dd1c14289de9c8f79db89558e614025f37897735d841e26e0994429007a0",
     "packages/core/src/bots/goals/completion-evidence.ts": "744fad416149d739f38023cc13f50cd58c83dc084e12589232a919b12ef274c3",
-    "packages/core/src/runtime.ts": "a9ac5c4242175296f93fc0787c61d91d3ce377fda4df51ab90b9b2da494f76e5",
+    "packages/core/src/runtime.ts": "7965e8a9dd320a130ff9546fb226b8c00996b3a80d75b1e7b85221a2fa53ec3b",
     "packages/core/src/runtime/l5-bindings.ts": "1dae8664dd30dbbe18114acb8098a938ef50649d8f0927c54f4fbf8afe494f87",
     "packages/core/src/bots/strict-output.ts": "892f0f7347b6bf134c1f4d66d97e8f9a0677afaff69b5fc812d1ecf117d7aeb2",
     "packages/core/src/runtime/steer-tools.ts": "5fd2b787f41943c947322525b2dd8c0b5f9fb516aa371142e441ae65cf6990bc",
@@ -600,7 +600,7 @@
     "packages/core/src/session/bot-compact-policy.ts": "fb6e56853b505a71b9098c5c9f298794a8f89764efdb015a684299496d45c655",
     "packages/core/src/bots/bot-coaching.ts": "8a47cff8a8dd9db67ec3ee780c1d604dc294c821a55857206d443ae75bad6c4e",
     "packages/core/src/bots/coaching-scope.ts": "56e0bf80040518440fb08863d9aee109070d3e1de50bc2d844f73d43f042b9d8",
-    "packages/core/src/model/prompt-builder.ts": "ed9f2613f24fd324a0e3cbb71c0e97f21556fdc6cd0dfc32595db6df603c069b",
+    "packages/core/src/model/prompt-builder.ts": "62b4bd1860524342ae95ed8998fc210e54653894baa4e07030b5261f5295cb8e",
     "packages/core/src/rooms/debate.ts": "291197d5af302d5b5b752d2f89c8836b26dde9a804faed6e108532c0e762a399",
     "packages/core/src/skills/skill-task-scope.ts": "6cac24762d4038815564b94af1afc2ff7b56a433ccc0fe1b3a8d12d9663fc1b5",
     "packages/agent-loop/src/runtime/abort-lineage.ts": "e77b46a793f5d18aad14e95fec7f38aad9218a40938e81c81dd45c1d31433913",

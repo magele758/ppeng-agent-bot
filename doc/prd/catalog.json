@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 487,
+    "implemented": 488,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -258,6 +258,13 @@
       "requirement": "总结一下经验，生成一个完整的调教文档\n还有这个方法，能内化到我的这个项目里吗？",
       "verificationStage": "software",
       "file": "acceptance/bot-coaching-playbook.yaml"
+    },
+    {
+      "id": "bot-coding-agent-tools",
+      "title": "Bot 识别并善用本机编程助手处理深度编码任务",
+      "requirement": "现在bot会不会调用我电脑里的coding-agent 的工具去解决一些深度的编码的问题？如果目前不能，最好让他能知道并能善用工具，避免bot里处理过于复杂的编码问题",
+      "verificationStage": "software",
+      "file": "acceptance/bot-coding-agent-tools.yaml"
     },
     {
       "id": "bot-completion-reliability",
