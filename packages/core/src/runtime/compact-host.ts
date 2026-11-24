@@ -52,8 +52,34 @@ import {
 } from '../turn/prepare-view.js';
 import { textPart } from './session-facade.js';
 import { boundedSourceSummary, continuationSummaryInstruction, HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
+import {
+  applyPrunedEventsToMessages,
+  attachContextGraphArtifactBlock,
+  ingestAndCompileSessionArtifacts,
+  stripContextGraphArtifactBlock,
+  type ContextGraphCompactionOutcome
+} from '../session/context-graph-client.js';
 
 const log = createLogger('compact-host');
+
+function emitContextGraphTrace(
+  host: CompactHost,
+  sessionId: string,
+  cg: ContextGraphCompactionOutcome | null
+): void {
+  if (cg === null) return;
+  void host.emitTrace(sessionId, {
+    kind: 'cg_compaction' as TraceEvent['kind'],
+    payload: {
+      applied: cg.applied,
+      durationMs: cg.durationMs,
+      prunedCount: cg.prunedCount,
+      charsSaved: cg.charsSaved,
+      blockChars: cg.artifactBlock?.length ?? 0,
+      fallbackReason: cg.fallbackReason
+    }
+  });
+}
 
 /** Short note of the span about to be summarized. Empty when there is no user/assistant text. */
 export function shortCompactConclusion(messages: SessionMessage[], maxChars = 480): string {
@@ -253,12 +279,19 @@ export async function autoCompactSession(
     tokenThreshold,
     force,
     summarize: async (older) => {
+      const cg = await ingestAndCompileSessionArtifacts({
+        sessionId: context.session.id,
+        messages: older,
+        signal: opts?.summarySignal
+      });
+      emitContextGraphTrace(host, context.session.id, cg);
+      const messagesForSummary = cg?.applied ? applyPrunedEventsToMessages(older, cg.prunedEvents) : older;
       const adapter = host.resolveModelAdapter?.(context.session) ?? host.modelAdapter;
       let summary: string;
       try {
         summary = await adapter.summarizeMessages({
           agent: context.agent,
-          messages: [...older, instructionMessage(context.session.id, continuationSummaryInstruction())],
+          messages: [...messagesForSummary, instructionMessage(context.session.id, continuationSummaryInstruction())],
           reason: `compact session ${context.session.id}`
         });
       } catch (e) {
@@ -268,7 +301,11 @@ export async function autoCompactSession(
       // Runs before runAutoCompact appends the replacement, with no await in between.
       persistBotCompactLong(host, context, older, adapter.name === 'heuristic' ? undefined : summary);
       if (!summary.trim()) return summary;
-      return boundedSourceSummary(summary, older, compactSummaryMaxChars(process.env, tokenThreshold)).text;
+      const maxChars = compactSummaryMaxChars(process.env, tokenThreshold);
+      const summaryWithArtifacts = cg?.applied
+        ? attachContextGraphArtifactBlock(summary, cg.artifactBlock, maxChars)
+        : summary;
+      return boundedSourceSummary(summaryWithArtifacts, older, maxChars).text;
     },
     archive: (older) => archiveMessages(host.stateDir, context.session.id, older),
     prepareView: (msgs) => host.prepareMessagesForModel(context.session, msgs),
@@ -366,15 +403,24 @@ async function compactCanonicalBot(
 
   const sourceSnapshot = JSON.stringify(range.older.map(m => [m.id, m.parts]));
   const prior = session.summary?.trim() ?? '';
-  const instruction = botCompactInstruction(tier, prior);
-  const pruned = pruneLargeToolOutputs(botSummaryHistory(range.older, Boolean(prior)));
+  const rawBotHistory = botSummaryHistory(range.older, Boolean(prior));
+  const cg = await ingestAndCompileSessionArtifacts({
+    sessionId: session.id,
+    messages: rawBotHistory,
+    signal: opts?.summarySignal
+  });
+  emitContextGraphTrace(host, session.id, cg);
+  const priorForSummary = cg?.applied ? stripContextGraphArtifactBlock(prior) : prior;
+  const instruction = botCompactInstruction(tier, priorForSummary);
+  const historyForPrune = cg?.applied ? applyPrunedEventsToMessages(rawBotHistory, cg.prunedEvents) : rawBotHistory;
+  const pruned = pruneLargeToolOutputs(historyForPrune);
   const adapter = actualAdapter;
   let summary: string;
   try {
     summary = await summarizeWithinDeadline(host.store, session.id, async (signal) => adapter.completeText
       ? await adapter.completeText({
         system: botCompactInstruction(tier) + '\nSummarize only the supplied history and still-valid previous summary. Do not include these summarization instructions, their output format, or this internal request as a user goal or constraint. Return the summary text only.',
-        user: JSON.stringify({ previousSummary: prior, history: pruned }),
+        user: JSON.stringify({ previousSummary: priorForSummary, history: pruned }),
         jsonMode: false,
         signal
       })
@@ -400,7 +446,11 @@ async function compactCanonicalBot(
   }
 
   const summaryLimit = compactSummaryMaxChars(process.env, thresholds.structuredTokens);
-  const bounded = boundedSourceSummary(trimmed, range.older, Math.max(0, summaryLimit - HISTORICAL_SUMMARY_NOTICE.length));
+  const availableForBody = Math.max(0, summaryLimit - HISTORICAL_SUMMARY_NOTICE.length);
+  const summaryWithArtifacts = cg?.applied
+    ? attachContextGraphArtifactBlock(trimmed, cg.artifactBlock, availableForBody)
+    : trimmed;
+  const bounded = boundedSourceSummary(summaryWithArtifacts, range.older, availableForBody);
   const capped = bounded.summary;
   if (!capped.trim()) {
     void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: 'empty_summary', tier } });
