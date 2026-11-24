@@ -252,7 +252,7 @@ export interface DurableSettingsStore {
 
 export function defaultDurableSettings(): DurableSettings {
   return {
-    mode: 'journal_only',
+    mode: 'atomic_workspace',
     workspaceBackend: 'auto',
     chatRestartPolicy: 'auto_resume',
     waveRollbackPolicy: 'abort_or_tx_only',

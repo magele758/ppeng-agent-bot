@@ -281,6 +281,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/sessions/:id/secure-form', session],
     ['GET /api/sessions/:id/trajectory', session],
     ['GET /api/sessions/:id/durable', session],
+    ['POST /api/sessions/:id/durable/rollback', session],
+    ['POST /api/sessions/:id/durable/fork', session],
     ['POST /api/lab/composer-hint', owner('session', sessionBodyRef('sessionId'))],
     ['POST /api/chat', owner('session', sessionBodyRef('sessionId'))],
     ['POST /api/chat/stream', owner('session', sessionBodyRef('sessionId'))],

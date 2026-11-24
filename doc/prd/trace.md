@@ -2846,6 +2846,12 @@ Durable wait is the default Goal/Routine park path
 
 - `packages/core/test/durable-wait-default.test.js`
 
+### durable-workspace-rollback
+
+Durable WorkspaceTx physical atomic rollback and cognitive-preservation folding
+
+- `packages/core/test/durable-workspace-rollback.test.js`
+
 ### email-webhook-replay
 
 邮件事件不能靠换投递号重放

@@ -275,8 +275,8 @@ test('hot-switching durable_settings.mode=off takes effect immediately with zero
   });
   t.after(() => rt.destroy());
 
-  // Default mode is journal_only, chatRestartPolicy is auto_resume
-  assert.equal(readDurableSettings(rt.store).mode, 'journal_only');
+  // Default mode is atomic_workspace, chatRestartPolicy is auto_resume
+  assert.equal(readDurableSettings(rt.store).mode, 'atomic_workspace');
   assert.equal(readDurableSettings(rt.store).chatRestartPolicy, 'auto_resume');
 
   const sOn = rt.createChatSession({ title: 'durable-on', message: 'hello', background: false });

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 484,
+    "implemented": 485,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1735,6 +1735,13 @@
       "requirement": "waiting_condition / wait_for is the default path for Goal and Routine when suspending\nfor an owned observable. Host parks waiting goal_dispatch results onto durable wait\nwithout requiring the model to call wait_for. Cron/sleep/history-poll are not substitutes.",
       "verificationStage": "software",
       "file": "acceptance/durable-wait-default.yaml"
+    },
+    {
+      "id": "durable-workspace-rollback",
+      "title": "Durable WorkspaceTx physical atomic rollback and cognitive-preservation folding",
+      "requirement": "怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；1、普通工具失败默认不回滚；2、原地 Git Shadow Savepoint + 长任务可选 APFS clonefile/Worktree 隔离副本；Phase 1 到 Phase 4 逐步推进并每步验证无降级",
+      "verificationStage": "software",
+      "file": "acceptance/durable-workspace-rollback.yaml"
     },
     {
       "id": "email-webhook-replay",

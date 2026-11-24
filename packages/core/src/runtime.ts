@@ -79,6 +79,7 @@ import {
   readModelCatalog
 } from './model/provider-catalog.js';
 import { SqliteStateStore } from './storage.js';
+import { CompositeWorkspaceTxManager } from './durable/workspace-tx-manager.js';
 import { readSessionTracePage, type SessionTracePage } from './stores/read-traces.js';
 import { childSessionTrace } from './stores/trace-visible.js';
 import { appendTraceEvent } from './stores/trace.js';
@@ -380,6 +381,7 @@ export class RawAgentRuntime {
   private connectorToolNames = new Set<string>();
   readonly secretVault: SecretVault;
   readonly userVault: UserVault;
+  readonly workspaceTx: CompositeWorkspaceTxManager;
   /** Product-facing kernel event registry. `runSession` always fans out here. */
   readonly hooks: KernelHookRegistry;
 
@@ -471,6 +473,7 @@ export class RawAgentRuntime {
     const sqliteStarted = Date.now();
     try {
       this.store = new SqliteStateStore(join(this.stateDir, 'runtime.sqlite'));
+      this.workspaceTx = new CompositeWorkspaceTxManager(this.stateDir);
       registerDomainCatalog(this.store, options.domainBundles ?? []);
     } finally {
       logStartupPhase(undefined, { phase: 'sqlite_open', scope: 'boot', durationMs: Date.now() - sqliteStarted });
@@ -2317,6 +2320,7 @@ export class RawAgentRuntime {
     return {
       goalRuntimeHost: () => this.goalRuntimeHost(),
       store: this.store,
+      workspaceTx: this.workspaceTx,
       repoRoot: this.repoRoot,
       stateDir: this.stateDir,
       tools: this.tools,

@@ -8,6 +8,7 @@ import {
   NotFoundError,
   ValidationError,
   readDurableSettings,
+  rollbackSessionToStep,
   writeDurableSettings,
   type DurableSettingsPatch,
   type RawAgentRuntime,
@@ -69,5 +70,43 @@ export function durableRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         json(ctx.response, 200, sessionDurablePayload(runtime, sessionId));
       },
     },
+    {
+      method: 'POST',
+      pattern: '/api/sessions/:id/durable/rollback',
+      handler: async (ctx) => {
+        const sessionId = ctx.requireParam('id');
+        if (!runtime.store.getSession(sessionId)) throw new NotFoundError('Session');
+        const body = ((await ctx.readBody()) ?? {}) as { stepId?: string; force?: boolean; reason?: string };
+        const result = await rollbackSessionToStep(runtime.store, runtime.workspaceTx, {
+          sessionId,
+          stepId: typeof body.stepId === 'string' ? body.stepId : undefined,
+          force: body.force === true,
+          reason: typeof body.reason === 'string' ? body.reason : undefined,
+        });
+        json(ctx.response, result.blockedByPivot ? 409 : 200, result);
+      },
+    },
+    {
+      method: 'POST',
+      pattern: '/api/sessions/:id/durable/fork',
+      handler: async (ctx) => {
+        const sessionId = ctx.requireParam('id');
+        if (!runtime.store.getSession(sessionId)) throw new NotFoundError('Session');
+        const body = ((await ctx.readBody()) ?? {}) as { stepId?: string; title?: string };
+        const boundarySeq = resolveForkBoundarySeq(runtime, sessionId, body.stepId);
+        const result = runtime.forkSession(sessionId, {
+          boundarySeq,
+          title: typeof body.title === 'string' ? body.title : undefined,
+        });
+        json(ctx.response, 201, result);
+      },
+    },
   ];
+}
+
+function resolveForkBoundarySeq(runtime: RawAgentRuntime, sessionId: string, stepId: unknown): number | undefined {
+  if (typeof stepId !== 'string' || !stepId) return undefined;
+  const step = runtime.store.durableJournal.getStep(stepId);
+  if (!step || step.sessionId !== sessionId) return undefined;
+  return step.messageSeq;
 }

@@ -36,3 +36,8 @@ Durable wait is the default Goal/Routine park path
 waiting_condition / wait_for is the default path for Goal and Routine when suspending
 for an owned observable. Host parks waiting goal_dispatch results onto durable wait
 without requiring the model to call wait_for. Cron/sleep/history-poll are not substitutes.
+
+## durable-workspace-rollback
+Durable WorkspaceTx physical atomic rollback and cognitive-preservation folding
+
+怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；1、普通工具失败默认不回滚；2、原地 Git Shadow Savepoint + 长任务可选 APFS clonefile/Worktree 隔离副本；Phase 1 到 Phase 4 逐步推进并每步验证无降级

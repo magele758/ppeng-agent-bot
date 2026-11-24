@@ -1477,7 +1477,18 @@ export async function executeToolCalls(
     }
   }
 
+  await notifyDurableWaveSettled(host.durable);
+
   return results;
+}
+
+async function notifyDurableWaveSettled(durable: DurableToolLoopContext | undefined): Promise<void> {
+  if (!durable?.onWaveSettled) return;
+  try {
+    await durable.onWaveSettled();
+  } catch {
+    /* post-wave state capture is best-effort */
+  }
 }
 
 // ============================================================================

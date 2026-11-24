@@ -61,6 +61,7 @@ import {
   pairedToolCallIdsFromMessages,
   processToolResults as processToolResultsA,
   readDurableSettings,
+  resolveToolEffectClass,
   runTurnWithRetries as runTurnWithRetriesA,
   callsNotCoveredBySessionGrant,
   stripAutoReviewFlags,
@@ -139,6 +140,7 @@ export interface ToolLoopDeps {
   settingsStore?: IngestionSettingsStore;
   durableJournal?: DurableJournalPort;
   durableSettingsStore?: DurableSettingsStore;
+  workspaceTx?: import('../durable/workspace-tx-manager.js').CompositeWorkspaceTxManager;
   onArtifactCreated?: (manifest: PagedArtifactManifest) => void;
   /** Arm the unattended-wake deny timer when a deadline was stored. */
   armUnattendedApproval?: (approval: ApprovalRecord) => void;
@@ -657,6 +659,53 @@ function hasDeferredWaveMedia(result: { images?: unknown[]; media?: unknown[]; m
   return Array.isArray(a2ui) && a2ui.length > 0;
 }
 
+function buildLazySavepointHooks(
+  deps: ToolLoopDeps,
+  context: RunContext,
+  sessionId: string,
+  settings: ReturnType<typeof readDurableSettings>
+): Pick<DurableToolLoopContext, 'ensureWaveSavepoint' | 'onWaveSettled'> {
+  const tx = deps.workspaceTx;
+  const journal = deps.durableJournal;
+  const runId = context.durableRunId;
+  if (settings.mode !== 'atomic_workspace' || !tx || !journal || !runId) return {};
+  let waveScopeId: string | undefined;
+  let waveSavepointId: string | undefined;
+  let pending: Promise<string | undefined> | undefined;
+  const ensureScopeId = async (): Promise<string> => {
+    const existing = journal.getRun(runId)?.txScopeId;
+    if (existing && tx.loadScope(existing)) return existing;
+    const workspaceRoot = context.workspaceRoot ?? context.repoRoot;
+    const handle = await tx.beginScope({
+      sessionId,
+      runId,
+      workspaceRoot,
+      mode: 'in_place',
+      backend: settings.workspaceBackend,
+      savepointTimeoutMs: settings.savepointTimeoutMs,
+    });
+    journal.updateRun(runId, { txScopeId: handle.scopeId });
+    return handle.scopeId;
+  };
+  return {
+    ensureWaveSavepoint: async (tool) => {
+      if (resolveToolEffectClass(tool) !== 'workspace_fs') return undefined;
+      if (waveSavepointId) return waveSavepointId;
+      pending ??= (async () => {
+        waveScopeId = await ensureScopeId();
+        const sp = await tx.savepoint(waveScopeId, `turn-${context.durableTurn ?? 0}`);
+        waveSavepointId = sp.id;
+        return sp.id;
+      })();
+      return pending;
+    },
+    onWaveSettled: async () => {
+      if (!waveScopeId) return;
+      await tx.capturePostState(waveScopeId);
+    },
+  };
+}
+
 function attachCoreDurableHost(
   baseHost: ToolLoopHost,
   deps: ToolLoopDeps,
@@ -666,6 +715,7 @@ function attachCoreDurableHost(
   if (!deps.durableJournal || !context.durableRunId) return baseHost;
   const settings = readDurableSettings(deps.durableSettingsStore);
   if (settings.mode === 'off') return baseHost;
+  const savepointHooks = buildLazySavepointHooks(deps, context, sessionId, settings);
   const durable: DurableToolLoopContext = {
     journal: deps.durableJournal,
     runId: context.durableRunId,
@@ -683,6 +733,7 @@ function attachCoreDurableHost(
       const last = folded.at(-1) as { seq?: number } | undefined;
       return typeof last?.seq === 'number' ? last.seq : undefined;
     },
+    ...savepointHooks,
   };
   return {
     ...baseHost,

@@ -520,7 +520,7 @@ describe('Phase 1 Durable Control Plane', () => {
         kv.set(k, v);
       },
     };
-    expect(readDurableSettings(kvStore).mode).toBe('journal_only');
+    expect(readDurableSettings(kvStore).mode).toBe('atomic_workspace');
     writeDurableSettings(kvStore, { mode: 'off', restartLimit: 7 });
     expect(readDurableSettings(kvStore).mode).toBe('off');
     expect(readDurableSettings(kvStore).restartLimit).toBe(7);

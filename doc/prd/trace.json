@@ -3230,6 +3230,13 @@
       ]
     },
     {
+      "id": "durable-workspace-rollback",
+      "title": "Durable WorkspaceTx physical atomic rollback and cognitive-preservation folding",
+      "tests": [
+        "packages/core/test/durable-workspace-rollback.test.js"
+      ]
+    },
+    {
       "id": "email-webhook-replay",
       "title": "邮件事件不能靠换投递号重放",
       "tests": [

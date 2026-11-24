@@ -48,6 +48,8 @@ export interface DurableToolLoopContext {
   ) => number | undefined;
   /** Lazy savepoint hook invoked before first mutating tool in the wave (Phase 2). */
   ensureWaveSavepoint?: (tool: ToolContract<Record<string, unknown>>, call: ToolCallPart) => Promise<string | undefined>;
+  /** Optional post-wave hook to record post-mutation workspace state for CAS conflict detection. */
+  onWaveSettled?: () => Promise<void> | void;
 }
 
 export type PreDispatchDecision =

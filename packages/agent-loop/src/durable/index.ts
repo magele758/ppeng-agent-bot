@@ -8,3 +8,4 @@ export * from './step-helpers.js';
 export * from './memory-journal.js';
 export * from './tool-runner-hooks.js';
 export * from './kernel-bridge.js';
+export * from './workspace-tx.js';

@@ -171,6 +171,7 @@ import type { SchedulerTickHost } from './scheduler-host.js';
 export interface L5Bindable {
   goalRuntimeHost?(): GoalRuntimeHost;
   store: SqliteStateStore;
+  workspaceTx?: import('../durable/workspace-tx-manager.js').CompositeWorkspaceTxManager;
   repoRoot: string;
   stateDir: string;
   tools: ToolContract<any>[];
@@ -446,6 +447,7 @@ export function toolLoopDepsFrom(rt: L5Bindable): ToolLoopDeps {
     settingsStore: rt.store,
     durableJournal: rt.store.durableJournal,
     durableSettingsStore: rt.store,
+    workspaceTx: rt.workspaceTx,
     armUnattendedApproval: (approval) => {
       armUnattendedApprovalExpiry(approval, () => {
         expireDueUnattendedApprovals(rt.store);
