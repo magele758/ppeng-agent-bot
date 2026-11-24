@@ -33,6 +33,7 @@ export type GraceOutcome =
  */
 export class AdvisoryGrace {
   private remaining: number;
+  private used = 0;
 
   constructor(budget: number) {
     this.remaining = Math.max(0, budget);
@@ -40,6 +41,17 @@ export class AdvisoryGrace {
 
   get remainingBudget(): number {
     return this.remaining;
+  }
+
+  get usedCount(): number {
+    return this.used;
+  }
+
+  restoreUsedCount(used: number): void {
+    const safeUsed = Math.max(0, Math.floor(used));
+    const delta = Math.max(0, safeUsed - this.used);
+    this.used = safeUsed;
+    this.remaining = Math.max(0, this.remaining - delta);
   }
 
   /**
@@ -52,6 +64,7 @@ export class AdvisoryGrace {
     if (!decision.abort) return { action: 'continue' };
     if (this.remaining > 0) {
       this.remaining -= 1;
+      this.used += 1;
       return {
         action: 'advise',
         reason: decision.reason,

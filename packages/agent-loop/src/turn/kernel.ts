@@ -60,6 +60,14 @@ import { resolveHistoryTokenBudget } from '../session/session-budget.js';
 import { estimateUsageCostUsd, mergeCostUsd } from '../model/token-cost.js';
 import { mergeUsage, splitCumulativePromptTokens } from '../model/usage.js';
 import {
+  findOpenDurableToolCalls,
+  firstParkedToolResult,
+  restoreDurableKernelGuards,
+  snapshotDurableKernelState,
+  startOrResumeDurableRun,
+  type DurableRunSession,
+} from '../durable/kernel-bridge.js';
+import {
   resolveLoopConfig,
   resolveTurnCap,
   type LoopConfig,
@@ -162,6 +170,50 @@ async function executePatternBOrdinaryWave(
     ok: false,
     content: 'missing tool result',
   });
+}
+
+async function maybeResumeDurableOpenWave(input: {
+  host: TurnKernelHost;
+  sid: string;
+  turn: number;
+  context: RunContext;
+  pickTurnTools: (
+    sess: SessionRecord,
+    messages: SessionMessage[],
+    systemPromptChars: number,
+    emptyTools: boolean
+  ) => Promise<{ allowExternalAiTools: boolean; resolvedTools: TurnKernelHost['tools'] }>;
+  emitStep: (ev: AgentStepEvent) => Promise<void>;
+  onModelStreamChunk?: (chunk: ModelStreamChunk) => void;
+  checkpointDurable: (turn: number) => void;
+}): Promise<boolean> {
+  const folded = input.host.store.foldMessages(input.sid);
+  const openCalls = findOpenDurableToolCalls(folded);
+  if (openCalls.length === 0) return false;
+  const picked = await input.pickTurnTools(input.context.session, folded, 0, false);
+  const results = await executeGatedToolWave(
+    input.host,
+    input.context.session,
+    openCalls,
+    input.context,
+    picked.allowExternalAiTools,
+    input.sid,
+    picked.resolvedTools
+  );
+  input.host.processToolResults(
+    resultsToPersist(results),
+    openCalls,
+    input.context.session,
+    undefined,
+    input.sid,
+    input.onModelStreamChunk
+  );
+  await input.emitStep({
+    type: 'tools_done',
+    results: results.map((r) => ({ ok: r.ok, content: r.content, name: r.name })),
+  });
+  input.checkpointDurable(input.turn);
+  return true;
 }
 
 async function executeGatedToolWave(
@@ -565,6 +617,9 @@ async function runSessionKernel(
   } catch {
     /* fail-soft */
   }
+  const durableSession: DurableRunSession | undefined = host.durable
+    ? startOrResumeDurableRun({ config: host.durable, sessionId: sid, writerRunId })
+    : undefined;
 
   const persistOutcome = (
     record: SessionRecord,
@@ -621,6 +676,7 @@ async function runSessionKernel(
     emitKernelReady(startup);
     const rewind = await rewindUncommitted(reason);
     await endRunTx(reason);
+    durableSession?.finish(reason === 'abort' ? 'aborted' : 'failed', reason);
     const current = host.store.getSession(sid) ?? record;
     const { record: next, outcome } = persistOutcome(current, reason, rewind);
     void host.emitTrace(next.id, {
@@ -637,6 +693,7 @@ async function runSessionKernel(
   const finishEnded = async (record: SessionRecord, reason: string, answered?: boolean) => {
     emitKernelReady(startup);
     await endRunTx(reason);
+    durableSession?.finish(reason === 'waiting_park' ? 'waiting_park' : 'completed');
     const { record: next, outcome } = persistOutcome(record, reason, undefined, answered);
     void host.emitTrace(next.id, {
       kind: 'turn_end',
@@ -657,7 +714,7 @@ async function runSessionKernel(
     }
   };
 
-  let stepCursor = 0;
+  let stepCursor = durableSession?.startStepCursor ?? 0;
   const stepInfo = (turn: number, kind: KernelStepInfo['kind']): KernelStepInfo => {
     stepCursor += 1;
     return { turn, step: stepCursor, kind, sessionId: sid };
@@ -732,6 +789,14 @@ async function runSessionKernel(
     : null;
   const recoveryState = createTurnRecoveryState();
   const progressGuard = loopGuard ?? new SessionLoopGuard(env);
+  const durableGuards = { advisoryGrace, advisoryQueue, spinWatchdog, progressGuard };
+  restoreDurableKernelGuards(durableSession, durableGuards, usageBySession, sid);
+  const checkpointDurable = (turn: number) => {
+    durableSession?.checkpoint(
+      snapshotDurableKernelState({ turn, stepCursor, guards: durableGuards, usageBySession, sessionId: sid })
+    );
+  };
+  let durableResumeWaveChecked = !durableSession?.resumed;
 
   const packTurn = async (input: {
     workspaceRoot?: string;
@@ -870,9 +935,13 @@ async function runSessionKernel(
       claimAndApplyInbox(host.store, sid, 'next-run', { expectedWriterRunId: writerRunId });
     });
 
+    if (durableSession?.blockedByRestartLimit) {
+      return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'restart_limit');
+    }
+
     {
 const kernelFinished = await (async () => {
-for (let turn = 0; turn < maxTurns; turn += 1) {
+for (let turn = durableSession?.startTurn ?? 0; turn < maxTurns; turn += 1) {
 let refreshedSession: any;
 let task: any;
 let workspaceRoot: any;
@@ -997,6 +1066,13 @@ context = {
         workspaceRoot: workspaceRoot ?? host.repoRoot,
         workspaceRoots,
         abortSignal: signal,
+        ...(durableSession
+          ? {
+              durableRunId: durableSession.run.runId,
+              durableTurn: turn,
+              durableFencingEpoch: durableSession.run.fencingEpoch,
+            }
+          : {}),
       };
 return undefined;
 }
@@ -1040,6 +1116,20 @@ if (resumeFromInterrupt) {
           metadata: mergeInterruptMetadata(afterResume?.metadata ?? {}, null),
         });
         return kernelTurnSignal('continue');
+      }
+if (!durableResumeWaveChecked) {
+        durableResumeWaveChecked = true;
+        const resumedWave = await maybeResumeDurableOpenWave({
+          host,
+          sid,
+          turn,
+          context,
+          pickTurnTools,
+          emitStep,
+          onModelStreamChunk: options?.onModelStreamChunk,
+          checkpointDurable,
+        });
+        if (resumedWave) return kernelTurnSignal('continue');
       }
 ensureFoldToolCallsPaired({
         foldMessages: () => host.store.foldMessages(sid),
@@ -1988,6 +2078,7 @@ await emitStep({
         assistant: { parts: turnResult.assistantParts },
       });
 await host.stepTx?.commitStep?.(modelStep);
+checkpointDurable(turn);
 options?.onModelStreamChunk?.({ type: 'assistant_saved', messageId: assistantMessage.id });
 if (recovery.action !== 'continue') {
 const __gateSignal = await __gate97();
@@ -2058,6 +2149,7 @@ parkForApproval = async () => {
           ),
         });
         await emitStep({ type: 'waiting_approval', approvalIds, interrupt });
+        durableSession?.finish('waiting_park');
         void host.emitTrace(sid, {
           kind: 'turn_end',
           data: { terminal: true, reason: 'waiting_approval', outcome },
@@ -2131,6 +2223,10 @@ recordExplicitHandoff(host, sid, results);
 if (toolWaveHeldForApproval(results)) {
         return kernelTurnSignal('return', await parkForApproval());
       }
+if (firstParkedToolResult(results)) {
+        checkpointDurable(turn);
+        return kernelTurnSignal('return', await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'waiting_park'));
+      }
 for (const r of results) {
         host.recordToolUse?.({ name: r.name, sessionId: sid, turn, ok: r.ok });
       }
@@ -2139,6 +2235,7 @@ await emitStep({
         results: results.map((r: { ok: boolean; content: string; name: string }) => ({ ok: r.ok, content: r.content, name: r.name })),
       });
 await host.stepTx?.commitStep?.(toolsStep);
+checkpointDurable(turn + 1);
 return undefined;
 }
 async function stopUnassignedGoalCheckpoint() {
@@ -2309,6 +2406,7 @@ if (kernelFinished !== undefined) return kernelFinished as SessionRecord;
       ? 'abort'
       : rollbackReasonOf({ runError: err instanceof Error ? err.message : String(err) }) ?? 'run-error';
     const rewind = await rewindUncommitted(rewindReason);
+    durableSession?.finish(aborted ? 'aborted' : 'failed', aborted ? 'abort' : 'model_error');
     const current = host.store.getSession(sid);
     if (current) {
       persistOutcome(

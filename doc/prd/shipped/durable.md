@@ -1,5 +1,10 @@
 <!-- 本文件由 scripts/prd/build-catalog.mjs 生成，不要手改。改验收规格或技能说明后重新运行该脚本。 -->
 
+## durable-agent-control-plane
+Durable Agent 控制面持久化与断点续跑
+
+1、是；2、是；3、自动续跑；4、可以，我希望你能从phase1 到 phase4逐步推进，每一步都要经过验证没问题、无降级才继续推进，有问题就修复到无问题为止，直到4个phase都完成为止
+
 ## durable-agent-waits
 Agent 持久化条件等待与恢复
 

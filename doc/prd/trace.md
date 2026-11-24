@@ -2810,6 +2810,13 @@ Kernel handoff states must not map to implement delivery success
 - `apps/web-console/lib/discovery-default-on.test.ts`
 - `packages/core/test/discovery-settings.test.js`
 
+### durable-agent-control-plane
+
+Durable Agent 控制面持久化与断点续跑
+
+- `packages/agent-loop/src/durable/durable-control-plane.test.ts`
+- `packages/core/test/durable-control-plane.test.js`
+
 ### durable-agent-waits
 
 Agent 持久化条件等待与恢复

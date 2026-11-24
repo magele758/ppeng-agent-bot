@@ -227,6 +227,18 @@ export class SessionLoopGuard {
     return this.sameCallStreak;
   }
 
+  get totalFailureCount(): number {
+    let total = 0;
+    for (const entry of this.toolFailStreak.values()) total += entry.streak;
+    return total;
+  }
+
+  restoreCounters(input: { sameToolStreak?: number }): void {
+    if (typeof input.sameToolStreak === 'number' && Number.isFinite(input.sameToolStreak)) {
+      this.sameCallStreak = Math.max(0, Math.floor(input.sameToolStreak));
+    }
+  }
+
   get sameToolThreshold(): number {
     return this.sameToolStreakMax;
   }

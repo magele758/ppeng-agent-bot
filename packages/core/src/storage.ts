@@ -24,6 +24,7 @@ import { CloudFolderStore } from './workspace/cloud-store.js';
 import { TeamPlanStore } from './teams/store.js';
 import { CapabilityStore } from './discovery/store.js';
 import { SidechatStore } from './sidechat/store.js';
+import { SqliteDurableJournal } from '@ppeng/agent-loop/full';
 import { TaskStore } from './stores/task-store.js';
 import type { CreateTaskInput } from './stores/task-store.js';
 import { SelfHealStore } from './stores/self-heal-store.js';
@@ -90,6 +91,7 @@ export class SqliteStateStore {
   readonly dbPath: string;
   readonly db: DatabaseSync;
   readonly sidechats: SidechatStore;
+  readonly durableJournal: SqliteDurableJournal;
   /**
    * Monotonic version counter bumped on every state-mutating call. Used by
    * the daemon to emit `ETag: W/"<version>"` on list endpoints so the
@@ -144,6 +146,7 @@ export class SqliteStateStore {
     this.contextSnapshots = new ContextSnapshotStore(this.db);
     try {
       this.initialize();
+      this.durableJournal = new SqliteDurableJournal(this.db);
     } catch (error) {
       this.db.close();
       throw error;

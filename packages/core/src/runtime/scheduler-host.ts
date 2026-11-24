@@ -11,6 +11,7 @@ import type { Logger } from '../logger.js';
 import type { AutonomousScheduler } from '../services/autonomous-scheduler.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { SessionRecord } from '../types.js';
+import { tickDurableRecovery } from '../durable/recovery.js';
 import { textPart } from './session-facade.js';
 
 export interface SchedulerTickHost {
@@ -138,6 +139,7 @@ export async function runScheduler(host: SchedulerTickHost): Promise<void> {
   }
   await runSchedulerStep(host, 'orchestration', () => host.orchestrationEngine.tick());
   await runSchedulerStep(host, 'cron', () => tickCronJobs(host));
+  await runSchedulerStep(host, 'durable-recovery', () => tickDurableRecovery(host));
   await runSchedulerStep(host, 'autonomous', () => host.autonomousScheduler.tick());
   await selfHeal;
 }

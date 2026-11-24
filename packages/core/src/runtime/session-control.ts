@@ -6,6 +6,7 @@ import type { McpManager } from '../mcp/mcp-manager.js';
 import { parseRunInterrupt, mergeInterruptMetadata } from '../session/interrupt.js';
 import { mergeOutcomeMetadata, runOutcomeFromEnd } from '../session/run-outcome.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
+import { cancelDurableRunsForSession } from '../durable/recovery.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { TraceEvent } from '../stores/trace.js';
 import type { SessionRecord } from '../types.js';
@@ -41,6 +42,7 @@ export function cancelSession(host: SessionControlHost, sessionId: string, expec
       || [...host.backgroundJobAborts].some(([id, ac]) => !ac.signal.aborted && host.store.getBackgroundJob(id)?.sessionId === sessionId);
     if (!active) return;
     host.store.assertCurrentWriter(sessionId);
+    cancelDurableRunsForSession(host.store, sessionId);
     closeOpenToolWave(host.store, sessionId, 'interrupted', { expectedWriterRunId: session.activeWriterRunId });
     for (const approval of host.store.listApprovals({ status: 'pending' })) {
       if (approval.sessionId === sessionId) host.store.updateApproval(approval.id, 'rejected');

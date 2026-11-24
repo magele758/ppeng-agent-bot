@@ -264,6 +264,7 @@ export interface TurnKernelHost {
     }): void | Promise<void>;
     rollbackUncommitted?(reason: string): void | Promise<void>;
   };
+  durable?: import('@ppeng/agent-loop').DurableKernelConfig;
   latestClosedCheckpoint?(sessionId: string): { seq: number } | undefined;
   applyAutoFork?(input: {
     session: SessionRecord;

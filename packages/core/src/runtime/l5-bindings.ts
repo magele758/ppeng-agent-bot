@@ -82,6 +82,7 @@ import { tryGoalStore } from '../goal/goal-store.js';
 import {
   createKernelHookRegistry,
   createStreamResetTracker,
+  readDurableSettings,
   recoveryPolicyEnabled,
   reasoningSpinWatchdogEnabled,
   registerKernelHooks
@@ -443,6 +444,8 @@ export function toolLoopDepsFrom(rt: L5Bindable): ToolLoopDeps {
       return r.systemMessage ? { systemMessage: r.systemMessage } : undefined;
     },
     settingsStore: rt.store,
+    durableJournal: rt.store.durableJournal,
+    durableSettingsStore: rt.store,
     armUnattendedApproval: (approval) => {
       armUnattendedApprovalExpiry(approval, () => {
         expireDueUnattendedApprovals(rt.store);
@@ -972,6 +975,16 @@ function resolveL5TurnModel(rt: L5Bindable, session: SessionRecord | undefined):
   return resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter);
 }
 
+function buildDurableKernelConfig(rt: L5Bindable): TurnKernelHost['durable'] {
+  const settings = readDurableSettings(rt.store);
+  if (settings.mode === 'off') return undefined;
+  return {
+    journal: rt.store.durableJournal,
+    restartLimit: settings.restartLimit,
+    waveRollbackPolicy: settings.waveRollbackPolicy,
+  };
+}
+
 export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
   return {
     store: rt.store,
@@ -1321,6 +1334,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       return { applied: true };
     },
     stepTx: createRuntimeStepTx(rt),
+    durable: buildDurableKernelConfig(rt),
     filterValidToolCalls: (toolCalls, allowExternalAiTools, sessionId, turnTools) =>
       toolLoopFilterValid(toolLoopDepsFrom(rt), toolCalls, allowExternalAiTools, sessionId, turnTools),
     checkToolApprovals: async (
@@ -1521,6 +1535,7 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
       );
     },
     stepTx: host.stepTx,
+    durable: host.durable,
     vault: {
       resolveNamed(refs) {
         return getBoundSecretVault()?.resolveNamed(refs as string[]) ?? {};

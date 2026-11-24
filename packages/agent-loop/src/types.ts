@@ -264,6 +264,16 @@ export interface RunContext {
   task?: TaskRecord;
   /** When aborted, long-running tools should stop. */
   abortSignal?: AbortSignal;
+  /** Active durable run id when durable control plane is enabled. */
+  durableRunId?: string;
+  /** Active durable turn index when durable control plane is enabled. */
+  durableTurn?: number;
+  /** Active durable step id for the current tool invocation. */
+  durableStepId?: string;
+  /** Active durable run fencing epoch (incremented on resume). */
+  durableFencingEpoch?: number;
+  /** First-writer-wins durable step memoization for idempotency keys. */
+  memo?: <T>(key: string, compute: () => T | Promise<T>) => Promise<T>;
 }
 
 export interface ToolExecutionResult {
@@ -275,6 +285,8 @@ export interface ToolExecutionResult {
   media?: MediaPart[];
   artifacts?: TaskArtifact[];
   metadata?: Record<string, unknown>;
+  /** Optional durable park directive (suspend without holding a process). */
+  park?: import('./durable/types.js').ToolParkDirective;
 }
 
 export interface ToolContract<Args extends Record<string, unknown> = Record<string, unknown>> {
@@ -299,6 +311,31 @@ export interface ToolContract<Args extends Record<string, unknown> = Record<stri
   compensate?: (context: RunContext, args: Args, snapshot: unknown) => Promise<void>;
   /** Side effect cannot be undone; wave failure records carryover instead. */
   irreversible?: boolean;
+  /** Durable effect classification (runtime-only; never sent in LLM tool schema). */
+  effectClass?: import('./durable/types.js').EffectClass;
+  /** Durable crash-replay safety policy (default 'unsafe'; never sent to LLM). */
+  replay?: import('./durable/types.js').ReplayPolicy;
+  /** Optional semantic idempotency key extractor for durable step ledger. */
+  idempotencyKey?: (args: Args) => string;
+  /** Durable JSON-serializable compensation spec builder (survives process restart). */
+  buildCompensation?: (
+    context: RunContext,
+    args: Args,
+    result: ToolExecutionResult,
+    snapshotRef?: string
+  ) => import('./durable/types.js').CompensationSpec | null;
+  /** Stateless, idempotent compensation executor used by durable rollback runner. */
+  executeCompensation?: (
+    context: RunContext,
+    spec: import('./durable/types.js').CompensationSpec
+  ) => Promise<{ ok: boolean; alreadyUndone?: boolean; error?: string }>;
+  /** Optional reconciliation probe for unknown/crashed dispatched invocations. */
+  reconcile?: (
+    context: RunContext,
+    intent: { idempotencyKey: string; args: Args; startedAt?: string }
+  ) => Promise<import('./durable/types.js').ToolReconcileOutcome>;
+  /** Idempotent cleanup hook called when a parked tool is aborted. */
+  cancel?: (context: RunContext, checkpoint?: Record<string, unknown>) => Promise<void>;
   /**
    * Host-owned plan mutation. Allowed in an active planner or executor
    * occupancy. Not a generic file write, and a read-only host phase still denies it.

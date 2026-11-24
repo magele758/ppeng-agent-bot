@@ -30,3 +30,9 @@ export type { ResolveWorkspacePath } from './session/file-compensation.js';
 export { saveStepCheckpoint, rewindUncommittedTail, isCheckpointStore } from './session/checkpoint.js';
 export { openSqliteEventLog, createSqliteEventLogStore } from './session/event-log-sqlite.js';
 export type { OpenSqliteEventLogInput, SqliteEventLogHandle } from './session/event-log-sqlite.js';
+export {
+  DURABLE_SCHEMA_SQL,
+  ensureDurableSchema,
+  SqliteDurableJournal,
+  openStandaloneSqliteDurableJournal,
+} from './durable/sqlite-journal.js';

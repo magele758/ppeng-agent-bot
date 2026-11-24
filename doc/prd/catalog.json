@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 483,
+    "implemented": 484,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1700,6 +1700,13 @@
       "requirement": "能力发现 / tool_search 的总开关要默认开启。",
       "verificationStage": "software",
       "file": "acceptance/discovery-default-on.yaml"
+    },
+    {
+      "id": "durable-agent-control-plane",
+      "title": "Durable Agent 控制面持久化与断点续跑",
+      "requirement": "1、是；2、是；3、自动续跑；4、可以，我希望你能从phase1 到 phase4逐步推进，每一步都要经过验证没问题、无降级才继续推进，有问题就修复到无问题为止，直到4个phase都完成为止",
+      "verificationStage": "software",
+      "file": "acceptance/durable-agent-control-plane.yaml"
     },
     {
       "id": "durable-agent-waits",
@@ -3597,6 +3604,11 @@
       "name": "outbound-send",
       "description": "Outbound social / IM send workflow. Load before schedule_social_post. Force Draft → Confirm → Send; may remind about style sampling; NEVER send without confirmation.",
       "path": "skills/outbound-send/SKILL.md"
+    },
+    {
+      "name": "password-one",
+      "description": "Blind credential broker workflow via Password One CLI (pw1:// handles). Run authenticated HTTP/CLI calls without ever handling plaintext secrets.",
+      "path": "skills/password-one/SKILL.md"
     },
     {
       "name": "payment",

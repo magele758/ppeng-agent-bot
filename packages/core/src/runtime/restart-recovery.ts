@@ -6,7 +6,7 @@ import { isCanonicalBotChat } from '../session/bot-compact-policy.js';
 import { blockHumanContinuations } from '../session/human-continuation.js';
 import { parseRunInterrupt, mergeInterruptMetadata } from '../session/interrupt.js';
 import { buildRunOutcome, mergeOutcomeMetadata } from '../session/run-outcome.js';
-import { closeOpenToolWave } from '../session/tool-wave-close.js';
+import { closeUnsafeOpenToolCallsOnBoot, recoverDurableRunsOnBoot } from '../durable/recovery.js';
 
 /**
  * A kernel-owned file lock guards recovery, not normal WAL authorization.
@@ -22,6 +22,7 @@ export function acquireRuntimeProcessOwnership(store: SqliteStateStore): { relea
 export function recoverInterruptedSessions(store: SqliteStateStore): void {
   store.db.exec('BEGIN IMMEDIATE');
   try {
+    recoverDurableRunsOnBoot(store);
     for (const session of store.listSessions()) {
       // Delegated children and bot-work rows keep their own recovery.
       // A canonical bot chat always carries botId, so release its dead WAL claim
@@ -44,7 +45,7 @@ export function recoverInterruptedSessions(store: SqliteStateStore): void {
       // the dead process's active WAL claim must not block ordinary approval input.
       if (session.activeWriterRunId) store.releaseWriter(session.id, session.activeWriterRunId);
       if (resumableApproval || session.status !== 'running') continue;
-      closeOpenToolWave(store, session.id, 'interrupted');
+      closeUnsafeOpenToolCallsOnBoot(store, session.id);
       for (const approval of store.listApprovals({ status: 'pending' })) {
         if (approval.sessionId === session.id) store.updateApproval(approval.id, 'rejected');
       }

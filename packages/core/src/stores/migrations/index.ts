@@ -1,4 +1,5 @@
 import { createSidechatSchema, upgradeSidechatLearning } from '../../sidechat/schema.js';
+import { ensureDurableSchema } from '@ppeng/agent-loop/full';
 import { ensureMemorySuppressionSchema } from '../../memory/deletion-suppression.js';
 import { ensureSoftwareInvocationSchema } from '../../connectors/software-execution.js';
 import { ensureBotWorkSchema } from '../../bots/bot-work.js';
@@ -1087,6 +1088,7 @@ export const MIGRATIONS: Migration[] = [
   },
   { version: 39, description: 'source-anchored sidechat threads, turns and search index', up: createSidechatSchema },
   { version: 40, description: 'sidechat grasp and one-line note', up: upgradeSidechatLearning },
+  { version: 41, description: 'durable_runs / durable_steps / durable_memos / durable_signals control plane', up: ensureDurableSchema },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

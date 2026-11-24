@@ -816,3 +816,10 @@ export type {
 } from './trajectory-handoff/adapter.js';
 export { createTrajectoryHandoffAdapter, TrajectoryHandoffAdapterImpl } from './trajectory-handoff/adapter.js';
 export type { CompiledContextPack, RecallSources } from './session/context-compiler.js';
+export * from './durable/index.js';
+export {
+  DURABLE_SCHEMA_SQL,
+  ensureDurableSchema,
+  SqliteDurableJournal,
+  openStandaloneSqliteDurableJournal,
+} from './durable/sqlite-journal.js';

@@ -51,6 +51,7 @@ import { goalRoutes } from './routes/goals.js';
 import { jevRoutes } from './routes/jev.js';
 import { langfuseRoutes } from './routes/langfuse.js';
 import { loopRoutes } from './routes/loop.js';
+import { durableRoutes } from './routes/durable.js';
 import { inputSuggestionRoutes } from './routes/input-suggestion.js';
 import { approvalExplanationRoutes } from './routes/approval-explanation.js';
 import { obsidianRoutes } from './routes/obsidian.js';
@@ -133,6 +134,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(cronRoutes(runtime))
     .addAll(configRoutes(runtime, { ...deps.config, env, repoRoot }))
     .addAll(loopRoutes(runtime))
+    .addAll(durableRoutes(runtime))
     .addAll(inputSuggestionRoutes(runtime))
     .addAll(sessionRecapRoutes(runtime))
     .addAll(obsidianRoutes(runtime))
