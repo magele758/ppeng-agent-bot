@@ -2847,6 +2847,14 @@ Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Re
 - `packages/agent-loop/src/durable/durable-saga-park-reconcile.test.ts`
 - `packages/core/test/durable-saga-park-reconcile.test.js`
 
+### durable-tx-tree-and-ui
+
+Durable ownership tree, orphan abandonment, and Lab settings & time-travel UI
+
+- `apps/web-console/lib/durable.test.ts`
+- `packages/agent-loop/src/durable/durable-ownership-tree.test.ts`
+- `packages/core/test/durable-ownership-tree.test.js`
+
 ### durable-wait-default
 
 Durable wait is the default Goal/Routine park path

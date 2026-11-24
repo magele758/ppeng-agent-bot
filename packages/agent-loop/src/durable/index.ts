@@ -11,3 +11,4 @@ export * from './kernel-bridge.js';
 export * from './workspace-tx.js';
 export * from './saga-runner.js';
 export * from './park-reconcile.js';
+export * from './ownership-tree.js';

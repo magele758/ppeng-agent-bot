@@ -28,13 +28,22 @@ function settingsPayload(runtime: RawAgentRuntime) {
   };
 }
 
+function latestRunArtifacts(runtime: RawAgentRuntime, latestRun: { runId: string } | null) {
+  if (!latestRun) return { steps: [], signals: [], childRuns: [] };
+  const journal = runtime.store.durableJournal;
+  return {
+    steps: journal.listSteps(latestRun.runId),
+    signals: journal.listSignals(latestRun.runId),
+    childRuns: journal.listChildRuns(latestRun.runId),
+  };
+}
+
 function sessionDurablePayload(runtime: RawAgentRuntime, sessionId: string) {
   const session = runtime.store.getSession(sessionId);
   if (!session) throw new NotFoundError('Session');
   const runs = runtime.store.durableJournal.listRunsForSession(sessionId, 20);
   const latestRun = runs[0] ?? null;
-  const steps = latestRun ? runtime.store.durableJournal.listSteps(latestRun.runId) : [];
-  const signals = latestRun ? runtime.store.durableJournal.listSignals(latestRun.runId) : [];
+  const { steps, signals, childRuns } = latestRunArtifacts(runtime, latestRun);
   return {
     sessionId,
     settings: readDurableSettings(runtime.store),
@@ -42,6 +51,7 @@ function sessionDurablePayload(runtime: RawAgentRuntime, sessionId: string) {
     runs,
     steps,
     signals,
+    childRuns,
   };
 }
 

@@ -3231,6 +3231,15 @@
       ]
     },
     {
+      "id": "durable-tx-tree-and-ui",
+      "title": "Durable ownership tree, orphan abandonment, and Lab settings & time-travel UI",
+      "tests": [
+        "apps/web-console/lib/durable.test.ts",
+        "packages/agent-loop/src/durable/durable-ownership-tree.test.ts",
+        "packages/core/test/durable-ownership-tree.test.js"
+      ]
+    },
+    {
       "id": "durable-wait-default",
       "title": "Durable wait is the default Goal/Routine park path",
       "tests": [

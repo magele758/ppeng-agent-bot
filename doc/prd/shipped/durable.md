@@ -35,6 +35,11 @@ Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Re
 
 怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；Phase 3 实现持久化声明式 Saga、Pivot 边界守卫、工具级 park()/Signal/memo() 与 unknown 副作用 reconcile() 收敛
 
+## durable-tx-tree-and-ui
+Durable ownership tree, orphan abandonment, and Lab settings & time-travel UI
+
+怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；Phase 4 实现父子 Subagent 所有权树级联取消与重启孤儿收敛，以及 Lab 控制台热配置卡片和会话 Checkpoint 时间旅行与 Reconcile 人工确认面板
+
 ## durable-wait-default
 Durable wait is the default Goal/Routine park path
 

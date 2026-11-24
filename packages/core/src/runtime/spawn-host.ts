@@ -226,6 +226,12 @@ function unfinishedSubagentOutcome(
   return undefined;
 }
 
+function attachDurableParentMeta(childMeta: Record<string, unknown>, context: RunContext): void {
+  if (!context.durableRunId) return;
+  childMeta.parentDurableRunId = context.durableRunId;
+  childMeta.durableAbandonOnRestart = true;
+}
+
 export async function spawnSubagentOutcome(
   host: SpawnHost,
   context: RunContext,
@@ -267,6 +273,7 @@ export async function spawnSubagentOutcome(
   Object.assign(childMeta, inheritForkRetrievalMetadata(liveParent.metadata));
   Object.assign(childMeta, inheritBotIdentityMetadata(liveParent, host.store));
   Object.assign(childMeta, inheritedExecutionMetadata(liveParent.metadata, liveParent.id));
+  attachDurableParentMeta(childMeta, context);
 
   const subagent = host.store.createSession({
     title: `Subagent: ${role ?? parentAgent.role}`,

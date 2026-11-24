@@ -60,7 +60,9 @@ export {
   recoverDurableRunsOnBoot,
   closeUnsafeOpenToolCallsOnBoot,
   cancelDurableRunsForSession,
+  cancelDurableTreeForSession,
   tickDurableRecovery,
+  type CancelDurableTreeResult,
   type DurableSchedulerHost,
 } from './recovery.js';
 
@@ -106,10 +108,14 @@ export {
   wakeReadyParkedRun,
   cancelParkedStepsForRun,
   reconcileUnknownStepsForRun,
+  cancelDurableOwnershipTree,
+  abandonOrphanChildRunsOnBoot,
   type CompensationExecOutcome,
   type CompensationExecutor,
   type DurableSagaRollbackInput,
   type DurableSagaRollbackResult,
   type ParkWakeMatch,
   type ReconcileStepsOutcome,
+  type CancelDurableOwnershipTreeInput,
+  type CancelOwnershipTreeResult,
 } from '@ppeng/agent-loop';

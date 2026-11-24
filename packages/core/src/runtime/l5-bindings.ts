@@ -980,6 +980,11 @@ function resolveL5TurnModel(rt: L5Bindable, session: SessionRecord | undefined):
   return resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter);
 }
 
+function readParentDurableRunId(store: SqliteStateStore, sessionId: string): string | undefined {
+  const raw = store.getSession(sessionId)?.metadata?.parentDurableRunId;
+  return typeof raw === 'string' && raw.length > 0 ? raw : undefined;
+}
+
 function buildDurableKernelConfig(rt: L5Bindable): TurnKernelHost['durable'] {
   const settings = readDurableSettings(rt.store);
   if (settings.mode === 'off') return undefined;
@@ -987,6 +992,7 @@ function buildDurableKernelConfig(rt: L5Bindable): TurnKernelHost['durable'] {
     journal: rt.store.durableJournal,
     restartLimit: settings.restartLimit,
     waveRollbackPolicy: settings.waveRollbackPolicy,
+    resolveParentRunId: (sid) => readParentDurableRunId(rt.store, sid),
   };
 }
 

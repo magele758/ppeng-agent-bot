@@ -18,6 +18,7 @@ export interface DurableKernelConfig {
   journal: DurableJournalPort;
   restartLimit: number;
   parentRunId?: string;
+  resolveParentRunId?: (sessionId: string) => string | undefined;
   waveRollbackPolicy?: WaveRollbackPolicy;
 }
 
@@ -133,6 +134,8 @@ export function startOrResumeDurableRun(input: {
     return makeSession(journal, failed, true, true);
   }
 
+  const resolvedParentRunId = parentRunId ?? input.config.resolveParentRunId?.(input.sessionId);
+
   const run = resumable
     ? journal.updateRun(resumable.runId, {
         status: 'running',
@@ -141,7 +144,7 @@ export function startOrResumeDurableRun(input: {
     : journal.beginRun({
         runId: input.writerRunId,
         sessionId: input.sessionId,
-        parentRunId,
+        parentRunId: resolvedParentRunId,
         kernelState: createInitialDurableKernelState(),
       });
 

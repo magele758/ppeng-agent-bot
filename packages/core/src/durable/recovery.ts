@@ -6,6 +6,8 @@
  */
 
 import {
+  abandonOrphanChildRunsOnBoot,
+  cancelDurableOwnershipTree,
   readDurableSettings,
   reconcileUnknownStepsForRun,
   runDurableSagaRollback,
@@ -63,10 +65,30 @@ function nextBootStatus(input: {
   return { status: 'resumable' };
 }
 
+function settleCompletingRunsOnBoot(store: SqliteStateStore): DurableRunRecord[] {
+  const completing = store.durableJournal.listRunsByStatus(['completing']);
+  const settled: DurableRunRecord[] = [];
+  for (const run of completing) {
+    if (store.isSessionWriterLive(run.sessionId)) continue;
+    const res = cancelDurableOwnershipTree({
+      journal: store.durableJournal,
+      rootRunId: run.runId,
+      reason: 'completing_interrupted',
+    });
+    for (const id of res.cancelledRunIds) {
+      const updated = store.durableJournal.getRun(id);
+      if (updated) settled.push(updated);
+    }
+  }
+  return settled;
+}
+
 /**
  * Synchronous boot-time reconciliation of crashed `running` durable runs.
  * Leaves `rolling_back` and `waiting_park` runs untouched so the scheduler
  * finishes interrupted compensations and resumes parked signals cleanly.
+ * Also completes interrupted `completing` cancellations and abandons orphaned
+ * child runs whose parent run is terminal or blocked.
  * Never starts async LLM/tool execution during RawAgentRuntime construction.
  */
 export function recoverDurableRunsOnBoot(store: SqliteStateStore): DurableRunRecord[] {
@@ -91,7 +113,9 @@ export function recoverDurableRunsOnBoot(store: SqliteStateStore): DurableRunRec
       })
     );
   }
-  return settled;
+  const completedCancels = settleCompletingRunsOnBoot(store);
+  const abandonedChildren = abandonOrphanChildRunsOnBoot(store.durableJournal);
+  return [...settled, ...completedCancels, ...abandonedChildren];
 }
 
 const CANCELLABLE_RUN_STATUSES = new Set<DurableRunRecord['status']>([
@@ -99,21 +123,50 @@ const CANCELLABLE_RUN_STATUSES = new Set<DurableRunRecord['status']>([
   'resumable',
   'suspended_interrupted',
   'waiting_park',
+  'completing',
 ]);
 
+export interface CancelDurableTreeResult {
+  count: number;
+  cancelledRunIds: string[];
+  childSessionIds: string[];
+}
+
 /**
- * Mark active/resumable durable runs for a session as aborted so the
- * scheduler will not auto-resume a session the user explicitly stopped.
+ * Cancel active/resumable durable runs for a session and their entire
+ * ownership subtree (bottom-up through `completing`).
  */
-export function cancelDurableRunsForSession(store: SqliteStateStore, sessionId: string): number {
+export function cancelDurableTreeForSession(
+  store: SqliteStateStore,
+  sessionId: string
+): CancelDurableTreeResult {
   const runs = store.durableJournal.listRunsForSession(sessionId, 10);
-  let count = 0;
+  const cancelledRunIds: string[] = [];
+  const childSessionIds: string[] = [];
+  const seenChildSessions = new Set<string>();
   for (const run of runs) {
     if (!CANCELLABLE_RUN_STATUSES.has(run.status)) continue;
-    store.durableJournal.updateRun(run.runId, { status: 'aborted' });
-    count += 1;
+    const tree = cancelDurableOwnershipTree({
+      journal: store.durableJournal,
+      rootRunId: run.runId,
+      reason: 'cancelled',
+    });
+    cancelledRunIds.push(...tree.cancelledRunIds);
+    for (const sid of tree.childSessionIds) {
+      if (seenChildSessions.has(sid)) continue;
+      seenChildSessions.add(sid);
+      childSessionIds.push(sid);
+    }
   }
-  return count;
+  return { count: cancelledRunIds.length, cancelledRunIds, childSessionIds };
+}
+
+/**
+ * Mark active/resumable durable runs for a session (and descendant runs) as
+ * aborted so the scheduler will not auto-resume a stopped tree.
+ */
+export function cancelDurableRunsForSession(store: SqliteStateStore, sessionId: string): number {
+  return cancelDurableTreeForSession(store, sessionId).count;
 }
 
 /**
