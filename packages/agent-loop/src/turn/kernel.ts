@@ -60,11 +60,19 @@ import { resolveHistoryTokenBudget } from '../session/session-budget.js';
 import { estimateUsageCostUsd, mergeCostUsd } from '../model/token-cost.js';
 import { mergeUsage, splitCumulativePromptTokens } from '../model/usage.js';
 import {
+  durableContextPatch,
+  durableInitialResumeChecked,
+  durableInitialStepCursor,
+  durableInitialTurn,
+  durableIsBlockedByRestartLimit,
   findOpenDurableToolCalls,
+  finishDurableEnded,
+  finishDurableFailed,
+  finishDurableOnError,
   firstParkedToolResult,
+  maybeStartDurableSession,
   restoreDurableKernelGuards,
   snapshotDurableKernelState,
-  startOrResumeDurableRun,
   type DurableRunSession,
 } from '../durable/kernel-bridge.js';
 import {
@@ -617,9 +625,11 @@ async function runSessionKernel(
   } catch {
     /* fail-soft */
   }
-  const durableSession: DurableRunSession | undefined = host.durable
-    ? startOrResumeDurableRun({ config: host.durable, sessionId: sid, writerRunId })
-    : undefined;
+  const durableSession: DurableRunSession | undefined = maybeStartDurableSession(
+    host.durable,
+    sid,
+    writerRunId
+  );
 
   const persistOutcome = (
     record: SessionRecord,
@@ -676,7 +686,7 @@ async function runSessionKernel(
     emitKernelReady(startup);
     const rewind = await rewindUncommitted(reason);
     await endRunTx(reason);
-    durableSession?.finish(reason === 'abort' ? 'aborted' : 'failed', reason);
+    finishDurableFailed(durableSession, reason);
     const current = host.store.getSession(sid) ?? record;
     const { record: next, outcome } = persistOutcome(current, reason, rewind);
     void host.emitTrace(next.id, {
@@ -693,7 +703,7 @@ async function runSessionKernel(
   const finishEnded = async (record: SessionRecord, reason: string, answered?: boolean) => {
     emitKernelReady(startup);
     await endRunTx(reason);
-    durableSession?.finish(reason === 'waiting_park' ? 'waiting_park' : 'completed');
+    finishDurableEnded(durableSession, reason);
     const { record: next, outcome } = persistOutcome(record, reason, undefined, answered);
     void host.emitTrace(next.id, {
       kind: 'turn_end',
@@ -714,7 +724,7 @@ async function runSessionKernel(
     }
   };
 
-  let stepCursor = durableSession?.startStepCursor ?? 0;
+  let stepCursor = durableInitialStepCursor(durableSession);
   const stepInfo = (turn: number, kind: KernelStepInfo['kind']): KernelStepInfo => {
     stepCursor += 1;
     return { turn, step: stepCursor, kind, sessionId: sid };
@@ -796,7 +806,7 @@ async function runSessionKernel(
       snapshotDurableKernelState({ turn, stepCursor, guards: durableGuards, usageBySession, sessionId: sid })
     );
   };
-  let durableResumeWaveChecked = !durableSession?.resumed;
+  let durableResumeWaveChecked = durableInitialResumeChecked(durableSession);
 
   const packTurn = async (input: {
     workspaceRoot?: string;
@@ -935,13 +945,13 @@ async function runSessionKernel(
       claimAndApplyInbox(host.store, sid, 'next-run', { expectedWriterRunId: writerRunId });
     });
 
-    if (durableSession?.blockedByRestartLimit) {
+    if (durableIsBlockedByRestartLimit(durableSession)) {
       return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'restart_limit');
     }
 
     {
 const kernelFinished = await (async () => {
-for (let turn = durableSession?.startTurn ?? 0; turn < maxTurns; turn += 1) {
+for (let turn = durableInitialTurn(durableSession); turn < maxTurns; turn += 1) {
 let refreshedSession: any;
 let task: any;
 let workspaceRoot: any;
@@ -1066,13 +1076,7 @@ context = {
         workspaceRoot: workspaceRoot ?? host.repoRoot,
         workspaceRoots,
         abortSignal: signal,
-        ...(durableSession
-          ? {
-              durableRunId: durableSession.run.runId,
-              durableTurn: turn,
-              durableFencingEpoch: durableSession.run.fencingEpoch,
-            }
-          : {}),
+        ...durableContextPatch(durableSession, turn),
       };
 return undefined;
 }
@@ -2406,7 +2410,7 @@ if (kernelFinished !== undefined) return kernelFinished as SessionRecord;
       ? 'abort'
       : rollbackReasonOf({ runError: err instanceof Error ? err.message : String(err) }) ?? 'run-error';
     const rewind = await rewindUncommitted(rewindReason);
-    durableSession?.finish(aborted ? 'aborted' : 'failed', aborted ? 'abort' : 'model_error');
+    finishDurableOnError(durableSession, aborted);
     const current = host.store.getSession(sid);
     if (current) {
       persistOutcome(

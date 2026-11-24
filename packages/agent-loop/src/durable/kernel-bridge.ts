@@ -86,6 +86,58 @@ export function firstParkedToolResult(
   return undefined;
 }
 
+export function maybeStartDurableSession(
+  config: DurableKernelConfig | undefined,
+  sessionId: string,
+  writerRunId: string
+): DurableRunSession | undefined {
+  if (!config) return undefined;
+  return startOrResumeDurableRun({ config, sessionId, writerRunId });
+}
+
+export function durableInitialStepCursor(session: DurableRunSession | undefined): number {
+  return session ? session.startStepCursor : 0;
+}
+
+export function durableInitialTurn(session: DurableRunSession | undefined): number {
+  return session ? session.startTurn : 0;
+}
+
+export function durableInitialResumeChecked(session: DurableRunSession | undefined): boolean {
+  return !(session && session.resumed);
+}
+
+export function durableIsBlockedByRestartLimit(session: DurableRunSession | undefined): boolean {
+  return Boolean(session && session.blockedByRestartLimit);
+}
+
+export function durableContextPatch(
+  session: DurableRunSession | undefined,
+  turn: number
+): Record<string, unknown> {
+  if (!session) return {};
+  return {
+    durableRunId: session.run.runId,
+    durableTurn: turn,
+    durableFencingEpoch: session.run.fencingEpoch,
+  };
+}
+
+export function finishDurableFailed(session: DurableRunSession | undefined, reason: string): void {
+  if (!session) return;
+  session.finish(reason === 'abort' ? 'aborted' : 'failed', reason);
+}
+
+export function finishDurableEnded(session: DurableRunSession | undefined, reason: string): void {
+  if (!session) return;
+  session.finish(reason === 'waiting_park' ? 'waiting_park' : 'completed');
+}
+
+export function finishDurableOnError(session: DurableRunSession | undefined, aborted: boolean): void {
+  if (!session) return;
+  session.finish(aborted ? 'aborted' : 'failed', aborted ? 'abort' : 'model_error');
+}
+
 export function findOpenDurableToolCalls(
   folded: readonly { parts: readonly { type: string; toolCallId?: string; name?: string; input?: Record<string, unknown> }[] }[]
 ): Array<{ toolCallId: string; name: string; input: Record<string, unknown> }> {
