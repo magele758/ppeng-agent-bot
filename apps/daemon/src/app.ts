@@ -15,6 +15,7 @@ import { botFinishRoutes } from './routes/bot-finish.js';
 import { botHistoryRoutes } from './routes/bot-history.js';
 import { computerUseRoutes } from './routes/computer-use.js';
 import { appControlRoutes } from './routes/app-control.js';
+import { externalAiRoutes } from './routes/external-ai.js';
 import { connectorRoutes } from './routes/connectors.js';
 /**
  * Daemon HTTP application: route registry + auth pipeline, without listening
@@ -158,6 +159,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(capabilitiesRoutes(runtime))
     .addAll(computerUseRoutes(runtime))
     .addAll(appControlRoutes(runtime))
+    .addAll(externalAiRoutes(runtime, env))
     .addAll(connectorRoutes(runtime))
     .addAll(modelProviderRoutes(runtime))
     .addAll(modelFallbackRoutes(runtime))

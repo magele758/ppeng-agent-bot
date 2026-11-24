@@ -40,6 +40,28 @@ export const settingsEntries = {
 
   computerUse: {"title": "本机桌面操作（LCU）", "desc": "让 Agent 使用本机桌面应用。需要已安装 LCU 和 ChatGPT，应用授权由你决定。", "keywords": "LCU 桌面 电脑操作 截图 TextEdit", "enabled": "启用本机桌面操作", "hint": "关闭后不再暴露桌面工具。每个对话独立授权，同一桌面按回合排队；浏览器和音频未启用。"},
   appControl: {"title": "macOS 应用控制", "desc": "让 Agent 激活本机应用、向当前应用输入文字，或发送少量按键。仅 macOS。", "keywords": "macOS 应用控制 Apple Events 自动化 按键", "enabled": "启用 macOS 应用控制", "hint": "默认关闭。打开后只能激活应用、输入文字，或发送回车、Tab、Esc、方向键、拷贝和粘贴。每次动作仍需在 Lab 批准。首次使用时 macOS 可能弹出权限询问，这个开关不会预先授权。其它系统会提示不可用。"},
+  externalAi: {
+    title: '本机编程助手',
+    desc: '让 Bot 在面对多文件重构、深度调试或复杂编码任务时，委派给本机已安装的编程助手 CLI（Claude Code / Codex / Cursor Agent），避免在 Bot 对话循环里硬扛复杂改动。',
+    keywords: '本机编程助手 外部编程助手 coding agent claude codex cursor cli 深度编码 重构',
+    detectedTitle: '本机检测到的 CLI',
+    installed: '已安装',
+    notInstalled: '未安装',
+    enabled: '启用本机编程助手工具',
+    enabledHint: '关闭时工具不可见。打开后保存立即生效，无需重启；普通非 Bot 会话仍默认隔离，每次调用在自动/询问模式下仍需人工批准。',
+    allowInBotChats: '允许 Bot 聊天自动使用',
+    allowInBotChatsHint: '开启后，Bot 会知晓本机已安装的编程助手并优先把复杂编码任务委派给它们（仍遵守 Bot 工具白名单与人工审批）。',
+    preferredTool: '优先使用的编程助手',
+    preferredToolHint: '本机装有多个编程助手时，引导 Bot 优先选用的工具。',
+    preferredAuto: '自动选择（由 Bot 按任务决定）',
+    preferredClaude: 'Claude Code (claude_code)',
+    preferredCodex: 'Codex CLI (codex_exec)',
+    preferredCursor: 'Cursor Agent CLI (cursor_agent)',
+    cursorModel: 'Cursor Agent 模型覆盖',
+    cursorModelHint: '留空使用环境变量或默认值 composer-2-fast；不能包含空格。',
+    cursorModelPlaceholder: 'composer-2-fast',
+    cursorModelInvalid: '模型名不能包含空格且不超过 128 字符'
+  },
   common: {
     saved: '已保存，立即生效',
     save: '保存',

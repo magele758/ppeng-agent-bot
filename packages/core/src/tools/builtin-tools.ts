@@ -1964,7 +1964,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
   if (options.includeDormantCapabilities || a2uiToolsEnabled()) tools.push(a2uiRenderTool, a2uiDeleteSurfaceTool);
 
   if (externalAiToolsEnabled()) {
-    tools.push(...createExternalAiTools());
+    tools.push(...createExternalAiTools({ settingsStore: services.stateStore }));
   }
 
   return stampBuiltinAccess(tools);

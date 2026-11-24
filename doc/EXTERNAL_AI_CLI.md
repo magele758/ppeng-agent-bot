@@ -4,22 +4,26 @@
 
 **安全风险**：这些工具会读写仓库并可能执行终端命令。仅在信任的目录中使用；勿在脚本里塞 API 密钥。
 
-## Agent 内自主调用（推荐跑 daemon / 任务时用）
+## Agent / Bot 内自主调用（推荐通过 Lab 设置开启）
 
-在 `.env` 中设置 **`RAW_AGENT_EXTERNAL_AI_TOOLS=1`**（或 `true`）并**重启 daemon** 后，模型工具列表会多出：
+在 Lab **设置 → 工具 → 本机编程助手** 中打开总开关（`GET/PATCH /api/external-ai/settings`，持久化到 `daemon_control`，保存后下一轮立即生效，**无需改 `.env` 或重启 daemon**）；若从未在界面保存过，则回退读取既有环境变量 **`RAW_AGENT_EXTERNAL_AI_TOOLS=1`**。界面同时展示本机 PATH 上检测到的 CLI（绝不因检测到 CLI 而自动开启）。
+
+开启后提供三个工具：
 
 | 工具名 | 行为 |
 |--------|------|
-| `claude_code` | `claude -p <prompt>`，工作区 cwd |
-| `codex_exec` | `codex exec --sandbox workspace-write`（可选参数 `full_auto`） |
-| `cursor_agent` | `agent --print --model <id> <prompt>`（默认模型 `composer-2-fast`；可用 `RAW_AGENT_CURSOR_AGENT_MODEL` / `EVOLUTION_CURSOR_AGENT_MODEL` 覆盖） |
+| `claude_code` | `claude -p <prompt>`，默认工作区 cwd（支持可选 `cwd` 指定授权工作区子目录） |
+| `codex_exec` | `codex exec --sandbox workspace-write`（可选 `full_auto`、`cwd`） |
+| `cursor_agent` | `agent`（若 PATH 无 `agent` 则回退 `cursor-agent`）`--print --model <id> <prompt>`（模型优先取 Lab 设置，其次 `RAW_AGENT_CURSOR_AGENT_MODEL` / `EVOLUTION_CURSOR_AGENT_MODEL`，默认 `composer-2-fast`；支持可选 `cwd`） |
 
-- 使用 **`spawn` 传 argv`**，不经过 shell，避免提示词注入。
-- 默认 **`needsApproval: true`**，每次调用需在 Web 控制台 / 审批流里通过（与高风险 `bash` 类似）。
-- 默认超时 **600s**；可在工具参数里传 `timeout_ms`。
-- 仍需本机 **PATH** 已安装并登录对应 CLI；未安装会返回非 0 / 错误信息。
-
-无需再让用户敲 `pnpm run ai:*`；由 Agent 在工具回合里自行决定是否调用（系统提示里已简要说明 Main Agent 的用法）。
+- **Bot 深度编码委派**：开启总开关且保留「允许 Bot 聊天自动使用」（默认开启）时，Bot 主对话在渐进加载模式下首轮即可直接看到本机**已安装**的编程助手工具，并在系统提示中获知本机可用 CLI、偏好工具及委派原则——多文件重构、深度调试、复杂编码与修构建/单测优先交给本机编程助手，简单小改动仍由内置工具直接完成。普通非 Bot 聊天会话仍保持默认隔离（需显式 `session.metadata.allowExternalAiTools: true`）。
+- **边界与审批不放松**：
+  - 使用 **`spawn` 传 argv**，不经过 shell，避免提示词注入；输出做长度截断与敏感值脱敏。
+  - 可选 `cwd` 必须位于当前会话授权工作区目录内，越界路径直接拒绝。
+  - 严格遵守 Bot 工具白名单与关闭开关。
+  - 默认 **`needsApproval: true`**，自动/询问模式下每次调用仍需人工审批。
+  - 默认超时 **600s**；可在工具参数里传 `timeout_ms`。
+  - 仍需本机 **PATH** 已安装并登录对应 CLI；未安装时返回错误并列出本机检测到的其它可用 CLI。
 
 ## 检查本机是否已安装
 

@@ -1886,6 +1886,14 @@ Bloub 动态头像风格
 
 - `apps/web-console/components/BotChildTaskStreamEntry.test.ts`
 
+### bot-coding-agent-tools
+
+Bot 识别并善用本机编程助手处理深度编码任务
+
+- `apps/daemon/test/external-ai-settings.test.ts`
+- `apps/web-console/components/ExternalAiSettingsCard.test.ts`
+- `packages/core/test/bot-coding-agent-tools.test.js`
+
 ### bot-completion-reliability
 
 完成验证可追溯与任务收尾可靠性

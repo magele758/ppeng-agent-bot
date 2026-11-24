@@ -840,6 +840,39 @@ export {
 } from '../tools/browser-settings.js';
 export type { BrowserSettings, BrowserSettingsPatch, BrowserSettingsStore } from '../tools/browser-settings.js';
 export {
+  EXTERNAL_AI_SETTINGS_KEY,
+  EXTERNAL_AI_TOOL_NAMES,
+  defaultExternalAiSettings,
+  hasPersistedExternalAiSettings,
+  isBotOwnedCodingSession,
+  isExternalAiAllowedForSession,
+  normalizeExternalAiSettings,
+  readExternalAiSettings,
+  resolveExternalAiSettings,
+  writeExternalAiSettings
+} from '../tools/external-ai-settings.js';
+export type {
+  ExternalAiSettings,
+  ExternalAiSettingsPatch,
+  ExternalAiSettingsReadStore,
+  ExternalAiSettingsStore,
+  ExternalAiToolName,
+  PreferredExternalAiTool
+} from '../tools/external-ai-settings.js';
+export {
+  LOCAL_CODING_AGENT_SPECS,
+  buildLocalCodingAgentsPromptBlock,
+  createExternalAiTools,
+  detectLocalCodingAgents,
+  installedExternalAiToolNames,
+  resolveCursorAgentModel
+} from '../tools/external-ai-tools.js';
+export type {
+  CreateExternalAiToolsOptions,
+  LocalCodingAgentInfo,
+  LocalCodingAgentSpec
+} from '../tools/external-ai-tools.js';
+export {
   WEB_SEARCH_NOT_CONFIGURED,
   WEB_SETTINGS_KEY,
   assertSearchUrlTemplate,

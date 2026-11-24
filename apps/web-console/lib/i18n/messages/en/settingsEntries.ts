@@ -43,6 +43,28 @@ export const settingsEntries = {
 
   computerUse: {"title": "Local computer use (LCU)", "desc": "Let agents use local desktop apps. Requires LCU and ChatGPT; you decide app access.", "keywords": "LCU desktop computer use screenshot TextEdit", "enabled": "Enable local computer use", "hint": "Disabling hides desktop tools. Conversations have independent approvals; desktop turns are queued. Browser and audio are not enabled."},
   appControl: {"title": "macOS app control", "desc": "Let an agent activate a named Mac app, type into the front app, or send a small set of keys. macOS only.", "keywords": "macOS app control Apple Events Automation keystroke", "enabled": "Enable macOS app control", "hint": "Off by default. The agent can only activate an app, type text, or send return, tab, escape, arrows, copy, and paste. Each action still needs Lab approval. The first use can show the normal macOS permission dialog; this switch does not grant that permission. Other operating systems report that the actions are unavailable."},
+  externalAi: {
+    title: 'Local coding agents',
+    desc: 'Let Bots delegate multi-file refactors, deep debugging, and complex coding tasks to local coding-agent CLIs installed on this machine (Claude Code, Codex, Cursor Agent) instead of grinding inside the Bot loop.',
+    keywords: 'local coding agents external ai claude codex cursor cli deep coding refactor',
+    detectedTitle: 'Detected local CLIs',
+    installed: 'Installed',
+    notInstalled: 'Not installed',
+    enabled: 'Enable local coding-agent tools',
+    enabledHint: 'Off hides all external coding-agent tools. Changes apply on the next turn without restart; ordinary non-bot chats remain isolated and every call still requires approval in auto/ask mode.',
+    allowInBotChats: 'Allow Bots to use for deep coding',
+    allowInBotChatsHint: 'When on, Bots know which local CLIs are installed and prefer delegating complex coding tasks to them (Bot tool allowlists and approval rules still apply).',
+    preferredTool: 'Preferred coding agent',
+    preferredToolHint: 'Guides Bots on which installed coding agent to try first.',
+    preferredAuto: 'Auto (let the Bot choose)',
+    preferredClaude: 'Claude Code (claude_code)',
+    preferredCodex: 'Codex CLI (codex_exec)',
+    preferredCursor: 'Cursor Agent CLI (cursor_agent)',
+    cursorModel: 'Cursor Agent model override',
+    cursorModelHint: 'Leave blank to use env or default composer-2-fast. No spaces.',
+    cursorModelPlaceholder: 'composer-2-fast',
+    cursorModelInvalid: 'Model name must have no spaces and be at most 128 characters'
+  },
   common: {
     saved: 'Saved, takes effect immediately',
     save: 'Save',

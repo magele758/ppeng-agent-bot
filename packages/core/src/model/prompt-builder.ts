@@ -4,6 +4,7 @@ import { defaultSkillCandidates } from '../skills/default-skill-candidates.js';
 import { RUNTIME_CAPABILITIES_KEY, runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import { HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
 import { toolDirectory } from '../tools/tool-exposure.js';
+import { buildLocalCodingAgentsPromptBlock } from '../tools/external-ai-tools.js';
 import {readBotSkillSelection, selectBotSkills} from '../skills/bot-selection.js';
 import { filterSkillsByBot, sessionBotId } from '../skills/bot-scope.js';
 /**
@@ -86,7 +87,7 @@ function timePromptSlice<T>(sessionId: string, phase: string, run: () => T, extr
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v18';
+export const STABLE_SYSTEM_VERSION = 'v19';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):
@@ -531,6 +532,7 @@ export class PromptBuilder {
       ctx.session.mode,
       String(resolveDiscoveryEnabled(this.deps.store, process.env)),
       toolDirectory(this.deps.store),
+      buildLocalCodingAgentsPromptBlock(this.deps.store, process.env, ctx.session),
       agenticSafetyAppendixScope(process.env),
       resolvePromptVariant(this.deps.store)
     ].join('\0');
@@ -588,6 +590,7 @@ export class PromptBuilder {
         ? 'External service discovery is enabled. It is separate from local tool delivery. Capability cards describe external bindings; they are not executable tools by themselves.'
         : '',
       toolDirectory(this.deps.store),
+      buildLocalCodingAgentsPromptBlock(this.deps.store, process.env, ctx.session),
       harnessLines.length > 0 ? harnessLines.join('\n') : '',
     ]
       .filter(Boolean)
@@ -630,6 +633,7 @@ export class PromptBuilder {
     const discoveryLine = resolveDiscoveryEnabled(this.deps.store, process.env)
       ? 'External service discovery is enabled. It is separate from local tool delivery. Capability cards describe external bindings; they are not executable tools by themselves.'
       : '';
+    const codingAgentsBlock = buildLocalCodingAgentsPromptBlock(this.deps.store, process.env, ctx.session);
     const toolDir = toolDirectory(this.deps.store);
 
     const sections: string[] = [
@@ -695,6 +699,9 @@ export class PromptBuilder {
       ].join('\n'),
     ];
 
+    if (codingAgentsBlock) {
+      sections.push(['<local_coding_agents>', codingAgentsBlock, '</local_coding_agents>'].join('\n'));
+    }
     if (discoveryLine) {
       sections.push(['<discovery>', discoveryLine, '</discovery>'].join('\n'));
     }
