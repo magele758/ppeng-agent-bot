@@ -8,8 +8,13 @@
  */
 
 import { createHash } from 'node:crypto';
-import { request as httpRequest, type IncomingMessage, type RequestOptions } from 'node:http';
-import { request as httpsRequest } from 'node:https';
+import {
+  Agent as HttpAgent,
+  request as httpRequest,
+  type IncomingMessage,
+  type RequestOptions
+} from 'node:http';
+import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
 import { currentSecretOverrides, getBoundSecretVault } from '../secrets/secret-vault.js';
 import type { MessagePart, SessionMessage, ToolCallPart, ToolResultPart } from '../types.js';
 
@@ -560,6 +565,26 @@ function exceedsDeclaredContentLength(
   return Number.isFinite(parsedLen) && parsedLen > maxBytes;
 }
 
+let sharedHttpAgent: HttpAgent | undefined;
+let sharedHttpsAgent: HttpsAgent | undefined;
+
+function getKeepAliveAgent(isHttps: boolean): HttpAgent | HttpsAgent {
+  if (isHttps) {
+    sharedHttpsAgent ??= new HttpsAgent({
+      keepAlive: true,
+      keepAliveMsecs: 15_000,
+      maxSockets: 8
+    });
+    return sharedHttpsAgent;
+  }
+  sharedHttpAgent ??= new HttpAgent({
+    keepAlive: true,
+    keepAliveMsecs: 15_000,
+    maxSockets: 8
+  });
+  return sharedHttpAgent;
+}
+
 function buildPostHeaders(bodyLength: number, token?: string): Record<string, string> {
   const headers: Record<string, string> = {
     accept: 'application/json',
@@ -588,11 +613,13 @@ function postJson(
 
   const bodyBuffer = Buffer.from(serialized, 'utf8');
   const targetUrl = new URL(path.replace(/^\/+/, ''), `${config.baseUrl.replace(/\/+$/, '')}/`);
+  const isHttps = targetUrl.protocol === 'https:';
   const reqOptions: RequestOptions = {
     method: 'POST',
+    agent: getKeepAliveAgent(isHttps),
     headers: buildPostHeaders(bodyBuffer.length, config.token)
   };
-  const transport = targetUrl.protocol === 'https:' ? httpsRequest : httpRequest;
+  const transport = isHttps ? httpsRequest : httpRequest;
 
   return new Promise<HttpJsonResult>((resolve) => {
     let settled = false;
@@ -813,7 +840,14 @@ function buildIngestRequestBody(
   if (typeof maxOutputChars === 'number' && Number.isFinite(maxOutputChars) && maxOutputChars > 0) {
     compileOptions.maxOutputChars = Math.floor(maxOutputChars);
   }
-  return { events, prune: true, compile: true, compileOptions };
+  return {
+    events,
+    autoCreate: true,
+    graphName: 'ppeng-session',
+    prune: true,
+    compile: true,
+    compileOptions
+  };
 }
 
 function createGraphFallbackReason(reason: string): string {

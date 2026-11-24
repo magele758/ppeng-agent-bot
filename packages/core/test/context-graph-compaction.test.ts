@@ -1522,3 +1522,58 @@ test('non-2xx HTTP 302 handling on /ingest-artifacts & POST /v1/graphs, plus chu
   assert.ok(rClosed && rClosed.applied === false);
   assert.ok(rClosed.fallbackReason.length > 0);
 });
+
+test('1-RTT autoCreate sends autoCreate + graphName on Round 1 in 1 request and reuses keep-alive TCP socket', async (t) => {
+  const requests: Array<{ url: string; body: Record<string, unknown>; connection: string }> = [];
+  let tcpConnections = 0;
+
+  const server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => chunks.push(c));
+    req.on('end', () => {
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>;
+      requests.push({
+        url: req.url ?? '',
+        body,
+        connection: String(req.headers.connection ?? '')
+      });
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          compiled: { promptText: '- [file] src/v025.ts (v1)' },
+          pruned: { prunedCount: 1, charsSaved: 500, events: [] }
+        })
+      );
+    });
+  });
+  server.on('connection', () => {
+    tcpConnections += 1;
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  t.after(async () => {
+    server.closeAllConnections?.();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  const env = { CONTEXT_GRAPH_URL: `http://127.0.0.1:${port}` };
+  const msgs = makeToolMessages('sess-v025-1rtt');
+  const expectedGraphId = sessionContextGraphId('sess-v025-1rtt');
+
+  // Round 1 completes in 1 single HTTP request with autoCreate: true & graphName: 'ppeng-session'
+  const r1 = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-v025-1rtt', messages: msgs, env });
+  assert.ok(r1 && r1.applied === true);
+  assert.equal(r1.artifactBlock, '- [file] src/v025.ts (v1)');
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0]!.url, `/v1/graphs/${expectedGraphId}/ingest-artifacts`);
+  assert.equal(requests[0]!.body.autoCreate, true);
+  assert.equal(requests[0]!.body.graphName, 'ppeng-session');
+  assert.equal(requests[0]!.connection.toLowerCase(), 'keep-alive');
+
+  // Round 2 reuses the existing keep-alive TCP connection (still 1 TCP connection across 2 requests!)
+  const r2 = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-v025-1rtt', messages: msgs, env });
+  assert.ok(r2 && r2.applied === true);
+  assert.equal(requests.length, 2);
+  assert.equal(tcpConnections, 1, 'expected keep-alive TCP socket reuse across sequential requests');
+});
