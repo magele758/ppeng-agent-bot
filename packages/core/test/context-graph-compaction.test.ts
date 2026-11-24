@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { gunzipSync } from 'node:zlib';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import {
   CONTEXT_GRAPH_ARTIFACT_HEADING,
   DEFAULT_CG_MAX_OUTPUT_CHARS,
   DEFAULT_CONTEXT_GRAPH_TIMEOUT_MS,
+  GZIP_REQUEST_MIN_BYTES,
   MAX_CONTEXT_GRAPH_TIMEOUT_MS,
   MIN_CONTEXT_GRAPH_TIMEOUT_MS,
   MAX_TOOL_EVENTS_PER_BATCH,
@@ -39,6 +41,21 @@ interface RecordedRequest {
   body: Record<string, unknown>;
 }
 
+function decodeMockRequestBody(req: IncomingMessage, rawBuf: Buffer): Record<string, unknown> {
+  if (rawBuf.length === 0) return {};
+  const decoded =
+    String(req.headers['content-encoding'] ?? '').toLowerCase() === 'gzip'
+      ? gunzipSync(rawBuf)
+      : rawBuf;
+  const text = decoded.toString('utf8').trim();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 async function startMockServer(
   handler: (req: IncomingMessage, res: ServerResponse, body: Record<string, unknown>) => void
 ): Promise<{ baseUrl: string; close: () => Promise<void> }> {
@@ -46,15 +63,7 @@ async function startMockServer(
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8').trim();
-      let parsed: Record<string, unknown> = {};
-      if (raw) {
-        try {
-          parsed = JSON.parse(raw) as Record<string, unknown>;
-        } catch {
-          parsed = {};
-        }
-      }
+      const parsed = decodeMockRequestBody(req, Buffer.concat(chunks));
       handler(req, res, parsed);
     });
   });
@@ -1531,7 +1540,7 @@ test('1-RTT autoCreate sends autoCreate + graphName on Round 1 in 1 request and 
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => chunks.push(c));
     req.on('end', () => {
-      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>;
+      const body = decodeMockRequestBody(req, Buffer.concat(chunks));
       requests.push({
         url: req.url ?? '',
         body,
@@ -1576,4 +1585,108 @@ test('1-RTT autoCreate sends autoCreate + graphName on Round 1 in 1 request and 
   assert.ok(r2 && r2.applied === true);
   assert.equal(requests.length, 2);
   assert.equal(tcpConnections, 1, 'expected keep-alive TCP socket reuse across sequential requests');
+});
+
+test('wire efficiency: sends responseMode slim, gzips >=2KB requests, leaves <2KB requests uncompressed, and handles slim responses', async (t) => {
+  const seen: Array<{
+    contentEncoding: string | undefined;
+    wireBytes: number;
+    decodedBytes: number;
+    body: Record<string, unknown>;
+  }> = [];
+
+  const server = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => chunks.push(c));
+    req.on('end', () => {
+      const wireBuf = Buffer.concat(chunks);
+      const enc = req.headers['content-encoding'];
+      const decodedBuf = enc === 'gzip' ? gunzipSync(wireBuf) : wireBuf;
+      const body = JSON.parse(decodedBuf.toString('utf8')) as Record<string, unknown>;
+      seen.push({
+        contentEncoding: typeof enc === 'string' ? enc : undefined,
+        wireBytes: wireBuf.length,
+        decodedBytes: decodedBuf.length,
+        body
+      });
+      // Slim response: only returns the single changed event (omits unchanged events)
+      const events = (body.events ?? []) as Array<{ callId: string }>;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          compiled: { promptText: '- [file] src/slim.ts (v2)' },
+          pruned: {
+            prunedCount: 1,
+            charsSaved: 4096,
+            events: events.length > 0 ? [{ callId: events[0]!.callId, output: '[slim-pruned]' }] : []
+          }
+        })
+      );
+    });
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  t.after(async () => {
+    server.closeAllConnections?.();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  const env = { CONTEXT_GRAPH_URL: `http://127.0.0.1:${port}` };
+
+  // 1) Small request (< 2048 bytes) -> uncompressed plain JSON + responseMode: 'slim'
+  const smallMsgs: SessionMessage[] = [
+    {
+      id: 'sm1',
+      sessionId: 'sess-wire',
+      role: 'tool',
+      seq: 1,
+      parts: [{ type: 'tool_result', toolCallId: 'small_1', name: 'bash', ok: true, content: 'short output' }],
+      createdAt: '2026-11-01T00:00:00.000Z'
+    },
+    {
+      id: 'sm2',
+      sessionId: 'sess-wire',
+      role: 'tool',
+      seq: 2,
+      parts: [{ type: 'tool_result', toolCallId: 'small_2', name: 'bash', ok: true, content: 'untouched output' }],
+      createdAt: '2026-11-01T00:00:01.000Z'
+    }
+  ];
+  const smallRes = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-wire', messages: smallMsgs, env });
+  assert.ok(smallRes && smallRes.applied === true);
+  assert.equal(seen.length, 1);
+  assert.ok(seen[0]!.decodedBytes < GZIP_REQUEST_MIN_BYTES);
+  assert.equal(seen[0]!.contentEncoding, undefined, 'requests < 2KB must stay uncompressed');
+  assert.equal(seen[0]!.body.responseMode, 'slim');
+
+  // Slim response only returned small_1; applying preserves small_2 untouched
+  const appliedSlim = applyPrunedEventsToMessages(smallMsgs, smallRes.prunedEvents);
+  assert.equal((appliedSlim[0]!.parts[0] as { content: string }).content, '[slim-pruned]');
+  assert.equal(appliedSlim[1], smallMsgs[1], 'unchanged message omitted from slim response stays identical');
+
+  // 2) Large compressible request (>= 2048 bytes) -> Content-Encoding: gzip with big wire savings
+  const bigOutput = 'export function handler() { return "repeated-payload-line"; }\n'.repeat(120);
+  const largeMsgs: SessionMessage[] = [
+    {
+      id: 'lg1',
+      sessionId: 'sess-wire',
+      role: 'tool',
+      seq: 1,
+      parts: [{ type: 'tool_result', toolCallId: 'large_1', name: 'read_file', ok: true, content: bigOutput }],
+      createdAt: '2026-11-01T00:00:00.000Z'
+    }
+  ];
+  const largeRes = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-wire', messages: largeMsgs, env });
+  assert.ok(largeRes && largeRes.applied === true);
+  assert.equal(seen.length, 2);
+  assert.ok(seen[1]!.decodedBytes >= GZIP_REQUEST_MIN_BYTES);
+  assert.equal(seen[1]!.contentEncoding, 'gzip', 'compressible requests >= 2KB must use gzip');
+  assert.ok(
+    seen[1]!.wireBytes < seen[1]!.decodedBytes * 0.25,
+    `expected strong gzip reduction (${seen[1]!.wireBytes} vs ${seen[1]!.decodedBytes})`
+  );
+  assert.equal(seen[1]!.body.responseMode, 'slim');
+  const sentEvents = seen[1]!.body.events as Array<{ callId: string; output: string }>;
+  assert.equal(sentEvents[0]!.output, bigOutput);
 });

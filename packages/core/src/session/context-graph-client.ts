@@ -15,6 +15,7 @@ import {
   type RequestOptions
 } from 'node:http';
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
+import { gzipSync } from 'node:zlib';
 import { currentSecretOverrides, getBoundSecretVault } from '../secrets/secret-vault.js';
 import type { MessagePart, SessionMessage, ToolCallPart, ToolResultPart } from '../types.js';
 
@@ -24,6 +25,7 @@ export const MIN_CONTEXT_GRAPH_TIMEOUT_MS = 200;
 export const MAX_CONTEXT_GRAPH_TIMEOUT_MS = 15_000;
 export const MAX_CONTEXT_GRAPH_RESPONSE_BYTES = 2 * 1024 * 1024;
 export const MAX_TOOL_EVENTS_PER_BATCH = 2_000;
+export const GZIP_REQUEST_MIN_BYTES = 2_048;
 export const DEFAULT_CG_MAX_OUTPUT_CHARS = 720;
 export const MIN_CG_BODY_ROOM_CHARS = 320;
 export const MIN_CG_PROSE_RESERVE_CHARS = 120;
@@ -585,12 +587,32 @@ function getKeepAliveAgent(isHttps: boolean): HttpAgent | HttpsAgent {
   return sharedHttpAgent;
 }
 
-function buildPostHeaders(bodyLength: number, token?: string): Record<string, string> {
+function encodeRequestPayload(
+  payload: unknown
+): { body: Buffer; contentEncoding?: 'gzip' } | null {
+  const serialized = safeJsonStringify(payload);
+  if (serialized === undefined) return null;
+  const raw = Buffer.from(serialized, 'utf8');
+  if (raw.length < GZIP_REQUEST_MIN_BYTES) {
+    return { body: raw };
+  }
+  const compressed = gzipSync(raw, { level: 1 });
+  return compressed.length < raw.length
+    ? { body: compressed, contentEncoding: 'gzip' }
+    : { body: raw };
+}
+
+function buildPostHeaders(
+  bodyLength: number,
+  token?: string,
+  contentEncoding?: 'gzip'
+): Record<string, string> {
   const headers: Record<string, string> = {
     accept: 'application/json',
     'content-type': 'application/json; charset=utf-8',
     'content-length': String(bodyLength)
   };
+  if (contentEncoding) headers['content-encoding'] = contentEncoding;
   if (token) headers.authorization = `Bearer ${token}`;
   return headers;
 }
@@ -606,18 +628,18 @@ function postJson(
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     return Promise.resolve({ ok: false, reason: 'timeout' });
   }
-  const serialized = safeJsonStringify(payload);
-  if (serialized === undefined) {
+  const encoded = encodeRequestPayload(payload);
+  if (!encoded) {
     return Promise.resolve({ ok: false, reason: 'serialize_error' });
   }
 
-  const bodyBuffer = Buffer.from(serialized, 'utf8');
+  const bodyBuffer = encoded.body;
   const targetUrl = new URL(path.replace(/^\/+/, ''), `${config.baseUrl.replace(/\/+$/, '')}/`);
   const isHttps = targetUrl.protocol === 'https:';
   const reqOptions: RequestOptions = {
     method: 'POST',
     agent: getKeepAliveAgent(isHttps),
-    headers: buildPostHeaders(bodyBuffer.length, config.token)
+    headers: buildPostHeaders(bodyBuffer.length, config.token, encoded.contentEncoding)
   };
   const transport = isHttps ? httpsRequest : httpRequest;
 
@@ -844,6 +866,7 @@ function buildIngestRequestBody(
     events,
     autoCreate: true,
     graphName: 'ppeng-session',
+    responseMode: 'slim',
     prune: true,
     compile: true,
     compileOptions
