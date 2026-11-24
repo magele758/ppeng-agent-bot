@@ -23,9 +23,13 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  CasFileJournalTx,
   CompositeWorkspaceTxManager,
   RawAgentRuntime,
+  commitIsolatedDelta,
+  removeIsolatedDir,
   rollbackSessionToStep,
+  tryCreateGitWorktree,
 } from '../dist/exports/public.js';
 
 function git(cwd, args) {
@@ -191,6 +195,33 @@ test('Isolated workspace scope (APFS CoW / Git Worktree) isolates mutations unti
   assert.equal(readFileSync(join(repoRoot, 'added.txt'), 'utf8'), 'brand-new\n');
   assert.equal(existsSync(join(repoRoot, 'bin.dat')), false);
   assert.equal(existsSync(scope2.execRoot), false);
+
+  // Scope 3: explicitly test git_worktree backend (whose .git is a regular pointer file)
+  const cas = new CasFileJournalTx(stateDir);
+  const wtBaseline = cas.captureManifest('wt_scope', repoRoot);
+  const wtDir = join(stateDir, 'wt-explicit');
+  const wtOk = await tryCreateGitWorktree(repoRoot, wtDir, cas, wtBaseline);
+  assert.equal(wtOk, true);
+  writeFileSync(join(wtDir, 'wt-file.txt'), 'from-worktree\n', 'utf8');
+  const wtCommit = commitIsolatedDelta({
+    cas,
+    state: {
+      scopeId: 'wt_scope',
+      workspaceRoot: repoRoot,
+      execRoot: wtDir,
+      backend: 'git_worktree',
+      baselineManifestId: wtBaseline.id,
+    },
+  });
+  await removeIsolatedDir({
+    scopeId: 'wt_scope',
+    workspaceRoot: repoRoot,
+    execRoot: wtDir,
+    backend: 'git_worktree',
+    baselineManifestId: wtBaseline.id,
+  });
+  assert.equal(wtCommit.ok, true);
+  assert.equal(readFileSync(join(repoRoot, 'wt-file.txt'), 'utf8'), 'from-worktree\n');
 });
 
 test('CasFileJournalTx handles non-Git directories and timeout fallback with exact binary+mode restoration [AC:durable-workspace-rollback#AC-4]', async (t) => {

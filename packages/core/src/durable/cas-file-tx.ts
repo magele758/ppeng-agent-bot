@@ -95,7 +95,7 @@ export function collectWorkspaceFiles(
   return out.sort();
 }
 
-function shouldSkipDir(name: string, extraSkip?: ReadonlySet<string>): boolean {
+function shouldSkipEntry(name: string, extraSkip?: ReadonlySet<string>): boolean {
   return SKIPPED_DIRS.has(name) || Boolean(extraSkip?.has(name));
 }
 
@@ -113,9 +113,10 @@ function walkDir(
     return;
   }
   for (const entry of entries) {
+    if (shouldSkipEntry(entry.name, extraSkip)) continue;
     const abs = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!shouldSkipDir(entry.name, extraSkip)) walkDir(root, abs, maxFileBytes, extraSkip, out);
+      walkDir(root, abs, maxFileBytes, extraSkip, out);
     } else if (entry.isFile()) {
       if (fileWithinSizeLimit(abs, maxFileBytes)) out.push(toPosixRel(root, abs));
     }
