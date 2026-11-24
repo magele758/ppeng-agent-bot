@@ -25,7 +25,7 @@ import {
   matchCommandHardline,
   type CommandHardlineMatch
 } from '../sandbox/command-hardline.js';
-import { buildRedactionEnv, redactToolContent } from '../sandbox/result-redaction.js';
+import { redactToolContent } from '../sandbox/result-redaction.js';
 import { agentSandboxKindFromEnv } from '../sandbox/create-agent-sandbox.js';
 import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { planDirectIsolationHold, shellIsolationAvailability } from '../sandbox/model-isolation.js';
@@ -399,7 +399,7 @@ function hostFromDeps(deps: ToolLoopDeps): ToolLoopHost {
         settingsStore: deps.settingsStore,
         onCreated: deps.onArtifactCreated
       }),
-    redactSecrets: (content) => redactToolContent(content, buildRedactionEnv(process.env)),
+    redactSecrets: (content) => redactToolContent(content, process.env),
     compensate: (items) => compensateCompletedLifo(items),
     pairedToolCallIds: (sessionId) => pairedToolCallIdsFromMessages(foldMessagesOf(deps.store, sessionId))
   };
