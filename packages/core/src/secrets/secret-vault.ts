@@ -150,6 +150,20 @@ export class SecretVault {
     }
     return stripReservedEnvNames(out);
   }
+
+  /**
+   * Internal snapshot for return-path redaction only.
+   * Never expose plaintext values via public HTTP or tool APIs.
+   */
+  snapshotValues(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [name, entry] of this.memory.entries()) {
+      if (!isReservedEnvName(name) && entry.value) {
+        out[name] = entry.value;
+      }
+    }
+    return out;
+  }
 }
 
 export function parseSecretRefs(metadata: Record<string, unknown> | undefined): string[] {

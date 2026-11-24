@@ -64,3 +64,35 @@ export type {
   SecureFormReceipt,
   SecureFormPort
 } from './secure-form.js';
+export {
+  DEFAULT_PASSWORD_ONE_TIMEOUT_MS,
+  MAX_PASSWORD_ONE_RESPONSE_BYTES,
+  PasswordOneClient,
+  PasswordOneClientError,
+  createPasswordOneClient,
+  resolvePasswordOneConfig,
+  listHandles as passwordOneListHandles,
+  proxyHttp as passwordOneProxyHttp,
+  proxyExec as passwordOneProxyExec,
+  scrubText as passwordOneScrubText,
+  verifyAudit as passwordOneVerifyAudit
+} from './password-one-client.js';
+export type {
+  PasswordOneAllowedToolKind,
+  PasswordOneCrossOriginRedirectMode,
+  PasswordOneSecretPolicy,
+  PasswordOneHandle,
+  PasswordOneHttpAuthBinding,
+  PasswordOneHttpRequest,
+  PasswordOneRedirectHop,
+  PasswordOneHttpResponse,
+  PasswordOneExecRequest,
+  PasswordOneExecResponse,
+  PasswordOneScrubMatch,
+  PasswordOneScrubResult,
+  PasswordOneAuditVerification,
+  PasswordOneAuditEntry,
+  PasswordOneAuditResult,
+  PasswordOneClientOptions,
+  ResolvedPasswordOneConfig
+} from './password-one-client.js';
