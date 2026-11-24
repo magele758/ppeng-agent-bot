@@ -85,12 +85,18 @@ export async function tryCreateGitWorktree(
   }
 }
 
+function fileMatchesBlob(abs: string, size: number, data: Buffer): boolean {
+  if (!existsSync(abs)) return false;
+  if (lstatSync(abs).size !== size) return false;
+  return readFileSync(abs).equals(data);
+}
+
 function overlayBaselineFiles(destDir: string, cas: CasFileJournalTx, baseline: CasManifest): void {
   for (const [rel, entry] of Object.entries(baseline.files)) {
-    const abs = join(destDir, rel);
     const data = cas.readBlob(entry.sha256);
     if (!data) continue;
-    if (existsSync(abs) && lstatSync(abs).size === entry.size && readFileSync(abs).equals(data)) continue;
+    const abs = join(destDir, rel);
+    if (fileMatchesBlob(abs, entry.size, data)) continue;
     atomicWriteFile(abs, data, entry.mode);
   }
 }

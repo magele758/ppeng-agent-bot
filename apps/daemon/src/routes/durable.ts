@@ -62,6 +62,61 @@ function resolveForkBoundarySeq(runtime: RawAgentRuntime, sessionId: string, ste
   return step.messageSeq;
 }
 
+function requireExistingSession(runtime: RawAgentRuntime, sessionId: string): void {
+  if (!runtime.store.getSession(sessionId)) throw new NotFoundError('Session');
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function parseRollbackBody(body: unknown): { stepId?: string; force: boolean; reason?: string } {
+  const rec = (body ?? {}) as Record<string, unknown>;
+  return {
+    stepId: optionalString(rec.stepId),
+    force: rec.force === true,
+    reason: optionalString(rec.reason),
+  };
+}
+
+function resolveSignalRunId(
+  runtime: RawAgentRuntime,
+  sessionId: string,
+  explicit: unknown
+): string | undefined {
+  return optionalString(explicit) ?? runtime.store.durableJournal.getLatestRunForSession(sessionId)?.runId;
+}
+
+function parseSignalBody(
+  runtime: RawAgentRuntime,
+  sessionId: string,
+  body: unknown
+): { runId: string; stepId: string; signalName: string; signalKey: string; payload: unknown } {
+  const rec = (body ?? {}) as Record<string, unknown>;
+  const runId = resolveSignalRunId(runtime, sessionId, rec.runId);
+  const stepId = optionalString(rec.stepId);
+  const signalName = optionalString(rec.signalName);
+  const signalKey = optionalString(rec.signalKey);
+  if (![runId, stepId, signalName, signalKey].every(Boolean)) {
+    throw new ValidationError('runId/latestRun, stepId, signalName, and signalKey are required');
+  }
+  return {
+    runId: runId!,
+    stepId: stepId!,
+    signalName: signalName!,
+    signalKey: signalKey!,
+    payload: rec.payload ?? null,
+  };
+}
+
+function parseResolveBody(body: unknown): { decision: 'committed' | 'not_applied'; note?: string } {
+  const rec = (body ?? {}) as Record<string, unknown>;
+  if (rec.decision !== 'committed' && rec.decision !== 'not_applied') {
+    throw new ValidationError('decision must be committed or not_applied');
+  }
+  return { decision: rec.decision, note: optionalString(rec.note) };
+}
+
 export function durableRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   return [
     {
@@ -97,13 +152,13 @@ export function durableRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/sessions/:id/durable/rollback',
       handler: async (ctx) => {
         const sessionId = ctx.requireParam('id');
-        if (!runtime.store.getSession(sessionId)) throw new NotFoundError('Session');
-        const body = ((await ctx.readBody()) ?? {}) as { stepId?: string; force?: boolean; reason?: string };
+        requireExistingSession(runtime, sessionId);
+        const parsed = parseRollbackBody(await ctx.readBody());
         const result = await rollbackSessionToStep(runtime.store, runtime.workspaceTx, {
           sessionId,
-          stepId: typeof body.stepId === 'string' ? body.stepId : undefined,
-          force: body.force === true,
-          reason: typeof body.reason === 'string' ? body.reason : undefined,
+          stepId: parsed.stepId,
+          force: parsed.force,
+          reason: parsed.reason,
           tools: runtime.tools,
           buildContext: (step) =>
             buildSyntheticStepContext({
@@ -122,12 +177,12 @@ export function durableRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/sessions/:id/durable/fork',
       handler: async (ctx) => {
         const sessionId = ctx.requireParam('id');
-        if (!runtime.store.getSession(sessionId)) throw new NotFoundError('Session');
+        requireExistingSession(runtime, sessionId);
         const body = ((await ctx.readBody()) ?? {}) as { stepId?: string; title?: string };
         const boundarySeq = resolveForkBoundarySeq(runtime, sessionId, body.stepId);
         const result = runtime.forkSession(sessionId, {
           boundarySeq,
-          title: typeof body.title === 'string' ? body.title : undefined,
+          title: optionalString(body.title),
         });
         json(ctx.response, 201, result);
       },
@@ -137,27 +192,10 @@ export function durableRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/sessions/:id/durable/signals',
       handler: async (ctx) => {
         const sessionId = ctx.requireParam('id');
-        if (!runtime.store.getSession(sessionId)) throw new NotFoundError('Session');
-        const body = ((await ctx.readBody()) ?? {}) as {
-          runId?: string;
-          stepId?: string;
-          signalName?: string;
-          signalKey?: string;
-          payload?: unknown;
-        };
-        const latest = runtime.store.durableJournal.getLatestRunForSession(sessionId);
-        const runId = typeof body.runId === 'string' && body.runId ? body.runId : latest?.runId;
-        if (!runId || !body.stepId || !body.signalName || !body.signalKey) {
-          throw new ValidationError('runId/latestRun, stepId, signalName, and signalKey are required');
-        }
-        const delivery = runtime.store.durableJournal.deliverSignal({
-          runId,
-          stepId: body.stepId,
-          signalName: body.signalName,
-          signalKey: body.signalKey,
-          payload: body.payload ?? null,
-        });
-        const woke = wakeReadyParkedRun(runtime.store.durableJournal, runId);
+        requireExistingSession(runtime, sessionId);
+        const input = parseSignalBody(runtime, sessionId, await ctx.readBody());
+        const delivery = runtime.store.durableJournal.deliverSignal(input);
+        const woke = wakeReadyParkedRun(runtime.store.durableJournal, input.runId);
         json(ctx.response, 200, { ...delivery, woke: woke.woke, wokeStepIds: woke.wokeStepIds });
       },
     },
@@ -166,7 +204,7 @@ export function durableRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/sessions/:id/durable/reconcile',
       handler: async (ctx) => {
         const sessionId = ctx.requireParam('id');
-        if (!runtime.store.getSession(sessionId)) throw new NotFoundError('Session');
+        requireExistingSession(runtime, sessionId);
         const result = await reconcileSessionUnknownSteps({
           store: runtime.store,
           sessionId,
@@ -183,16 +221,13 @@ export function durableRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       handler: async (ctx) => {
         const sessionId = ctx.requireParam('id');
         const stepId = ctx.requireParam('stepId');
-        if (!runtime.store.getSession(sessionId)) throw new NotFoundError('Session');
-        const body = ((await ctx.readBody()) ?? {}) as { decision?: string; note?: string };
-        if (body.decision !== 'committed' && body.decision !== 'not_applied') {
-          throw new ValidationError('decision must be committed or not_applied');
-        }
+        requireExistingSession(runtime, sessionId);
+        const parsed = parseResolveBody(await ctx.readBody());
         const result = resolveDurableStepManually(runtime.store, {
           sessionId,
           stepId,
-          decision: body.decision,
-          note: typeof body.note === 'string' ? body.note : undefined,
+          decision: parsed.decision,
+          note: parsed.note,
         });
         json(ctx.response, result.ok ? 200 : 404, result);
       },

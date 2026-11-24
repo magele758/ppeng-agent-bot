@@ -2851,6 +2851,7 @@ Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Re
 
 Durable ownership tree, orphan abandonment, and Lab settings & time-travel UI
 
+- `apps/daemon/test/durable-routes.test.ts`
 - `apps/web-console/lib/durable.test.ts`
 - `packages/agent-loop/src/durable/durable-ownership-tree.test.ts`
 - `packages/core/test/durable-ownership-tree.test.js`
