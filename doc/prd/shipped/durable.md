@@ -30,6 +30,11 @@ through the same daemon/core patterns as other library resources.
 Rendering may reuse a read-only A2UI basic-catalog surface. Do not clone a
 Grok/Cursor canvas, and do not turn session A2UI cards into library pages.
 
+## durable-saga-park-reconcile
+Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Reconcile
+
+怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；Phase 3 实现持久化声明式 Saga、Pivot 边界守卫、工具级 park()/Signal/memo() 与 unknown 副作用 reconcile() 收敛
+
 ## durable-wait-default
 Durable wait is the default Goal/Routine park path
 

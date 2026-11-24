@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-24T17:19:42.719Z",
-  "reviewNote": "Reviewed Phase 2 WorkspaceTx atomic rollback additions. Lazy savepoints run only on workspace_fs tools and notify post-wave state capture via notifyDurableWaveSettled without adding branches to executeToolCalls or changing pairing/lifecycle/restart/concurrency semantics. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-24T17:27:52.988Z",
+  "reviewNote": "Reviewed Phase 3 Persistent Saga, Pivot guard, Park/Signal/Memo, and Reconcile additions. Boot recovery leaves rolling_back and waiting_park runs untouched while scheduler handles async compensation resume, signal wakes, and reconcile probes. Pairing/lifecycle/restart/concurrency boundaries unchanged.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -443,6 +443,15 @@
         "packages/core/src/durable/rollback-service.ts",
         "packages/core/test/durable-workspace-rollback.test.js"
       ]
+    },
+    {
+      "step": "Phase 3 Persistent Saga, Pivot guard, Park/Signal/Memo, and Reconcile: crash-resumable rolling_back LIFO compensation, external_irreversible pivot guard, tool-level park/signal/memo/cancel, and unknown-step reconcile probes with operator resolve endpoints. Does not alter tool-call pairing, writer claims, approvals, cancellation, or restart fencing.",
+      "files": [
+        "packages/agent-loop/src/durable/saga-runner.ts",
+        "packages/agent-loop/src/durable/park-reconcile.ts",
+        "packages/agent-loop/src/durable/durable-saga-park-reconcile.test.ts",
+        "packages/core/test/durable-saga-park-reconcile.test.js"
+      ]
     }
   ],
   "sha256": {
@@ -460,7 +469,7 @@
     "packages/agent-loop/src/assembly/normal-host.ts": "75879ab3ae4dad2868d3518ef314d419740f1fa66a03e64575d6455ad9b913ff",
     "packages/agent-loop/src/assembly/full-host.ts": "e68f07f9e200cc43ba274bba5129f764c331017e6df3c3c937304e4de7ba73a4",
     "packages/agent-loop/src/assembly/max-host.ts": "8c6e91a60b4864e085fa4d14d72cb58176feff5bd04100aced4cbfabbae27c56",
-    "packages/core/src/runtime/l5-bindings.ts": "8814d5a6830cbd379fcbe61105e0bd1500927ce3e30c8f7310b40c42c4ef42d5",
+    "packages/core/src/runtime/l5-bindings.ts": "5c44ddf986f6964c1c4e1d126dbb37675301e1078ff6cccd01c3fca96c9117dd",
     "scripts/formal/lifecycle-model.mjs": "fa7e31c20b10016e13a081789a16a4cd459b8425b719ed2f0bc165245faf7b66",
     "scripts/formal/lifecycle-runtime.mjs": "70d8259d67252077f872dd800ae5fbed9108ffa21d392c74f02f5a987b15b670",
     "scripts/formal/lifecycle-verifier.mjs": "3555385ae003dbf6ac4e6e54021e1b6cbc4979be7f43c25ba3573ad32f8e1195",
@@ -586,7 +595,7 @@
     "packages/core/test/steer-tool-continuity.test.js": "4ae0b8876808936524d7ab75b9cec59990c9eb9bb611793f185e682a6eeb9e9d",
     "packages/core/src/learning/sources.ts": "dc39b94026833c515e560607af9e241d0ed0aca11a929fbb41c6289bfdb93a29",
     "packages/core/src/cron/routine-runtime.ts": "751349566b4c78fe1e178d650504fa681ab76765e7a238af16438894bdd2bb4b",
-    "packages/core/src/runtime/scheduler-host.ts": "aed2641317aaf7e32e19ba13f543deaf7c23f3e86c7b894c8c2dd022fbcae1b1",
+    "packages/core/src/runtime/scheduler-host.ts": "d2d0b189150dd0aba59c31f6461ca02e66abacd3d39036678bc9b8302596be2f",
     "packages/core/test/learning-governance.test.js": "3df0904451a8b9244df1301d1bfecc3d3f1f24babcd87ef3a62d59b6228b7f29",
     "packages/core/src/waits/types.ts": "82ded488485a76dc7bffba1fc8d181a410c2f83db393937cbae46f53cef8c206",
     "packages/core/src/waits/conditions.ts": "2b5a3aab81282771f9bbc1a0bf66bbd4a9103dfd1a38efaa8bb4e889f09141f7",
@@ -652,8 +661,8 @@
     "packages/agent-loop/src/model/model-adapters.ts": "81a339f0ffba32487f6b04355c3e3a5c5bad7f51f3ce03403a951de740374826",
     "packages/agent-loop/src/model/reasoning-replay.test.ts": "bd693954b8371ba3b854b8367786bfb2f2a1a1d664bf5ea9edf9830e873200a3",
     "packages/core/test/model-adapters.test.js": "4a0f76f56d59d22e21e4e36decf0d0ae138dde9d7a07d4229b6954573f84e02d",
-    "skills/agent-loop/SKILL.md": "957364c130bcdf93806df10dc4898416766a10484432b8562c2d644c980e6cb3",
-    "packages/agent-loop/SKILL.md": "957364c130bcdf93806df10dc4898416766a10484432b8562c2d644c980e6cb3",
+    "skills/agent-loop/SKILL.md": "c5f7799bd34ed59489b11106a208bcdc2246c26d81f3b150426dfebcbaade10c",
+    "packages/agent-loop/SKILL.md": "c5f7799bd34ed59489b11106a208bcdc2246c26d81f3b150426dfebcbaade10c",
     "packages/agent-loop/src/turn/turn-recovery.ts": "d7223180ed521cb7d24a357c6d7353408a7237ed9c96e86d09d5a65b7d2390a2",
     "packages/core/src/turn/turn-recovery.ts": "a220faa894acaea08e84b3ae0de1ec9d610871b7563406e8d6dd468d31a06208",
     "packages/core/src/bots/goals/delivery-review.ts": "867c32f6f765a91a3b82e981b46785c7e2bc4e25184a7e6b5cbf32134075fe0c",
@@ -662,14 +671,14 @@
     "packages/core/src/session/request-context-events.ts": "fd95689f7b41bfe2d03bac0239d8e6129d9fa965bdbdd1fb2de2065118d8663a",
     "packages/core/src/session/request-wire-diagnostics.ts": "c37ab97a28c1bb69caa13780856ef6cd73e8c326830982d7525cfa7849917cd1",
     "packages/agent-loop/src/approval/session-tool-grant.ts": "ce02c696157a3ba47f38fc442e96e7e382e0a69d7862fd397424bd88af047715",
-    "packages/agent-loop/src/durable/index.ts": "51dae19a4af7e86c114b39ae09181a290981fd76a58cc3e7d7437c199e523bcd",
+    "packages/agent-loop/src/durable/index.ts": "ec6a7d7056e5a7f0a2d277f322e600aeb8f8dbe9de32d66ba0da3b82ed0115bf",
     "packages/agent-loop/src/durable/kernel-bridge.ts": "fa6303600a25967fff70c30a9a62dca1a73ca9b35a925d34772fa5891baa5771",
     "packages/agent-loop/src/durable/memory-journal.ts": "b3a54bf190fbda48897f917b1bb5d56405738b129ba1cf9bda00a182341e21d3",
     "packages/agent-loop/src/durable/step-helpers.ts": "1bbaccee5db1a37ed5fcf76de84264414fcae6dd08036a04c02b916d79d3f38d",
     "packages/agent-loop/src/durable/tool-runner-hooks.ts": "7f581088bcf8220a94f307222439e5e317afc40b483b671920886a7cd491ceb2",
     "packages/agent-loop/src/durable/types.ts": "acdc676241c408e60e63a27ec8734326ff3c5225c2e4afa9ef7bfa62a8e1ff65",
     "packages/agent-loop/src/durable/sqlite-journal.ts": "c70ea788bfdaaa6746d10750c5eb7fa27872373693d46dd9a84896538b7493b2",
-    "packages/core/src/durable/recovery.ts": "2c8b20688627b7edbbbcb94a1be2e5eb9bce878a07a212fabf5bf22728dc00ec",
+    "packages/core/src/durable/recovery.ts": "faaebc6341bdb83a7b16483a514ec7110901d93da272f72b635f41598795b4fb",
     "packages/agent-loop/src/durable/durable-control-plane.test.ts": "1bf06ced5bf2faf601f1cb6168a9f0306c1e74c7ac3181a3bcdb8ebbd2a01290",
     "packages/core/test/durable-control-plane.test.js": "d9b59b146a421b95265d7027e63bbfd1d8afc722033441dc9641348086e6f378",
     "packages/agent-loop/src/durable/workspace-tx.ts": "b7f3e5c7d53e8f16fe8417c755f09495c511dbdc421133424b21aeff5d14f7bd",
@@ -677,8 +686,12 @@
     "packages/core/src/durable/git-shadow-tx.ts": "21a6d435b8ca239fa003e231ac985195ec0c93b565fe838ab26b91d1db9c479c",
     "packages/core/src/durable/isolated-tx.ts": "4980d4d0e4adb68458de589b63aa17a458a3ca18f8ef3991318321d244b7eccd",
     "packages/core/src/durable/workspace-tx-manager.ts": "99fd3505623ceb3d90cab1a304461584b090079f44e5aadef2131df223087091",
-    "packages/core/src/durable/rollback-service.ts": "2b94aa3b78a8d7d19d5b766ab6f9626182513923952098c73d0b082e6072b643",
-    "packages/core/test/durable-workspace-rollback.test.js": "519c2728c60e2856e6c883f713ce645f6b8776f0debdb1f3a159d63ef3892b05"
+    "packages/core/src/durable/rollback-service.ts": "18eee9d937aea5e63ec2f6b73e498c036aecc9b105bb1bb605977f0eacb53dc6",
+    "packages/core/test/durable-workspace-rollback.test.js": "519c2728c60e2856e6c883f713ce645f6b8776f0debdb1f3a159d63ef3892b05",
+    "packages/agent-loop/src/durable/saga-runner.ts": "e7b6d6415065985670b11470198ffa49a2249da0c2f4168fff94dacd27743934",
+    "packages/agent-loop/src/durable/park-reconcile.ts": "187739ee97108c665fb953179c135bcbb38f50a2db7cfddadca8eb4a3498c358",
+    "packages/agent-loop/src/durable/durable-saga-park-reconcile.test.ts": "da292a184fb4dedd16990db67a5da39e45d88b77b3d036b544ffa5d7ec2d79a3",
+    "packages/core/test/durable-saga-park-reconcile.test.js": "94470ff86b6066a4ac710944a77d3331ab542d86251857f38c7f8261a75d330d"
   },
   "notes": "PR202 vertical/security review: quote pointers validated at host admission and retained by durable/memory inbox, all drain paths and compaction continuation; quoted subagent admission/promotion rejects explicitly. Both kernels resolve only visible same-session assistant sources at model view. Room binds the source author and uses explicit empty recipients for departed authors. Quoted inputs remain outside lossy overflow summaries. Real runtime, route, SQLite, SDK and UI regressions supplement existing bounded probes without expanding their proof claims. No acceptance criteria or thresholds weakened. PR204 independent vertical/security review: quoted WAL fork copies now remap source IDs in SQLite and portable memory stores. Child history inherits revoked constraints and closes active/pending exposure at its copied boundary, without changing parent scope or blocking fresh private turns. A host unable to persist required constraints rejects before child creation. Fail-first SQLite/memory and both-kernel quote/privacy regressions cover this boundary; existing bounded source/process scope, criteria and thresholds unchanged.  Completion follow-up review: assistantTranscript now puts only the last assistant text message in finalResponse, while retaining the entire execution tail as paired tool evidence. No writer, approval, retry, cancellation, settlement fence or goal completion threshold changes. Tests retain initial failed observations and require later successful grounded evidence; unsupported verdicts remain unverified. This input-separation review does not certify model judgements. Bounded pre-completion review: the existing core goal-gate host now checks a direct Bot execution before clean end and may return one corrective continuation. Kernel turn/request budgets and LoopGuard remain unchanged. Settlement still owns durable goal transitions. Process-local report reuse requires matching execution, revision and evidence fingerprint; no caller metadata can supply verification. Cancellation reaches the preflight judge, changed evidence forces re-verification, and approved side effects are not replayed by the runtime. New tests cover one correction, repeated rejection, cancellation and stale evidence. SDK interfaces and implementation are unchanged. Integration with PR252: pre-completion verification and its trusted cache use the same runtime-validated execution evidence packet, including source associations and sequence ranges. The packet fingerprint is captured before awaiting the judge, then recomputed at settlement; late evidence and revisions cannot inherit an older approval. Upstream checkpoint ownership, notices and worker guards remain intact. Intake integration retains PR252 full-objective preservation for sequential steps, alongside the already reviewed bounded judge deadline and no post-success abort. Reviewed failure-branch correction: correctionNeeded controls only one in-turn corrective continuation, never verified/met or settlement eligibility. A compliant requested failure reply can end while its unsuccessful goal remains queued. Missing legacy fields retain the existing correction behavior. Runtime regression proves one failed write, no extra model turn, one judge and no false completion; original evidence guards, execution fences and budgets remain unchanged. Reviewed query-only format guard after durable-goal review: explicit unconditional directives only, ignores fenced/quoted/conditional requests, reads latest persisted user/assistant text, one bounded corrective continuation without editing the original answer or grader. Process-local attempt tracking is bounded and released only by the owning runtime controller; cancellation and approval waits skip review. It does not grant evidence or completion state and keeps existing budgets. Runtime tests cover path/number/version/JSON, stubborn wrong responses, original transcript retention and no artificial goal creation; baseline runtime reproduces the regression. Reviewed historical-result query routing: only explicit return-from-existing-evidence requests are released as self-contained Bot chat; deployment/build/release result nouns alone do not request a new execution. Stated deliveries, isolation requests and mixed mutation/save/upgrade/deploy commands remain goals. No historical evidence is relabeled as a current execution and no completion proof guard is relaxed. Runtime regression forces the model to propose a new goal and still asserts no artificial goal for the read-only query. compact-revision now additionally requires goalStatus none; original answer/state/compaction assertions and all gate thresholds remain unchanged. Reviewed send-only completion view: strict-format turns omit historical reasoning from assistant replay while preserving text/tool calls/results and stored WAL; current system completion feedback gets one ephemeral user continuation anchor so chat adapters that hoist system notices cannot leave the request ending in old assistant text. New real-adapter HTTP test reproduced the assistant-ended payload before the fix, then verifies a user-ended request, no reasoning replay, unchanged stored reasoning and exactly one persisted user message. Stale/user-forged notices do not activate it, applying the view twice is idempotent, and repacking reapplies the view before the existing token budget check. No SDK source or grader logic changed. Reviewed integration of main bd7a019a: retain built-in interview roster/persona behavior and interview query routing alongside historical-result query routing, completion feedback, private-reasoning model view and owner-fenced cleanup. No gate threshold or evidence requirement changes. Reviewed the group-command diff: a group turn is no longer source_scope_denied only because the unattended room wake was recorded as an external event. Real external events, other bots, approval, sandbox, and secret paths still reject. rooms/index.ts only comments that the existing unattended stamp remains an approval fail-safe and this bot's command scope stays the same as its own chat. The steer route no longer lets a stale client target override the saved interrupt policy; admission, quote checks, role, key, and subagent options are unchanged. Writer admission, tool pairing, approval decisions, and restart recovery are unchanged. No checks removed and no thresholds changed.\n2026-10-29 Round-2 P0 Auto-review (r2-1) + UserVault sync from main 382dacfd: checkToolApprovals owns high-risk Shell/spawn/MCP via evaluateAutoReview (soft-block default; requestSmartModeApproval native card; approve same-fingerprint proceed; deny terminal; permissionMode=bypass cannot skip). UserVault reference-fill remains typed apart from SecretVault. Pairing/lifecycle/restart/concurrency control-flow bounds unchanged; fingerprints refreshed.\n2026-11-10 memory_read SOURCE_UNAVAILABLE review: packages/core/src/turn/kernel.ts wraps the already admitted writer-scoped runSessionKernel call in runWithMemoryReadTurn so a SOURCE_UNAVAILABLE memory_read result is remembered only for this turn. Writer admission, tool pairing, approval, cancellation, and restart recovery are unchanged. Formal fingerprints refreshed. No checks removed and no thresholds changed. 2026-11-11 merge origin/main into feat/trace-fail-stop: recomputed fingerprints for files whose merged bytes differ. Fail-stop decisions stay; main additions stay. No checks removed and no thresholds changed."
 }

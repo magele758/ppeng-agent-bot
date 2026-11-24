@@ -17,6 +17,9 @@ import { textPart } from './session-facade.js';
 export interface SchedulerTickHost {
   store: SqliteStateStore;
   stateDir: string;
+  repoRoot?: string;
+  tools?: readonly import('../types.js').ToolContract<any>[];
+  workspaceTx?: import('../durable/workspace-tx-manager.js').CompositeWorkspaceTxManager;
   log: Logger;
   cronStore: CronJobStore | undefined;
   setCronStore(store: CronJobStore): void;

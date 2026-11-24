@@ -3223,6 +3223,14 @@
       ]
     },
     {
+      "id": "durable-saga-park-reconcile",
+      "title": "Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Reconcile",
+      "tests": [
+        "packages/agent-loop/src/durable/durable-saga-park-reconcile.test.ts",
+        "packages/core/test/durable-saga-park-reconcile.test.js"
+      ]
+    },
+    {
       "id": "durable-wait-default",
       "title": "Durable wait is the default Goal/Routine park path",
       "tests": [

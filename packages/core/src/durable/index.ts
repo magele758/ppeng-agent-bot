@@ -92,6 +92,24 @@ export { CompositeWorkspaceTxManager } from './workspace-tx-manager.js';
 
 export {
   rollbackSessionToStep,
+  buildSyntheticStepContext,
+  reconcileSessionUnknownSteps,
+  resolveDurableStepManually,
   type SessionRollbackInput,
   type SessionRollbackOutcome,
 } from './rollback-service.js';
+
+export {
+  runDurableSagaRollback,
+  rangeCrossesPivot,
+  checkParkedStepWake,
+  wakeReadyParkedRun,
+  cancelParkedStepsForRun,
+  reconcileUnknownStepsForRun,
+  type CompensationExecOutcome,
+  type CompensationExecutor,
+  type DurableSagaRollbackInput,
+  type DurableSagaRollbackResult,
+  type ParkWakeMatch,
+  type ReconcileStepsOutcome,
+} from '@ppeng/agent-loop';

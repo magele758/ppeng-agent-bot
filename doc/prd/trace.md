@@ -2840,6 +2840,13 @@ Agent 持久化条件等待与恢复
 - `packages/core/test/durable-page-port.test.js`
 - `packages/core/test/page-revisions.test.js`
 
+### durable-saga-park-reconcile
+
+Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Reconcile
+
+- `packages/agent-loop/src/durable/durable-saga-park-reconcile.test.ts`
+- `packages/core/test/durable-saga-park-reconcile.test.js`
+
 ### durable-wait-default
 
 Durable wait is the default Goal/Routine park path

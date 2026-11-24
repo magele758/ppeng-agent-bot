@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 485,
+    "implemented": 486,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1728,6 +1728,13 @@
       "requirement": "implement a SMALL cut of a library-level durable Page Port (shareable markdown page).\nThis is NOT DurableArtifactPort and NOT paged tool-result by-reference (#328).\nA Page has a title, a monotonic revision, a shareable id, and a markdown body.\nIt persists in the runtime store and can be created, updated, fetched, and listed\nthrough the same daemon/core patterns as other library resources.\nRendering may reuse a read-only A2UI basic-catalog surface. Do not clone a\nGrok/Cursor canvas, and do not turn session A2UI cards into library pages.",
       "verificationStage": "software",
       "file": "acceptance/durable-page-port.yaml"
+    },
+    {
+      "id": "durable-saga-park-reconcile",
+      "title": "Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Reconcile",
+      "requirement": "怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；Phase 3 实现持久化声明式 Saga、Pivot 边界守卫、工具级 park()/Signal/memo() 与 unknown 副作用 reconcile() 收敛",
+      "verificationStage": "software",
+      "file": "acceptance/durable-saga-park-reconcile.yaml"
     },
     {
       "id": "durable-wait-default",
