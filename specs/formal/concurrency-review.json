@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-23T09:36:02.074Z",
-  "reviewNote": "Reviewed SDK documentation update and 0.2.0 package version bump. Appended Trajectory Handoff v2.3 and Pattern B isolation contract docs to skills/agent-loop/SKILL.md (synced to packages/agent-loop/SKILL.md) and packages/agent-loop/README.md, and bumped @ppeng/api-types and @ppeng/agent-loop from 0.1.5 to 0.2.0. Zero runtime, kernel, tool-loop, approval, writer-claim, restart, or session lifecycle source files changed. No property, case, or threshold was weakened.",
+  "reviewedAt": "2026-11-24T14:20:07.248Z",
+  "reviewNote": "Reviewed opt-in fail-open Context Graph v0.2.4 compaction adapter hook in compact-host.ts and cg_compaction trace event kind in stores/trace.ts. Both ordinary autoCompactSession and canonical bot compactCanonicalBot stay byte-for-byte unchanged when CONTEXT_GRAPH_URL is unset, on pure-chat spans, or on any transport/server fallback; when enabled, pruning clones messages non-mutatingly while preserving original range.older snapshots, replacement seq ranges, SQLite SAVEPOINT bot_summary_publish optimistic lock checks against raw prior summary, tool-call pairing, session lifecycle, restart recovery, and writer concurrency boundaries. Dedicated unit and end-to-end compaction tests supplement unchanged formal models and probes. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Production runtime startup and writer surfaces, cancellation and approval decisions; actual OS process probes",
@@ -486,7 +486,7 @@
     "packages/core/src/turn/host.ts": "4ab4caa18902d11e704533e85bd2186c0f96ee275a1b5cbe5fdbe1e61a0a88d8",
     "packages/core/src/turn/kernel.ts": "229aede615ff8d171f3c222673d32e14ab3be4f4801bd2304d6ea461ad51b803",
     "packages/core/src/runtime/tool-loop.ts": "ced6d9ade9aad2ad18b5fef0e08f42a65ea34820ad260119b8b9c4530df780ce",
-    "packages/core/src/stores/trace.ts": "3053c853ebd3d0f7f25332b8fdbb8ea912e2baac51b2386b8497d026da0533f7",
+    "packages/core/src/stores/trace.ts": "568198303713db7fcba921bed0692ddd9ebb4cfe7653ecbb3a6e4986fae1f7f2",
     "skills/agent-loop/SKILL.md": "12f94b08ec1689ed9bb616b4d355a427d4cafea86a0f45184f2718531f848930",
     "packages/agent-loop/SKILL.md": "12f94b08ec1689ed9bb616b4d355a427d4cafea86a0f45184f2718531f848930",
     "scripts/test/session-multiprocess-state-consistency.test.mjs": "050990c7ddc41c4be1e61ed8ae9e5f9b170ab780e8c7ec3046d9b2c8f064718a",
@@ -638,7 +638,7 @@
     "packages/core/src/bots/bot-work-waits.ts": "9749cc4d22e532ffc7c18cc4b3b5164ce5572bbd209541fe0e3c6003562ccf1b",
     "packages/core/src/runtime/bot-summary-background.ts": "ee6e999d8317ccc649016bbe48521f2b700c521561fe876b48116e02cfc2655f",
     "packages/core/src/runtime/bot-summary-lease.ts": "daa6b860a2453a595c603d7a49e43af2191d252ba450a783b194bfb1870f527c",
-    "packages/core/src/runtime/compact-host.ts": "ba1d8a78aa41be077efbb4955e82bd661fca1c530be226b11e890036ab3cf457",
+    "packages/core/src/runtime/compact-host.ts": "20abe85dd4a26eb2ff68ec3a6915f2d388e0f8afbca59a14a3821ca7c8808e63",
     "packages/core/src/session/compact-summary-deadline.ts": "3d6838a179bbc49d6b7cce9597e2d7766a1e8334baf16c554e6a23ba16964c9d",
     "packages/core/src/tools/tool-search-enhanced.ts": "d1bfa3473a035369f1d9715ee7db99971b4e0dda4aa8f6ef121d375f06557396",
     "packages/core/src/tools/tool-search-ranking.ts": "5d1d46ba001b7a33c2b9b7e4c184d8a75a8009b636b48fe09abf3fffb65ddf0c",

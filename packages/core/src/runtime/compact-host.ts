@@ -51,12 +51,19 @@ import {
   compactSummaryMaxChars
 } from '../turn/prepare-view.js';
 import { textPart } from './session-facade.js';
-import { boundedSourceSummary, continuationSummaryInstruction, HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
+import {
+  boundedSourceSummary,
+  contextSourceNavigation,
+  continuationSummaryInstruction,
+  HISTORICAL_SUMMARY_NOTICE
+} from '../session/context-sources.js';
 import {
   applyPrunedEventsToMessages,
   attachContextGraphArtifactBlock,
+  computeContextGraphBodyBudget,
   ingestAndCompileSessionArtifacts,
   stripContextGraphArtifactBlock,
+  type ContextGraphBodyBudget,
   type ContextGraphCompactionOutcome
 } from '../session/context-graph-client.js';
 
@@ -69,7 +76,7 @@ function emitContextGraphTrace(
 ): void {
   if (cg === null) return;
   void host.emitTrace(sessionId, {
-    kind: 'cg_compaction' as TraceEvent['kind'],
+    kind: 'cg_compaction',
     payload: {
       applied: cg.applied,
       durationMs: cg.durationMs,
@@ -79,6 +86,33 @@ function emitContextGraphTrace(
       fallbackReason: cg.fallbackReason
     }
   });
+}
+
+async function runContextGraphCompaction(
+  host: CompactHost,
+  sessionId: string,
+  messages: readonly SessionMessage[],
+  budget: ContextGraphBodyBudget,
+  signal?: AbortSignal
+): Promise<ContextGraphCompactionOutcome | null> {
+  const cg = await ingestAndCompileSessionArtifacts({
+    sessionId,
+    messages,
+    signal,
+    maxOutputChars: budget.maxOutputChars
+  });
+  emitContextGraphTrace(host, sessionId, cg);
+  return cg;
+}
+
+function finalizeSummaryWithContextGraph(
+  summary: string,
+  cg: ContextGraphCompactionOutcome | null,
+  budget: ContextGraphBodyBudget
+): string {
+  if (!cg?.applied) return summary;
+  const block = budget.maxOutputChars !== undefined ? cg.artifactBlock : '';
+  return attachContextGraphArtifactBlock(summary, block, budget.bodyRoom);
 }
 
 /** Short note of the span about to be summarized. Empty when there is no user/assistant text. */
@@ -279,12 +313,9 @@ export async function autoCompactSession(
     tokenThreshold,
     force,
     summarize: async (older) => {
-      const cg = await ingestAndCompileSessionArtifacts({
-        sessionId: context.session.id,
-        messages: older,
-        signal: opts?.summarySignal
-      });
-      emitContextGraphTrace(host, context.session.id, cg);
+      const maxChars = compactSummaryMaxChars(process.env, tokenThreshold);
+      const cgBudget = computeContextGraphBodyBudget(maxChars, contextSourceNavigation(older));
+      const cg = await runContextGraphCompaction(host, context.session.id, older, cgBudget, opts?.summarySignal);
       const messagesForSummary = cg?.applied ? applyPrunedEventsToMessages(older, cg.prunedEvents) : older;
       const adapter = host.resolveModelAdapter?.(context.session) ?? host.modelAdapter;
       let summary: string;
@@ -301,10 +332,7 @@ export async function autoCompactSession(
       // Runs before runAutoCompact appends the replacement, with no await in between.
       persistBotCompactLong(host, context, older, adapter.name === 'heuristic' ? undefined : summary);
       if (!summary.trim()) return summary;
-      const maxChars = compactSummaryMaxChars(process.env, tokenThreshold);
-      const summaryWithArtifacts = cg?.applied
-        ? attachContextGraphArtifactBlock(summary, cg.artifactBlock, maxChars)
-        : summary;
+      const summaryWithArtifacts = finalizeSummaryWithContextGraph(summary, cg, cgBudget);
       return boundedSourceSummary(summaryWithArtifacts, older, maxChars).text;
     },
     archive: (older) => archiveMessages(host.stateDir, context.session.id, older),
@@ -404,12 +432,10 @@ async function compactCanonicalBot(
   const sourceSnapshot = JSON.stringify(range.older.map(m => [m.id, m.parts]));
   const prior = session.summary?.trim() ?? '';
   const rawBotHistory = botSummaryHistory(range.older, Boolean(prior));
-  const cg = await ingestAndCompileSessionArtifacts({
-    sessionId: session.id,
-    messages: rawBotHistory,
-    signal: opts?.summarySignal
-  });
-  emitContextGraphTrace(host, session.id, cg);
+  const summaryLimit = compactSummaryMaxChars(process.env, thresholds.structuredTokens);
+  const availableForBody = Math.max(0, summaryLimit - HISTORICAL_SUMMARY_NOTICE.length);
+  const cgBudget = computeContextGraphBodyBudget(availableForBody, contextSourceNavigation(range.older));
+  const cg = await runContextGraphCompaction(host, session.id, rawBotHistory, cgBudget, opts?.summarySignal);
   const priorForSummary = cg?.applied ? stripContextGraphArtifactBlock(prior) : prior;
   const instruction = botCompactInstruction(tier, priorForSummary);
   const historyForPrune = cg?.applied ? applyPrunedEventsToMessages(rawBotHistory, cg.prunedEvents) : rawBotHistory;
@@ -445,11 +471,7 @@ async function compactCanonicalBot(
     return {};
   }
 
-  const summaryLimit = compactSummaryMaxChars(process.env, thresholds.structuredTokens);
-  const availableForBody = Math.max(0, summaryLimit - HISTORICAL_SUMMARY_NOTICE.length);
-  const summaryWithArtifacts = cg?.applied
-    ? attachContextGraphArtifactBlock(trimmed, cg.artifactBlock, availableForBody)
-    : trimmed;
+  const summaryWithArtifacts = finalizeSummaryWithContextGraph(trimmed, cg, cgBudget);
   const bounded = boundedSourceSummary(summaryWithArtifacts, range.older, availableForBody);
   const capped = bounded.summary;
   if (!capped.trim()) {
@@ -479,7 +501,7 @@ async function compactCanonicalBot(
     host.store.db.exec('ROLLBACK TO bot_summary_publish; RELEASE bot_summary_publish');
     throw error;
   }
-  persistBotCompactLong(host, context, range.older, adapter.name === 'heuristic' ? undefined : capped);
+  persistBotCompactLong(host, context, range.older, adapter.name === 'heuristic' ? undefined : trimmed);
   await archiveMessages(host.stateDir, session.id, range.older);
   noteCompact(host, session.id, { startSeq: range.startSeq, endSeq: range.endSeq }, tier);
   return { replaced: { startSeq: range.startSeq, endSeq: range.endSeq } };

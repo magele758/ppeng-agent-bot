@@ -7,18 +7,21 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import {
   CONTEXT_GRAPH_ARTIFACT_HEADING,
+  DEFAULT_CG_MAX_OUTPUT_CHARS,
   DEFAULT_CONTEXT_GRAPH_TIMEOUT_MS,
   MAX_CONTEXT_GRAPH_TIMEOUT_MS,
   MIN_CONTEXT_GRAPH_TIMEOUT_MS,
   MAX_TOOL_EVENTS_PER_BATCH,
   applyPrunedEventsToMessages,
   attachContextGraphArtifactBlock,
+  computeContextGraphBodyBudget,
   extractToolTrajectoryEvents,
   ingestAndCompileSessionArtifacts,
   resolveContextGraphConfig,
   sessionContextGraphId,
   stripContextGraphArtifactBlock
 } from '../dist/session/context-graph-client.js';
+import { boundedSourceSummary, contextSourceNavigation } from '../dist/session/context-sources.js';
 import { autoCompactSession } from '../dist/runtime/compact-host.js';
 import { SqliteStateStore } from '../dist/storage.js';
 import { createExtensionRegistry } from '../dist/extensions/extension-registry.js';
@@ -165,7 +168,8 @@ function withSavedCgEnv(
     'CONTEXT_GRAPH_TOKEN',
     'CG_AUTH_TOKEN',
     'RAW_AGENT_CONTEXT_GRAPH_TIMEOUT_MS',
-    'CONTEXT_GRAPH_TIMEOUT_MS'
+    'CONTEXT_GRAPH_TIMEOUT_MS',
+    'RAW_AGENT_COMPACT_SUMMARY_MAX_CHARS'
   ];
   const saved: Record<string, string | undefined> = {};
   for (const k of keys) {
@@ -199,6 +203,8 @@ test('disabled by default when CONTEXT_GRAPH_URL is unset or invalid -> 0 HTTP c
   assert.equal(resolveContextGraphConfig({ CONTEXT_GRAPH_URL: 'file:///etc/passwd' }), null);
   assert.equal(resolveContextGraphConfig({ CONTEXT_GRAPH_URL: 'not-a-valid-url' }), null);
   assert.equal(resolveContextGraphConfig({ CONTEXT_GRAPH_URL: 'http://user:pass@127.0.0.1:52341' }), null);
+  assert.equal(resolveContextGraphConfig({ CONTEXT_GRAPH_URL: `${mock.baseUrl}?query=1` }), null);
+  assert.equal(resolveContextGraphConfig({ CONTEXT_GRAPH_URL: `${mock.baseUrl}#hash` }), null);
   assert.equal(resolveContextGraphConfig({ CONTEXT_GRAPH_URL: `${mock.baseUrl}\r\nX-Evil: 1` }), null);
   assert.equal(
     resolveContextGraphConfig({
@@ -207,6 +213,27 @@ test('disabled by default when CONTEXT_GRAPH_URL is unset or invalid -> 0 HTTP c
     }),
     null
   );
+  assert.equal(
+    resolveContextGraphConfig({
+      CONTEXT_GRAPH_URL: mock.baseUrl,
+      CONTEXT_GRAPH_TOKEN: 'bad token with space'
+    }),
+    null
+  );
+  assert.equal(
+    resolveContextGraphConfig({
+      CONTEXT_GRAPH_URL: mock.baseUrl,
+      CONTEXT_GRAPH_TOKEN: 'bad\u00e9token'
+    }),
+    null
+  );
+
+  // Invalid numeric timeout falls back to default; explicit timeoutMs overrides and clamps
+  assert.equal(
+    resolveContextGraphConfig({ CONTEXT_GRAPH_URL: mock.baseUrl, CONTEXT_GRAPH_TIMEOUT_MS: 'not-a-number' })?.timeoutMs,
+    DEFAULT_CONTEXT_GRAPH_TIMEOUT_MS
+  );
+  assert.equal(resolveContextGraphConfig({ CONTEXT_GRAPH_URL: mock.baseUrl }, 50)?.timeoutMs, MIN_CONTEXT_GRAPH_TIMEOUT_MS);
 
   // Timeout clamping & precedence
   const cfgDefault = resolveContextGraphConfig({ CONTEXT_GRAPH_URL: mock.baseUrl });
@@ -1183,4 +1210,315 @@ test('end-to-end autoCompactSession: canonical bot multi-round compaction receiv
     const fbAfter = store.getSession(fbSession.id)!;
     assert.equal(countOccurrences(fbAfter.summary ?? '', CONTEXT_GRAPH_ARTIFACT_HEADING), 1);
   });
+});
+
+test('computePruneStats derives accurate client fallback stats and handles nested stats/data envelopes and rejection cases', async (t) => {
+  let responseBody: Record<string, unknown> = {};
+  const mock = await startMockServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(responseBody));
+  });
+  t.after(() => mock.close());
+
+  const msgs = makeToolMessages('sess-stats');
+  // Also include a tool_result with empty toolCallId to verify symmetry guard skips it
+  const msgsWithEmptyId: SessionMessage[] = [
+    ...msgs,
+    {
+      id: 'm_empty_id',
+      sessionId: 'sess-stats',
+      role: 'tool',
+      seq: 6,
+      parts: [{ type: 'tool_result', toolCallId: '', name: 'bash', ok: true, content: 'ignored' }],
+      createdAt: '2026-11-01T00:00:05.000Z'
+    }
+  ];
+  assert.equal(extractToolTrajectoryEvents(msgsWithEmptyId).length, 2);
+
+  const env = { CONTEXT_GRAPH_URL: mock.baseUrl };
+  const extracted = extractToolTrajectoryEvents(msgs);
+  const origWriteArgsLen = JSON.stringify(extracted[0]!.args).length;
+  const prunedWriteArgs = { path: 'src/app.ts', content: '[short]' };
+  const prunedReadOutput = '[short read]';
+  const expectedSaved =
+    (origWriteArgsLen - JSON.stringify(prunedWriteArgs).length) +
+    (extracted[1]!.output.length - prunedReadOutput.length);
+
+  // 1) Server omits prunedCount & charsSaved -> client derives exact diff counts
+  responseBody = {
+    compiled: { promptText: '- [file] src/app.ts' },
+    pruned: {
+      events: [
+        { callId: 'call_write_1', tool: 'write_file', ok: true, seq: 3, args: prunedWriteArgs, output: 'Wrote src/app.ts (v1)' },
+        { callId: 'call_read_1', tool: 'read_file', ok: true, seq: 5, output: prunedReadOutput }
+      ]
+    }
+  };
+  const derived = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-stats', messages: msgsWithEmptyId, env });
+  assert.ok(derived && derived.applied === true);
+  assert.equal(derived.prunedCount, 2);
+  assert.equal(derived.charsSaved, expectedSaved);
+
+  // 2) Server wraps response in { ok: true, data: { compiled, pruned: { stats: ... } } }
+  responseBody = {
+    ok: true,
+    data: {
+      compiled: { promptText: '- [file] wrapped.ts' },
+      pruned: {
+        stats: { prunedCount: 3, charsSaved: 4321 },
+        events: []
+      }
+    }
+  };
+  const wrapped = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-stats', messages: msgs, env });
+  assert.ok(wrapped && wrapped.applied === true);
+  assert.equal(wrapped.prunedCount, 3);
+  assert.equal(wrapped.charsSaved, 4321);
+  assert.equal(wrapped.artifactBlock, '- [file] wrapped.ts');
+
+  // 3) Server returns { ok: false } on 200 -> server_rejected
+  responseBody = { ok: false, error: { message: 'rejected' } };
+  const rejected = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-stats', messages: msgs, env });
+  assert.ok(rejected && rejected.applied === false);
+  assert.equal(rejected.fallbackReason, 'server_rejected');
+
+  // 4) Malformed item inside pruned.events -> invalid_response
+  responseBody = {
+    compiled: { promptText: '- ok' },
+    pruned: { events: ['not-an-object'] }
+  };
+  const badItem = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-stats', messages: msgs, env });
+  assert.ok(badItem && badItem.applied === false);
+  assert.equal(badItem.fallbackReason, 'invalid_response');
+});
+
+test('tight-budget computeContextGraphBodyBudget + attachContextGraphArtifactBlock + boundedSourceSummary preserves prose head, intact CG block, and source footer', async (t) => {
+  const older = makeToolMessages('sess-budget');
+  const sourceNav = contextSourceNavigation(older);
+  assert.ok(sourceNav.length > 150);
+
+  // Normal budget -> server default 720c
+  const normal = computeContextGraphBodyBudget(20_000, sourceNav);
+  assert.equal(normal.bodyRoom, 20_000 - (sourceNav.length + 2));
+  assert.equal(normal.maxOutputChars, DEFAULT_CG_MAX_OUTPUT_CHARS);
+
+  // Tight budget (1000c) -> scales maxOutputChars down cleanly
+  const tight = computeContextGraphBodyBudget(1_000, sourceNav);
+  assert.equal(tight.bodyRoom, 1_000 - (sourceNav.length + 2));
+  assert.ok(tight.maxOutputChars !== undefined && tight.maxOutputChars < DEFAULT_CG_MAX_OUTPUT_CHARS);
+
+  // Ultra-tiny budget (< 320c bodyRoom) -> omits CG attachment
+  const tiny = computeContextGraphBodyBudget(sourceNav.length + 200, sourceNav);
+  assert.equal(tiny.maxOutputChars, undefined);
+
+  // Long prose + 300c CG block under tight 1000c cap: prose HEAD survives, CG heading/body stay intact, no tail-slicing!
+  const longProse =
+    '- Goal: Preserve primary user requirement at the head.\n' +
+    '- Constraints: Keep SQLite WAL intact and never drop tests.\n' +
+    '- Progress: ' + 'detailed step note '.repeat(80);
+  const artifactBlock = '- [file] src/app.ts (v2)\n- [check ok] unit suite\n' + 'x'.repeat(200);
+  const attached = attachContextGraphArtifactBlock(longProse, artifactBlock, tight.bodyRoom);
+  assert.ok(attached.length <= tight.bodyRoom, `attached (${attached.length}) must fit bodyRoom (${tight.bodyRoom})`);
+
+  const bounded = boundedSourceSummary(attached, older, 1_000);
+  assert.equal(bounded.text.includes('…[earlier summary truncated]'), false, 'boundedSourceSummary must not tail-slice');
+  assert.match(bounded.summary, /^- Goal: Preserve primary user requirement at the head\./);
+  assert.equal(countOccurrences(bounded.summary, CONTEXT_GRAPH_ARTIFACT_HEADING), 1);
+  assert.equal(bounded.summary.includes(artifactBlock), true, 'CG artifact block must remain completely intact');
+  assert.equal(bounded.text.includes(sourceNav), true, 'History source footer must remain intact');
+
+  // End-to-end autoCompactSession under tight RAW_AGENT_COMPACT_SUMMARY_MAX_CHARS
+  const seenMaxOutputs: Array<number | undefined> = [];
+  const mock = await startMockServer((_req, res, body) => {
+    const opts = (body.compileOptions ?? {}) as { maxOutputChars?: number };
+    seenMaxOutputs.push(opts.maxOutputChars);
+    const events = (body.events ?? []) as Array<{ callId: string }>;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        compiled: { promptText: '- [file] src/tight.ts (v1)\n- [check ok] tests' },
+        pruned: { events: events.map((e) => ({ callId: e.callId, output: '[pruned]' })) }
+      })
+    );
+  });
+  t.after(() => mock.close());
+
+  const stateDir = mkdtempSync(join(tmpdir(), 'cg-tight-'));
+  const store = new SqliteStateStore(':memory:');
+  t.after(() => {
+    store.db.close();
+    rmSync(stateDir, { recursive: true, force: true });
+  });
+
+  const traces: Array<{ sessionId: string; kind: string; payload?: Record<string, unknown> }> = [];
+  const host = makeCompactHost(
+    store,
+    stateDir,
+    {
+      name: 'scripted-tight',
+      contextWindow: 16_000,
+      async runTurn() {
+        return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'ok' }] };
+      },
+      async summarizeMessages() {
+        return '- Goal: Keep tight-budget goal visible.\n' + 'prose filler '.repeat(120);
+      }
+    },
+    traces
+  );
+
+  await withSavedCgEnv(
+    { CONTEXT_GRAPH_URL: mock.baseUrl, RAW_AGENT_COMPACT_SUMMARY_MAX_CHARS: '950' },
+    async () => {
+      const s = store.createSession({ title: 'tight-ord', mode: 'chat', agentId: 'general' });
+      store.appendMessage(s.id, 'user', [{ type: 'text', text: 'Edit tight.ts' }]);
+      store.appendMessage(s.id, 'assistant', [
+        { type: 'tool_call', toolCallId: 't1', name: 'read_file', input: { path: 'src/tight.ts' } }
+      ]);
+      store.appendMessage(s.id, 'tool', [
+        { type: 'tool_result', toolCallId: 't1', name: 'read_file', ok: true, content: 'body '.repeat(100) }
+      ]);
+      for (let i = 0; i < 26; i += 1) {
+        store.appendMessage(s.id, i % 2 === 0 ? 'user' : 'assistant', [{ type: 'text', text: `turn-${i}` }]);
+      }
+      const res = await autoCompactSession(host, makeRunContext(stateDir, store.getSession(s.id)!), { force: true });
+      assert.ok(res.replaced);
+      assert.ok(
+        seenMaxOutputs[0] !== undefined && seenMaxOutputs[0] < DEFAULT_CG_MAX_OUTPUT_CHARS,
+        `expected scaled maxOutputChars < 720, got ${seenMaxOutputs[0]}`
+      );
+      const after = store.getSession(s.id)!;
+      assert.match(after.summary ?? '', /^- Goal: Keep tight-budget goal visible\./);
+      assert.equal(countOccurrences(after.summary ?? '', CONTEXT_GRAPH_ARTIFACT_HEADING), 1);
+      assert.equal((after.summary ?? '').includes('- [file] src/tight.ts (v1)'), true);
+      assert.equal((after.summary ?? '').includes('…[earlier summary truncated]'), false);
+    }
+  );
+});
+
+test('multi-round stripping demotes internal ## headings and preserves History source, archive footer, and bot section bullets', () => {
+  // 1) Subheadings inside compiled.promptText are demoted to ### on attach, so strip removes everything cleanly
+  const artifactWithSubheadings = '## Modified Files\n- [file] src/a.ts (v1)\n\n## Failing Tests\n- [check failed] test A';
+  const attached = attachContextGraphArtifactBlock('Round 1 prose.', artifactWithSubheadings, 4000);
+  assert.equal(attached.includes('\n## Modified Files'), false, 'internal ## must be demoted to ###');
+  assert.equal(attached.includes('\n### Modified Files'), true);
+  assert.equal(attached.includes('\n### Failing Tests'), true);
+  assert.equal(stripContextGraphArtifactBlock(attached), 'Round 1 prose.');
+
+  // 2) Trailing History source: and Compacted original transcript: footers survive stripping!
+  const withFooters = [
+    'Round 1 prose.',
+    '',
+    CONTEXT_GRAPH_ARTIFACT_HEADING,
+    '### Files',
+    '- [file] src/a.ts (v1)',
+    '',
+    'History source: retained original messages 1-20. Use history_search with session_id="s1".',
+    '',
+    'Compacted original transcript: .agent-state/transcripts/s1/1700000000.jsonl',
+    'Read this file with read_file only when the summary is missing specific code or an error.'
+  ].join('\n');
+  const strippedFooters = stripContextGraphArtifactBlock(withFooters);
+  assert.equal(strippedFooters.includes(CONTEXT_GRAPH_ARTIFACT_HEADING), false);
+  assert.equal(strippedFooters.includes('- [file] src/a.ts (v1)'), false);
+  assert.equal(strippedFooters.includes('Round 1 prose.'), true);
+  assert.equal(strippedFooters.includes('History source: retained original messages 1-20.'), true);
+  assert.equal(strippedFooters.includes('Compacted original transcript: .agent-state/transcripts/s1/1700000000.jsonl'), true);
+  assert.equal(strippedFooters.includes('Read this file with read_file only when'), true);
+
+  // 3) Echoed CG heading mid-bot-summary stops before canonical bot section bullets (- Decisions, - Next steps)
+  const echoedMidBot = [
+    '- Goal',
+    'Ship feature',
+    '- Progress',
+    'Wrote code',
+    '',
+    CONTEXT_GRAPH_ARTIFACT_HEADING,
+    '- [file] stale.ts (v1)',
+    '- [check failed] old err',
+    '',
+    '- Decisions',
+    'Use SQLite savepoints',
+    '- Next steps',
+    'Run formal verification'
+  ].join('\n');
+  const strippedBot = stripContextGraphArtifactBlock(echoedMidBot);
+  assert.equal(strippedBot.includes(CONTEXT_GRAPH_ARTIFACT_HEADING), false);
+  assert.equal(strippedBot.includes('stale.ts'), false);
+  assert.equal(strippedBot.includes('- Goal\nShip feature'), true);
+  assert.equal(strippedBot.includes('- Decisions\nUse SQLite savepoints'), true);
+  assert.equal(strippedBot.includes('- Next steps\nRun formal verification'), true);
+});
+
+test('non-2xx HTTP 302 handling on /ingest-artifacts & POST /v1/graphs, plus chunked >2MiB streaming cap and premature socket close', async (t) => {
+  let mode: '302_ingest' | '302_create' | 'chunked_oversized' | 'premature_close' = '302_ingest';
+  let createAttempts = 0;
+
+  const mock = await startMockServer((req, res) => {
+    const url = req.url ?? '/';
+    if (mode === '302_ingest') {
+      res.writeHead(302, { location: 'https://login.example.com' });
+      res.end('Redirecting');
+      return;
+    }
+    if (mode === '302_create') {
+      if (url.endsWith('/ingest-artifacts')) {
+        res.writeHead(404, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: false }));
+        return;
+      }
+      if (url === '/v1/graphs') {
+        createAttempts += 1;
+        res.writeHead(302, { location: 'https://login.example.com' });
+        res.end('Redirecting');
+        return;
+      }
+    }
+    if (mode === 'chunked_oversized') {
+      // No Content-Length header — chunked stream exceeding 2 MiB
+      res.writeHead(200, { 'content-type': 'application/json' });
+      const chunk = 'A'.repeat(256 * 1024);
+      for (let i = 0; i < 10; i += 1) {
+        if (res.destroyed) break;
+        res.write(chunk);
+      }
+      res.end();
+      return;
+    }
+    if (mode === 'premature_close') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.write('{"compiled":{"promptText":"partial');
+      res.destroy();
+      return;
+    }
+  });
+  t.after(() => mock.close());
+
+  const msgs = makeToolMessages('sess-http-edge');
+  const env = { CONTEXT_GRAPH_URL: mock.baseUrl, CONTEXT_GRAPH_TIMEOUT_MS: '1000' };
+
+  // 302 on /ingest-artifacts -> fail-open http_302 (never treated as 2xx)
+  mode = '302_ingest';
+  const r302 = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-http-edge', messages: msgs, env });
+  assert.ok(r302 && r302.applied === false);
+  assert.equal(r302.fallbackReason, 'http_302');
+
+  // 404 -> POST /v1/graphs returns 302 -> fail-open create_graph_http_302 (no retry)
+  mode = '302_create';
+  const r302Create = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-http-edge', messages: msgs, env });
+  assert.ok(r302Create && r302Create.applied === false);
+  assert.equal(r302Create.fallbackReason, 'create_graph_http_302');
+  assert.equal(createAttempts, 1);
+
+  // Chunked > 2 MiB streaming response without Content-Length -> response_too_large
+  mode = 'chunked_oversized';
+  const rChunked = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-http-edge', messages: msgs, env });
+  assert.ok(rChunked && rChunked.applied === false);
+  assert.equal(rChunked.fallbackReason, 'response_too_large');
+
+  // Premature socket close mid-body -> fail-open without hanging or throwing
+  mode = 'premature_close';
+  const rClosed = await ingestAndCompileSessionArtifacts({ sessionId: 'sess-http-edge', messages: msgs, env });
+  assert.ok(rClosed && rClosed.applied === false);
+  assert.ok(rClosed.fallbackReason.length > 0);
 });
