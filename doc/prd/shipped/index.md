@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 484 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 488 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -451,14 +451,18 @@
 
 - `discovery-default-on` 能力发现总开关默认开启
 
-## durable（4）
+## durable（8）
 
 需求正文见 [durable](durable.md)。
 
+- `durable-agent-control-plane` Durable Agent 控制面持久化与断点续跑
 - `durable-agent-waits` Agent 持久化条件等待与恢复
 - `durable-artifact-port` 大结果落盘并按页引用
 - `durable-page-port` 库级持久页面与分享链接
+- `durable-saga-park-reconcile` Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Reconcile
+- `durable-tx-tree-and-ui` Durable ownership tree, orphan abandonment, and Lab settings & time-travel UI
 - `durable-wait-default` Durable wait is the default Goal/Routine park path
+- `durable-workspace-rollback` Durable WorkspaceTx physical atomic rollback and cognitive-preservation folding
 
 ## email（1）
 

@@ -55,6 +55,7 @@ export function applyIoOverrides(host: TurnKernelHost, io: AssembledLoopIo): voi
   if (io.prepareMessagesForModel) host.prepareMessagesForModel = io.prepareMessagesForModel;
   if (io.readWorkingLogAppendix) host.readWorkingLogAppendix = io.readWorkingLogAppendix;
   if (io.stepTx) host.stepTx = io.stepTx;
+  if (io.durable) host.durable = io.durable;
   if (io.mergeSessionMetadata) host.mergeSessionMetadata = io.mergeSessionMetadata;
   if (io.promptCacheEpoch != null) host.promptCacheEpoch = io.promptCacheEpoch;
 }

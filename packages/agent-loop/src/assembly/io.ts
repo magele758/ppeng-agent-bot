@@ -82,6 +82,7 @@ export interface AssembledLoopIo {
   prepareMessagesForModel?: TurnKernelHost['prepareMessagesForModel'];
   readWorkingLogAppendix?: TurnKernelHost['readWorkingLogAppendix'];
   stepTx?: KernelStepTx;
+  durable?: TurnKernelHost['durable'];
 
   sqlite?: OpenSqliteEventLogInput;
   envApprovalPolicy?: ApprovalPolicy;

@@ -52,6 +52,17 @@ import {
   stripAutoReviewFlags,
   readAuthorizedBy,
 } from '../approval/auto-review.js';
+import {
+  attachDurableMemoContext,
+  partitionCallsByEffectStage,
+  planDurableToolWave,
+  prepareDurableToolDispatch,
+  settleDurableToolResult,
+  shouldTriggerWaveCompensation,
+  type DurableToolLoopContext,
+  type ToolParkDirective,
+  type WaveRollbackPolicy,
+} from '../durable/index.js';
 
 // ============================================================================
 // Public types
@@ -70,6 +81,8 @@ export interface ToolLoopResult {
   problem?: HttpProblemDetails;
   /** Set when a hook asked for approval. The kernel parks instead of persisting this row. */
   hold?: 'approval';
+  /** Set when a tool returned a durable park directive. */
+  park?: ToolParkDirective;
   /** True once `tool.execute` was entered. Omitted means the attempt never ran. */
   ran?: boolean;
   /** Time inside `tool.execute`, when it was entered. */
@@ -205,6 +218,12 @@ export interface ToolLoopHost {
 
   /** Tool-call ids that already have a persisted tool_result. Skip writing them again. */
   pairedToolCallIds?(sessionId: string): ReadonlySet<string>;
+
+  /** Optional durable single-tool intent-first + replay memoization context. */
+  durable?: DurableToolLoopContext;
+
+  /** Wave rollback policy: 'abort_or_tx_only' prevents rolling back normal tool errors (e.g. TDD failures). */
+  waveRollbackPolicy?: WaveRollbackPolicy;
 }
 
 // ============================================================================
@@ -1134,6 +1153,7 @@ async function dispatchAdmittedScopedTool(
       media: result.media,
       artifacts: result.artifacts,
       metadata: result.metadata,
+      ...(result.park ? { park: result.park } : {}),
       ...(hookRewrote ? { hookRewrote: true } : {}),
     };
   } catch (error) {
@@ -1144,6 +1164,35 @@ async function dispatchAdmittedScopedTool(
   }
 }
 
+
+async function dispatchWithDurableIntent(
+  host: ToolLoopHost,
+  tool: ToolContract<Record<string, unknown>>,
+  toolCall: ToolCallPart,
+  liveContext: RunContext,
+  sessionId: string,
+  completed: CompletedWaveItem[] | undefined,
+  hookRewrote: boolean,
+  execInput: unknown,
+  snapshot: Awaited<ReturnType<typeof captureToolSnapshot>>,
+  fresh: SessionRecord
+): Promise<ToolLoopResult> {
+  if (!host.durable) {
+    return dispatchAdmittedScopedTool(
+      host, tool, toolCall, liveContext, sessionId, completed, hookRewrote, execInput, snapshot, fresh
+    );
+  }
+  const decision = await prepareDurableToolDispatch(host.durable, tool, toolCall);
+  if (decision.action !== 'execute') return decision.result;
+  const durableCtx = attachDurableMemoContext(liveContext, decision.step.stepId, decision.memo);
+  const settled = await dispatchAdmittedScopedTool(
+    host, tool, toolCall, durableCtx, sessionId, completed, hookRewrote, execInput, snapshot, fresh
+  );
+  settleDurableToolResult(
+    host.durable, tool, toolCall, decision.step, durableCtx, (execInput ?? {}) as Record<string, unknown>, settled
+  );
+  return settled;
+}
 
 /** Keep in-memory skill-manifest ceilings when execution re-reads the stored session. */
 function sessionWithStoredSkillManifests(
@@ -1251,7 +1300,7 @@ async function executeScopedTool(
   const liveContext =
     fresh === context.session ? context : { ...context, session: sessionWithStoredSkillManifests(fresh, context.session) };
 
-  return dispatchAdmittedScopedTool(
+  return dispatchWithDurableIntent(
     host,
     tool,
     toolCall,
@@ -1378,6 +1427,21 @@ function toolResultIdsAlreadyPaired(host: ToolLoopHost, sessionId: string): Read
 // Wave execution with compensation
 // ============================================================================
 
+function buildExecutionChunks(
+  host: ToolLoopHost,
+  tools: ToolContract<Record<string, unknown>>[],
+  validToolCalls: ToolCallPart[],
+  maxParallelToolCalls: number
+): ToolCallPart[][] {
+  if (!host.durable) return partitionForParallel(validToolCalls, maxParallelToolCalls);
+  planDurableToolWave(host.durable, validToolCalls, tools);
+  const { prePivot, pivot } = partitionCallsByEffectStage(validToolCalls, tools);
+  return [
+    ...partitionForParallel(prePivot, maxParallelToolCalls),
+    ...pivot.map((call) => [call]),
+  ];
+}
+
 export async function executeToolCalls(
   host: ToolLoopHost,
   tools: ToolContract<Record<string, unknown>>[],
@@ -1391,7 +1455,7 @@ export async function executeToolCalls(
   const results: ToolLoopResult[] = [];
   const approvalFor = createApprovalLookup(host, sessionId);
 
-  for (const chunk of partitionForParallel(validToolCalls, maxParallelToolCalls)) {
+  for (const chunk of buildExecutionChunks(host, tools, validToolCalls, maxParallelToolCalls)) {
     if (context.abortSignal?.aborted) break;
     host.assertSessionWritable?.(sessionId);
     const chunkResults = await Promise.all(
@@ -1400,7 +1464,10 @@ export async function executeToolCalls(
     results.push(...chunkResults);
   }
 
-  if (waveNeedsCompensation(results, context.abortSignal?.aborted === true) && host.compensate) {
+  const needsComp = host.waveRollbackPolicy
+    ? shouldTriggerWaveCompensation({ results, aborted: context.abortSignal?.aborted === true, policy: host.waveRollbackPolicy })
+    : waveNeedsCompensation(results, context.abortSignal?.aborted === true);
+  if (needsComp && host.compensate) {
     const report = await host.compensate(completed);
     const rolledBack = new Set(report?.compensated ?? []);
     for (const result of results) {
@@ -1410,7 +1477,18 @@ export async function executeToolCalls(
     }
   }
 
+  await notifyDurableWaveSettled(host.durable);
+
   return results;
+}
+
+async function notifyDurableWaveSettled(durable: DurableToolLoopContext | undefined): Promise<void> {
+  if (!durable?.onWaveSettled) return;
+  try {
+    await durable.onWaveSettled();
+  } catch {
+    /* post-wave state capture is best-effort */
+  }
 }
 
 // ============================================================================

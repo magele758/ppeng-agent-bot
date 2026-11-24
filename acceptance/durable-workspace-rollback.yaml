@@ -1,0 +1,33 @@
+id: durable-workspace-rollback
+title: Durable WorkspaceTx physical atomic rollback and cognitive-preservation folding
+status: implemented
+owner: core
+requirement: "怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；1、普通工具失败默认不回滚；2、原地 Git Shadow Savepoint + 长任务可选 APFS clonefile/Worktree 隔离副本；Phase 1 到 Phase 4 逐步推进并每步验证无降级"
+notes: >-
+  assumedApproval: standing-order-2026-10-22.
+  Phase 2 of the Durable Agent Loop RFC: physical workspace atomic rollback covering
+  write_file, edit_file, and bash via Git Shadow Savepoint (independent GIT_INDEX_FILE),
+  isolated APFS clonefile / Git Worktree long-task scopes, and non-Git CAS file journal
+  fallback with external-edit CAS conflict protection, lazy zero-overhead read waves,
+  and [tx_rolled_back] cognitive-preservation folding.
+criteria:
+  - id: AC-1
+    given: A Git workspace where an agent takes a GitShadowWorkspaceTx savepoint and runs write_file, edit_file, and destructive bash commands creating, modifying, and deleting files
+    when: rollbackTo(savepoint) runs without touching .git/index or HEAD
+    then: The workspace is restored byte-for-byte to the savepoint, newly created files are removed, and user .git/index and HEAD remain untouched
+  - id: AC-2
+    given: A dirty Git workspace with pre-existing user uncommitted tracked and untracked files, plus a file modified externally after the agent's write
+    when: rollbackTo(savepoint) runs without force
+    then: Pre-existing user dirty edits and untracked files are preserved verbatim, and the externally modified file is reported in conflicts[] without being overwritten
+  - id: AC-3
+    given: An isolated long-task workspace scope (APFS CoW clone on macOS or Git Worktree fallback)
+    when: Mutating operations run inside execRoot and either abortScope or commitScope is called
+    then: Main workspace stays untouched until commitScope atomically applies deltas with CAS conflict checks, and abortScope leaves zero residue
+  - id: AC-4
+    given: A non-Git workspace directory or a Git repository exceeding savepointTimeoutMs
+    when: WorkspaceTx takes a savepoint and rolls back binary and executable-mode file mutations
+    then: CasFileJournalTx persists blobs under stateDir/tx-blobs, restores exact bytes and POSIX file modes, and detects external modifications
+  - id: AC-5
+    given: Durable mode is atomic_workspace with default waveRollbackPolicy abort_or_tx_only
+    when: A read-only wave executes, a TDD wave [write_file, bash("exit 1")] fails normally, and an explicit rollback endpoint POST /api/sessions/:id/durable/rollback is triggered
+    then: Read-only waves take zero savepoints (<=5ms overhead), ordinary tool failure does not auto-rollback prior writes, and explicit rollback restores the workspace and appends a [tx_rolled_back] cognitive-preservation notice without breaking early Prompt Cache

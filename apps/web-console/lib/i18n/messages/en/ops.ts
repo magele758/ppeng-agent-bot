@@ -246,5 +246,54 @@ export const ops = {
     detailFailed: 'Failed to load: {message}',
     hiddenTitle: 'Evolution is hidden',
     hiddenBody: 'Evolution is turned off in the product and will not run on its own. This address only shows this note.'
+  },
+
+  durable: {
+    title: 'Durable checkpoints & recovery',
+    hint: 'Inspect durable run frames and child ownership tree, or trigger rollback, fork, and reconcile.',
+    empty: 'No durable runs recorded for this session yet.',
+    loadFailed: 'Failed to load durable state: {message}',
+    refresh: 'Refresh',
+    runLabel: 'Run',
+    epochLabel: 'Epoch #{n}',
+    restartsLabel: 'Restarts: {n}',
+    pivotPassed: 'Passed irreversible Pivot',
+    pivotClear: 'Before Pivot',
+    childRunsTitle: 'Child run ownership tree ({n})',
+    stepsTitle: 'Step timeline ({n})',
+    noSteps: 'No durable steps recorded yet.',
+    rollback: 'Rollback here',
+    fork: 'Fork here',
+    reconcile: 'Reconcile unknown',
+    resolveCommitted: 'Confirm applied',
+    resolveNotApplied: 'Confirm not applied',
+    actionDone: 'Action completed',
+    actionForked: 'Forked new session: {id}',
+    actionPivotBlocked: 'Blocked by irreversible Pivot boundary; automatic rollback stopped.',
+    actionFailed: 'Action failed: {message}',
+    phase: {
+      planned: 'Planned',
+      dispatched: 'Dispatched',
+      parked: 'Parked',
+      committed: 'Committed',
+      failed: 'Failed',
+      unknown: 'Unknown',
+      compensating: 'Compensating',
+      compensated: 'Compensated',
+      compensation_failed: 'Compensation failed'
+    },
+    runStatus: {
+      running: 'Running',
+      waiting_park: 'Waiting signal',
+      completing: 'Completing subtree',
+      rolling_back: 'Rolling back',
+      rolled_back: 'Rolled back',
+      needs_reconcile: 'Needs reconcile',
+      resumable: 'Resumable',
+      suspended_interrupted: 'Suspended',
+      completed: 'Completed',
+      failed: 'Failed',
+      aborted: 'Aborted'
+    }
   }
 };

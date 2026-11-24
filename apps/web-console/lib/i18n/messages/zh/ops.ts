@@ -246,5 +246,54 @@ export const ops = {
     detailFailed: '加载失败：{message}',
     hiddenTitle: 'Evolution 已隐藏',
     hiddenBody: 'Evolution 已从产品里关掉，不会自动运行。直接打开这个地址只会看到这段说明。'
+  },
+
+  durable: {
+    title: 'Durable 检查点与恢复',
+    hint: '查看持久执行帧、子任务所有权树，并执行工作区回滚、分叉或人工核对。',
+    empty: '该会话尚无 Durable 运行记录。',
+    loadFailed: 'Durable 状态加载失败：{message}',
+    refresh: '刷新',
+    runLabel: '运行',
+    epochLabel: '代次 #{n}',
+    restartsLabel: '重启 {n} 次',
+    pivotPassed: '已跨过不可逆边界（Pivot）',
+    pivotClear: '未跨过不可逆边界',
+    childRunsTitle: '子运行所有权树（{n}）',
+    stepsTitle: '步骤时间线（{n}）',
+    noSteps: '暂无持久步骤记录。',
+    rollback: '回滚到此步',
+    fork: '从此步分叉',
+    reconcile: '核对未知副作用',
+    resolveCommitted: '确认已生效',
+    resolveNotApplied: '确认未生效',
+    actionDone: '操作已完成',
+    actionForked: '已分叉新会话：{id}',
+    actionPivotBlocked: '已被不可逆边界（Pivot）拦截，未自动回滚。',
+    actionFailed: '操作失败：{message}',
+    phase: {
+      planned: '已规划',
+      dispatched: '已派发',
+      parked: '已挂起',
+      committed: '已提交',
+      failed: '失败',
+      unknown: '状态未知',
+      compensating: '补偿中',
+      compensated: '已补偿',
+      compensation_failed: '补偿失败'
+    },
+    runStatus: {
+      running: '运行中',
+      waiting_park: '等待外部信号',
+      completing: '正在收口子树',
+      rolling_back: '回滚补偿中',
+      rolled_back: '已回滚',
+      needs_reconcile: '待人工核对',
+      resumable: '可自动续跑',
+      suspended_interrupted: '已挂起待恢复',
+      completed: '已完成',
+      failed: '已失败',
+      aborted: '已中止'
+    }
   }
 };

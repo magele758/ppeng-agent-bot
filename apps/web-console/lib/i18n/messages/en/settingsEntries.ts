@@ -603,6 +603,63 @@ export const settingsEntries = {
       }
     }
   },
+  durable: {
+    title: 'Durable execution & atomic rollback',
+    keywords: 'durable execution atomic rollback resume checkpoint savepoint git shadow saga reconcile crash recovery',
+    desc: 'Control intent-first tool journaling, workspace atomic rollback, restart recovery policy, and restart circuit breaker. Applies immediately without restart.',
+    fields: {
+      mode: {
+        label: 'Durable mode',
+        hint: 'Controls per-tool intent journaling, crash resume, and physical workspace savepoints.'
+      },
+      workspaceBackend: {
+        label: 'Workspace snapshot backend',
+        hint: 'Auto prefers detached-index Git Shadow and falls back to CAS file journal outside Git repos.'
+      },
+      chatRestartPolicy: {
+        label: 'Chat restart policy',
+        hint: 'How unfinished ordinary chats recover after a daemon restart.'
+      },
+      waveRollbackPolicy: {
+        label: 'Wave error rollback policy',
+        hint: 'By default ordinary tool failures keep files in place so the agent can inspect and fix them.'
+      },
+      isolateLongTasks: {
+        label: 'Isolate long tasks',
+        hint: 'Run long autonomous tasks in an APFS CoW or Git worktree isolated copy.'
+      },
+      restartLimit: {
+        label: 'Restart circuit limit',
+        hint: 'Trips into failed once consecutive crashes reach this limit to prevent restart loops.'
+      },
+      savepointTimeoutMs: {
+        label: 'Savepoint timeout (ms)',
+        hint: 'Falls back cleanly if taking a workspace savepoint exceeds this latency budget.'
+      }
+    },
+    options: {
+      mode: {
+        atomic_workspace: 'Full (journal + atomic workspace rollback)',
+        journal_only: 'Journal only (no workspace savepoints)',
+        off: 'Off'
+      },
+      workspaceBackend: {
+        auto: 'Auto',
+        git_shadow: 'Git Shadow index',
+        cow: 'APFS CoW / Worktree clone',
+        cas_file: 'CAS file journal'
+      },
+      chatRestartPolicy: {
+        auto_resume: 'Auto resume',
+        park_resumable: 'Park for manual resume',
+        legacy_fail: 'Mark failed on restart'
+      },
+      waveRollbackPolicy: {
+        abort_or_tx_only: 'Only on abort or explicit tx failure',
+        on_tool_error: 'Auto rollback on tool error'
+      }
+    }
+  },
   registeredMachines: {
     "title": "Registered Machines",
     "keywords": "machines desktop agent phone device local registered attach ssh",

@@ -600,6 +600,63 @@ export const settingsEntries = {
       }
     }
   },
+  durable: {
+    title: '持久执行与原子回滚（Durable）',
+    keywords: 'durable 持久执行 原子回滚 断点续跑 checkpoint savepoint git shadow saga reconcile 崩溃恢复',
+    desc: '控制单工具落盘、工作区原子回滚、进程重启恢复策略与熔断上限。保存后立即生效，无需重启。',
+    fields: {
+      mode: {
+        label: '持久执行模式',
+        hint: '控制工具调用的意图先写、崩溃续跑与工作区物理快照能力。'
+      },
+      workspaceBackend: {
+        label: '工作区快照后端',
+        hint: '自动模式优先使用独立索引 Git Shadow，非 Git 目录回退到 CAS 文件日志。'
+      },
+      chatRestartPolicy: {
+        label: '重启后恢复策略',
+        hint: '进程意外重启后，对未完成普通对话的默认处理方式。'
+      },
+      waveRollbackPolicy: {
+        label: '工具报错回滚策略',
+        hint: '默认普通工具报错不自动回滚，保留现场便于 Agent 观察和修复。'
+      },
+      isolateLongTasks: {
+        label: '长任务隔离副本',
+        hint: '为长时间自主任务启用 APFS CoW / Git Worktree 隔离工作区副本。'
+      },
+      restartLimit: {
+        label: '最大崩溃重启次数',
+        hint: '同一运行连续崩溃达到上限后触发熔断，避免无限重启循环。'
+      },
+      savepointTimeoutMs: {
+        label: '快照超时上限（毫秒）',
+        hint: '单次工作区 Savepoint 超出该预算后自动降级，避免拖慢主循环。'
+      }
+    },
+    options: {
+      mode: {
+        atomic_workspace: '完整模式（日志 + 工作区原子回滚）',
+        journal_only: '仅控制面日志（不建工作区快照）',
+        off: '关闭'
+      },
+      workspaceBackend: {
+        auto: '自动选择',
+        git_shadow: 'Git Shadow 独立索引',
+        cow: 'APFS CoW / Worktree 副本',
+        cas_file: 'CAS 文件日志'
+      },
+      chatRestartPolicy: {
+        auto_resume: '自动续跑',
+        park_resumable: '挂起等待人工继续',
+        legacy_fail: '标记为中断失败'
+      },
+      waveRollbackPolicy: {
+        abort_or_tx_only: '仅在取消/事务失败时回滚',
+        on_tool_error: '工具报错即自动回滚'
+      }
+    }
+  },
   registeredMachines: {
     "title": "已注册的机器",
     "keywords": "机器 桌面 代理 手机 设备 本地 注册 连接 ssh",

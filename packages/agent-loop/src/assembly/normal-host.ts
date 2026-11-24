@@ -11,10 +11,13 @@ import {
   checkToolApprovals,
   executeToolCalls,
   filterValidToolCalls,
+  pairedToolCallIdsFromMessages,
   processToolResults,
   runTurnWithRetries,
   type ToolLoopHost,
+  type ToolLoopResult,
 } from '../runtime/tool-loop.js';
+import type { DurableToolLoopContext } from '../durable/tool-runner-hooks.js';
 import {
   compensateCompletedLifo,
   createCompensationTx,
@@ -80,6 +83,61 @@ function buildToolLoopHost(
           })
       : undefined,
     compensate: (items) => compensateCompletedLifo(items),
+    pairedToolCallIds: (sessionId) => pairedToolCallIdsFromMessages(store.foldMessages(sessionId)),
+  };
+}
+
+function findCommittedToolResult(
+  store: AssembledLoop['store'],
+  sessionId: string,
+  toolCallId: string
+): { ok: boolean; content: string; name: string } | undefined {
+  const folded = store.foldMessages(sessionId);
+  for (let i = folded.length - 1; i >= 0; i -= 1) {
+    for (const part of folded[i]!.parts) {
+      if (part.type === 'tool_result' && part.toolCallId === toolCallId) {
+        return { ok: part.ok, content: part.content, name: part.name };
+      }
+    }
+  }
+  return undefined;
+}
+
+function hasDeferredWaveMedia(result: { images?: unknown[]; media?: unknown[]; metadata?: Record<string, unknown> }): boolean {
+  if (result.images?.length || result.media?.length) return true;
+  const a2ui = result.metadata?.a2uiMessages;
+  return Array.isArray(a2ui) && a2ui.length > 0;
+}
+
+function attachDurableToToolHost(
+  toolHost: ToolLoopHost,
+  assembled: AssembledLoop,
+  context: import('../types.js').RunContext,
+  sessionId: string
+): ToolLoopHost {
+  const cfg = assembled.host.durable;
+  if (!cfg || !context.durableRunId) return toolHost;
+  const durable: DurableToolLoopContext = {
+    journal: cfg.journal,
+    runId: context.durableRunId,
+    sessionId,
+    turn: context.durableTurn ?? 0,
+    waveIndex: 0,
+    fencingEpoch: context.durableFencingEpoch ?? 1,
+    restartLimit: cfg.restartLimit ?? 3,
+    getCommittedToolResult: (toolCallId) => findCommittedToolResult(assembled.store, sessionId, toolCallId),
+    persistSingleToolResult: (result, call) => {
+      if (result.hold === 'approval' || hasDeferredWaveMedia(result)) return undefined;
+      const task = context.session.taskId ? toolHost.getTask(context.session.taskId) : undefined;
+      processToolResults(toolHost, [result as ToolLoopResult], [call], context.session, task, sessionId);
+      const last = assembled.store.foldMessages(sessionId).at(-1);
+      return typeof last?.seq === 'number' ? last.seq : undefined;
+    },
+  };
+  return {
+    ...toolHost,
+    durable,
+    waveRollbackPolicy: cfg.waveRollbackPolicy ?? 'abort_or_tx_only',
   };
 }
 
@@ -121,9 +179,10 @@ export function createNormalAssembledLoop(input: CreateAssembledLoopInput = {}):
   if (!io.executeToolCalls) {
     assembled.host.executeToolCalls = (toolCalls, context, allowExternal, sessionId, turnTools) => {
       const tx = createCompensationTx();
+      const execHost = attachDurableToToolHost(toolHost, assembled, context, sessionId);
       return runWithCompensation(tx, () =>
         executeToolCalls(
-          toolHost,
+          execHost,
           toolsOf(turnTools),
           toolCalls as ToolCallPart[],
           context,

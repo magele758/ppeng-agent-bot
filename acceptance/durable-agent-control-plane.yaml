@@ -1,0 +1,33 @@
+id: durable-agent-control-plane
+title: Durable Agent 控制面持久化与断点续跑
+status: implemented
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  Phase 1 of durable-agent-rfc.md: single-tool intent-first persistence, double-checked replay safety, restart limit circuit breaker, checkpointed kernel guards, auto-resume for interrupted chats, and zero-degradation prompt cache byte identity.
+requirement: |
+  1、是；2、是；3、自动续跑；4、可以，我希望你能从phase1 到 phase4逐步推进，每一步都要经过验证没问题、无降级才继续推进，有问题就修复到无问题为止，直到4个phase都完成为止
+criteria:
+  - id: AC-1
+    given: 会话开启持久化控制面，一轮中包含多个连续工具调用
+    when: 前面的工具已执行完成且后面的工具在执行中途进程中断并重启续跑
+    then: 已完成工具的结果保留且续跑时不再重复执行，仅处理未完成的工具
+  - id: AC-2
+    given: 某工具调用在执行中途因进程中断处于未确认状态
+    when: 系统重启并尝试恢复该工具调用
+    then: 只有当落盘记录和当前工具定义都允许安全重放时才重新执行，非安全或默认工具绝不自动重放并向模型返回明确中断提示
+  - id: AC-3
+    given: 某会话任务连续多次在推进有效进度前发生进程中断
+    when: 连续中断次数达到配置的重启上限
+    then: 系统停止继续自动续跑并将该运行终止为重启超限，避免无限崩溃死循环
+  - id: AC-4
+    given: 会话在多轮执行中已累积轮次与护栏状态
+    when: 进程中断后通过持久化断点恢复该会话
+    then: 恢复后的运行继承中断前的轮次与护栏状态，不重置为零
+  - id: AC-5
+    given: 持久化控制面默认开启且聊天重启策略为自动续跑
+    when: 普通对话运行中断后重启调度器执行恢复，或将持久化配置热切换为关闭
+    then: 自动续跑模式下调度器自动续跑可恢复会话直至完成；切换为关闭模式后立即退回原有行为且无需重启
+  - id: AC-6
+    given: 同一对话输入与工具集分别在开启和关闭持久化控制面下执行正常轮次
+    when: 对比发往模型的系统提示、工具定义列表与历史消息载荷
+    then: 两者逐字节完全一致，持久化元数据不泄漏进模型请求且不破坏提示词缓存前缀

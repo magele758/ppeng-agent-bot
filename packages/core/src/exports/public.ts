@@ -756,6 +756,7 @@ export * from '../workspace/index.js';
 export * from '../teams/index.js';
 export * from '../a2ui/index.js';
 export * from '../bots/index.js';
+export * from '../durable/index.js';
 export { parseSessionMaxTurns } from '../runtime/session-max-turns.js';
 export * from '../auth/index.js';
 export {

@@ -1,5 +1,10 @@
 <!-- 本文件由 scripts/prd/build-catalog.mjs 生成，不要手改。改验收规格或技能说明后重新运行该脚本。 -->
 
+## durable-agent-control-plane
+Durable Agent 控制面持久化与断点续跑
+
+1、是；2、是；3、自动续跑；4、可以，我希望你能从phase1 到 phase4逐步推进，每一步都要经过验证没问题、无降级才继续推进，有问题就修复到无问题为止，直到4个phase都完成为止
+
 ## durable-agent-waits
 Agent 持久化条件等待与恢复
 
@@ -25,9 +30,24 @@ through the same daemon/core patterns as other library resources.
 Rendering may reuse a read-only A2UI basic-catalog surface. Do not clone a
 Grok/Cursor canvas, and do not turn session A2UI cards into library pages.
 
+## durable-saga-park-reconcile
+Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Reconcile
+
+怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；Phase 3 实现持久化声明式 Saga、Pivot 边界守卫、工具级 park()/Signal/memo() 与 unknown 副作用 reconcile() 收敛
+
+## durable-tx-tree-and-ui
+Durable ownership tree, orphan abandonment, and Lab settings & time-travel UI
+
+怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；Phase 4 实现父子 Subagent 所有权树级联取消与重启孤儿收敛，以及 Lab 控制台热配置卡片和会话 Checkpoint 时间旅行与 Reconcile 人工确认面板
+
 ## durable-wait-default
 Durable wait is the default Goal/Routine park path
 
 waiting_condition / wait_for is the default path for Goal and Routine when suspending
 for an owned observable. Host parks waiting goal_dispatch results onto durable wait
 without requiring the model to call wait_for. Cron/sleep/history-poll are not substitutes.
+
+## durable-workspace-rollback
+Durable WorkspaceTx physical atomic rollback and cognitive-preservation folding
+
+怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；1、普通工具失败默认不回滚；2、原地 Git Shadow Savepoint + 长任务可选 APFS clonefile/Worktree 隔离副本；Phase 1 到 Phase 4 逐步推进并每步验证无降级

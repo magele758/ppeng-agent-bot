@@ -2818,6 +2818,13 @@ Kernel handoff states must not map to implement delivery success
 - `apps/web-console/lib/discovery-default-on.test.ts`
 - `packages/core/test/discovery-settings.test.js`
 
+### durable-agent-control-plane
+
+Durable Agent 控制面持久化与断点续跑
+
+- `packages/agent-loop/src/durable/durable-control-plane.test.ts`
+- `packages/core/test/durable-control-plane.test.js`
+
 ### durable-agent-waits
 
 Agent 持久化条件等待与恢复
@@ -2841,11 +2848,33 @@ Agent 持久化条件等待与恢复
 - `packages/core/test/durable-page-port.test.js`
 - `packages/core/test/page-revisions.test.js`
 
+### durable-saga-park-reconcile
+
+Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Reconcile
+
+- `packages/agent-loop/src/durable/durable-saga-park-reconcile.test.ts`
+- `packages/core/test/durable-saga-park-reconcile.test.js`
+
+### durable-tx-tree-and-ui
+
+Durable ownership tree, orphan abandonment, and Lab settings & time-travel UI
+
+- `apps/daemon/test/durable-routes.test.ts`
+- `apps/web-console/lib/durable.test.ts`
+- `packages/agent-loop/src/durable/durable-ownership-tree.test.ts`
+- `packages/core/test/durable-ownership-tree.test.js`
+
 ### durable-wait-default
 
 Durable wait is the default Goal/Routine park path
 
 - `packages/core/test/durable-wait-default.test.js`
+
+### durable-workspace-rollback
+
+Durable WorkspaceTx physical atomic rollback and cognitive-preservation folding
+
+- `packages/core/test/durable-workspace-rollback.test.js`
 
 ### email-webhook-replay
 

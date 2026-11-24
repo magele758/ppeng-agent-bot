@@ -29,3 +29,4 @@ export { createKernelHookRegistry } from './turn/hooks.js';
 export { createMemorySurfaceStore } from './session/surface-store.js';
 export { decideHitlLatch } from './approval/hitl-latch.js';
 export { DEFAULT_EMBED_AGENT, adaptMemoryStore, createDefaultMemoryStore } from './assembly/store-adapter.js';
+export * from './durable/index.js';

@@ -6,6 +6,7 @@ import type { McpManager } from '../mcp/mcp-manager.js';
 import { parseRunInterrupt, mergeInterruptMetadata } from '../session/interrupt.js';
 import { mergeOutcomeMetadata, runOutcomeFromEnd } from '../session/run-outcome.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
+import { cancelDurableTreeForSession } from '../durable/recovery.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { TraceEvent } from '../stores/trace.js';
 import type { SessionRecord } from '../types.js';
@@ -25,9 +26,17 @@ function parkedCancelStatus(session: SessionRecord): 'failed' | 'idle' {
   return 'idle';
 }
 
+function abortDurableChildSessions(host: SessionControlHost, childSessionIds: readonly string[]): void {
+  for (const childId of childSessionIds) {
+    cancelSession(host, childId);
+    host.sessionAbortControllers.get(childId)?.abort();
+  }
+}
+
 export function cancelSession(host: SessionControlHost, sessionId: string, expectedWriterRunId?: string): void {
   const controller = host.sessionAbortControllers.get(sessionId);
   let cancelled = false;
+  let childSessionIds: string[] = [];
   host.store.transaction(() => {
     const session = host.store.getSession(sessionId);
     if (!session) return;
@@ -41,6 +50,7 @@ export function cancelSession(host: SessionControlHost, sessionId: string, expec
       || [...host.backgroundJobAborts].some(([id, ac]) => !ac.signal.aborted && host.store.getBackgroundJob(id)?.sessionId === sessionId);
     if (!active) return;
     host.store.assertCurrentWriter(sessionId);
+    childSessionIds = cancelDurableTreeForSession(host.store, sessionId).childSessionIds;
     closeOpenToolWave(host.store, sessionId, 'interrupted', { expectedWriterRunId: session.activeWriterRunId });
     for (const approval of host.store.listApprovals({ status: 'pending' })) {
       if (approval.sessionId === sessionId) host.store.updateApproval(approval.id, 'rejected');
@@ -54,6 +64,7 @@ export function cancelSession(host: SessionControlHost, sessionId: string, expec
     cancelled = true;
   });
   if (!cancelled) return;
+  abortDurableChildSessions(host, childSessionIds);
   controller?.abort();
   for (const jobId of [...host.backgroundJobAborts.keys()]) {
     const ac = host.backgroundJobAborts.get(jobId);
