@@ -63,6 +63,7 @@ export interface EffectiveConfigInput {
     runtimeCapabilities?: { a2uiEnabled?: boolean; domains?: string[] };
     memory?: { persisted: boolean; embeddingRecallMode: MemoryEmbeddingMode };
     browser?: { persisted: boolean; enabled: boolean };
+    externalAi?: { persisted: boolean; enabled: boolean; allowInBotChats?: boolean };
     discovery?: { persisted: boolean; enabled: boolean };
     /** Lab 模型供应商里是否已有可用的 openai-compatible（含 key + baseUrl）。 */
     openAiCompatibleProviderConfigured?: boolean;
@@ -652,22 +653,48 @@ function resolveA2ui(input: EffectiveConfigInput): EffectiveItem {
 
 }
 
+function localBinariesHints(enabled: boolean, bins: string[]): ConfigNote[] {
+  if (enabled || bins.length === 0) return [];
+  return [
+    note('local_binaries_detected', `Detected on this machine: ${bins.join(', ')}. Not enabled automatically.`, {
+      bins: bins.join(', ')
+    })
+  ];
+}
+
+function resolveExternalAi(input: EffectiveConfigInput, bins: string[]): EffectiveItem {
+  const extLab = input.lab?.externalAi;
+  if (extLab?.persisted) {
+    return item(
+      'manual.externalAiTools',
+      'manual',
+      extLab.enabled,
+      extLab.enabled ? 'on' : 'off',
+      'lab',
+      extLab.enabled ? 'lab_on' : 'lab_off',
+      'Set in Lab.',
+      { hints: localBinariesHints(extLab.enabled, bins) }
+    );
+  }
+  const ext = envFlag(input.env, 'RAW_AGENT_EXTERNAL_AI_TOOLS');
+  return item(
+    'manual.externalAiTools',
+    'manual',
+    ext.on,
+    ext.on ? 'on' : 'off',
+    ext.set ? 'explicit-env' : 'local-fallback',
+    ext.set ? (ext.on ? 'explicit_on' : 'explicit_off') : 'manual_only',
+    'External AI CLIs run local code, so they are opt-in.',
+    { hints: localBinariesHints(ext.on, bins) }
+  );
+}
+
 function resolveManual(input: EffectiveConfigInput): EffectiveItem[] {
   const env = input.env;
   const out: EffectiveItem[] = [];
   const bins = input.probes?.localBinaries ?? [];
 
-  const ext = envFlag(env, 'RAW_AGENT_EXTERNAL_AI_TOOLS');
-  out.push(
-    item('manual.externalAiTools', 'manual', ext.on, ext.on ? 'on' : 'off', ext.set ? 'explicit-env' : 'local-fallback',
-      ext.set ? (ext.on ? 'explicit_on' : 'explicit_off') : 'manual_only',
-      'External AI CLIs run local code, so they are opt-in.',
-      {
-        hints: !ext.on && bins.length > 0
-          ? [note('local_binaries_detected', `Detected on this machine: ${bins.join(', ')}. Not enabled automatically.`, { bins: bins.join(', ') })]
-          : []
-      })
-  );
+  out.push(resolveExternalAi(input, bins));
 
   const browser = input.lab?.browser;
   if (browser?.persisted) {

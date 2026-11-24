@@ -1,6 +1,6 @@
-import { existsSync, statSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import { existsSync } from 'node:fs';
 import {
+  detectLocalCodingAgents,
   gatewayConfigPath,
   RUNTIME_CAPABILITIES_KEY,
   readRuntimeCapabilities,
@@ -8,10 +8,12 @@ import {
   type RuntimeCapabilities,
   hasPersistedBrowserSettings,
   hasPersistedDiscoverySettings,
+  hasPersistedExternalAiSettings,
   hasPersistedMemorySettings,
   hasPersistedWebSettings,
   readBrowserSettings,
   readDiscoverySettings,
+  readExternalAiSettings,
   readMemorySettings,
   readModelCatalog,
   readWebSettings,
@@ -23,25 +25,11 @@ import {
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
 
-const EXTERNAL_AI_BINARIES = ['claude', 'codex', 'cursor-agent'] as const;
-
 /** 只看 PATH 上有没有可执行文件；结果仅作提示，绝不据此自动开启能力。 */
 export function detectLocalBinaries(env: NodeJS.ProcessEnv): string[] {
-  const dirs = String(env.PATH ?? '')
-    .split(delimiter)
-    .filter(Boolean);
-  const found: string[] = [];
-  for (const bin of EXTERNAL_AI_BINARIES) {
-    const hit = dirs.some((d) => {
-      try {
-        return statSync(join(d, bin)).isFile();
-      } catch {
-        return false;
-      }
-    });
-    if (hit) found.push(bin);
-  }
-  return found;
+  return detectLocalCodingAgents(env)
+    .filter((agent) => agent.installed)
+    .map((agent) => agent.resolvedBinary ?? agent.command);
 }
 
 export interface ConfigRoutesDeps {
@@ -70,6 +58,11 @@ export function buildEffectiveConfigInput(runtime: RawAgentRuntime, deps: Config
       browser: {
         persisted: hasPersistedBrowserSettings(store),
         enabled: readBrowserSettings(store).enabled
+      },
+      externalAi: {
+        persisted: hasPersistedExternalAiSettings(store),
+        enabled: readExternalAiSettings(store).enabled,
+        allowInBotChats: readExternalAiSettings(store).allowInBotChats
       },
       discovery: {
         persisted: hasPersistedDiscoverySettings(store),
