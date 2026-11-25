@@ -296,6 +296,11 @@ export function TaskDelivery({ delivery, onContinue }: { delivery: Delivery; onC
   return (
     <section className={styles.deliveryCard} data-testid="bot-task-delivery">
       <DeliveryMeta delivery={delivery} manualReview={manualReview} />
+      {delivery.failureReason && (
+        <p role="status" className={styles.deliveryFailure}>
+          {t('botWork.unfinishedReason', { reason: delivery.failureReason })}
+        </p>
+      )}
       <Feedback {...reviewAction} />
       <DeliveryActionRow
         delivery={delivery}
@@ -310,11 +315,6 @@ export function TaskDelivery({ delivery, onContinue }: { delivery: Delivery; onC
           className={`markdown-body ${styles.deliveryReport}`}
           dangerouslySetInnerHTML={{ __html: renderMarkdown(delivery.report) }}
         />
-      )}
-      {delivery.failureReason && (
-        <p role="status" className={styles.deliveryFailure}>
-          {t('botWork.unfinishedReason', { reason: delivery.failureReason })}
-        </p>
       )}
       <DeliveryArtifacts
         artifacts={delivery.artifacts}

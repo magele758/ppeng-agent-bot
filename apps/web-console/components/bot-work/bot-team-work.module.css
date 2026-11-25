@@ -166,7 +166,7 @@
   border: 1px solid var(--ui-home-accent, var(--ui-accent));
   border-radius: 999px;
   background: var(--ui-home-accent, var(--ui-accent));
-  color: var(--ui-home-on-accent, #ffffff);
+  color: var(--ui-home-on-accent, var(--ui-accent-contrast));
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -425,7 +425,7 @@
   padding: 0 5px;
   border-radius: 999px;
   background: var(--ui-home-accent, var(--ui-accent));
-  color: var(--ui-home-on-accent, #ffffff);
+  color: var(--ui-home-on-accent, var(--ui-accent-contrast));
   font-size: 11px;
   font-weight: 600;
 }
@@ -437,6 +437,8 @@
   left: 8px;
   right: 8px;
   z-index: 30;
+  max-height: min(65vh, 400px);
+  overflow-y: auto;
   padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--ui-home-line-strong, var(--ui-border));
@@ -1244,13 +1246,18 @@
   overflow-wrap: anywhere;
 }
 
-.deliveryFailure {
+.deliveryFailure,
+.failureBanner {
   margin: 0;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--ui-home-danger-soft, rgb(220 38 38 / 0.1));
+  padding: 10px 14px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--ui-home-danger, var(--ui-danger)) 35%, transparent);
+  background: var(--ui-home-danger-soft, rgb(220 38 38 / 0.12));
   color: var(--ui-home-danger, var(--ui-danger));
-  font-size: 12.5px;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .artifactList {
@@ -1424,12 +1431,75 @@
 .pillBtnPrimary {
   border-color: var(--ui-home-accent, var(--ui-accent));
   background: var(--ui-home-accent, var(--ui-accent));
-  color: var(--ui-home-on-accent, #ffffff);
+  color: var(--ui-home-on-accent, var(--ui-accent-contrast));
 }
 
 .pillBtnPrimary:hover:not(:disabled) {
   filter: brightness(1.06);
   background: var(--ui-home-accent, var(--ui-accent));
+}
+
+.pillBtnPrimary:disabled {
+  opacity: 1;
+  border-color: var(--ui-home-line, var(--ui-border));
+  background: var(--ui-home-sunk, var(--ui-surface));
+  color: var(--ui-home-text-tertiary, var(--ui-text-muted));
+  cursor: not-allowed;
+}
+
+/* ── Semantic Status Pill Alignment (Matches #/tasks/queue Tokens) ── */
+.shell :global(.routine-status) {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px !important;
+  border-radius: 999px !important;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  border-color: var(--ui-home-line, var(--ui-border));
+  background: var(--ui-home-sunk, var(--ui-surface));
+  color: var(--ui-home-text-secondary, var(--ui-text-muted));
+}
+
+.shell :global(.routine-status--failed),
+.shell :global(.routine-status--unavailable) {
+  background: var(--ui-home-danger-soft, rgb(220 38 38 / 0.12)) !important;
+  color: var(--ui-home-danger, var(--ui-danger)) !important;
+  border-color: color-mix(in srgb, var(--ui-home-danger, var(--ui-danger)) 28%, transparent) !important;
+}
+
+.shell :global(.routine-status--waiting_approval),
+.shell :global(.routine-status--unknown),
+.shell :global(.routine-status--degraded) {
+  background: var(--ui-home-warn-soft, rgb(217 119 6 / 0.14)) !important;
+  color: var(--ui-home-warn, var(--ui-warn)) !important;
+  border-color: color-mix(in srgb, var(--ui-home-warn, var(--ui-warn)) 28%, transparent) !important;
+}
+
+.shell :global(.routine-status--running),
+.shell :global(.routine-status--active),
+.shell :global(.routine-status--queued) {
+  background: var(--ui-home-accent-soft, rgb(95 125 101 / 0.16)) !important;
+  color: var(--ui-home-accent, var(--ui-accent)) !important;
+  border-color: color-mix(in srgb, var(--ui-home-accent, var(--ui-accent)) 30%, transparent) !important;
+}
+
+.shell :global(.routine-status--completed),
+.shell :global(.routine-status--ready) {
+  background: var(--ui-home-ok-soft, rgb(44 122 77 / 0.12)) !important;
+  color: var(--ui-home-ok, var(--ui-ok)) !important;
+  border-color: color-mix(in srgb, var(--ui-home-ok, var(--ui-ok)) 24%, transparent) !important;
+}
+
+.shell :global(.routine-status--cancelled),
+.shell :global(.routine-status--skipped),
+.shell :global(.routine-status--idle),
+.shell :global(.routine-status--paused) {
+  background: var(--ui-home-sunk, var(--ui-surface)) !important;
+  color: var(--ui-home-text-secondary, var(--ui-text-muted)) !important;
+  border-color: var(--ui-home-line, var(--ui-border)) !important;
 }
 
 .pillBtnDanger {

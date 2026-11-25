@@ -1,8 +1,8 @@
 'use client';
 
-import { formatRelativeTime, getBotInitials } from '@/lib/bot-tasks-view';
+import { formatRelativeTime, getBotInitials, relativeTimeLabelsFrom } from '@/lib/bot-tasks-view';
 import { useI18n } from '@/lib/i18n';
-import { extractJobDisplayTitle, resolveAgentLabel } from '@/lib/task-queue-view';
+import { extractJobDisplayTitle, extractQueueTaskPreview, resolveAgentLabel } from '@/lib/task-queue-view';
 import type { BotInfo, SocialPostScheduleItem, TaskSummary } from '@/lib/types';
 import type { JobRow } from '../../shell/LabProvider';
 import { TaskQueueStatusBadge } from './TaskQueueStatusBadge';
@@ -20,8 +20,8 @@ function rowProps(selected: boolean, onSelect: () => void) {
 }
 
 function RowTimestamp({ iso }: { iso: string | undefined }) {
-  const { locale } = useI18n();
-  const rel = formatRelativeTime(iso, locale);
+  const { t, locale } = useI18n();
+  const rel = formatRelativeTime(iso, locale, undefined, relativeTimeLabelsFrom(t));
   return rel ? <span className={styles.rowTime}>{rel}</span> : null;
 }
 
@@ -38,7 +38,7 @@ export function TaskQueueTaskRow({
 }) {
   const { t } = useI18n();
   const agentLabel = resolveAgentLabel(task.ownerAgentId, bots, t('tasks.queue.unassigned'));
-  const preview = firstLineSnippet(task.description);
+  const preview = extractQueueTaskPreview(task.description);
 
   return (
     <button {...rowProps(selected, onSelect)}>

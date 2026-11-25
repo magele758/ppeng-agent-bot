@@ -42,13 +42,18 @@ interface BotTaskListPaneProps {
   onOpenDefaultBot: () => void;
 }
 
-const BAND_CONFIG: ReadonlyArray<{
+interface BandConfig {
   band: BotTaskBand;
   labelKey: MessageKey;
   dotClass: string;
-}> = [
+}
+
+const PRIORITY_BAND_CONFIG: ReadonlyArray<BandConfig> = [
   { band: 'attention', labelKey: 'botWork.bandAttention', dotClass: styles.bandDotAttention },
   { band: 'active', labelKey: 'botWork.bandActive', dotClass: styles.bandDotActive },
+];
+
+const HISTORY_BAND_CONFIG: ReadonlyArray<BandConfig> = [
   { band: 'history', labelKey: 'botWork.bandHistory', dotClass: styles.bandDotHistory },
 ];
 
@@ -231,6 +236,7 @@ function ListHeadBar({
 }
 
 function TaskBandSections({
+  configs,
   bands,
   botNameMap,
   collapsed,
@@ -240,6 +246,7 @@ function TaskBandSections({
   onSelectTask,
   onCancelTask,
 }: {
+  configs: ReadonlyArray<BandConfig>;
   bands: Record<BotTaskBand, BotTaskItem[]>;
   botNameMap: ReadonlyMap<string, string>;
   collapsed: Record<string, boolean>;
@@ -252,7 +259,7 @@ function TaskBandSections({
   const { t } = useI18n();
   return (
     <>
-      {BAND_CONFIG.map(({ band, labelKey, dotClass }) =>
+      {configs.map(({ band, labelKey, dotClass }) =>
         bands[band].length > 0 ? (
           <CollapsibleBand
             key={band}
@@ -384,6 +391,18 @@ export function BotTaskListPane({
       />
 
       <div className={styles.listScroll}>
+        <TaskBandSections
+          configs={PRIORITY_BAND_CONFIG}
+          bands={bands}
+          botNameMap={botNameMap}
+          collapsed={collapsed}
+          selectedTaskId={selectedTaskId}
+          busy={busy}
+          onToggleBand={toggleBand}
+          onSelectTask={onSelectTask}
+          onCancelTask={onCancelTask}
+        />
+
         <CollaborationBandSection
           groups={groups}
           botNameMap={botNameMap}
@@ -398,6 +417,7 @@ export function BotTaskListPane({
         />
 
         <TaskBandSections
+          configs={HISTORY_BAND_CONFIG}
           bands={bands}
           botNameMap={botNameMap}
           collapsed={collapsed}

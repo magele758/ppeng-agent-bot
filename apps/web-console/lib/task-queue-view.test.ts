@@ -2,15 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   QUEUE_BAND_ORDER,
+  QUEUE_EVENT_KEY_MAP,
   buildBotNameMap,
   classifyQueueBand,
   extractJobDisplayTitle,
+  extractQueueTaskPreview,
   formatQueueEventSummary,
   getScheduleActions,
   groupQueueTasks,
   matchesQueueQuery,
+  queueEventTitleKey,
   resolveAgentLabel,
 } from './task-queue-view.ts';
+import { relativeTimeLabelsFrom } from './bot-tasks-view.ts';
+import { zh } from './i18n/messages/zh/index.ts';
+import { en } from './i18n/messages/en/index.ts';
 
 const NOW = Date.parse('2026-11-25T12:00:00Z');
 
@@ -72,6 +78,24 @@ test('extractJobDisplayTitle distills verbose shell pipelines and preserves fall
 
   const onlyCd = extractJobDisplayTitle('cd /tmp/work', '（未命名任务）');
   assert.equal(onlyCd, 'cd /tmp/work');
+
+  const sshCmd =
+    "ssh -o BatchMode=yes -o ConnectTimeout=8 -o ServerAliveInterval=15 ubuntu1 'while ps -p 1234 >/dev/null; do sleep 5; done'";
+  assert.equal(extractJobDisplayTitle(sshCmd, '（未命名任务）'), 'ssh ubuntu1 · while ps -p 1234');
+
+  const sshChained =
+    "cd /Users/penglei/project && ssh -i ~/.ssh/id_ed25519 -p 2222 -q ubuntu2 'cd /opt/srv && pnpm run test > /tmp/out.log 2>&1'";
+  assert.equal(extractJobDisplayTitle(sshChained, '（未命名任务）'), 'ssh ubuntu2 · pnpm run test');
+
+  assert.equal(
+    extractQueueTaskPreview('Self-heal repair Policy: {"testPreset":"unit","maxRetries":2}'),
+    'Self-heal repair'
+  );
+  assert.equal(
+    extractQueueTaskPreview('Policy: {"testPreset":"unit"}\n修复核心单元测试回归'),
+    '修复核心单元测试回归'
+  );
+  assert.equal(extractQueueTaskPreview('Policy: {"testPreset":"unit"}'), '');
 });
 
 test('formatQueueEventSummary and getScheduleActions support queue detail timeline and schedule actions [AC:bot-tasks-queue-redesign#AC-7]', () => {
@@ -83,15 +107,45 @@ test('formatQueueEventSummary and getScheduleActions support queue detail timeli
     payload: { reason: 'Exit code 1' },
     createdAt: new Date(NOW - 5 * 60_000).toISOString(),
   };
-  const zh = formatQueueEventSummary(ev, 'zh', NOW);
-  assert.equal(zh.title, '执行失败');
-  assert.equal(zh.detail, 'coder · Exit code 1');
-  assert.equal(zh.time, '5 分钟前');
+  assert.equal(queueEventTitleKey('task.failed'), 'tasks.queue.eventTypes.taskFailed');
+  assert.equal(Object.keys(QUEUE_EVENT_KEY_MAP).length, 7);
 
-  const en = formatQueueEventSummary({ ...ev, kind: 'custom.event', payload: {} }, 'en', NOW);
-  assert.equal(en.title, 'custom.event');
-  assert.equal(en.detail, 'coder');
-  assert.equal(en.time, '5m ago');
+  const zhEventMap = zh.tasks.queue.eventTypes as Record<string, string>;
+  const zhLabels = relativeTimeLabelsFrom((key, vars) => {
+    const map: Record<string, string> = {
+      'botWork.timeJustNow': zh.botWork.timeJustNow,
+      'botWork.timeMinutesAgo': zh.botWork.timeMinutesAgo,
+      'botWork.timeHoursAgo': zh.botWork.timeHoursAgo,
+      'botWork.timeDaysAgo': zh.botWork.timeDaysAgo,
+    };
+    return map[key].replace('{count}', String(vars?.count ?? ''));
+  });
+  const zhSummary = formatQueueEventSummary(ev, 'zh', {
+    nowMs: NOW,
+    resolveTitle: (kind, key) => (key ? zhEventMap[key.split('.').pop()!] : kind),
+    relativeLabels: zhLabels,
+  });
+  assert.equal(zhSummary.title, '执行失败');
+  assert.equal(zhSummary.detail, 'coder · Exit code 1');
+  assert.equal(zhSummary.time, '5 分钟前');
+
+  const enEventMap = en.tasks.queue.eventTypes as Record<string, string>;
+  const enSummary = formatQueueEventSummary(
+    { ...ev, kind: 'task.completed', payload: {} },
+    'en',
+    {
+      nowMs: NOW,
+      resolveTitle: (kind, key) => (key ? enEventMap[key.split('.').pop()!] : kind),
+    }
+  );
+  assert.equal(enSummary.title, 'Completed');
+  assert.equal(enSummary.detail, 'coder');
+  assert.equal(enSummary.time, '5m ago');
+
+  const fallbackSummary = formatQueueEventSummary({ ...ev, kind: 'custom.event', payload: {} }, 'en', {
+    nowMs: NOW,
+  });
+  assert.equal(fallbackSummary.title, 'custom.event');
 
   assert.deepEqual(getScheduleActions('pending'), ['approve', 'reject', 'run_now', 'cancel']);
   assert.deepEqual(getScheduleActions('in_progress'), ['cancel']);

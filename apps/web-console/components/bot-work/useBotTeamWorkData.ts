@@ -51,12 +51,20 @@ async function fetchSnapshot(): Promise<{ bots: BotTaskStatusRow[]; page: Normal
   return { bots: statusRes.bots ?? [], page: normalizePage(workRes) };
 }
 
-async function fetchTaskDetailSilent(taskId: string): Promise<BotTaskDetail | null> {
+function buildTaskDetailSignal(signal?: AbortSignal): AbortSignal {
+  return signal ? AbortSignal.any([signal, AbortSignal.timeout(5000)]) : AbortSignal.timeout(5000);
+}
+
+async function fetchTaskDetail(taskId: string, signal?: AbortSignal): Promise<BotTaskDetail> {
+  const data = (await api(`/api/bot-work/tasks/${encodeURIComponent(taskId)}`, {
+    signal: buildTaskDetailSignal(signal),
+  })) as { task: BotTaskDetail };
+  return data.task;
+}
+
+async function fetchTaskDetailSilent(taskId: string, signal?: AbortSignal): Promise<BotTaskDetail | null> {
   try {
-    const data = (await api(`/api/bot-work/tasks/${encodeURIComponent(taskId)}`, {
-      signal: AbortSignal.timeout(5000),
-    })) as { task?: BotTaskDetail };
-    return data.task ?? null;
+    return await fetchTaskDetail(taskId, signal);
   } catch {
     return null;
   }
@@ -75,13 +83,14 @@ async function resolveDroppedTasks(
 function findChangedSummary(
   previous: BotTaskDetail | null,
   rows: readonly BotTaskItem[],
-): BotTaskItem | null {
+): { previous: BotTaskDetail; changed: BotTaskItem } | null {
   if (!previous) return null;
   const summary = rows.find((task) => task.id === previous.id);
-  return summary && summary.status !== previous.status ? summary : null;
+  return summary && summary.status !== previous.status ? { previous, changed: summary } : null;
 }
 
 export function useBotTeamWorkData(action: ActionRunner) {
+  const runAction = action.run;
   const [statuses, setStatuses] = useState<BotTaskStatusRow[]>([]);
   const [groups, setGroups] = useState<BotCollaborationGroup[]>([]);
   const [tasks, setTasks] = useState<BotTaskItem[]>([]);
@@ -99,15 +108,34 @@ export function useBotTeamWorkData(action: ActionRunner) {
   const selectedRef = useRef<BotTaskDetail | null>(selected);
   selectedRef.current = selected;
   const refreshGeneration = useRef(0);
+  const selectionReqRef = useRef(0);
+  const selectionAbortRef = useRef<AbortController | null>(null);
   const didAutoSelectRef = useRef(false);
 
+  useEffect(() => () => selectionAbortRef.current?.abort(), []);
+
+  const startSelectionRequest = useCallback(() => {
+    selectionAbortRef.current?.abort();
+    const controller = new AbortController();
+    selectionAbortRef.current = controller;
+    const reqId = ++selectionReqRef.current;
+    return { reqId, signal: controller.signal };
+  }, []);
+
+  const cancelSelectionRequest = useCallback(() => {
+    selectionAbortRef.current?.abort();
+    selectionAbortRef.current = null;
+    selectionReqRef.current += 1;
+  }, []);
+
   const refreshSelectedIfChanged = useCallback(async (rows: readonly BotTaskItem[]) => {
-    const previous = selectedRef.current;
-    const changed = findChangedSummary(previous, rows);
-    if (!previous || !changed) return;
-    const fetched = await fetchTaskDetailSilent(previous.id);
-    const next = fetched ?? { ...previous, ...changed };
-    setSelected((current) => (current?.id === previous.id ? next : current));
+    const match = findChangedSummary(selectedRef.current, rows);
+    if (!match) return;
+    const reqAtStart = selectionReqRef.current;
+    const fetched = await fetchTaskDetailSilent(match.previous.id);
+    if (reqAtStart !== selectionReqRef.current) return;
+    const next = fetched ?? { ...match.previous, ...match.changed };
+    setSelected((current) => (current?.id === match.previous.id ? next : current));
   }, []);
 
   const load = useCallback(async () => {
@@ -155,7 +183,7 @@ export function useBotTeamWorkData(action: ActionRunner) {
   );
 
   useEffect(() => {
-    if (!paged) void action.run(load);
+    if (!paged) void runAction(load);
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     const poll = () => {
@@ -175,16 +203,19 @@ export function useBotTeamWorkData(action: ActionRunner) {
       active = false;
       clearTimeout(timer);
     };
-  }, [paged, action.run, load, applyPolledSnapshot]);
+  }, [paged, runAction, load, applyPolledSnapshot]);
 
   const loadOlder = useCallback(() => {
     if (!cursor) return;
-    void action.run(async () => {
+    void runAction(async () => {
+      const generation = ++refreshGeneration.current;
       const raw = (await api(
         `/api/bot-work/tasks?limit=50&cursor=${encodeURIComponent(cursor)}`,
       )) as RawPagePayload;
+      if (generation !== refreshGeneration.current) return;
       const page = normalizePage(raw);
       const finished = await resolveDroppedTasks(tasksRef.current, page);
+      if (generation !== refreshGeneration.current) return;
       setTasks(
         mergePolledBotTasks(page, tasksRef.current, true, {
           extend: true,
@@ -194,50 +225,60 @@ export function useBotTeamWorkData(action: ActionRunner) {
       setCursor(page.nextCursor);
       setPaged(true);
     });
-  }, [cursor, action]);
+  }, [cursor, runAction]);
 
   const selectTask = useCallback(
     (task: BotTaskItem) => {
       didAutoSelectRef.current = true;
+      const { reqId, signal } = startSelectionRequest();
       setSelectedCollabId(null);
-      setSelected(task);
+      setRoutineTask(null);
       setConfirmUnknown(false);
-      void action.run(async () => {
-        const data = (await api(`/api/bot-work/tasks/${encodeURIComponent(task.id)}`)) as {
-          task: BotTaskDetail;
-        };
-        setSelected(data.task);
+      setSelected(task);
+      void fetchTaskDetailSilent(task.id, signal).then((fetched) => {
+        if (reqId === selectionReqRef.current && fetched) setSelected(fetched);
       });
     },
-    [action],
+    [startSelectionRequest],
   );
 
-  const autoSelectTask = useCallback((task: BotTaskItem) => {
-    didAutoSelectRef.current = true;
-    setSelectedCollabId(null);
-    setSelected(task);
-    void fetchTaskDetailSilent(task.id).then((fetched) => {
-      if (fetched) setSelected((current) => (current?.id === task.id ? fetched : current));
-    });
-  }, []);
+  const autoSelectTask = useCallback(
+    (task: BotTaskItem) => {
+      didAutoSelectRef.current = true;
+      const { reqId, signal } = startSelectionRequest();
+      setSelectedCollabId(null);
+      setRoutineTask(null);
+      setSelected(task);
+      void fetchTaskDetailSilent(task.id, signal).then((fetched) => {
+        if (reqId === selectionReqRef.current && fetched) setSelected(fetched);
+      });
+    },
+    [startSelectionRequest],
+  );
 
-  const selectCollaboration = useCallback((groupId: string) => {
-    didAutoSelectRef.current = true;
-    setSelected(null);
-    setSelectedCollabId(groupId);
-    setConfirmUnknown(false);
-  }, []);
+  const selectCollaboration = useCallback(
+    (groupId: string) => {
+      didAutoSelectRef.current = true;
+      cancelSelectionRequest();
+      setSelected(null);
+      setRoutineTask(null);
+      setSelectedCollabId(groupId);
+      setConfirmUnknown(false);
+    },
+    [cancelSelectionRequest],
+  );
 
   const clearSelection = useCallback(() => {
     didAutoSelectRef.current = true;
+    cancelSelectionRequest();
     setSelected(null);
     setSelectedCollabId(null);
     setRoutineTask(null);
-  }, []);
+  }, [cancelSelectionRequest]);
 
   const cancelTask = useCallback(
     (taskId: string) => {
-      void action.run(async () => {
+      void runAction(async () => {
         const res = (await api(`/api/bot-work/tasks/${encodeURIComponent(taskId)}/cancel`, {
           method: 'POST',
         })) as { task?: BotTaskDetail };
@@ -247,35 +288,41 @@ export function useBotTeamWorkData(action: ActionRunner) {
         await load();
       });
     },
-    [action, load],
+    [runAction, load],
   );
 
   const retrySelected = useCallback(() => {
     const current = selectedRef.current;
     if (!current) return;
-    void action.run(async () => {
+    const { reqId } = startSelectionRequest();
+    void runAction(async () => {
       const data = (await api(
         `/api/bot-work/tasks/${encodeURIComponent(current.id)}/retry`,
         json({ confirmUnknown }),
       )) as { task: BotTaskDetail };
-      setSelected(data.task);
-      setConfirmUnknown(false);
+      if (reqId === selectionReqRef.current) {
+        setSelected(data.task);
+        setConfirmUnknown(false);
+      }
       await load();
     });
-  }, [action, confirmUnknown, load]);
+  }, [runAction, confirmUnknown, load, startSelectionRequest]);
 
   const openSourceVersion = useCallback(
     (source: { taskId: string; attempt: number }, unavailableMsg: string) => {
-      void action.run(async () => {
-        const { task } = (await api(`/api/bot-work/tasks/${encodeURIComponent(source.taskId)}`)) as {
-          task: BotTaskDetail;
-        };
+      const { reqId, signal } = startSelectionRequest();
+      void runAction(async () => {
+        const task = await fetchTaskDetail(source.taskId, signal);
         const delivery = task.deliveryVersions?.find((v) => v.attempt === source.attempt);
         if (!delivery) throw new Error(unavailableMsg);
-        setSelected({ ...task, delivery });
+        if (reqId === selectionReqRef.current) {
+          setSelectedCollabId(null);
+          setRoutineTask(null);
+          setSelected({ ...task, delivery });
+        }
       });
     },
-    [action],
+    [runAction, startSelectionRequest],
   );
 
   const selectDeliveryAttempt = useCallback((attempt: number) => {

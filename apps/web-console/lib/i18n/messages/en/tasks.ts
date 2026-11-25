@@ -112,7 +112,17 @@ export const tasks = {
     detailLoadFailed: 'Failed to load details. Try again shortly.',
     taskTypeBadge: 'Task',
     scheduleTypeBadge: 'Schedule',
-    jobTypeBadge: 'Job'
+    jobTypeBadge: 'Job',
+    eventPayloadToggle: 'View raw payload',
+    eventTypes: {
+      taskCreated: 'Task created',
+      taskUpdated: 'Status updated',
+      taskStarted: 'Execution started',
+      taskCompleted: 'Completed',
+      taskFailed: 'Failed',
+      taskCancelled: 'Cancelled',
+      taskBlocked: 'Blocked'
+    }
   },
   runs: {
     title: 'Orchestration runs',

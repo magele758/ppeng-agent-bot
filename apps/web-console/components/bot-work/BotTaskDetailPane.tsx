@@ -1,11 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import {
   extractBotTaskTitle,
   extractCollaborationTitle,
   formatRelativeTime,
   getBotInitials,
+  relativeTimeLabelsFrom,
   type BotCollaborationGroup,
   type BotTaskDetail,
   type BotTaskItem,
@@ -116,16 +118,38 @@ function DeliveryVersionBar({
 
 function FoldedRawPrompt({ input }: { input: string }) {
   const { t } = useI18n();
+  const [open, setOpen] = useState(false);
   const singleLine = collapseOneLine(input);
   return (
-    <details className={styles.foldedRow}>
+    <details
+      className={styles.foldedRow}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary className={styles.foldedSummary}>
         <span className={styles.foldedTitle}>{t('botWork.rawPromptTitle')}</span>
         <span className={styles.foldedPreview}>{singleLine}</span>
-        <span className={styles.foldedHint}>{t('botWork.rawPromptExpand')}</span>
+        <span className={styles.foldedHint}>
+          {t(open ? 'botWork.rawPromptCollapse' : 'botWork.rawPromptExpand')}
+        </span>
       </summary>
       <pre className={styles.rawPromptBody}>{input}</pre>
     </details>
+  );
+}
+
+function topOnlyFailureReason(task: BotTaskDetail): string {
+  const reason = task.failureReason?.trim() ?? '';
+  if (!reason) return '';
+  return task.delivery?.failureReason?.trim() === reason ? '' : reason;
+}
+
+function TaskFailureBanner({ reason }: { reason: string }) {
+  const { t } = useI18n();
+  if (!reason) return null;
+  return (
+    <p role="alert" className={styles.failureBanner}>
+      {t('botWork.unfinishedReason', { reason })}
+    </p>
   );
 }
 
@@ -269,7 +293,7 @@ function CollaborationInspector({
       </div>
 
       <div className={styles.detailBody}>
-        <FoldedRawPrompt input={group.goal} />
+        <FoldedRawPrompt key={group.id} input={group.goal} />
 
         {group.blockers.length > 0 && (
           <div className={styles.collabDetailSection}>
@@ -331,7 +355,12 @@ function DetailStatusStrip({
   botName: string;
 }) {
   const { t, locale } = useI18n();
-  const relTime = formatRelativeTime(task.updatedAt ?? task.createdAt, locale);
+  const relTime = formatRelativeTime(
+    task.updatedAt ?? task.createdAt,
+    locale,
+    undefined,
+    relativeTimeLabelsFrom(t),
+  );
   const attempt = task.delivery?.attempt ?? task.attempt;
   return (
     <p className={styles.detailStatusStrip}>
@@ -458,6 +487,10 @@ function RoutineCreatorBox({
   );
 }
 
+function hasOnlyFailureReason(task: BotTaskDetail): boolean {
+  return task.result == null && Boolean(task.failureReason?.trim());
+}
+
 function TaskDeliveryOrResult({
   task,
   onContinueFromDelivery,
@@ -474,9 +507,10 @@ function TaskDeliveryOrResult({
       />
     );
   }
+  if (hasOnlyFailureReason(task)) return null;
   return (
     <div className={styles.rawResultCard}>
-      <Result value={task.result ?? task.failureReason ?? task} />
+      <Result value={task.result ?? task} />
     </div>
   );
 }
@@ -545,6 +579,8 @@ export function BotTaskDetailPane({
       />
       <div className={styles.detailBody}>
         <RoutineCreatorBox routineTask={routineTask} onClose={onCloseRoutine} />
+        <TaskFailureBanner reason={topOnlyFailureReason(selected)} />
+        <FoldedRawPrompt key={selected.id} input={selected.input} />
         <DeliveryVersionBar
           task={selected}
           busy={busy}
@@ -552,7 +588,6 @@ export function BotTaskDetailPane({
           onSelectDeliveryAttempt={onSelectDeliveryAttempt}
         />
         <TaskDeliveryOrResult task={selected} onContinueFromDelivery={onContinueFromDelivery} />
-        <FoldedRawPrompt input={selected.input} />
       </div>
       <DetailFooterBar
         task={selected}

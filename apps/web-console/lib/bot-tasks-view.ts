@@ -182,7 +182,8 @@ function stripMarkdownLine(line: string): string {
       .replace(/^#{1,6}\s+/, '')
       .replace(/^[-*+]\s+/, '')
       .replace(/^\d+\.\s+/, '')
-      .replace(/[*_`~]+/g, '')
+      .replace(/[*`~]+/g, '')
+      .replace(/(^|\s)_+|_+(\s|$)/g, '$1$2')
   );
 }
 
@@ -242,8 +243,54 @@ export function extractBotTaskTitle(
   return { title: clipped.text || fallback, isExtracted };
 }
 
+const JSON_PREVIEW_KEYS = ['reason', 'summary', 'message', 'detail', 'error', 'verdict'] as const;
+const JSON_FIELD_FALLBACK_RE = /"(?:reason|summary|message|detail|error)"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)/;
+
 function asText(value: unknown): string {
   return typeof value === 'string' ? value : '';
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function pickJsonTextField(parsed: Record<string, unknown>): string {
+  for (const key of JSON_PREVIEW_KEYS) {
+    const val = parsed[key];
+    if (typeof val === 'string' && val.trim()) return val.trim();
+  }
+  return '';
+}
+
+function tryParseJsonObject(text: string): Record<string, unknown> | null {
+  if (!text.endsWith('}')) return null;
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return isPlainRecord(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractJsonPreview(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('{')) return '';
+  const parsed = tryParseJsonObject(trimmed);
+  if (parsed) return pickJsonTextField(parsed);
+  const match = JSON_FIELD_FALLBACK_RE.exec(trimmed);
+  return match ? match[1].replace(/\\"/g, '"').trim() : '';
+}
+
+function extractTextSnippet(raw: string): string {
+  const jsonText = extractJsonPreview(raw);
+  if (jsonText) return collapseSpaces(jsonText);
+  return firstMeaningfulLine(raw);
+}
+
+function extractValuePreview(value: unknown): string {
+  if (typeof value === 'string') return extractTextSnippet(value);
+  if (isPlainRecord(value)) return collapseSpaces(pickJsonTextField(value));
+  return '';
 }
 
 function secondaryInputLine(rawInput: string): string {
@@ -257,11 +304,11 @@ function previewCandidates(
   task: Pick<BotTaskItem, 'input' | 'failureReason' | 'result' | 'resultSummary' | 'delivery'>
 ): string[] {
   return [
-    asText(task.failureReason),
-    asText(task.delivery?.summary),
-    asText(task.resultSummary),
-    firstMeaningfulLine(asText(task.delivery?.report)),
-    firstMeaningfulLine(asText(task.result)),
+    extractTextSnippet(asText(task.failureReason)),
+    extractTextSnippet(asText(task.delivery?.summary)),
+    extractTextSnippet(asText(task.resultSummary)),
+    extractTextSnippet(asText(task.delivery?.report)),
+    extractValuePreview(task.result),
     secondaryInputLine(task.input),
   ];
 }
@@ -288,7 +335,7 @@ export function extractCollaborationTitle(goal: string, fallback: string): strin
 
 export function extractCollaborationPreview(summary?: string): string {
   if (!summary) return '';
-  const line = firstMeaningfulLine(summary);
+  const line = extractTextSnippet(summary);
   return line ? clipText(line, MAX_PREVIEW_CHARS).text : '';
 }
 
@@ -400,6 +447,69 @@ export function groupBotTasksByBand<T extends BotTaskItem>(
   return grouped;
 }
 
+function hasMemberInBand(members: readonly BotTaskItem[], band: BotTaskBand): boolean {
+  return members.some((member) => classifyBotTaskBand(member) === band);
+}
+
+function isAttentionCollaboration(
+  group: Pick<BotCollaborationGroup, 'status' | 'blockers' | 'members'>
+): boolean {
+  if (group.status === 'blocked' || group.blockers.length > 0) return true;
+  return hasMemberInBand(group.members, 'attention');
+}
+
+export function classifyCollaborationBand(
+  group: Pick<BotCollaborationGroup, 'status' | 'blockers' | 'members'>
+): BotTaskBand {
+  if (isAttentionCollaboration(group)) return 'attention';
+  if (ACTIVE_STATUSES.has(group.status) || hasMemberInBand(group.members, 'active')) return 'active';
+  return 'history';
+}
+
+function matchesCollaborationQuery(
+  group: BotCollaborationGroup,
+  needle: string,
+  botNameMap: BotNameLookup
+): boolean {
+  if (!needle) return true;
+  if (group.goal.toLowerCase().includes(needle)) return true;
+  return group.members.some((member) => matchesBotTaskQuery(member, needle, botNameMap));
+}
+
+function matchesCollaborationBot(group: BotCollaborationGroup, botId: string): boolean {
+  if (!botId) return true;
+  return group.members.some((member) => member.targetBotId === botId);
+}
+
+function matchesCollaborationBand(group: BotCollaborationGroup, band: 'all' | BotTaskBand): boolean {
+  return band === 'all' || classifyCollaborationBand(group) === band;
+}
+
+function matchesCollaborationTime(
+  group: BotCollaborationGroup,
+  range: BotTaskTimeRange,
+  nowMs: number
+): boolean {
+  if (range === 'all') return true;
+  return group.members.some((member) => matchesTimeRange(member, range, nowMs));
+}
+
+export function filterCollaborations(
+  groups: readonly BotCollaborationGroup[],
+  filters: BotTaskFilterState,
+  botNameMap: BotNameLookup,
+  nowMs: number = Date.now()
+): BotCollaborationGroup[] {
+  const needle = filters.query.trim().toLowerCase();
+  return groups.filter(
+    (group) =>
+      matchesCollaborationBand(group, filters.band) &&
+      matchesCollaborationBot(group, filters.botId) &&
+      matchesCollaborationTime(group, filters.timeRange, nowMs) &&
+      matchesCollaborationQuery(group, needle, botNameMap)
+  );
+}
+
 export interface BotTaskPagePayload<T extends { id: string; status: string } = BotTaskItem> {
   tasks?: T[];
   activeTasks: T[];
@@ -471,42 +581,78 @@ function formatShortDate(ts: number, nowMs: number): string {
   return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
-function formatRelativeUnit(
-  value: number,
-  unit: 'm' | 'h' | 'd',
-  isEn: boolean
+export interface RelativeTimeLabels {
+  justNow: string;
+  minutesAgo: (count: number) => string;
+  hoursAgo: (count: number) => string;
+  daysAgo: (count: number) => string;
+}
+
+export type RelativeTimeTranslator = (
+  key: 'botWork.timeJustNow' | 'botWork.timeMinutesAgo' | 'botWork.timeHoursAgo' | 'botWork.timeDaysAgo',
+  vars?: { count: number }
+) => string;
+
+export function relativeTimeLabelsFrom(t: RelativeTimeTranslator): RelativeTimeLabels {
+  return {
+    justNow: t('botWork.timeJustNow'),
+    minutesAgo: (count) => t('botWork.timeMinutesAgo', { count }),
+    hoursAgo: (count) => t('botWork.timeHoursAgo', { count }),
+    daysAgo: (count) => t('botWork.timeDaysAgo', { count }),
+  };
+}
+
+const DEFAULT_ZH_TIME_LABELS: RelativeTimeLabels = {
+  justNow: '刚刚',
+  minutesAgo: (count) => `${count} 分钟前`,
+  hoursAgo: (count) => `${count} 小时前`,
+  daysAgo: (count) => `${count} 天前`,
+};
+
+const DEFAULT_EN_TIME_LABELS: RelativeTimeLabels = {
+  justNow: 'Just now',
+  minutesAgo: (count) => `${count}m ago`,
+  hoursAgo: (count) => `${count}h ago`,
+  daysAgo: (count) => `${count}d ago`,
+};
+
+function resolveTimeLabels(locale: string, labels?: RelativeTimeLabels): RelativeTimeLabels {
+  if (labels) return labels;
+  return locale.toLowerCase().startsWith('en') ? DEFAULT_EN_TIME_LABELS : DEFAULT_ZH_TIME_LABELS;
+}
+
+function formatDaysOrDate(
+  days: number,
+  ts: number,
+  nowMs: number,
+  labels: RelativeTimeLabels
 ): string {
-  if (isEn) return `${value}${unit} ago`;
-  const zhUnit = unit === 'm' ? '分钟前' : unit === 'h' ? '小时前' : '天前';
-  return `${value} ${zhUnit}`;
+  return days < 7 ? labels.daysAgo(days) : formatShortDate(ts, nowMs);
 }
 
-function formatRelativeDelta(diffSec: number, ts: number, nowMs: number, isEn: boolean): string {
-  if (diffSec < 60) return formatJustNow(isEn);
-  if (diffSec < 3600) return formatRelativeUnit(Math.floor(diffSec / 60), 'm', isEn);
-  if (diffSec < 86400) return formatRelativeUnit(Math.floor(diffSec / 3600), 'h', isEn);
-  return formatDaysOrDate(Math.floor(diffSec / 86400), ts, nowMs, isEn);
-}
-
-function formatJustNow(isEn: boolean): string {
-  return isEn ? 'Just now' : '刚刚';
-}
-
-function formatDaysOrDate(days: number, ts: number, nowMs: number, isEn: boolean): string {
-  return days < 7 ? formatRelativeUnit(days, 'd', isEn) : formatShortDate(ts, nowMs);
+function formatRelativeDelta(
+  diffSec: number,
+  ts: number,
+  nowMs: number,
+  labels: RelativeTimeLabels
+): string {
+  if (diffSec < 60) return labels.justNow;
+  if (diffSec < 3600) return labels.minutesAgo(Math.floor(diffSec / 60));
+  if (diffSec < 86400) return labels.hoursAgo(Math.floor(diffSec / 3600));
+  return formatDaysOrDate(Math.floor(diffSec / 86400), ts, nowMs, labels);
 }
 
 export function formatRelativeTime(
   iso: string | undefined,
   locale: 'zh' | 'en' | string,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  labels?: RelativeTimeLabels
 ): string {
   if (!iso) return '';
   const ts = Date.parse(iso);
   if (!Number.isFinite(ts)) return '';
-  const isEn = locale.toLowerCase().startsWith('en');
   const diffSec = Math.max(0, Math.floor((nowMs - ts) / 1000));
-  return formatRelativeDelta(diffSec, ts, nowMs, isEn);
+  return formatRelativeDelta(diffSec, ts, nowMs, resolveTimeLabels(locale, labels));
 }
 
 const CJK_START_RE = /^[\u3400-\u9fff\uf900-\ufaff]/;

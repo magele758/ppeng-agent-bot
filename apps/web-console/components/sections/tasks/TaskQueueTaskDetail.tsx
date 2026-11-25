@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { getBotInitials } from '@/lib/bot-tasks-view';
+import { getBotInitials, relativeTimeLabelsFrom } from '@/lib/bot-tasks-view';
 import { useI18n } from '@/lib/i18n';
 import {
   formatQueueEventSummary,
@@ -61,11 +61,29 @@ function formatPayloadJson(payload: Record<string, unknown> | undefined): string
   return JSON.stringify(payload, null, 2);
 }
 
+function FoldedEventPayload({ payloadJson }: { payloadJson: string }) {
+  const { t } = useI18n();
+  if (!payloadJson) return null;
+  return (
+    <details className={styles.payloadFold}>
+      <summary className={styles.payloadFoldSummary}>{t('tasks.queue.eventPayloadToggle')}</summary>
+      <pre className={styles.codeBlock}>{payloadJson}</pre>
+    </details>
+  );
+}
+
+function useFormattedEvent(event: TaskEventRecord) {
+  const { t, locale } = useI18n();
+  const summary = formatQueueEventSummary(event, locale, {
+    resolveTitle: (kind, key) => (key ? t(key) : kind),
+    relativeLabels: relativeTimeLabelsFrom(t)
+  });
+  return { locale, summary, payloadJson: formatPayloadJson(event.payload) };
+}
+
 function FoldedEventRow({ event }: { event: TaskEventRecord }) {
-  const { locale } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const summary = formatQueueEventSummary(event, locale);
-  const payloadJson = formatPayloadJson(event.payload);
+  const { locale, summary, payloadJson } = useFormattedEvent(event);
 
   return (
     <div className={styles.foldedEvent} data-testid="queue-event-folded">
@@ -83,7 +101,7 @@ function FoldedEventRow({ event }: { event: TaskEventRecord }) {
         <div className={styles.foldedExpandedBody}>
           <div>{formatIsoTimestamp(event.createdAt, locale)}</div>
           {summary.detail ? <p className={styles.latestEventDetail}>{summary.detail}</p> : null}
-          {payloadJson ? <pre className={styles.codeBlock}>{payloadJson}</pre> : null}
+          <FoldedEventPayload payloadJson={payloadJson} />
         </div>
       ) : null}
     </div>
@@ -91,9 +109,7 @@ function FoldedEventRow({ event }: { event: TaskEventRecord }) {
 }
 
 function LatestEventCard({ event }: { event: TaskEventRecord }) {
-  const { locale } = useI18n();
-  const summary = formatQueueEventSummary(event, locale);
-  const payloadJson = formatPayloadJson(event.payload);
+  const { locale, summary, payloadJson } = useFormattedEvent(event);
 
   return (
     <div className={styles.latestEventCard} data-testid="queue-event-latest">
@@ -102,7 +118,7 @@ function LatestEventCard({ event }: { event: TaskEventRecord }) {
         <span className={styles.eventTime}>{summary.time || formatIsoTimestamp(event.createdAt, locale)}</span>
       </div>
       {summary.detail ? <p className={styles.latestEventDetail}>{summary.detail}</p> : null}
-      {payloadJson ? <pre className={styles.codeBlock}>{payloadJson}</pre> : null}
+      <FoldedEventPayload payloadJson={payloadJson} />
     </div>
   );
 }

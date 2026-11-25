@@ -6,6 +6,7 @@ import {
   extractBotTaskTitle,
   formatRelativeTime,
   getBotInitials,
+  relativeTimeLabelsFrom,
   type BotTaskItem,
 } from '@/lib/bot-tasks-view';
 import { Status } from './shared';
@@ -80,10 +81,15 @@ export function BotTaskRow({
   onSelect,
   onCancel,
 }: BotTaskRowProps) {
-  const { locale } = useI18n();
+  const { t, locale } = useI18n();
   const { title } = extractBotTaskTitle(task.input, task.id);
   const preview = extractBotTaskPreview(task, title);
-  const relTime = formatRelativeTime(task.updatedAt ?? task.createdAt, locale);
+  const relTime = formatRelativeTime(
+    task.updatedAt ?? task.createdAt,
+    locale,
+    undefined,
+    relativeTimeLabelsFrom(t),
+  );
   const rowClass = selected ? `${styles.taskRow} ${styles.taskRowSelected}` : styles.taskRow;
 
   return (

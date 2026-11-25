@@ -7,6 +7,7 @@ import { createBotDispatchIdentity } from '@/lib/bot-dispatch';
 import {
   countBotTaskFacets,
   filterBotTasks,
+  filterCollaborations,
   groupBotTasksByBand,
   stepItemId,
   type BotCollaborationGroup,
@@ -36,19 +37,6 @@ function countActiveFilters(filters: BotTaskFilterState): number {
   if (filters.band !== 'all') count += 1;
   if (filters.timeRange !== 'all') count += 1;
   return count;
-}
-
-function matchesCollaborationQuery(
-  group: BotCollaborationGroup,
-  needle: string,
-  botNameMap: ReadonlyMap<string, string>,
-): boolean {
-  if (!needle) return true;
-  if (group.goal.toLowerCase().includes(needle)) return true;
-  return group.members.some((member) => {
-    const botName = (botNameMap.get(member.targetBotId) ?? member.targetBotId).toLowerCase();
-    return member.input.toLowerCase().includes(needle) || botName.includes(needle);
-  });
 }
 
 function pickInitialDesktopTask(
@@ -114,10 +102,10 @@ export function BotTeamWork({
     [standaloneTasks, filters, botNameMap],
   );
   const bands = useMemo(() => groupBotTasksByBand(filteredTasks), [filteredTasks]);
-  const visibleGroups = useMemo(() => {
-    const needle = filters.query.trim().toLowerCase();
-    return data.groups.filter((group) => matchesCollaborationQuery(group, needle, botNameMap));
-  }, [data.groups, filters.query, botNameMap]);
+  const visibleGroups = useMemo(
+    () => filterCollaborations(data.groups, filters, botNameMap),
+    [data.groups, filters, botNameMap],
+  );
 
   const orderedStandalone = useMemo(
     () => [...bands.attention, ...bands.active, ...bands.history],
@@ -125,25 +113,43 @@ export function BotTeamWork({
   );
   const orderedTaskIds = useMemo(
     () => [
-      ...orderedStandalone.map((task) => task.id),
+      ...bands.attention.map((task) => task.id),
+      ...bands.active.map((task) => task.id),
       ...visibleGroups.flatMap((group) => group.members.map((member) => member.id)),
+      ...bands.history.map((task) => task.id),
     ],
-    [orderedStandalone, visibleGroups],
+    [bands, visibleGroups],
   );
   const taskById = useMemo(
     () => new Map(data.tasks.map((task) => [task.id, task])),
     [data.tasks],
   );
 
+  const {
+    selected,
+    selectedCollabId,
+    autoSelectTask,
+    selectCollaboration,
+    didAutoSelectRef,
+  } = data;
+
   useEffect(() => {
-    if (!shouldAutoSelect(data.didAutoSelectRef.current, data.selected, data.selectedCollabId)) return;
+    if (!shouldAutoSelect(didAutoSelectRef.current, selected, selectedCollabId)) return;
     applyInitialSelection(
       orderedStandalone,
       visibleGroups,
-      data.autoSelectTask,
-      data.selectCollaboration,
+      autoSelectTask,
+      selectCollaboration,
     );
-  }, [orderedStandalone, visibleGroups, data]);
+  }, [
+    orderedStandalone,
+    visibleGroups,
+    selected,
+    selectedCollabId,
+    autoSelectTask,
+    selectCollaboration,
+    didAutoSelectRef,
+  ]);
 
   const selectedCollab = useMemo(
     () => data.groups.find((group) => group.id === data.selectedCollabId) ?? null,

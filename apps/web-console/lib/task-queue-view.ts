@@ -1,4 +1,4 @@
-import { formatRelativeTime, type BotNameLookup } from './bot-tasks-view.ts';
+import { formatRelativeTime, type BotNameLookup, type RelativeTimeLabels } from './bot-tasks-view.ts';
 import type { BotInfo, TaskSummary } from './types.ts';
 
 export type QueuePriorityBand = 'attention' | 'active' | 'pending' | 'done';
@@ -36,6 +36,21 @@ export interface QueueEventSummary {
   time: string;
 }
 
+export type QueueEventTitleKey =
+  | 'tasks.queue.eventTypes.taskCreated'
+  | 'tasks.queue.eventTypes.taskUpdated'
+  | 'tasks.queue.eventTypes.taskStarted'
+  | 'tasks.queue.eventTypes.taskCompleted'
+  | 'tasks.queue.eventTypes.taskFailed'
+  | 'tasks.queue.eventTypes.taskCancelled'
+  | 'tasks.queue.eventTypes.taskBlocked';
+
+export interface QueueEventFormatOptions {
+  nowMs?: number;
+  resolveTitle?: (kind: string, i18nKey: QueueEventTitleKey | undefined) => string;
+  relativeLabels?: RelativeTimeLabels;
+}
+
 export const QUEUE_BAND_ORDER: readonly QueuePriorityBand[] = [
   'attention',
   'active',
@@ -64,29 +79,23 @@ const SCHEDULE_ACTIONS_BY_STATUS: Readonly<Record<string, readonly ScheduleActio
   cancelled: [],
 };
 
-const EVENT_TITLES_ZH: Readonly<Record<string, string>> = {
-  'task.created': '任务已创建',
-  'task.updated': '状态已更新',
-  'task.started': '开始执行',
-  'task.completed': '执行完成',
-  'task.failed': '执行失败',
-  'task.cancelled': '任务已取消',
-  'task.blocked': '任务受阻',
-};
-
-const EVENT_TITLES_EN: Readonly<Record<string, string>> = {
-  'task.created': 'Task created',
-  'task.updated': 'Status updated',
-  'task.started': 'Execution started',
-  'task.completed': 'Completed',
-  'task.failed': 'Failed',
-  'task.cancelled': 'Cancelled',
-  'task.blocked': 'Blocked',
+export const QUEUE_EVENT_KEY_MAP: Readonly<Record<string, QueueEventTitleKey>> = {
+  'task.created': 'tasks.queue.eventTypes.taskCreated',
+  'task.updated': 'tasks.queue.eventTypes.taskUpdated',
+  'task.started': 'tasks.queue.eventTypes.taskStarted',
+  'task.completed': 'tasks.queue.eventTypes.taskCompleted',
+  'task.failed': 'tasks.queue.eventTypes.taskFailed',
+  'task.cancelled': 'tasks.queue.eventTypes.taskCancelled',
+  'task.blocked': 'tasks.queue.eventTypes.taskBlocked',
 };
 
 const SETUP_SEGMENT_RE = /^(?:cd\s+|export\s+|set\s+-[a-z]+|mkdir\s+|umask\s+)/i;
+const LEADING_SETUP_RE = /^(?:cd\s+|export\s+|set\s+-[a-z]+|mkdir\s+|umask\s+)[^&;]+(?:&&|;)\s*/i;
 const SHELL_REDIRECT_RE = /\s+(?:2>&1|1>&2|&>>?\s*\S+|\d?>>?\s*\S+|\|\s*tee\b[\s\S]*)$/i;
 const LONG_PATH_RE = /(?:~|\/)[^\s"'`]{16,}/g;
+const SSH_PREFIX_RE = /^ssh\s+/i;
+const SSH_OPT_RE = /^(?:-(?:[opbceliFmJLRSWE]\s+(?:'[^']*'|"[^"]*"|\S+)|o\S+|[1246AaCfGgKkMNnqsTtVvXxYy]+))\s+/;
+const INLINE_JSON_LABEL_RE = /\b(?:Policy|Config|Metadata|Options|Payload)\s*:\s*\{[\s\S]*$/i;
 const MAX_JOB_TITLE_CHARS = 80;
 
 export function buildBotNameMap(
@@ -140,16 +149,79 @@ function clipJobTitle(text: string): string {
   return `${text.slice(0, MAX_JOB_TITLE_CHARS - 1).trimEnd()}…`;
 }
 
+function stripSshFlags(rest: string): string {
+  let current = rest.trim();
+  for (let pass = 0; pass < 16; pass++) {
+    const next = current.replace(SSH_OPT_RE, '');
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
+function unquoteEdge(text: string): string {
+  return text.replace(/^['"]/, '').replace(/['"]$/, '').trim();
+}
+
+function distillSegment(segment: string): string {
+  const primary = stripTrailingRedirects(pickPrimaryCommandSegment(segment));
+  return (primary || segment).replace(LONG_PATH_RE, shortenPathToken);
+}
+
+function formatSshSummary(host: string, rawRemote: string | undefined): string {
+  const remote = rawRemote ? distillSegment(unquoteEdge(rawRemote)) : '';
+  return remote ? `ssh ${host} · ${remote}` : `ssh ${host}`;
+}
+
+function summarizeSshCommand(command: string): string | null {
+  if (!SSH_PREFIX_RE.test(command)) return null;
+  const afterFlags = stripSshFlags(command.replace(SSH_PREFIX_RE, ''));
+  const match = /^(\S+)(?:\s+([\s\S]+))?$/.exec(afterFlags);
+  return match ? formatSshSummary(match[1], match[2]) : null;
+}
+
+function stripLeadingSetup(command: string): string {
+  let current = command.trim();
+  for (let pass = 0; pass < 6; pass++) {
+    const next = current.replace(LEADING_SETUP_RE, '').trim();
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
+function normalizeCommandText(command: string | undefined): string {
+  return (command ?? '').replace(/\s+/g, ' ').trim();
+}
+
 /**
- * Distills verbose shell pipelines (e.g. `cd /path && tool --flag /a/b/c > /tmp/log 2>&1`)
- * into a concise scannable title while leaving the raw command intact for the detail pane.
+ * Distills verbose shell pipelines and SSH flag chains into a concise scannable title
+ * while leaving the raw command intact for the detail pane.
  */
 export function extractJobDisplayTitle(command: string | undefined, fallback: string): string {
-  const clean = (command ?? '').replace(/\s+/g, ' ').trim();
+  const clean = stripLeadingSetup(normalizeCommandText(command));
   if (!clean) return fallback;
-  const primary = stripTrailingRedirects(pickPrimaryCommandSegment(clean));
-  const compact = (primary || clean).replace(LONG_PATH_RE, shortenPathToken);
+  const compact = summarizeSshCommand(clean) ?? distillSegment(clean);
   return clipJobTitle(compact) || fallback;
+}
+
+function cleanQueuePreviewLine(line: string): string {
+  const stripped = line.replace(INLINE_JSON_LABEL_RE, '').trim();
+  if (!stripped || stripped.startsWith('{')) return '';
+  return stripped;
+}
+
+/**
+ * Extracts the first human-readable preview line from a queue task description,
+ * stripping inline `Policy: {...}` / `Config: {...}` JSON blobs.
+ */
+export function extractQueueTaskPreview(description: string | undefined): string {
+  if (!description) return '';
+  for (const raw of description.split(/\r?\n/)) {
+    const cleaned = cleanQueuePreviewLine(raw.trim());
+    if (cleaned) return cleaned;
+  }
+  return '';
 }
 
 export function classifyQueueBand(status: string): QueuePriorityBand {
@@ -198,20 +270,23 @@ function summarizePayload(payload: Record<string, unknown> | undefined): string 
   return '';
 }
 
+export function queueEventTitleKey(kind: string): QueueEventTitleKey | undefined {
+  return QUEUE_EVENT_KEY_MAP[kind];
+}
+
 export function formatQueueEventSummary(
   event: TaskEventRecord,
   locale: 'zh' | 'en' | string = 'zh',
-  nowMs?: number
+  options: QueueEventFormatOptions = {}
 ): QueueEventSummary {
-  const isEn = locale.toLowerCase().startsWith('en');
-  const titleMap = isEn ? EVENT_TITLES_EN : EVENT_TITLES_ZH;
-  const title = titleMap[event.kind] ?? event.kind;
+  const i18nKey = queueEventTitleKey(event.kind);
+  const title = options.resolveTitle ? options.resolveTitle(event.kind, i18nKey) : event.kind;
   const payloadText = summarizePayload(event.payload);
   const detailParts = [event.actor, payloadText].filter(Boolean);
   return {
     title,
     detail: detailParts.join(' · '),
-    time: formatRelativeTime(event.createdAt, locale, nowMs),
+    time: formatRelativeTime(event.createdAt, locale, options.nowMs, options.relativeLabels),
   };
 }
 

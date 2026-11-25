@@ -112,7 +112,17 @@ export const tasks = {
     detailLoadFailed: '详情加载失败，请稍后重试。',
     taskTypeBadge: '队列任务',
     scheduleTypeBadge: '定时发布',
-    jobTypeBadge: '后台命令'
+    jobTypeBadge: '后台命令',
+    eventPayloadToggle: '查看原始事件数据',
+    eventTypes: {
+      taskCreated: '任务已创建',
+      taskUpdated: '状态已更新',
+      taskStarted: '开始执行',
+      taskCompleted: '执行完成',
+      taskFailed: '执行失败',
+      taskCancelled: '任务已取消',
+      taskBlocked: '任务受阻'
+    }
   },
   runs: {
     title: '编排运行',

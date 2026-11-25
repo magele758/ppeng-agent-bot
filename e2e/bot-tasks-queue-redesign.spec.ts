@@ -423,8 +423,10 @@ test.describe('Bot Tasks master-detail redesign (#/tasks/bots)', () => {
     const rawPromptDetails = detailAside.locator('details').filter({ hasText: '原始任务指令' });
     await expect(rawPromptDetails).toBeVisible();
     await expect(rawPromptDetails).not.toHaveAttribute('open', '');
+    await expect(rawPromptDetails).toContainText('展开完整指令');
     await rawPromptDetails.locator('summary').click();
     await expect(rawPromptDetails).toHaveAttribute('open', '');
+    await expect(rawPromptDetails).toContainText('收起指令');
     await expect(rawPromptDetails.locator('pre')).toContainText('Continue goal goal_827c0bc9');
   });
 

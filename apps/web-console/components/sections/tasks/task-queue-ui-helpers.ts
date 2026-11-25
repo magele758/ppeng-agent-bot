@@ -45,9 +45,11 @@ const STATUS_TONE_MAP: Readonly<Record<string, StatusTone>> = {
 const STATUS_LABEL_KEY_MAP: Readonly<Record<string, MessageKey>> = {
   all: 'tasks.status.all',
   pending: 'tasks.status.pending',
+  queued: 'tasks.status.pending',
   in_progress: 'tasks.status.in_progress',
   completed: 'tasks.status.completed',
   failed: 'tasks.status.failed',
+  error: 'tasks.status.failed',
   cancelled: 'tasks.status.cancelled',
   running: 'tasks.runStatus.running',
   waiting_approval: 'tasks.runStatus.waiting_approval',

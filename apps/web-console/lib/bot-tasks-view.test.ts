@@ -2,19 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   classifyBotTaskBand,
+  classifyCollaborationBand,
   countBotTaskFacets,
   extractBotTaskPreview,
   extractBotTaskTitle,
   extractCollaborationPreview,
   extractCollaborationTitle,
   filterBotTasks,
+  filterCollaborations,
   findDroppedUnresolvedIds,
   formatRelativeTime,
   getBotInitials,
   groupBotTasksByBand,
   isUnresolvedBotTask,
   mergePolledBotTasks,
+  relativeTimeLabelsFrom,
   stepItemId,
+  type BotCollaborationGroup,
   type BotTaskItem,
 } from './bot-tasks-view.ts';
 
@@ -102,7 +106,35 @@ test('extractBotTaskPreview prefers failure/delivery/result and avoids repeating
 
   assert.equal(extractCollaborationTitle('Continue goal g1. Objective: 联调验收 Constraints: []', '默认'), '联调验收');
   assert.equal(extractCollaborationPreview('## 汇总进度\n详情'), '汇总进度');
+  assert.equal(extractCollaborationPreview('[NO_UPDATE] __无新动态__'), '[NO_UPDATE] 无新动态');
   assert.equal(extractCollaborationPreview(undefined), '');
+
+  const jsonResultTask: BotTaskItem = {
+    id: 't4',
+    targetBotId: 'b1',
+    input: '巡检告警',
+    status: 'completed',
+    resultSummary: '{"verdict":"escalate","reason":"6 项任务失败需要人工处理"}',
+  };
+  assert.equal(extractBotTaskPreview(jsonResultTask, '巡检告警'), '6 项任务失败需要人工处理');
+
+  const truncatedJsonTask: BotTaskItem = {
+    id: 't5',
+    targetBotId: 'b1',
+    input: '巡检告警',
+    status: 'completed',
+    resultSummary: '{"verdict":"escalate","reason":"3 项任务超时未响应',
+  };
+  assert.equal(extractBotTaskPreview(truncatedJsonTask, '巡检告警'), '3 项任务超时未响应');
+
+  const objectResultTask: BotTaskItem = {
+    id: 't6',
+    targetBotId: 'b1',
+    input: '巡检告警',
+    status: 'completed',
+    result: { summary: '全部节点正常' },
+  };
+  assert.equal(extractBotTaskPreview(objectResultTask, '巡检告警'), '全部节点正常');
 });
 
 test('classifyBotTaskBand and groupBotTasksByBand separate attention, active, and history [AC:bot-tasks-queue-redesign#AC-3]', () => {
@@ -208,4 +240,66 @@ test('formatRelativeTime, getBotInitials, and stepItemId support readable row he
   assert.equal(stepItemId(['a', 'b', 'c'], 'c', 1), null);
   assert.equal(stepItemId(['a', 'b'], null, 1), 'a');
   assert.equal(stepItemId([], null, 1), null);
+
+  const customLabels = relativeTimeLabelsFrom((key, vars) => {
+    if (key === 'botWork.timeJustNow') return 'NOW';
+    if (key === 'botWork.timeMinutesAgo') return `${vars?.count}min`;
+    if (key === 'botWork.timeHoursAgo') return `${vars?.count}hr`;
+    return `${vars?.count}day`;
+  });
+  assert.equal(formatRelativeTime(new Date(NOW - 5_000).toISOString(), 'zh', NOW, customLabels), 'NOW');
+  assert.equal(formatRelativeTime(new Date(NOW - 10 * 60_000).toISOString(), 'zh', NOW, customLabels), '10min');
+  assert.equal(formatRelativeTime(new Date(NOW - 2 * HOURS).toISOString(), 'zh', NOW, customLabels), '2hr');
+  assert.equal(formatRelativeTime(new Date(NOW - 3 * DAYS).toISOString(), 'zh', NOW, customLabels), '3day');
+});
+
+test('filterCollaborations filters groups by query, botId, band, and timeRange [AC:bot-tasks-queue-redesign#AC-3]', () => {
+  const botNames = new Map([
+    ['bot_a', '研发助手'],
+    ['bot_b', '运维专员'],
+  ]);
+  const groups: BotCollaborationGroup[] = [
+    {
+      id: 'c1',
+      goal: '发布前联合回归',
+      status: 'blocked',
+      completed: 1,
+      total: 2,
+      members: [
+        { id: 'm1', targetBotId: 'bot_a', input: '检查接口', status: 'failed', updatedAt: new Date(NOW - 1 * HOURS).toISOString() },
+      ],
+      blockers: [
+        { id: 'm1', targetBotId: 'bot_a', input: '检查接口', status: 'failed', failureReason: '401' },
+      ],
+      deliveries: [],
+    },
+    {
+      id: 'c2',
+      goal: '历史巡检汇总',
+      status: 'completed',
+      completed: 1,
+      total: 1,
+      members: [
+        { id: 'm2', targetBotId: 'bot_b', input: '巡检磁盘', status: 'completed', updatedAt: new Date(NOW - 10 * DAYS).toISOString() },
+      ],
+      blockers: [],
+      deliveries: [],
+    },
+  ];
+
+  assert.equal(classifyCollaborationBand(groups[0]), 'attention');
+  assert.equal(classifyCollaborationBand(groups[1]), 'history');
+
+  assert.deepEqual(
+    filterCollaborations(groups, { query: '', botId: 'bot_b', band: 'all', timeRange: 'all' }, botNames, NOW).map((g) => g.id),
+    ['c2']
+  );
+  assert.deepEqual(
+    filterCollaborations(groups, { query: '', botId: '', band: 'attention', timeRange: 'today' }, botNames, NOW).map((g) => g.id),
+    ['c1']
+  );
+  assert.deepEqual(
+    filterCollaborations(groups, { query: '运维专员', botId: '', band: 'history', timeRange: 'all' }, botNames, NOW).map((g) => g.id),
+    ['c2']
+  );
 });
