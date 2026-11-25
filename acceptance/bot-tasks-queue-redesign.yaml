@@ -1,6 +1,6 @@
 id: bot-tasks-queue-redesign
 title: Bot 任务与任务队列界面主从重构
-status: approved
+status: implemented
 owner: user
 notes: |
   assumedApproval: standing-order-2026-10-22

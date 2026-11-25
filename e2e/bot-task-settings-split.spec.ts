@@ -14,7 +14,7 @@ test('Bot tasks retain existing history and dispatch work from Tasks [AC:bot-ent
   await expect(panel.getByTestId('bot-team-work-lead')).toContainText('功能分组');
   await expect(panel.getByTestId('bot-team-work-lead')).toContainText('群聊');
   await panel.getByRole('button', { name: '详情', exact: true }).click();
-  await expect(panel.getByText('历史结果仍然可读')).toBeVisible();
+  await expect(panel.locator('aside').getByText('历史结果仍然可读')).toBeVisible();
   await panel.getByRole('combobox', { name: '执行 Bot', exact: true }).selectOption('test-bot');
   await panel.getByLabel('工作内容', { exact: true }).fill('新的工作');
   await panel.getByRole('button', { name: '分派任务', exact: true }).click();
