@@ -1080,6 +1080,10 @@
   gap: 14px;
 }
 
+.detailBody > * {
+  flex-shrink: 0;
+}
+
 .versionBar {
   display: flex;
   align-items: center;
@@ -1117,6 +1121,7 @@
 
 /* ── 53798 `.ib-folded` 44px Progressive Disclosure Row ── */
 .foldedRow {
+  flex-shrink: 0;
   border-radius: 9px;
   border: 1px solid var(--ui-home-line, var(--ui-border));
   background: var(--ui-home-panel, var(--ui-surface));

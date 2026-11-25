@@ -585,6 +585,10 @@
   gap: 18px;
 }
 
+.detailBody > * {
+  flex-shrink: 0;
+}
+
 .metaStrip {
   display: flex;
   flex-wrap: wrap;
@@ -716,6 +720,7 @@
 }
 
 .foldedEvent {
+  flex-shrink: 0;
   border-radius: 8px;
   border: 1px solid var(--ui-home-line, var(--ui-border));
   background: var(--ui-home-panel, var(--ui-surface));

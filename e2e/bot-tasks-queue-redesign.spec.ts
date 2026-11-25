@@ -422,6 +422,9 @@ test.describe('Bot Tasks master-detail redesign (#/tasks/bots)', () => {
     const detailAside = panel.locator('aside');
     const rawPromptDetails = detailAside.locator('details').filter({ hasText: '原始任务指令' });
     await expect(rawPromptDetails).toBeVisible();
+    const promptBox = await rawPromptDetails.boundingBox();
+    expect(promptBox).not.toBeNull();
+    expect(promptBox!.height).toBeGreaterThanOrEqual(40);
     await expect(rawPromptDetails).not.toHaveAttribute('open', '');
     await expect(rawPromptDetails).toContainText('展开完整指令');
     await rawPromptDetails.locator('summary').click();
@@ -506,7 +509,7 @@ test.describe('Bot Tasks master-detail redesign (#/tasks/bots)', () => {
     await filterRegion.getByRole('button', { name: /今天/ }).click();
     await expect(panel.locator('article')).toHaveCount(2);
     await filterRegion.getByRole('button', { name: '清除筛选', exact: true }).click();
-    await filterRegion.getByRole('button', { name: '关闭详情', exact: true }).click();
+    await filterRegion.getByRole('button', { name: '关闭', exact: true }).click();
 
     // Quick dispatch still works cleanly
     await panel.getByLabel('执行 Bot', { exact: true }).selectOption('bot-beta');

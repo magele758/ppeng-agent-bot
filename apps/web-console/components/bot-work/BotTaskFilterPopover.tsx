@@ -162,7 +162,7 @@ export function BotTaskFilterPopover({
           </button>
         )}
         <button type="button" className={styles.ghostBtn} onClick={onClose}>
-          {t('botWork.closeDetail')}
+          {t('common.close')}
         </button>
       </div>
     </div>
