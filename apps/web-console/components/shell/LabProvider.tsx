@@ -81,8 +81,13 @@ function applyScrollSnapshot(snap: Record<string, { top: number; left: number }>
 }
 
 export interface JobRow {
+  id?: string;
+  sessionId?: string;
   command?: string;
   status?: string;
+  result?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface WorkspaceRow {

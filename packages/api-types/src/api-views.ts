@@ -108,10 +108,16 @@ export type ApiBotInfo = {
 
 /** Subset of TaskRecord for task list views. */
 export type ApiTaskSummary = {
+  id?: string;
   title: string;
+  description?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
   ownerAgentId?: string;
   sessionId?: string;
+  parentTaskId?: string;
+  blockedBy?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 /** Social queue row for daemon + Ops panel. */
