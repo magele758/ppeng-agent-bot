@@ -157,8 +157,10 @@ export interface ToolExecResult {
   ok: boolean;
   content: string;
   metadata?: Record<string, unknown>;
-  /** Hook asked for approval. The kernel parks and does not persist this row. */
+  /** Hook asked for approval. The kernel parks instead of persisting this row. */
   hold?: 'approval';
+  /** Tool returned a durable park directive. */
+  park?: import('../durable/types.js').ToolParkDirective;
 }
 
 // ============================================================================
@@ -576,6 +578,12 @@ export interface TurnKernelHost {
    * and rollbackUncommitted on abort / uncommitted failure. Host owns EventLog.
    */
   stepTx?: KernelStepTx;
+
+  /**
+   * Optional durable execution control plane (run frames, restart-limit breaker,
+   * checkpointed guard state, and open-wave resume). Omit on legacy/off mode.
+   */
+  durable?: import('../durable/kernel-bridge.js').DurableKernelConfig;
 
   /**
    * Optional working-log tail (full+). Kernel injects it into the view copy

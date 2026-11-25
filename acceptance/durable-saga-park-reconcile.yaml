@@ -1,0 +1,27 @@
+id: durable-saga-park-reconcile
+title: Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Reconcile
+status: implemented
+owner: core
+requirement: "怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；Phase 3 实现持久化声明式 Saga、Pivot 边界守卫、工具级 park()/Signal/memo() 与 unknown 副作用 reconcile() 收敛"
+notes: >-
+  assumedApproval: standing-order-2026-10-22.
+  Phase 3 of the Durable Agent Loop RFC: crash-safe LIFO CompensationSpec runner,
+  external_irreversible Pivot guard, tool-level park()/Signal/memo()/cancel(),
+  and reconcile() convergence with operator resolution endpoints.
+criteria:
+  - id: AC-1
+    given: A durable run with multiple committed external_compensatable steps whose JSON CompensationSpecs are persisted in durable_steps
+    when: Rollback starts, crashes mid-rollback after compensating the last step, and restarts into boot recovery and scheduler tick
+    then: The run remains rolling_back across boot, resumes LIFO compensation on the next tick, skips the already-compensated step, and finishes compensating remaining earlier steps to rolled_back
+  - id: AC-2
+    given: A tool wave containing reversible steps and an external_irreversible Pivot step
+    when: The wave executes and later triggers automatic rollback without force
+    then: The irreversible Pivot step is partitioned after reversible steps, marks passedPivot true on dispatch, and blocks automatic rollback across the Pivot with pivot_blocked
+  - id: AC-3
+    given: A tool using ctx.memo() for idempotency keys and returning a ToolParkDirective waiting on a named signal or deadline
+    when: The run parks in waiting_park, receives a signal (including an early signal delivered before park) or expires its deadline, or is aborted while parked
+    then: api.memo returns first-writer-wins values across restart, signals are consumed once and wake the run, and abort invokes tool.cancel idempotently and expires pending signals
+  - id: AC-4
+    given: A crashed durable run with an unknown step whose tool implements reconcile(), or an unresolvable step requiring human confirmation
+    when: Reconcile runs automatically or via POST /api/sessions/:id/durable/reconcile, or an operator calls POST /api/sessions/:id/durable/steps/:stepId/resolve
+    then: Reconciled committed/not_applied steps converge deterministically without re-executing the tool, and unresolved steps surface in needs_reconcile until manually resolved

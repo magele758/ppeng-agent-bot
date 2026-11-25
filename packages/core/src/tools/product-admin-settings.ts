@@ -23,6 +23,7 @@ import { readSkillProposalSettings, writeSkillProposalSettings } from '../skill-
 import { readSkillSettings, writeSkillSettings } from '../skills/skill-settings.js';
 import { readTeamsDagSettings, writeTeamsDagSettings } from '../teams/settings.js';
 import { readBrowserSettings, writeBrowserSettings } from './browser-settings.js';
+import { resolveExternalAiSettings, writeExternalAiSettings } from './external-ai-settings.js';
 import { readWebSettings, writeWebSettings } from './web-settings.js';
 import { botWorkSettings, updateBotWorkSettings } from '../bots/bot-work.js';
 
@@ -92,6 +93,15 @@ const HANDLERS: Record<string, Handler> = {
     info: { area: 'browser', description: 'Browser tool switch', fields: ['enabled'] },
     read: (store) => readBrowserSettings(store),
     write: (store, patch) => writeBrowserSettings(store, patch)
+  },
+  'external-ai': {
+    info: {
+      area: 'external-ai',
+      description: 'Local coding-agent CLI tools (claude_code, codex_exec, cursor_agent)',
+      fields: ['enabled', 'allowInBotChats', 'preferredTool', 'cursorAgentModel']
+    },
+    read: (store) => resolveExternalAiSettings(store, process.env),
+    write: (store, patch) => writeExternalAiSettings(store, patch, process.env)
   },
   web: {
     info: { area: 'web', description: 'Web search URL template; must contain {query} when set', fields: ['searchUrl'] },

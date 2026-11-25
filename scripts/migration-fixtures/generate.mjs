@@ -48,7 +48,8 @@ export const SNAPSHOT_REVISIONS = [
   { version: 36, ref: '60274e1ee25666cc0ed78c8d6b65de26b3fcdeb0', note: 'approval receipt authorizedBy, before library durable pages (v37)' },
   { version: 37, ref: '3585058b6cfa1efea0d75abf39f3a899e6f6f2e8', note: 'library durable pages, before page revision archive (v38)' },
   { version: 38, ref: 'f704049341272a2556347a6ad3c63f8c2970fed7', note: 'page revision archive, before sidechat annotations (v39)' },
-  { version: 39, ref: '602a5ca708892615e25371c51985e94bcfa9badb', note: 'sidechat annotations, before grasp and one-line notes (v40)' }
+  { version: 39, ref: '602a5ca708892615e25371c51985e94bcfa9badb', note: 'sidechat annotations, before grasp and one-line notes (v40)' },
+  { version: 40, ref: '3247ec33ec380cacfe2d8c666ba6ccae6f59d7fe', note: 'grasp and one-line notes, before durable control plane (v41)' }
 ];
 
 function run(cmd, args, cwd) {

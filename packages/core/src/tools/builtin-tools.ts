@@ -500,6 +500,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     },
     approvalMode: 'auto',
     sideEffectLevel: 'none',
+    effectClass: 'read',
+    replay: 'safe',
     ptc: { kind: 'read' },
     needsApproval: (_context, args) => Boolean(args?.machineId),
     async execute(context, args) {
@@ -601,6 +603,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     },
     approvalMode: 'never',
     sideEffectLevel: 'none',
+    effectClass: 'read',
+    replay: 'safe',
     ptc: { kind: 'read' },
     async execute(context, args) {
       const facts = forkFacts(context);
@@ -658,6 +662,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     },
     approvalMode: 'never',
     sideEffectLevel: 'none',
+    effectClass: 'read',
+    replay: 'safe',
     ptc: { kind: 'read' },
     async execute(context, args) {
       const roots = sandboxWorkspaceRoots(context);
@@ -858,6 +864,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
+    effectClass: 'workspace_fs',
+    replay: 'unsafe',
     async execute(context, args) {
       const target = repoPath(context, args.path);
       let created = false;
@@ -893,6 +901,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
+    effectClass: 'workspace_fs',
+    replay: 'unsafe',
     async execute(context, args) {
       const oldText = args.oldText ?? '';
       if (!oldText) {
@@ -940,6 +950,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
+    effectClass: 'workspace_fs',
+    replay: 'unsafe',
     needsApproval(_context, args) {
       return (
         Boolean(args?.machineId) ||
@@ -1007,6 +1019,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
+    effectClass: 'workspace_fs',
+    replay: 'unsafe',
     needsApproval(_context, args) {
       if (shellCallNeedsDirectApproval(args.isolation, shellIsolationAvailability(getAgentSandbox().kind))) return true;
       const cmd = String(args.verify_command ?? '').trim();
@@ -1557,6 +1571,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
+    effectClass: 'workspace_fs',
+    replay: 'unsafe',
     needsApproval(_context, args) {
       return shellCallNeedsDirectApproval(args.isolation, shellIsolationAvailability(getAgentSandbox().kind));
     },
@@ -1732,6 +1748,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
+    effectClass: 'workspace_fs',
+    replay: 'unsafe',
     async execute(context, args) {
       const target = repoPath(context, args.path);
       if (!target.toLowerCase().endsWith('.ipynb')) {
@@ -1964,7 +1982,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
   if (options.includeDormantCapabilities || a2uiToolsEnabled()) tools.push(a2uiRenderTool, a2uiDeleteSurfaceTool);
 
   if (externalAiToolsEnabled()) {
-    tools.push(...createExternalAiTools());
+    tools.push(...createExternalAiTools({ settingsStore: services.stateStore }));
   }
 
   return stampBuiltinAccess(tools);

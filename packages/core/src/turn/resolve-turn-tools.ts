@@ -47,6 +47,11 @@ import {
   isCanonicalBotChatSession,
   MESSAGE_AGENT_TOOL_NAME
 } from '../tools/message-agent.js';
+import {
+  isBotOwnedCodingSession,
+  isExternalAiAllowedForSession
+} from '../tools/external-ai-settings.js';
+import { installedExternalAiToolNames } from '../tools/external-ai-tools.js';
 
 function searchDynToolsNeeded(
   settingsStore: WebSettingsReadStore | undefined,
@@ -108,9 +113,7 @@ export function authorizeToolsForSession(input: {
 }, reasons?: Map<string,string>): { allowExternalAiTools: boolean; tools: ToolContract<any>[] } {
   let last=input.tools;
   const checkpoint=(next: ToolContract<any>[],reason:string)=>{const kept=new Set(next.map(t=>t.name));for(const t of last)if(!kept.has(t.name)&&!reasons?.has(t.name))reasons?.set(t.name,reason);last=next;};
-  const externalAiCapabilityGate = envBool(input.env, 'RAW_AGENT_EXTERNAL_AI_TOOLS', false);
-  const sessionOptIn = input.session.metadata?.allowExternalAiTools === true;
-  const allowExternalAiTools = externalAiCapabilityGate && sessionOptIn;
+  const allowExternalAiTools = isExternalAiAllowedForSession(input.settingsStore, input.env, input.session);
   const enabled = runtimeCapabilityCheck(input.settingsStore, input.env);
   const availableTools = input.tools.filter(tool => enabled('tools', tool.name));
   const externallyGated = allowExternalAiTools
@@ -209,7 +212,8 @@ function partitionDeferred(
   agent: AgentSpec,
   session: SessionRecord,
   tools: readonly ToolContract<any>[],
-  settingsStore?: WebSettingsReadStore
+  settingsStore?: WebSettingsReadStore,
+  env: NodeJS.ProcessEnv = process.env
 ) {
   const settings=readToolExposure(settingsStore);
   if(settings.mode==='full') return {visible:tools.filter(t=>!['tool_search','load_capability_tool'].includes(t.name)),hidden:[]};
@@ -218,6 +222,11 @@ function partitionDeferred(
     entries.add('bot_delegate');
     entries.add('cron_create');
     entries.add('cron_list');
+  }
+  if (isBotOwnedCodingSession(session) && isExternalAiAllowedForSession(settingsStore, env, session)) {
+    for (const toolName of installedExternalAiToolNames(env)) {
+      entries.add(toolName);
+    }
   }
   const pinned=new Set(Object.hasOwn(settings.pinnedGroups,agent.id) ? settings.pinnedGroups[agent.id] : []);
   return splitDeferredTools({
@@ -236,7 +245,7 @@ export function filterToolsForSession(input: {
   const authorized = authorizeToolsForSession(input);
   return {
     allowExternalAiTools: authorized.allowExternalAiTools,
-    tools: partitionDeferred(input.agent, input.session, authorized.tools, input.settingsStore).visible
+    tools: partitionDeferred(input.agent, input.session, authorized.tools, input.settingsStore, input.env).visible
   };
 }
 
@@ -249,7 +258,7 @@ export function hiddenDeferredToolsForSession(input: {
   settingsStore?: WebSettingsReadStore;
 }): ToolContract<any>[] {
   const authorized = authorizeToolsForSession(input);
-  return partitionDeferred(input.agent, input.session, authorized.tools, input.settingsStore).hidden;
+  return partitionDeferred(input.agent, input.session, authorized.tools, input.settingsStore, input.env).hidden;
 }
 
 /** A Room member turn is the only non-canonical session allowed to call message_agent. */

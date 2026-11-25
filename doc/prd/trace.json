@@ -2138,6 +2138,15 @@
       ]
     },
     {
+      "id": "bot-coding-agent-tools",
+      "title": "Bot 识别并善用本机编程助手处理深度编码任务",
+      "tests": [
+        "apps/daemon/test/external-ai-settings.test.ts",
+        "apps/web-console/components/ExternalAiSettingsCard.test.ts",
+        "packages/core/test/bot-coding-agent-tools.test.js"
+      ]
+    },
+    {
       "id": "bot-completion-reliability",
       "title": "完成验证可追溯与任务收尾可靠性",
       "tests": [
@@ -3189,6 +3198,14 @@
       ]
     },
     {
+      "id": "durable-agent-control-plane",
+      "title": "Durable Agent 控制面持久化与断点续跑",
+      "tests": [
+        "packages/agent-loop/src/durable/durable-control-plane.test.ts",
+        "packages/core/test/durable-control-plane.test.js"
+      ]
+    },
+    {
       "id": "durable-agent-waits",
       "title": "Agent 持久化条件等待与恢复",
       "tests": [
@@ -3215,10 +3232,35 @@
       ]
     },
     {
+      "id": "durable-saga-park-reconcile",
+      "title": "Durable persistent Saga LIFO compensation, Pivot guard, Park/Signal/Memo, and Reconcile",
+      "tests": [
+        "packages/agent-loop/src/durable/durable-saga-park-reconcile.test.ts",
+        "packages/core/test/durable-saga-park-reconcile.test.js"
+      ]
+    },
+    {
+      "id": "durable-tx-tree-and-ui",
+      "title": "Durable ownership tree, orphan abandonment, and Lab settings & time-travel UI",
+      "tests": [
+        "apps/daemon/test/durable-routes.test.ts",
+        "apps/web-console/lib/durable.test.ts",
+        "packages/agent-loop/src/durable/durable-ownership-tree.test.ts",
+        "packages/core/test/durable-ownership-tree.test.js"
+      ]
+    },
+    {
       "id": "durable-wait-default",
       "title": "Durable wait is the default Goal/Routine park path",
       "tests": [
         "packages/core/test/durable-wait-default.test.js"
+      ]
+    },
+    {
+      "id": "durable-workspace-rollback",
+      "title": "Durable WorkspaceTx physical atomic rollback and cognitive-preservation folding",
+      "tests": [
+        "packages/core/test/durable-workspace-rollback.test.js"
       ]
     },
     {

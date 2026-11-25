@@ -82,6 +82,7 @@ import { tryGoalStore } from '../goal/goal-store.js';
 import {
   createKernelHookRegistry,
   createStreamResetTracker,
+  readDurableSettings,
   recoveryPolicyEnabled,
   reasoningSpinWatchdogEnabled,
   registerKernelHooks
@@ -170,6 +171,7 @@ import type { SchedulerTickHost } from './scheduler-host.js';
 export interface L5Bindable {
   goalRuntimeHost?(): GoalRuntimeHost;
   store: SqliteStateStore;
+  workspaceTx?: import('../durable/workspace-tx-manager.js').CompositeWorkspaceTxManager;
   repoRoot: string;
   stateDir: string;
   tools: ToolContract<any>[];
@@ -294,6 +296,9 @@ export function schedulerFrom(rt: L5Bindable): SchedulerTickHost {
     loadRoutineSkill: (name,sessionId) => {rt.promptBuilder.invalidateSkillsCache();return resolveSkillLoad({promptBuilder:rt.promptBuilder,emitTrace:(sid,event)=>rt.emitTrace(sid,event)},name,sessionId);},
     store: rt.store,
     stateDir: rt.stateDir,
+    repoRoot: rt.repoRoot,
+    tools: rt.tools,
+    workspaceTx: rt.workspaceTx,
     log: rt.log,
     cronStore: rt.cronStore,
     setCronStore: (store) => rt.setCronStore(store),
@@ -443,6 +448,9 @@ export function toolLoopDepsFrom(rt: L5Bindable): ToolLoopDeps {
       return r.systemMessage ? { systemMessage: r.systemMessage } : undefined;
     },
     settingsStore: rt.store,
+    durableJournal: rt.store.durableJournal,
+    durableSettingsStore: rt.store,
+    workspaceTx: rt.workspaceTx,
     armUnattendedApproval: (approval) => {
       armUnattendedApprovalExpiry(approval, () => {
         expireDueUnattendedApprovals(rt.store);
@@ -972,6 +980,22 @@ function resolveL5TurnModel(rt: L5Bindable, session: SessionRecord | undefined):
   return resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter);
 }
 
+function readParentDurableRunId(store: SqliteStateStore, sessionId: string): string | undefined {
+  const raw = store.getSession(sessionId)?.metadata?.parentDurableRunId;
+  return typeof raw === 'string' && raw.length > 0 ? raw : undefined;
+}
+
+function buildDurableKernelConfig(rt: L5Bindable): TurnKernelHost['durable'] {
+  const settings = readDurableSettings(rt.store);
+  if (settings.mode === 'off') return undefined;
+  return {
+    journal: rt.store.durableJournal,
+    restartLimit: settings.restartLimit,
+    waveRollbackPolicy: settings.waveRollbackPolicy,
+    resolveParentRunId: (sid) => readParentDurableRunId(rt.store, sid),
+  };
+}
+
 export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
   return {
     store: rt.store,
@@ -1321,6 +1345,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       return { applied: true };
     },
     stepTx: createRuntimeStepTx(rt),
+    durable: buildDurableKernelConfig(rt),
     filterValidToolCalls: (toolCalls, allowExternalAiTools, sessionId, turnTools) =>
       toolLoopFilterValid(toolLoopDepsFrom(rt), toolCalls, allowExternalAiTools, sessionId, turnTools),
     checkToolApprovals: async (
@@ -1521,6 +1546,7 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
       );
     },
     stepTx: host.stepTx,
+    durable: host.durable,
     vault: {
       resolveNamed(refs) {
         return getBoundSecretVault()?.resolveNamed(refs as string[]) ?? {};

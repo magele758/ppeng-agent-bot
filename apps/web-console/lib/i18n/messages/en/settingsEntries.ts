@@ -43,6 +43,28 @@ export const settingsEntries = {
 
   computerUse: {"title": "Local computer use (LCU)", "desc": "Let agents use local desktop apps. Requires LCU and ChatGPT; you decide app access.", "keywords": "LCU desktop computer use screenshot TextEdit", "enabled": "Enable local computer use", "hint": "Disabling hides desktop tools. Conversations have independent approvals; desktop turns are queued. Browser and audio are not enabled."},
   appControl: {"title": "macOS app control", "desc": "Let an agent activate a named Mac app, type into the front app, or send a small set of keys. macOS only.", "keywords": "macOS app control Apple Events Automation keystroke", "enabled": "Enable macOS app control", "hint": "Off by default. The agent can only activate an app, type text, or send return, tab, escape, arrows, copy, and paste. Each action still needs Lab approval. The first use can show the normal macOS permission dialog; this switch does not grant that permission. Other operating systems report that the actions are unavailable."},
+  externalAi: {
+    title: 'Local coding agents',
+    desc: 'Let Bots delegate multi-file refactors, deep debugging, and complex coding tasks to local coding-agent CLIs installed on this machine (Claude Code, Codex, Cursor Agent) instead of grinding inside the Bot loop.',
+    keywords: 'local coding agents external ai claude codex cursor cli deep coding refactor',
+    detectedTitle: 'Detected local CLIs',
+    installed: 'Installed',
+    notInstalled: 'Not installed',
+    enabled: 'Enable local coding-agent tools',
+    enabledHint: 'Off hides all external coding-agent tools. Changes apply on the next turn without restart; ordinary non-bot chats remain isolated and every call still requires approval in auto/ask mode.',
+    allowInBotChats: 'Allow Bots to use for deep coding',
+    allowInBotChatsHint: 'When on, Bots know which local CLIs are installed and prefer delegating complex coding tasks to them (Bot tool allowlists and approval rules still apply).',
+    preferredTool: 'Preferred coding agent',
+    preferredToolHint: 'Guides Bots on which installed coding agent to try first.',
+    preferredAuto: 'Auto (let the Bot choose)',
+    preferredClaude: 'Claude Code (claude_code)',
+    preferredCodex: 'Codex CLI (codex_exec)',
+    preferredCursor: 'Cursor Agent CLI (cursor_agent)',
+    cursorModel: 'Cursor Agent model override',
+    cursorModelHint: 'Leave blank to use env or default composer-2-fast. No spaces.',
+    cursorModelPlaceholder: 'composer-2-fast',
+    cursorModelInvalid: 'Model name must have no spaces and be at most 128 characters'
+  },
   common: {
     saved: 'Saved, takes effect immediately',
     save: 'Save',
@@ -578,6 +600,63 @@ export const settingsEntries = {
       enabled: {
         label: 'Record the session event log',
         hint: 'When off, new events are no longer written; existing records are kept.'
+      }
+    }
+  },
+  durable: {
+    title: 'Durable execution & atomic rollback',
+    keywords: 'durable execution atomic rollback resume checkpoint savepoint git shadow saga reconcile crash recovery',
+    desc: 'Control intent-first tool journaling, workspace atomic rollback, restart recovery policy, and restart circuit breaker. Applies immediately without restart.',
+    fields: {
+      mode: {
+        label: 'Durable mode',
+        hint: 'Controls per-tool intent journaling, crash resume, and physical workspace savepoints.'
+      },
+      workspaceBackend: {
+        label: 'Workspace snapshot backend',
+        hint: 'Auto prefers detached-index Git Shadow and falls back to CAS file journal outside Git repos.'
+      },
+      chatRestartPolicy: {
+        label: 'Chat restart policy',
+        hint: 'How unfinished ordinary chats recover after a daemon restart.'
+      },
+      waveRollbackPolicy: {
+        label: 'Wave error rollback policy',
+        hint: 'By default ordinary tool failures keep files in place so the agent can inspect and fix them.'
+      },
+      isolateLongTasks: {
+        label: 'Isolate long tasks',
+        hint: 'Run long autonomous tasks in an APFS CoW or Git worktree isolated copy.'
+      },
+      restartLimit: {
+        label: 'Restart circuit limit',
+        hint: 'Trips into failed once consecutive crashes reach this limit to prevent restart loops.'
+      },
+      savepointTimeoutMs: {
+        label: 'Savepoint timeout (ms)',
+        hint: 'Falls back cleanly if taking a workspace savepoint exceeds this latency budget.'
+      }
+    },
+    options: {
+      mode: {
+        atomic_workspace: 'Full (journal + atomic workspace rollback)',
+        journal_only: 'Journal only (no workspace savepoints)',
+        off: 'Off'
+      },
+      workspaceBackend: {
+        auto: 'Auto',
+        git_shadow: 'Git Shadow index',
+        cow: 'APFS CoW / Worktree clone',
+        cas_file: 'CAS file journal'
+      },
+      chatRestartPolicy: {
+        auto_resume: 'Auto resume',
+        park_resumable: 'Park for manual resume',
+        legacy_fail: 'Mark failed on restart'
+      },
+      waveRollbackPolicy: {
+        abort_or_tx_only: 'Only on abort or explicit tx failure',
+        on_tool_error: 'Auto rollback on tool error'
       }
     }
   },

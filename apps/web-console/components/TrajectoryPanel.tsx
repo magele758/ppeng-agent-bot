@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { seedDetailsOpen } from '@/lib/seed-details-open';
+import { DurableTimelinePanel } from './DurableTimelinePanel';
 
 interface TrajectoryRecord {
   kind: string;
@@ -68,11 +69,17 @@ export function TrajectoryPanel({ sessionId }: { sessionId: string | null }) {
     return <div className="empty-hint">{err}</div>;
   }
   if (!data || data.turns.length === 0) {
-    return <div className="empty-hint">{t('ops.eventLogEmpty')}</div>;
+    return (
+      <div className="traj-panel" role="region" aria-label={t('ops.eventLogAria')}>
+        <DurableTimelinePanel sessionId={sessionId} />
+        <div className="empty-hint">{t('ops.eventLogEmpty')}</div>
+      </div>
+    );
   }
 
   return (
     <div className="traj-panel" role="region" aria-label={t('ops.eventLogAria')}>
+      <DurableTimelinePanel sessionId={sessionId} />
       <p className="muted small">{t('ops.eventLogHint')}</p>
       {data.turns.map((turn, idx) => {
         const statusLabel = turn.status

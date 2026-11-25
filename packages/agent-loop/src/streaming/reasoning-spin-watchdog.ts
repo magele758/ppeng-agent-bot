@@ -91,4 +91,8 @@ export class ReasoningSpinWatchdog {
   reset(): void {
     this.consecutiveNoProgress = 0;
   }
+
+  restoreStreak(streak: number): void {
+    this.consecutiveNoProgress = Math.max(0, Math.floor(streak));
+  }
 }

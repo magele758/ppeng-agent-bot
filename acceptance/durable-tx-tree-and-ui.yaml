@@ -1,0 +1,24 @@
+id: durable-tx-tree-and-ui
+title: Durable ownership tree, orphan abandonment, and Lab settings & time-travel UI
+status: implemented
+owner: core
+requirement: "怎么让当前系统的agent loop可以做到durable，比如操作的原子化回滚；Phase 4 实现父子 Subagent 所有权树级联取消与重启孤儿收敛，以及 Lab 控制台热配置卡片和会话 Checkpoint 时间旅行与 Reconcile 人工确认面板"
+notes: >-
+  assumedApproval: standing-order-2026-10-22.
+  Phase 4 of the Durable Agent Loop RFC: hierarchical durable ownership tree
+  with bottom-up completing cancellation, boot-time orphan child abandonment,
+  Lab Behavior settings card for durable_settings, and Lab Trajectory checkpoint
+  timeline + rollback/fork/reconcile/resolve panel with full zh/en i18n.
+criteria:
+  - id: AC-1
+    given: A durable parent run spawns one or more nested child subagent runs linked via parentRunId
+    when: The parent session is cancelled or crashes into a terminal state and the runtime reboots
+    then: Parent cancellation transitions through completing, cancels descendant runs bottom-up before settling the parent aborted, and boot recovery abandons orphaned active child runs of terminal parents with abandoned_on_restart
+  - id: AC-2
+    given: The Lab web console Behavior settings category
+    when: The user opens Durable Execution settings and updates mode, workspaceBackend, chatRestartPolicy, waveRollbackPolicy, isolateLongTasks, restartLimit, or savepointTimeoutMs
+    then: DurableSettingsCard loads and saves via GET/PATCH /api/durable/settings with complete zh/en i18n keys and zero hardcoded user-facing copy
+  - id: AC-3
+    given: A session with durable runs, steps, child runs, or unknown/compensation_failed steps in the Lab Trajectory panel
+    when: The user inspects the Durable Timeline panel and triggers rollback, fork, reconcile, or manual step resolution
+    then: DurableTimelinePanel renders run summary (status, passedPivot, restarts, child runs) and step timeline in zh/en and invokes /durable/rollback, /durable/fork, /durable/reconcile, and /durable/steps/:stepId/resolve

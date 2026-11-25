@@ -40,6 +40,28 @@ export const settingsEntries = {
 
   computerUse: {"title": "本机桌面操作（LCU）", "desc": "让 Agent 使用本机桌面应用。需要已安装 LCU 和 ChatGPT，应用授权由你决定。", "keywords": "LCU 桌面 电脑操作 截图 TextEdit", "enabled": "启用本机桌面操作", "hint": "关闭后不再暴露桌面工具。每个对话独立授权，同一桌面按回合排队；浏览器和音频未启用。"},
   appControl: {"title": "macOS 应用控制", "desc": "让 Agent 激活本机应用、向当前应用输入文字，或发送少量按键。仅 macOS。", "keywords": "macOS 应用控制 Apple Events 自动化 按键", "enabled": "启用 macOS 应用控制", "hint": "默认关闭。打开后只能激活应用、输入文字，或发送回车、Tab、Esc、方向键、拷贝和粘贴。每次动作仍需在 Lab 批准。首次使用时 macOS 可能弹出权限询问，这个开关不会预先授权。其它系统会提示不可用。"},
+  externalAi: {
+    title: '本机编程助手',
+    desc: '让 Bot 在面对多文件重构、深度调试或复杂编码任务时，委派给本机已安装的编程助手 CLI（Claude Code / Codex / Cursor Agent），避免在 Bot 对话循环里硬扛复杂改动。',
+    keywords: '本机编程助手 外部编程助手 coding agent claude codex cursor cli 深度编码 重构',
+    detectedTitle: '本机检测到的 CLI',
+    installed: '已安装',
+    notInstalled: '未安装',
+    enabled: '启用本机编程助手工具',
+    enabledHint: '关闭时工具不可见。打开后保存立即生效，无需重启；普通非 Bot 会话仍默认隔离，每次调用在自动/询问模式下仍需人工批准。',
+    allowInBotChats: '允许 Bot 聊天自动使用',
+    allowInBotChatsHint: '开启后，Bot 会知晓本机已安装的编程助手并优先把复杂编码任务委派给它们（仍遵守 Bot 工具白名单与人工审批）。',
+    preferredTool: '优先使用的编程助手',
+    preferredToolHint: '本机装有多个编程助手时，引导 Bot 优先选用的工具。',
+    preferredAuto: '自动选择（由 Bot 按任务决定）',
+    preferredClaude: 'Claude Code (claude_code)',
+    preferredCodex: 'Codex CLI (codex_exec)',
+    preferredCursor: 'Cursor Agent CLI (cursor_agent)',
+    cursorModel: 'Cursor Agent 模型覆盖',
+    cursorModelHint: '留空使用环境变量或默认值 composer-2-fast；不能包含空格。',
+    cursorModelPlaceholder: 'composer-2-fast',
+    cursorModelInvalid: '模型名不能包含空格且不超过 128 字符'
+  },
   common: {
     saved: '已保存，立即生效',
     save: '保存',
@@ -575,6 +597,63 @@ export const settingsEntries = {
       enabled: {
         label: '记录会话事件日志',
         hint: '关闭后，新的事件不再写入日志，已有记录保留。'
+      }
+    }
+  },
+  durable: {
+    title: '持久执行与原子回滚（Durable）',
+    keywords: 'durable 持久执行 原子回滚 断点续跑 checkpoint savepoint git shadow saga reconcile 崩溃恢复',
+    desc: '控制单工具落盘、工作区原子回滚、进程重启恢复策略与熔断上限。保存后立即生效，无需重启。',
+    fields: {
+      mode: {
+        label: '持久执行模式',
+        hint: '控制工具调用的意图先写、崩溃续跑与工作区物理快照能力。'
+      },
+      workspaceBackend: {
+        label: '工作区快照后端',
+        hint: '自动模式优先使用独立索引 Git Shadow，非 Git 目录回退到 CAS 文件日志。'
+      },
+      chatRestartPolicy: {
+        label: '重启后恢复策略',
+        hint: '进程意外重启后，对未完成普通对话的默认处理方式。'
+      },
+      waveRollbackPolicy: {
+        label: '工具报错回滚策略',
+        hint: '默认普通工具报错不自动回滚，保留现场便于 Agent 观察和修复。'
+      },
+      isolateLongTasks: {
+        label: '长任务隔离副本',
+        hint: '为长时间自主任务启用 APFS CoW / Git Worktree 隔离工作区副本。'
+      },
+      restartLimit: {
+        label: '最大崩溃重启次数',
+        hint: '同一运行连续崩溃达到上限后触发熔断，避免无限重启循环。'
+      },
+      savepointTimeoutMs: {
+        label: '快照超时上限（毫秒）',
+        hint: '单次工作区 Savepoint 超出该预算后自动降级，避免拖慢主循环。'
+      }
+    },
+    options: {
+      mode: {
+        atomic_workspace: '完整模式（日志 + 工作区原子回滚）',
+        journal_only: '仅控制面日志（不建工作区快照）',
+        off: '关闭'
+      },
+      workspaceBackend: {
+        auto: '自动选择',
+        git_shadow: 'Git Shadow 独立索引',
+        cow: 'APFS CoW / Worktree 副本',
+        cas_file: 'CAS 文件日志'
+      },
+      chatRestartPolicy: {
+        auto_resume: '自动续跑',
+        park_resumable: '挂起等待人工继续',
+        legacy_fail: '标记为中断失败'
+      },
+      waveRollbackPolicy: {
+        abort_or_tx_only: '仅在取消/事务失败时回滚',
+        on_tool_error: '工具报错即自动回滚'
       }
     }
   },

@@ -11,6 +11,7 @@ import { resolveSessionMaxTurns } from '../runtime/session-max-turns.js';
 import { envBool, envInt } from '../env.js';
 import { createId } from '../id.js';
 import { STABLE_SYSTEM_VERSION, type PromptContext } from '../model/prompt-builder.js';
+import { isExternalAiAllowedForSession } from '../tools/external-ai-settings.js';
 import { foldGoalJudgeSnapshot } from './goal-snapshot.js';
 import {
   lifecycleBlocks,
@@ -849,8 +850,7 @@ remaining = unmatchedToolCallsFromFold(
           host.store.foldMessages(sid),
           interrupt.toolCallIds.filter((id: string) => !interrupt.executedToolCallIds.includes(id))
         );
-sessionOptIn = context.session.metadata?.allowExternalAiTools === true;
-allowExt = envBool(process.env, 'RAW_AGENT_EXTERNAL_AI_TOOLS', false) && sessionOptIn;
+allowExt = isExternalAiAllowedForSession(host.store, process.env, context.session);
 if (remaining.length > 0) {
           const parked = await continueResumedToolWave({
             host,

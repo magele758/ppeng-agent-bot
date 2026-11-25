@@ -15,6 +15,7 @@ import { botFinishRoutes } from './routes/bot-finish.js';
 import { botHistoryRoutes } from './routes/bot-history.js';
 import { computerUseRoutes } from './routes/computer-use.js';
 import { appControlRoutes } from './routes/app-control.js';
+import { externalAiRoutes } from './routes/external-ai.js';
 import { connectorRoutes } from './routes/connectors.js';
 /**
  * Daemon HTTP application: route registry + auth pipeline, without listening
@@ -51,6 +52,7 @@ import { goalRoutes } from './routes/goals.js';
 import { jevRoutes } from './routes/jev.js';
 import { langfuseRoutes } from './routes/langfuse.js';
 import { loopRoutes } from './routes/loop.js';
+import { durableRoutes } from './routes/durable.js';
 import { inputSuggestionRoutes } from './routes/input-suggestion.js';
 import { approvalExplanationRoutes } from './routes/approval-explanation.js';
 import { obsidianRoutes } from './routes/obsidian.js';
@@ -133,6 +135,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(cronRoutes(runtime))
     .addAll(configRoutes(runtime, { ...deps.config, env, repoRoot }))
     .addAll(loopRoutes(runtime))
+    .addAll(durableRoutes(runtime))
     .addAll(inputSuggestionRoutes(runtime))
     .addAll(sessionRecapRoutes(runtime))
     .addAll(obsidianRoutes(runtime))
@@ -158,6 +161,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(capabilitiesRoutes(runtime))
     .addAll(computerUseRoutes(runtime))
     .addAll(appControlRoutes(runtime))
+    .addAll(externalAiRoutes(runtime, env))
     .addAll(connectorRoutes(runtime))
     .addAll(modelProviderRoutes(runtime))
     .addAll(modelFallbackRoutes(runtime))
