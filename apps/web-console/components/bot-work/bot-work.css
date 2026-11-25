@@ -1,4 +1,3 @@
-[data-testid="bot-team-work"],
 [data-testid="bot-rooms"],
 [data-testid="bot-history"],
 [data-testid="bot-memory"],
@@ -6,20 +5,16 @@
   margin-block: 1rem;
   min-width: 0;
 }
-[data-testid^="bot-"] form {
+[data-testid^="bot-"]:not([data-testid="bot-team-work"]) form {
   display: grid;
   gap: 0.65rem;
 }
-[data-testid="bot-team-work"] label,
 [data-testid="bot-rooms"] label,
 [data-testid="bot-history"] label,
 [data-testid="bot-connections"] label {
   display: grid;
   gap: 0.3rem;
 }
-[data-testid="bot-team-work"] input,
-[data-testid="bot-team-work"] select,
-[data-testid="bot-team-work"] textarea,
 [data-testid="bot-rooms"] input,
 [data-testid="bot-rooms"] select,
 [data-testid="bot-rooms"] textarea,
@@ -36,7 +31,6 @@
   color: inherit;
   font: inherit;
 }
-[data-testid="bot-team-work"] button,
 [data-testid="bot-rooms"] button,
 [data-testid="bot-history"] button,
 [data-testid="bot-connections"] button,
@@ -49,14 +43,12 @@
   color: inherit;
   cursor: pointer;
 }
-[data-testid="bot-team-work"] button:disabled,
 [data-testid="bot-rooms"] button:disabled,
 [data-testid="bot-history"] button:disabled,
 [data-testid="bot-connections"] button:disabled {
   opacity: 0.55;
   cursor: default;
 }
-[data-testid="bot-team-work"] article,
 [data-testid="bot-rooms"] article,
 [data-testid="bot-history"] article,
 [data-testid="bot-connections"] article,
