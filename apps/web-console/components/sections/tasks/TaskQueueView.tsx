@@ -1,146 +1,134 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useI18n, type MessageKey } from '@/lib/i18n';
-import { EmptyState, SettingsGroup } from '../../ui';
+import { stepItemId } from '@/lib/bot-tasks-view';
+import { useI18n } from '@/lib/i18n';
+import { buildBotNameMap, matchesQueueQuery, type QueueScope } from '@/lib/task-queue-view';
+import type { TaskSummary } from '@/lib/types';
 import { useLab } from '../../shell/LabProvider';
-import { ListFallback } from './ListFallback';
-import { StatusFilterBar } from './StatusFilterBar';
-import { TASK_STATUSES, countByStatus, filterByStatusAndQuery, type StatusFilter } from './task-filters';
-import styles from './tasks.module.css';
+import { TASK_STATUSES, countByStatus, type StatusFilter } from './task-filters';
+import { TaskQueueDetailPane } from './TaskQueueDetailPane';
+import { TaskQueueListPane, type TaskStatusId } from './TaskQueueListPane';
+import {
+  buildVisibleQueueItems,
+  groupIndexedTasks,
+  jobRowKey,
+  matchesJobQuery,
+  matchesScheduleQuery,
+  resolveActiveSelectionKey,
+  taskRowKey,
+  type IndexedJob,
+  type IndexedTask
+} from './task-queue-ui-helpers';
+import styles from './task-queue.module.css';
 
-type TaskStatusId = (typeof TASK_STATUSES)[number];
+function filterTaskEntries(
+  tasks: readonly TaskSummary[],
+  status: StatusFilter<TaskStatusId>,
+  query: string,
+  botNameMap: ReadonlyMap<string, string>
+): IndexedTask[] {
+  const indexed: IndexedTask[] = tasks.map((task, index) => ({ key: taskRowKey(task, index), index, task }));
+  return indexed.filter(
+    ({ task }) => (status === 'all' || task.status === status) && matchesQueueQuery(task, query, botNameMap)
+  );
+}
 
 export function TaskQueueView() {
   const { t } = useI18n();
-  const { tasks, socialSchedules, jobs, listState, openSession } = useLab();
+  const { tasks, socialSchedules, jobs, bots, listState, openSession, loadOverview } = useLab();
+  const [scope, setScope] = useState<QueueScope>('all');
   const [status, setStatus] = useState<StatusFilter<TaskStatusId>>('all');
   const [query, setQuery] = useState('');
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState(false);
 
-  const counts = useMemo(() => countByStatus(tasks, TASK_STATUSES), [tasks]);
-  const visible = useMemo(
-    () => filterByStatusAndQuery(tasks, { status, query }, (task) => [task.title, task.ownerAgentId]),
-    [tasks, status, query]
+  const botNameMap = useMemo(() => buildBotNameMap(bots), [bots]);
+  const statusCounts = useMemo(() => countByStatus(tasks, TASK_STATUSES), [tasks]);
+  const visibleTasks = useMemo(
+    () => filterTaskEntries(tasks, status, query, botNameMap),
+    [tasks, status, query, botNameMap]
   );
-  const statusLabel = (s: StatusFilter<TaskStatusId>) => t(`tasks.status.${s}` as MessageKey);
-  const clearFilters = () => {
+  const groupedTasks = useMemo(() => groupIndexedTasks(visibleTasks), [visibleTasks]);
+  const visibleSchedules = useMemo(
+    () => socialSchedules.filter((item) => matchesScheduleQuery(item, query)),
+    [socialSchedules, query]
+  );
+  const visibleJobs = useMemo<IndexedJob[]>(() => {
+    const fallback = t('tasks.queue.unnamedJob');
+    return jobs
+      .map((job, index) => ({ key: jobRowKey(job, index), index, job }))
+      .filter(({ job }) => matchesJobQuery(job, query, fallback));
+  }, [jobs, query, t]);
+
+  const visibleItems = useMemo(
+    () => buildVisibleQueueItems(scope, groupedTasks, visibleSchedules, visibleJobs),
+    [scope, groupedTasks, visibleSchedules, visibleJobs]
+  );
+  const visibleKeys = useMemo(() => visibleItems.map((item) => item.key), [visibleItems]);
+  const activeKey = useMemo(
+    () => resolveActiveSelectionKey(visibleKeys, selectedKey, dismissed),
+    [visibleKeys, selectedKey, dismissed]
+  );
+  const selectedItem = useMemo(
+    () => visibleItems.find((item) => item.key === activeKey) ?? null,
+    [visibleItems, activeKey]
+  );
+
+  const prevKey = stepItemId(visibleKeys, activeKey, -1);
+  const nextKey = stepItemId(visibleKeys, activeKey, 1);
+
+  const handleSelect = (key: string) => {
+    setSelectedKey(key);
+    setDismissed(false);
+  };
+  const handleStep = (delta: -1 | 1) => {
+    const target = stepItemId(visibleKeys, activeKey, delta);
+    if (target) handleSelect(target);
+  };
+  const handleClose = () => {
+    setSelectedKey(null);
+    setDismissed(true);
+  };
+  const handleClearFilters = () => {
     setStatus('all');
     setQuery('');
   };
+  const handleOpenSession = (sessionId: string) => {
+    void openSession(sessionId, { focusChat: true });
+  };
 
   return (
-    <>
-      <SettingsGroup title={t('tasks.queue.tasksTitle')} description={t('tasks.queue.tasksDesc')}>
-        <ListFallback
-          error={listState.tasks.error}
-          count={tasks.length}
-          empty={<EmptyState title={t('tasks.queue.emptyTitle')} description={t('tasks.queue.emptyDesc')} />}
-        >
-          <>
-            <div className={styles.toolbar}>
-              <input
-                id="taskSearch"
-                className={`input ${styles.search}`}
-                type="search"
-                aria-label={t('tasks.queue.searchLabel')}
-                placeholder={t('tasks.queue.searchPh')}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <StatusFilterBar
-                id="taskStatusFilter"
-                statuses={TASK_STATUSES}
-                active={status}
-                counts={counts}
-                labelOf={statusLabel}
-                onChange={setStatus}
-              />
-            </div>
-            {visible.length === 0 ? (
-              <EmptyState
-                title={t('tasks.queue.noMatchTitle')}
-                description={t('tasks.queue.noMatchDesc')}
-                action={
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>
-                    {t('tasks.clearFilters')}
-                  </button>
-                }
-              />
-            ) : (
-              <div id="listTasks" className={styles.list}>
-                {visible.map((task, i) => (
-                  <div key={`${task.title}-${i}`} className={`list-item ${styles.row}`}>
-                    <div className={styles.rowMain}>
-                      <span className={styles.rowTitle}>{task.title}</span>
-                      <span className={`${styles.status} ${styles[`status${task.status[0].toUpperCase()}${task.status.slice(1)}`] ?? ''}`}>
-                        {statusLabel(task.status)}
-                      </span>
-                    </div>
-                    <div className={styles.rowMeta}>
-                      <span>
-                        {task.ownerAgentId
-                          ? t('tasks.queue.owner', { agent: task.ownerAgentId })
-                          : t('tasks.queue.unassigned')}
-                      </span>
-                      {task.sessionId ? (
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => void openSession(task.sessionId as string, { focusChat: true })}
-                        >
-                          {t('tasks.openSession')}
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        </ListFallback>
-      </SettingsGroup>
-
-      <SettingsGroup title={t('tasks.queue.schedulesTitle')} description={t('tasks.queue.schedulesDesc')} collapsible>
-        <ListFallback
-          error={listState.socialSchedules.error}
-          count={socialSchedules.length}
-          empty={<EmptyState title={t('tasks.queue.schedulesEmptyTitle')} description={t('tasks.queue.schedulesEmptyDesc')} />}
-        >
-          <div id="listSchedules" className={styles.list}>
-            {socialSchedules.map((s) => (
-              <div key={s.taskId} className={`list-item ${styles.row}`}>
-                <div className={styles.rowMain}>
-                  <span className={styles.rowTitle}>{s.title}</span>
-                  <span className={styles.status}>{statusLabel(s.status)}</span>
-                </div>
-                <div className={styles.rowMeta}>
-                  <span>{s.publishAt}</span>
-                  <span>{s.channels.join(', ')}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </ListFallback>
-      </SettingsGroup>
-
-      <SettingsGroup title={t('tasks.queue.jobsTitle')} description={t('tasks.queue.jobsDesc')} collapsible>
-        <ListFallback
-          error={listState.jobs.error}
-          count={jobs.length}
-          empty={<EmptyState title={t('tasks.queue.jobsEmptyTitle')} description={t('tasks.queue.jobsEmptyDesc')} />}
-        >
-          <div id="listJobs" className={styles.list}>
-            {jobs.map((j, i) => (
-              <div key={`job-${i}-${j.command ?? ''}`} className={`list-item ${styles.row}`}>
-                <div className={styles.rowMain}>
-                  <span className={styles.rowTitle}>{j.command || t('tasks.queue.unnamedJob')}</span>
-                  {j.status ? <span className={styles.status}>{j.status}</span> : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </ListFallback>
-      </SettingsGroup>
-    </>
+    <div className={styles.shell} data-testid="task-queue-master-detail">
+      <TaskQueueListPane
+        scope={scope}
+        onScopeChange={setScope}
+        query={query}
+        onQueryChange={setQuery}
+        status={status}
+        onStatusChange={setStatus}
+        statusCounts={statusCounts}
+        totalCounts={{ tasks: tasks.length, schedules: socialSchedules.length, jobs: jobs.length }}
+        visibleTaskCount={visibleTasks.length}
+        groupedTasks={groupedTasks}
+        schedules={visibleSchedules}
+        jobs={visibleJobs}
+        bots={bots}
+        listState={listState}
+        selectedKey={activeKey}
+        onSelect={handleSelect}
+        onClearFilters={handleClearFilters}
+      />
+      <TaskQueueDetailPane
+        item={selectedItem}
+        bots={bots}
+        hasPrev={Boolean(prevKey)}
+        hasNext={Boolean(nextKey)}
+        onStep={handleStep}
+        onClose={handleClose}
+        onOpenSession={handleOpenSession}
+        onRefresh={loadOverview}
+      />
+    </div>
   );
 }
