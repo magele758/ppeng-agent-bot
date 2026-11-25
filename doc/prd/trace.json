@@ -2555,6 +2555,16 @@
       ]
     },
     {
+      "id": "bot-tasks-queue-redesign",
+      "title": "Bot 任务与任务队列界面主从重构",
+      "tests": [
+        "apps/web-console/components/sections/tasks/i18n-sync.test.ts",
+        "apps/web-console/lib/bot-tasks-view.test.ts",
+        "apps/web-console/lib/task-queue-view.test.ts",
+        "e2e/bot-tasks-queue-redesign.spec.ts"
+      ]
+    },
+    {
       "id": "bot-thinking-effort",
       "title": "每个 Bot 的思考力度固定",
       "tests": [

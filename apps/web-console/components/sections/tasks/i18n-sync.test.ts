@@ -18,3 +18,26 @@ test('任务页与知识页文案中英文键完全一致且非空 [AC:console-t
     assert.deepEqual(enKeys, zhKeys, `${ns} keys in sync`);
   }
 });
+
+function assertNonEmptyValues(value: unknown, pathPrefix: string): void {
+  if (typeof value === 'string') {
+    assert.ok(value.trim().length > 0, `${pathPrefix} must be non-empty`);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      assertNonEmptyValues(v, `${pathPrefix}.${k}`);
+    }
+  }
+}
+
+test('Bot 任务与任务队列重构文案中英文键完全一致且均非空 [AC:bot-tasks-queue-redesign#AC-8]', () => {
+  for (const ns of ['botWork', 'tasks'] as const) {
+    const zhKeys = leafKeys(zh[ns]).sort();
+    const enKeys = leafKeys(en[ns]).sort();
+    assert.ok(zhKeys.length > 0, `${ns} has messages`);
+    assert.deepEqual(enKeys, zhKeys, `${ns} zh/en keys match`);
+    assertNonEmptyValues(zh[ns], `zh.${ns}`);
+    assertNonEmptyValues(en[ns], `en.${ns}`);
+  }
+});

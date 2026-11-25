@@ -2252,6 +2252,15 @@ Bot 监督状态新鲜度与回复关联
 - `packages/core/test/bot-supervision-freshness.test.js`
 - `packages/core/test/bot-supervision-runtime.test.js`
 
+### bot-tasks-queue-redesign
+
+Bot 任务与任务队列界面主从重构
+
+- `apps/web-console/components/sections/tasks/i18n-sync.test.ts`
+- `apps/web-console/lib/bot-tasks-view.test.ts`
+- `apps/web-console/lib/task-queue-view.test.ts`
+- `e2e/bot-tasks-queue-redesign.spec.ts`
+
 ### bot-thinking-effort
 
 每个 Bot 的思考力度固定

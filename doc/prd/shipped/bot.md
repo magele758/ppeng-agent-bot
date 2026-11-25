@@ -831,6 +831,11 @@ bypass也要继承
 
 具体线索是，我用科研小助手发送的给RSI的，说是一直在队列里，但是没看到RSIbot执行
 
+## bot-tasks-queue-redesign
+Bot 任务与任务队列界面主从重构
+
+http://localhost:23000/#/tasks/bots 里的bot的任务部分和任务队列部分，你可以参考下http://localhost:53798/#thread=msg_01M7X02GKZRQ24S8ECCEPXY4ZS 他的实现，现在设计的太杂乱了，根本看不清也看不懂
+
 ## bot-thinking-effort
 每个 Bot 的思考力度固定
 
