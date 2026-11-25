@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-11-24T18:39:07.290Z",
-  "reviewNote": "Merged origin/main (PR #573 bot-coding-agent-tools) with Durable Agent Loop Phases 1-4; recomputed sha256 for merged runtime.ts, turn/kernel.ts, turn/host.ts, and durable files. Pairing, lifecycle, restart, and concurrency invariants remain unchanged.",
+  "reviewedAt": "2026-11-25T01:26:15.990Z",
+  "reviewNote": "Merged origin/main (PR #573 bot-coding-agent-tools) with Durable Agent Loop Phases 1-4; recomputed sha256 for merged runtime.ts, turn/kernel.ts, turn/host.ts, and durable files. Pairing, lifecycle, restart, and concurrency invariants remain unchanged. Context Graph v0.2.4 opt-in fail-open compaction adapter (compact-host.ts + cg_compaction trace kind in stores/trace.ts): both ordinary autoCompactSession and canonical bot compactCanonicalBot remain byte-for-byte unchanged when CONTEXT_GRAPH_URL is unset, on pure-chat spans, or on any transport/server fallback; when enabled, pruning clones messages non-mutatingly while preserving original range.older snapshots, replacement seq ranges, SQLite SAVEPOINT bot_summary_publish optimistic lock checks against raw prior summary, tool-call pairing, session lifecycle, restart recovery, and writer concurrency boundaries. No property, case, or threshold was weakened.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -588,7 +588,7 @@
     "packages/core/src/bots/bot-work-restart.ts": "014bda14cb76d8b726e210f77c452035285b31042985b6bf9c8c10c7c5bcf2b3",
     "packages/core/src/runtime/bot-summary-background.ts": "ee6e999d8317ccc649016bbe48521f2b700c521561fe876b48116e02cfc2655f",
     "packages/core/src/runtime/bot-summary-lease.ts": "daa6b860a2453a595c603d7a49e43af2191d252ba450a783b194bfb1870f527c",
-    "packages/core/src/runtime/compact-host.ts": "ba1d8a78aa41be077efbb4955e82bd661fca1c530be226b11e890036ab3cf457",
+    "packages/core/src/runtime/compact-host.ts": "20abe85dd4a26eb2ff68ec3a6915f2d388e0f8afbca59a14a3821ca7c8808e63",
     "packages/core/src/session/compact-summary-deadline.ts": "3d6838a179bbc49d6b7cce9597e2d7766a1e8334baf16c554e6a23ba16964c9d",
     "packages/core/src/tools/tool-search-enhanced.ts": "d1bfa3473a035369f1d9715ee7db99971b4e0dda4aa8f6ef121d375f06557396",
     "packages/core/src/tools/tool-search-ranking.ts": "5d1d46ba001b7a33c2b9b7e4c184d8a75a8009b636b48fe09abf3fffb65ddf0c",

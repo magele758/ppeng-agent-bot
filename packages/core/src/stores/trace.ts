@@ -100,6 +100,8 @@ export type TraceEventKind =
   | 'dyn_tool_promote'
   /** One Jev HTTP decision call (noul / choice) */
   | 'jev_call'
+  /** Context Graph v0.2.4 artifact compaction call outcome */
+  | 'cg_compaction';
 
 export interface TraceEvent {
   ts: string;
