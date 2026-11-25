@@ -3599,6 +3599,11 @@
       "path": "skills/outbound-send/SKILL.md"
     },
     {
+      "name": "password-one",
+      "description": "Blind credential broker workflow via Password One CLI (pw1:// handles). Run authenticated HTTP/CLI calls without ever handling plaintext secrets.",
+      "path": "skills/password-one/SKILL.md"
+    },
+    {
       "name": "payment",
       "description": "Card / CVV payment workflow via secure_form and vault_fill. Load before secure_form/vault_fill when touching cardNumber/CVV/card. Secrets NEVER enter the model; separate from login Secure Form track.",
       "path": "skills/payment/SKILL.md"

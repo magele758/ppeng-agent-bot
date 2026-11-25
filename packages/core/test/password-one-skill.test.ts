@@ -627,3 +627,217 @@ test('tool-loop redacts active SecretVault values on tool return path', async (t
   assert.equal(serialized.includes(b64), false, 'base64 SecretVault token must not persist');
   assert.match(serialized, /\[REDACTED:PW1_BROKER_TOKEN\]/);
 });
+
+test('password-one-client validates URLs, timeouts, maxResponseBytes, headers, auth bindings, exec/scrub/audit args, and ALS token precedence', async () => {
+  // URL validation errors (whitespace baseUrl on resolve returns undefined; createPasswordOneClient calls normalizeBaseUrl)
+  assert.equal(resolvePasswordOneConfig({ baseUrl: '   ', env: {} }), undefined);
+  assert.throws(
+    () => createPasswordOneClient({ baseUrl: '   ', env: {} }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  for (const badUrl of ['not-a-url', 'ftp://127.0.0.1:52342', 'http://user:pass@127.0.0.1:52342']) {
+    assert.throws(
+      () => resolvePasswordOneConfig({ baseUrl: badUrl, env: {} }),
+      (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+    );
+  }
+
+  // Timeout & maxResponseBytes validation
+  assert.throws(
+    () => resolvePasswordOneConfig({ baseUrl: 'http://127.0.0.1:52342', timeoutMs: 0, env: {} }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  assert.throws(
+    () => resolvePasswordOneConfig({ baseUrl: 'http://127.0.0.1:52342', maxResponseBytes: 1.5, env: {} }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+
+  // Header map validation (invalid name + non-string value) and unset URL still validates explicit token/headers
+  assert.throws(
+    () => resolvePasswordOneConfig({ headers: { 'Bad Header': 'ok' }, env: {} }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  assert.throws(
+    () =>
+      resolvePasswordOneConfig({
+        baseUrl: 'http://127.0.0.1:52342',
+        headers: { 'X-Num': 123 as unknown as string },
+        env: {}
+      }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  assert.equal(resolvePasswordOneConfig({ token: 'ok-tok', headers: { 'X-Ok': '1' }, env: {} }), undefined);
+
+  // Explicit empty/whitespace token resolves to undefined; ALS token takes precedence over env
+  assert.equal(resolvePasswordOneConfig({ baseUrl: 'http://127.0.0.1:52342', token: '   ', env: {} })?.token, undefined);
+  await runWithSecretRefs({ PW1_BROKER_TOKEN: 'als-broker-tok' }, async () => {
+    const cfg = resolvePasswordOneConfig({
+      baseUrl: 'http://127.0.0.1:52342',
+      env: { PW1_BROKER_TOKEN: 'env-broker-tok' }
+    });
+    assert.equal(cfg?.token, 'als-broker-tok');
+  });
+
+  // proxyHttp, proxyExec, scrubText, verifyAudit input validation
+  const client = createPasswordOneClient({ baseUrl: 'http://127.0.0.1:52342', token: 'valid-tok', env: {} });
+  await assert.rejects(
+    () => client.proxyHttp({ url: '   ' }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  await assert.rejects(
+    () => client.proxyHttp({ url: 'https://api.example.test', method: 'GET\r\n' }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  await assert.rejects(
+    () =>
+      client.proxyHttp({
+        url: 'https://api.example.test',
+        auth: { type: 'header', headerName: 'Bad Header', secret: 'pw1://a' }
+      }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  await assert.rejects(
+    () =>
+      client.proxyHttp({
+        url: 'https://api.example.test',
+        auth: { type: 'header', headerName: 'X-Api-Key', secret: 'pw1://a', prefix: 'Token \n' }
+      }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  await assert.rejects(
+    () =>
+      client.proxyHttp({
+        url: 'https://api.example.test',
+        auth: { type: 'basic', username: 'user\r\n', secret: 'pw1://a' }
+      }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  await assert.rejects(
+    () =>
+      client.proxyHttp({
+        url: 'https://api.example.test',
+        auth: { type: 'query', paramName: 'key\n', secret: 'pw1://a' }
+      }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  await assert.rejects(
+    () => client.proxyExec({ command: '   ' }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  await assert.rejects(
+    () => client.scrubText(123 as unknown as string),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+  await assert.rejects(
+    () => client.verifyAudit(0),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_INPUT'
+  );
+});
+
+test('password-one-client handles custom headers, auth variants, abort, invalid JSON, declared Content-Length overflow, and network errors', async (t) => {
+  const seenHeaders: Array<Record<string, string | string[] | undefined>> = [];
+  let mode: 'ok' | 'bad_json' | 'declared_huge' | 'non_array_secrets' | 'stall' = 'ok';
+
+  const server = createServer((req, res) => {
+    seenHeaders.push(req.headers);
+    if (mode === 'stall') {
+      return;
+    }
+    if (mode === 'bad_json') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{invalid-json');
+      return;
+    }
+    if (mode === 'declared_huge') {
+      res.writeHead(200, { 'content-type': 'application/json', 'content-length': '9999999' });
+      res.write('{');
+      return;
+    }
+    if (mode === 'non_array_secrets') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        ok: true,
+        result: {
+          status: 200,
+          headers: {},
+          body: 'ok',
+          finalUrl: 'https://api.example.test',
+          redirects: [],
+          redactionsCount: 0,
+          redactedAliases: [],
+          durationMs: 1
+        }
+      })
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  t.after(async () => {
+    server.closeAllConnections?.();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  // Custom headers forwarded while token wins over custom Authorization header; all 3 non-bearer auth types pass validation
+  const client = createPasswordOneClient({
+    baseUrl,
+    token: 'broker-tok-123',
+    headers: { 'X-Trace-Id': 'tr_1', Authorization: 'Bearer spoofed' },
+    env: {}
+  });
+  for (const auth of [
+    { type: 'header' as const, headerName: 'X-Api-Key', secret: 'pw1://k', prefix: 'Key ' },
+    { type: 'basic' as const, username: 'alice', secret: 'pw1://k' },
+    { type: 'query' as const, paramName: 'api_key', secret: 'pw1://k' }
+  ]) {
+    const r = await client.proxyHttp({ url: 'https://api.example.test', method: 'POST', auth });
+    assert.equal(r.status, 200);
+  }
+  assert.equal(seenHeaders[0]?.['x-trace-id'], 'tr_1');
+  assert.equal(seenHeaders[0]?.authorization, 'Bearer broker-tok-123');
+
+  // Non-array secrets defaults cleanly to []
+  mode = 'non_array_secrets';
+  assert.deepEqual(await client.listHandles(), []);
+
+  // Malformed JSON -> INVALID_RESPONSE
+  mode = 'bad_json';
+  await assert.rejects(
+    () => client.listHandles(),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'INVALID_RESPONSE'
+  );
+
+  // Declared Content-Length > maxResponseBytes -> RESPONSE_TOO_LARGE
+  mode = 'declared_huge';
+  await assert.rejects(
+    () => passwordOneListHandles({ baseUrl, token: 'broker-tok-123', maxResponseBytes: 512, env: {} }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'RESPONSE_TOO_LARGE'
+  );
+
+  // In-flight AbortSignal -> ABORTED
+  mode = 'stall';
+  const ac = new AbortController();
+  setTimeout(() => ac.abort(), 15);
+  await assert.rejects(
+    () => passwordOneListHandles({ baseUrl, token: 'broker-tok-123', signal: ac.signal, env: {} }),
+    (err: unknown) => err instanceof PasswordOneClientError && err.code === 'ABORTED'
+  );
+
+  // Connection refused -> NETWORK_ERROR without leaking token
+  const dead = createServer((_req, res) => res.end('{}'));
+  await new Promise<void>((resolve) => dead.listen(0, '127.0.0.1', resolve));
+  const deadPort = (dead.address() as AddressInfo).port;
+  await new Promise<void>((resolve) => dead.close(() => resolve()));
+  await assert.rejects(
+    () => passwordOneListHandles({ baseUrl: `http://127.0.0.1:${deadPort}`, token: 'secret-net-tok', env: {} }),
+    (err: unknown) =>
+      err instanceof PasswordOneClientError &&
+      err.code === 'NETWORK_ERROR' &&
+      !err.message.includes('secret-net-tok')
+  );
+});
